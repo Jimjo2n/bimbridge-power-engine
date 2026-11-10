@@ -18,8 +18,11 @@ jobs:
         with:
           python-version: '3.12'
       - run: python tools/repository/check_repository.py
+      - run: python tools/repository/inspect_history.py
       - name: First-party Python syntax
         run: python -m compileall -q workers/python tools/repository
+      - name: Delivery archive security checks
+        run: python -m unittest discover -s tests/repository -v
       - name: Declared dependency inventory
         run: |
           mkdir -p artifacts

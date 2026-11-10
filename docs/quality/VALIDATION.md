@@ -22,6 +22,8 @@ Native evidence is partial: the report lists passes for PE-01–08 and PE-11, fa
 
 ## Current import
 
+Locally reproduced foundation results are recorded in [FOUNDATION_RECORD.md](FOUNDATION_RECORD.md). They identify the tested source separately from later documentation/tooling changes.
+
 Sanitation and repository preparation produce a different commit from a291cc6. Current checks and hosted runs must name that import's exact SHA. Full native acceptance remains pending. No new Revit session is opened or connected during repository preparation.
 
 ## Release gates

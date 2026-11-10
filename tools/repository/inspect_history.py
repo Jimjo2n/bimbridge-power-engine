@@ -1,32 +1,34 @@
 # SPDX-License-Identifier: GPL-3.0-only
-# SPDX-License-Identifier: GPL-3.0-only
-"""Inspect reachable Git blobs without printing secret values."""
-import json, re, subprocess, sys
+"""Inspect reachable Git blobs without printing sensitive matching values."""
+import io
+import json
+import re
+import subprocess
+import sys
 from pathlib import Path
-root = Path(__file__).resolve().parents[2]
-def git(*args):
-    return subprocess.check_output(["git", "-C", str(root), *args])
+ROOT = Path(__file__).resolve().parents[2]
+def git(*args, data=None):
+    return subprocess.check_output(["git", "-C", str(ROOT), *args], input=data)
 ref = sys.argv[1] if len(sys.argv) > 1 else "HEAD"
 head = git("rev-parse", "--verify", ref + "^{commit}").decode().strip()
-objects = git("rev-list", "--objects", head).decode().splitlines()
+entries = [line.partition(" ") for line in git("rev-list", "--objects", head).decode().splitlines()]
+names = {sha: path for sha, _, path in entries if path}
+object_ids = [sha for sha, _, path in entries if path]
+checks = git("cat-file", "--batch-check=%(objectname) %(objecttype)", data=("".join(x+"\n" for x in object_ids)).encode()).decode().splitlines()
+blobs = [line.split()[0] for line in checks if line.endswith(" blob")]
+raw = io.BytesIO(git("cat-file", "--batch", data=("".join(x+"\n" for x in blobs)).encode()))
 patterns = {
     "private-key": rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
-    "github-token": rb"gh[pousr]_[A-Za-z0-9]{30,}",
+    "github-token": rb"gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}",
     "aws-access-key": rb"AKIA[0-9A-Z]{16}",
 }
 findings = []
-blobs = 0
-for entry in objects:
-    sha, _, path = entry.partition(" ")
-    if not path or git("cat-file", "-t", sha).strip() != b"blob":
-        continue
-    blobs += 1
-    data = git("cat-file", "blob", sha)
-    for name, pattern in patterns.items():
+for _ in blobs:
+    sha, kind, size = raw.readline().decode().split()
+    data = raw.read(int(size)); raw.read(1)
+    for label, pattern in patterns.items():
         if re.search(pattern, data):
-            findings.append({"category":name,"path":path,"blob":sha})
-    if Path(path).suffix.lower() in {".rvt",".rfa",".pdf",".docx",".pfx",".pem",".key"} or Path(path).name.lower() in {"revitapi.dll","revitapiui.dll"}:
-        findings.append({"category":"restricted-or-private-file-review","path":path,"blob":sha})
-result={"head":head,"blobs_checked":blobs,"findings":findings,"limitations":"Heuristic triage only. Does not inspect archives or prove absence of secrets. Review reachable history and dependency notices before upload."}
-print(json.dumps(result, indent=2))
+            findings.append({"category": label, "path": names.get(sha), "blob": sha})
+print(json.dumps({"head": head, "blobs_checked": len(blobs), "findings": findings,
+    "limitations": "Heuristic triage only; current-tree checks also inspect wheel contents. Does not certify absence of all private information."}, indent=2))
 sys.exit(1 if findings else 0)

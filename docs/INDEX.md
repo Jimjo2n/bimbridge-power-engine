@@ -1,6 +1,10 @@
 # Documentation index
 
 ## Current repository guides
+- [Foundation validation record](quality/FOUNDATION_RECORD.md)
+- [Installation and configuration](getting-started/INSTALLATION.md)
+- [CI scope and limitations](quality/CI.md)
+- [Examples](../examples/README.md)
 - [Project overview](PROJECT_OVERVIEW.md)
 - [MCP integration](integrations/MCP.md)
 - [Trust model](security/TRUST_MODEL.md)

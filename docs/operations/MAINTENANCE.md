@@ -9,6 +9,16 @@
 7. Merge only after applicable review and passing checks. An automated agent does not grant itself independent approval.
 8. Keep `0.9.0+commit` during consolidation. Use a release tag only after its defined acceptance gate. Prepare draft releases through [RELEASING.md](../RELEASING.md).
 
+## Automated integrity preflight
+
+The verifier executes Git integrity operations in a temporary private repository; it does not run delivery scripts, installers or Revit. This command shape is implemented by the checked-in tool:
+
+```text
+python tools/repository/verify_delivery.py <delivery.zip> --sha256 <expected-sha256> --commit <full-commit> --bundle <bundle-member-path> --source <source-zip-member-path>
+```
+
+The a291cc6 delivery was verified with this tool: 54 checksums, 381 matching source files and 14 available commits. The tool rejects duplicate/unsafe member names and mismatched hashes or source trees. Its PASS is an integrity result, not permission to upload private data or accept native behavior.
+
 ## Sanitation and history
 
 The original source commit is an external provenance reference for a sanitized import. It cannot retain the same Git commit ID once the tree or parentage changes. The original a291cc6 history is therefore not made recoverable from this hosted repository while the local-only privacy decision remains in effect.
