@@ -258,9 +258,14 @@ namespace PDI.RevitMcp.AgentHost
             // rc1: paginación tipada. Se piden las páginas siguientes hasta tener EXACTAMENTE total filas; si el total cambia entre páginas, se aborta.
             var pages = Arg.GetLong(d, "pages") ?? 1;
             if (pages > MaxPages) { error = "el alcance ocupa " + pages + " páginas (máximo " + MaxPages + "); acótelo"; return null; }
+            // Issue #2: con cursor, las páginas siguientes salen de la misma lectura (misma revisión) sin volver al hilo de Revit.
+            // Sin cursor (add-in anterior o instantánea demasiado grande) se mantiene la paginación clásica con control de total.
+            var cursor = Arg.GetString(d, "cursor");
             for (var pg = 2; pg <= pages && rows.Count < total; pg++)
             {
-                var a2 = new Dictionary<string, object>(a) { ["page"] = (long)pg };
+                var a2 = cursor != null
+                    ? new Dictionary<string, object> { [Wire.DocArg] = _docHandle, ["cursor"] = cursor, ["page"] = (long)pg }
+                    : new Dictionary<string, object>(a) { ["page"] = (long)pg };
                 var r2 = _link.Call(Wire.OpQuery, a2, false);
                 if (r2.Estado != Status.Ok || !(r2.Datos is Dictionary<string, object> d2)) { error = "query página " + pg + ": " + r2.Estado + " " + r2.Aviso; return null; }
                 if (Arg.GetLong(d2, "total") != total) { error = "el total cambió entre páginas (" + total + " → " + Arg.GetLong(d2, "total") + "): el modelo se modificó durante la lectura"; return null; }

@@ -116,6 +116,8 @@ namespace PDI.RevitMcp.Engine
             "where: campo=valor, !=, >, <, >=, <=, ~ (contiene), campo? (no vacío), !campo (vacío). Ej.: where=[\"elev>9\",\"type~LT-06\"].\n" +
             "f: id,cat,fam,type,lvl,ws,elev,mark,comments,host,x,y,z,name,uid,view o cualquier parámetro por nombre.\n" +
             "group_by (hasta 3 campos) cuenta por grupos; count=true sólo el total; page/page_size (máx. 200); since=rev sólo lo cambiado después.\n" +
+            "Varias páginas: la respuesta trae cursor=q…; pida las siguientes con cursor=q… page=N (sin releer el modelo). " +
+            "Si el documento cambió, el cursor se rechaza (conflicto) y hay que repetir la consulta; vence a los 5 min sin uso.\n" +
             "units=mm cambia elev,x,y,z (también en where). full=true no recorta textos.\n" +
             "get ids=… f=*: TODOS los parámetros (instancia y tipo) de hasta 10 elementos; lo común sale una vez en 'comunes'. buscar=texto filtra nombres.";
 

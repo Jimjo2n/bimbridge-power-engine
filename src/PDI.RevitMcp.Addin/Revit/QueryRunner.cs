@@ -29,6 +29,9 @@ namespace PDI.RevitMcp.Addin.Revit
 
         public readonly List<Dictionary<string, object>> Rows = new List<Dictionary<string, object>>();
         public long Rev;
+        /// <summary>Registro de revisiones y handle (dN) del documento leído: ligan el cursor de la instantánea (issue #2).</summary>
+        public VersionRegistry Registry;
+        public string DocId;
         public string Error;
         public string DocumentTitle;
         /// <summary>Total obtenido con GetElementCount (conteo rápido); null si se leyeron los elementos.</summary>
@@ -55,7 +58,9 @@ namespace PDI.RevitMcp.Addin.Revit
 
             if (_candidates == null)
             {
-                Rev = tracker.For(doc)?.Rev ?? 0;
+                Registry = tracker.For(doc);
+                DocId = DocRegistry.Instance.IdOf(doc);
+                Rev = Registry?.Rev ?? 0;
                 _candidates = Collect(doc);
                 if (Error != null) return true;
             }
