@@ -18,7 +18,7 @@ The outer SHA-256 matches the expected value. All 54 listed delivery hashes veri
 
 The report states C# 610/610, Rust 13/13 and Python 29 passed with 2 skipped, plus installer sandbox 31/31. These are historical reported results until independently reproduced.
 
-Native evidence is partial: the report lists passes for PE-01–08 and PE-11, failure for PE-12 (session timeout during an outstanding request), and visual/status controls not tested. Earlier NV-14/15/16 results from another build are not acceptance of a291cc6. Raw reports include private context and remain in the local audit archive.
+Native evidence is partial: the report lists passes for PE-01–06, PE-08 and PE-11. PE-07 points to the mixed benchmark results rather than a blanket PASS. PE-12 fails (session timeout during an outstanding request), and visual/status controls are not tested. Earlier NV-14/15/16 results from another build are not acceptance of a291cc6. Raw reports include private context and remain in the local audit archive.
 
 ## Current import
 
