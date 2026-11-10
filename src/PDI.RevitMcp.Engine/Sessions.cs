@@ -70,6 +70,16 @@ namespace PDI.RevitMcp.Engine
             s.Active > 0 ? "ejecutando" : (now - s.LastSeenUtc).TotalSeconds <= 60 ? "activo" : "inactivo";
     }
 
+    /// <summary>
+    /// Ciclo de vida de la sesión frente al umbral de inactividad (issue #1). La sesión lógica no muere por la duración de una solicitud:
+    /// sólo expira por inactividad cuando no tiene solicitudes en curso. Una conexión rota (EOF/IOException) se cierra siempre; lo que
+    /// estuviera escribiendo conserva su propia evidencia (intención durable, estado desconocido, reconciliación) y nunca se reintenta solo.
+    /// </summary>
+    public static class SessionLifecycle
+    {
+        public static bool ShouldExpireOnIdle(long activeRequests) => activeRequests <= 0;
+    }
+
     /// <summary>Sesión ya cerrada, para el historial del panel (acotado).</summary>
     public sealed class ClosedSession
     {

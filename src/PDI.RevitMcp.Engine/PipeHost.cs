@@ -98,6 +98,8 @@ namespace PDI.RevitMcp.Engine
         private async Task ServeConnection(NamedPipeServerStream stream)
         {
             Session session = null;
+            Task<string> pendingRead = null;
+            string closeReason = null;
             var writeLock = new SemaphoreSlim(1, 1);
             using (var connCts = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token))
             using (stream)
@@ -142,7 +144,22 @@ namespace PDI.RevitMcp.Engine
                     // 2) Peticiones. Sin latido ni petición en HeartbeatTimeoutMs, la sesión se da por muerta.
                     while (!connCts.IsCancellationRequested)
                     {
-                        var text = await ReadWithTimeout(stream, _config.HeartbeatTimeoutMs, connCts).ConfigureAwait(false);
+                        // Issue #1: el umbral de inactividad sólo cierra sesiones OCIOSAS. Con solicitudes en curso se sigue esperando la
+                        // misma lectura: la duración de una escritura no es abandono. Una conexión realmente rota termina la lectura con
+                        // EOF o IOException, y eso sí cierra la sesión (las escrituras en curso quedan con su propia evidencia y su estado).
+                        pendingRead = pendingRead ?? Frame.ReadAsync(stream, connCts.Token);
+                        var waited = await Task.WhenAny(pendingRead, Task.Delay(_config.HeartbeatTimeoutMs, connCts.Token)).ConfigureAwait(false);
+                        if (waited != pendingRead)
+                        {
+                            if (!SessionLifecycle.ShouldExpireOnIdle(session.Active)) continue;
+                            closeReason = "inactividad";
+                            connCts.Cancel();
+                            stream.Dispose();
+                            try { await pendingRead.ConfigureAwait(false); } catch (Exception) { }
+                            break;
+                        }
+                        var text = await pendingRead.ConfigureAwait(false);
+                        pendingRead = null;
                         if (text == null) break;
                         Request req;
                         try { req = Request.FromJson(text); }
@@ -208,7 +225,7 @@ namespace PDI.RevitMcp.Engine
                     connCts.Cancel();
                     if (session != null)
                     {
-                        _sessions.Close(session, lost ? "conexion_cerrada" : "revit_cerrando");
+                        _sessions.Close(session, closeReason ?? (lost ? "conexion_cerrada" : "revit_cerrando"));
                         try { _handler.OnSessionClosed(session); } catch (Exception ex) { _log("OnSessionClosed: " + ex.Message); }
                         _journal?.Log(session.Id, "desconectar", Status.Ok, 0);
                         _log("sesión cerrada: " + session.Id);
