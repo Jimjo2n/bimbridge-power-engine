@@ -1,0 +1,72 @@
+ID,Prioridad,Modulo,Pruebas_aceptacion,Estado_0.5.0,Evidencia,Falta
+R001,P0,Instrucciones,"A01,A02",Hecho,"Instrucciones de ambos perfiles, guías y ventana de ayuda sin exclusividad; esquema real en docs/ESQUEMA_HERRAMIENTAS_*.json",
+R002,P0,Capacidades,"A01,A29","Hecho, sin Revit",ctx devuelve capacidades por tipo de documento y año; docs/MATRIZ_CAPACIDADES.md se genera del código (prueba Capabilities_DocMatchesCode),comprobar ctx en Revit
+R003,P0,Runner API,A02,"Hecho, sin Revit","exec: C# general (expresión, cuerpo, clase) con Roslyn 4.8; pruebas ScriptingTests compilan contra RevitAPI 2022–2026",ejecutarlo dentro de Revit
+R004,P0,Familias,"A03,A04","Hecho, sin Revit","fam, exec y 7 operaciones de plan aceptan RFA; geo y chk responden no_soportado con alternativa",probar con un RFA real
+R005,P0,Identidad,"A06,A25","Hecho, sin Revit",DocTarget fija el documento en todos los tramos; si se cierra → destino_no_disponible,prueba en Revit cambiando de vista a mitad de trabajo
+R006,P0,Conjuntos,A07,Parcial,conjuntos atados a doc dN y título; error si se usan en otro documento (prueba NamedSets_AreBoundToTheirDocument),falta generación y revisión
+R007,P0,Reconexión,A08,"Hecho, sin prueba",el puente fija el pid tras el primer contacto; escrituras fallan con destino_no_disponible si desaparece; lecturas sólo pasan a un único Revit del mismo año y avisan,prueba automatizada del puente con dos instancias
+R008,P0,Familias,"A04,A05","Hecho, sin Revit","abrir (EditFamily), conector/param en el RFA, guardar y cargar con transacciones separadas por documento",caso lavamanos en Revit
+R009,P0,Conectores MEP,A05,"Hecho, sin Revit","act conector crea, adopta o reconcilia por clave (descripción); no duplica",caso lavamanos en Revit
+R010,P0,Conectores MEP,A05,"Hecho, sin Revit","verifica cara, normal, radio, sistema, duplicados; flujo pendiente si no se decide",caso lavamanos en Revit
+R011,P1,Runner API,"A02,A29","Hecho, sin Revit",caché por hash de código+año+add-in+referencias; compilación fuera del hilo de Revit; medido 89–140 ms en caliente,medir dentro de Revit
+R012,P1,Runner API,"A02,A22","Hecho, sin Revit",diagnósticos con línea del script (prueba Errors_PointToTheUsersLine); resultado JSON; excepción con línea,serializador sin probar en Revit
+R013,P1,Compatibilidad Python,"A02,A29",Pendiente,exec es sólo C#; no hay adaptador Python ni helpers pyRevit; declarado en la matriz,decidir si hace falta (IronPython/CPython)
+R014,P1,Unidades,"A05,A17","Hecho, sin prueba","fam exige unidad explícita y distingue radio, diámetro, ancho y alto; nunca supone un valor",prueba unitaria de LengthFeet (vive en el add-in)
+R015,P1,Familias,"A03,A05","Hecho, sin Revit","fam info: tipos, parámetros, fórmulas, GUID, asociaciones; fam param: valor, fórmula, crear, asociar",
+R016,P1,Familias,"A04,A23","Hecho, sin Revit",cargar con IFamilyLoadOptions y relectura de conectores desde el proyecto,
+R017,P1,Trabajos,"A09,A11",Parcial,clave= y tarea= con diario en disco; jobs con tarea no se cancelan al desconectar,faltan checkpoints dentro de un trabajo largo
+R018,P1,Trabajos,"A10,A11",Parcial,"exec declara su Deshacer real (auto=1, grupo=1, ninguna=lo que haga el script)",trabajos reanudables por tramos
+R019,P1,Trabajos,A10,Pendiente,,ceder el hilo entre unidades de escritura
+R020,P1,Trabajos,"A10,A23",Pendiente,,planificador con barreras por documento
+R021,P1,Cancelación,"A09,A10",Parcial,ctx.Cancel / ThrowIfCancelled en exec; plazo del puente cancela dentro de Revit,acuse con estado aplicado por tramo
+R022,P1,Recuperación,"A09,A11","Hecho, prueba unitaria",operación sin fin → interrumpido; no se repite sin reconciliar=si (Journal_InterruptedOperation_NeedsReconcile),probar con Revit cerrado a mitad
+R023,P1,Recuperación,"A09,A11",Parcial,jobs y planes visibles y aplicables por otra conversación con la misma tarea,los conjuntos siguen siendo por conexión
+R024,P1,Idempotencia,"A05,A09,A11",Parcial,claves semánticas en conectores (descripción) y clave= genérica,"claves semánticas de luces, grupos y láminas"
+R025,P1,Conflictos,A12,Hecho (0.4.0),plan/commit conserva diff y conflicto; nada quitado,
+R026,P1,Autorización,A32,Parcial,las instrucciones permiten aplicar sin confirmar por lote si la tarea está autorizada,no hay registro formal de autorización por tarea
+R027,P1,Autorización,A33,"Hecho, sin Revit","Pausa se comprueba antes de cada orden (también exec, fam y doc); Retener devuelve necesita_usuario para exec y familias",
+R028,P1,Documentos,A23,"Hecho, sin Revit","guardar / guardar_como verifican archivo, fecha, tamaño y SHA-256",
+R029,P1,Documentos,A23,"Hecho, sin Revit",sync confirma por evento DocumentSynchronizedWithCentral,
+R030,P1,Documentos,A24,"Hecho, sin Revit","pdf por conjunto u hojas; verifica archivo nuevo, hash y páginas",
+R031,P1,Grupos,"A13,A14",Sin cambios en 0.5.0,group_* de 0.3.0; exec permite estrategias a medida,estrategias tipadas por tipo de grupo
+R032,P1,Grupos,A15,Sin cambios en 0.5.0,,perfil de grupos de Unit Grouping
+R033,P1,Grupos,A14,Sin cambios en 0.5.0,,copia por nivel validada
+R034,P1,Worksets,"A13,A14",Sin cambios en 0.5.0,,verificación de worksets de grupo
+R035,P1,Alojamientos,A16,Sin cambios en 0.5.0,place de 0.3.0,adaptadores por FamilyPlacementType
+R036,P1,Alojamientos,"A16,A18",Sin cambios en 0.5.0,,
+R037,P1,Orientación,A16,Sin cambios en 0.5.0,,validar frente físico (el lavamanos lo pide explícito con frente=)
+R038,P1,Geometría,A17,Sin cambios en 0.5.0,geo montaje con mallas (0.3.0),
+R039,P1,Geometría,"A16,A17",Pendiente,,
+R040,P1,Geometría,A17,Sin cambios en 0.5.0,,
+R041,P1,Geometría,A18,"Hecho, sin Revit",GeoIndex excluye y avisa el vínculo cuya transformación falla,
+R042,P1,Caché,A18,Sin cambios en 0.5.0,,
+R043,P1,QC,A22,Parcial,commit relee lo tocado; exec informa creados/cambiados/borrados por documento,postcondiciones de exec
+R044,P1,QC,"A15,A35","Hecho, prueba unitaria",chk lighting_audit tags=uno|ninguno|ignorar (LightingAudit_TagRuleIsPerTask),
+R045,P1,QC,"A13,A22,A26","Hecho, prueba E2E",completado_con_diferencias; 'parcial:' por orden; act se detiene tras un fallo,
+R046,P1,QC,"A20,A24",Sin cambios en 0.5.0,,
+R047,P1,Plantillas,A20,Sin cambios en 0.5.0,,
+R048,P1,Vistas,A20,Sin cambios en 0.5.0,,
+R049,P1,Vistas,A20,Sin cambios en 0.5.0,,
+R050,P1,Regiones,A21,Sin cambios en 0.5.0,filled_region de 0.3.0,
+R051,P1,Documentación,A24,Pendiente,,las cotas requieren una operación explícita
+R052,P1,Documentación,A15,"Hecho, prueba unitaria",regla de tags por tarea (R044); ningún tag por defecto,
+R053,P1,Documentación,A24,Sin cambios en 0.5.0,sheet_create/sheet_place de 0.3.0,
+R054,P1,Recursos,A19,"Hecho, prueba unitaria",respuestas >12000 caracteres se guardan; res <id> desde= las lee por tramos; límites de plan subidos a 200 ops / 20000 entradas,streaming real
+R055,P1,Resultados,A27,"Hecho, prueba unitaria",handles r… 7 días en disco; el 'sin cambios' del puente trae el handle,
+R056,P1,Resultados,A26,"Hecho, prueba E2E",estado por línea; IsError sólo si fallan todas,
+R057,P1,Metadata MCP,"A01,A26",Hecho,revit es sólo lectura de verdad (fam abrir/conector salen a act); exec/act/commit marcados destructivos,
+R058,P1,Warnings,A28,"Hecho, sin Revit",FailureLog agrupa por FailureDefinitionId con ids,
+R059,P1,Multiversión,A29,Parcial,compila 2022–2026 y los scripts compilan contra cada API,"no se ha ejecutado en 2022, 2023, 2025, 2026"
+R060,P1,Multiversión,A29,Pendiente,,comprobación de métodos en tiempo de ejecución
+R061,P1,Build,A30,Hecho,build.ps1 comprueba $LASTEXITCODE en cada paso; build.sh usa set -e; pruebas después de compilar los add-ins,
+R062,P1,Actualización,A31,"Hecho, prueba unitaria",actualizar conserva enabled=false y las claves extra de Codex (Update_KeepsMcpOff_AndCodexExtraKeys),
+R063,P1,Actualización,"A29,A31",Parcial,MANIFIESTO con SHA-256 de cada archivo; protocolo 2 en el saludo,activación coordinada puente/add-in
+R064,P2,Fuentes,A34,Pendiente,,
+R065,P2,Fuentes,A34,Pendiente,,
+R066,P2,Fuentes,A34,Pendiente,,
+R067,P2,Tareas,"A27,A35",Pendiente,"diario por tarea guarda operaciones, no decisiones",
+R068,P2,Benchmark,"A02,A05,A24",Pendiente,sin Revit no hay benchmark equivalente; sólo mediciones de compilación y de tamaño de herramientas,
+R069,P2,Benchmark,"A09,A24",Pendiente,,
+R070,P2,Documentación,"A01,A29","Hecho, prueba unitaria",matriz generada desde Capabilities.cs y verificada por prueba,
+R071,P2,Entrega,"A29,A30",Hecho,"código fuente, binarios y SHA-256 en el paquete; límites en el informe",

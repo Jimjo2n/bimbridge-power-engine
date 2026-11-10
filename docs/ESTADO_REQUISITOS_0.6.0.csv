@@ -1,0 +1,22 @@
+seccion;requisito;estado;evidencia;pendiente
+3.1;identidad uniforme de documento (handle/ruta/clave/título; ambiguo no elige);implementado;IdentityJournalTests.Resolver_*, NormalizePath_*, UnsavedDocs_*, ReplacedDocument_*;nativo: dos modelos abiertos (PROCEDIMIENTO_0.6.0 §3)
+3.2;máquina de estados y persistencia; regresiones Codex;implementado;TransportRegressionTests (5 casos) + PartialOrUnknown_*, RevertedConfirmed_*;—
+3.3;memoria de trabajo persistente (decisiones, excepciones, artefactos);implementado;TaskEngineTests + Bench_CompactSummary_*;nativo §2.4
+4;motor de tareas largas: unidades, lotes, checkpoints, barreras, reanudar sin duplicar;implementado (motor probado; backend Revit compilado);TaskEngineTests (14) con inyección de fallos;nativo §2 y §3 en 2024 y 2026
+4;caída Revit / bridge / chat / cancelación / pausa;implementado;CrashBetweenCommitAndJournal_*, RevitRestart*_*, Cancel_*, PauseAndClosedDocument_*;nativo §2.3–2.6
+5;ejecutor general + recetas por archivo/nombre con copia y SHA;implementado;ScriptingTests.BuiltInRecipesAndBimHelpers_Compile (5 años), RecipeRegistry;nativo §2, §5, §6
+5;argumentos de archivo/recuperación/barreras llegan al handler;implementado;EndToEndTests (transporte ambos perfiles);—
+6;interfaz de bajo consumo;implementado;bench tokens: compacto 5 herramientas 5 685 caracteres (0.5.0: 5 810); resumen de 1 000 unidades 996 caracteres;tokens reales del cliente (no medidos)
+7.1;grupos: inspección, firma, composición, cambio de tipo con verificación;implementado (API);compila 5 años;nativo §5.6
+7.2;montaje con soporte real (rayos, vínculos), clasificación, transformaciones;implementado;Xform tests + compila;nativo §5.7
+7.3;rango de vista, plantilla, por qué no se ve, filtros por categoría;implementado;VisibilityQc tests + compila;nativo §5.8; plan regions: rango no legible por API pública
+7.4;QC contra manifiesto uno a uno;implementado;QcFixtureTests (fixture D con desviaciones conocidas);nativo §5.1–5.5
+8;save/sync/pdf con evidencia, páginas orientativas;implementado;compila; motor de barreras probado;nativo §2.6, §6
+8;instalador verificable por hash, diagnóstico, conservar config, reversión;implementado;SetupTests.Manifest_*, Diagnose_*, CacheSetup_KeepsCurrentAndPrevious;nativo §0
+9.1;unitarias + transporte;hecho;193 pruebas en verde;—
+9.2;inyección de fallos;hecho en el motor;TaskEngineTests;serialización y fin de worker sólo en el backend Revit (compilado)
+9.3;matriz compilado/simulado/nativo;hecho;docs/MATRIZ_CAPACIDADES.md generada desde el código;—
+9.4;aceptación nativa 2024/2026;NO EJECUTADA;tools/aceptacion/PROCEDIMIENTO_0.6.0.md;requiere el equipo de prueba
+9.5;benchmark equivalente MCP/pyRevit (3 cargas, 1 frío + 10 calientes);arnés listo, NO EJECUTADO;tools/bench_060;requiere el equipo de prueba
+9.6;prueba prolongada;NO EJECUTADA;PROCEDIMIENTO_0.6.0 §8;requiere el equipo de prueba
+9.7;paquete de diagnóstico por tarea;hecho;recoger_evidencia.ps1;—

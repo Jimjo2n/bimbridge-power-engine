@@ -1,0 +1,30 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N8-11",
+ "titulo": "Visibilidad y representación",
+ "estado_inicial": "Copia desechable LOCAL, no workshared, de un modelo público (p. ej. muestra de Autodesk). Revit 2024 con BIMBRIDGE 0.8.0 instalado; config.json niveles RPW.",
+ "variables": {
+  "vista": "id de una vista de planta o RCP con luminarias (o BB-N8-02 RCP)"
+ },
+ "pasos": [
+  {
+   "nombre": "auditoría de luminarias y etiquetas por vista",
+   "op": "check",
+   "args": {
+    "name": "lighting_audit",
+    "views": [
+     "${vista}"
+    ],
+    "tags": "ignorar"
+   }
+  },
+  {
+   "nombre": "captura de la vista",
+   "op": "capture",
+   "args": {
+    "view": "${vista}",
+    "px": 1600
+   }
+  }
+ ]
+}

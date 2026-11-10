@@ -1,0 +1,907 @@
+{
+ "instructions": "Herramientas para leer y, si el usuario lo habilitó, cambiar el modelo de Revit abierto. Empiece con revit_context y catalog. Use query con group_by o count para resúmenes y pida filas sólo si hacen falta; varias lecturas a la vez con lote. Guarde resultados con save_as y reutilícelos con ids=$nombre en vez de repetir ids. Para ver una vista use capture (colorear=categorias distingue luminarias de tomas e interruptores); para señalar elementos al usuario, show. Para cambiar algo: plan → commit (tipado, un Deshacer), exec (C# sobre la API de Revit) o fam/doc_op (familias, conectores, guardar, sync, PDF). Si el usuario autorizó la tarea, aplique sin pedir confirmación por lote; si no, muestre el diff antes del commit. clave= evita repetir una escritura. estado=retenido significa que el cambio espera en la cola de Revit a que el usuario lo aplique: no lo repita. Si una respuesta trae 'estado', lea 'aviso' y siga su indicación. Detalle de cualquier herramienta: guide.",
+ "tools": [
+  {
+   "name": "job",
+   "description": "Seguimiento. job_id: espera el resultado de una revisión larga (hasta ~40 s por llamada) u op=cancel. plan_id: estado del plan (listo, retenido, aplicado, conflicto, revertido, vencido, descartado) u op=drop. Sin ids: lista de esta conversación.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "job_id": {
+      "description": "job_id devuelto por geo o plan (opcional)",
+      "type": "string",
+      "default": null
+     },
+     "plan_id": {
+      "description": "plan_id (opcional)",
+      "type": "string",
+      "default": null
+     },
+     "op": {
+      "description": "status (por defecto), cancel (job) o drop (plan)",
+      "type": "string",
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "plan",
+   "description": "Prepara cambios SIN aplicarlos y devuelve el diff (antes → después) con plan_id. Operaciones tipadas, máx. 200, un plan = un Deshacer. ops: set_param, set_values, set_type_param, change_type, set_elevation, set_workset, set_level, snap_to_surface, move, rotate, mirror, copy, delete, place, tag, tag_move, group_create, ungroup, group_place, view_create, view_set, view_hide, view_override, sheet_create, sheet_place, text_note, filled_region. ids: \"1,2\", $conjunto o @n (lo creado por la op n). Argumentos: guide tema=escritura op=<op>. job_id → job.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "ops": {
+      "description": "[{\"op\":\"set_param\",\"ids\":\"$x\",\"name\":\"Comments\",\"value\":\"REVISAR\"}]"
+     },
+     "summary": {
+      "description": "Resumen corto para el usuario (aparece en la cola de Revit)",
+      "type": "string",
+      "default": null
+     },
+     "doc": {
+      "description": "Documento dN (por defecto el activo)",
+      "type": "string",
+      "default": null
+     },
+     "tarea": {
+      "description": "Tarea autorizada (permite commit tras reconectar)",
+      "type": "string",
+      "default": null
+     }
+    },
+    "required": [
+     "ops"
+    ]
+   },
+   "annotations": {
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "geo",
+   "description": "Geometría real (mallas del modelo y de los vínculos), sin modificar nada. name: montaje (9 puntos contra la cara inferior de lo de arriba: ok, empotrada, flotando, sin_superficie), holgura, choques, cerca, muro, nivel_real, duplicados, cuarto, rango_vista, indice. Devuelve conteos, problemas primero (holguras en pulgadas) y $conjuntos por clase para plan. Si tarda: job_id → job. Repetir sin cambios es instantáneo. Detalle: guide tema=geo.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "description": "Receta",
+      "type": "string"
+     },
+     "cat": {
+      "description": "Categorías (LightingFixtures)",
+      "type": "string",
+      "default": null
+     },
+     "lvl": {
+      "type": "string",
+      "default": null
+     },
+     "ids": {
+      "description": "Ids o $conjunto",
+      "type": "string",
+      "default": null
+     },
+     "ws": {
+      "type": "string",
+      "default": null
+     },
+     "type": {
+      "description": "Familia o tipo (contiene)",
+      "type": "string",
+      "default": null
+     },
+     "contra": {
+      "description": "losas, vigas, columnas, rampas, escaleras, muros, cielos, techos o categorías",
+      "type": "string",
+      "default": null
+     },
+     "vinculos": {
+      "description": "Vínculos (contiene), todos o ninguno",
+      "type": "string",
+      "default": null
+     },
+     "anfitrion": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     },
+     "lado": {
+      "description": "arriba o abajo",
+      "type": "string",
+      "default": null
+     },
+     "puntos": {
+      "description": "1, 5 o 9",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "tol": {
+      "description": "1/16\" por defecto",
+      "type": "string",
+      "default": null
+     },
+     "max": {
+      "description": "30' por defecto",
+      "type": "string",
+      "default": null
+     },
+     "radio": {
+      "description": "cerca/muro, p. ej. 2'",
+      "type": "string",
+      "default": null
+     },
+     "views": {
+      "description": "rango_vista: rcp, rcp_todos, plantas o ids",
+      "type": "string",
+      "default": null
+     },
+     "fuente": {
+      "description": "cuarto: ambos, cuartos o espacios",
+      "type": "string",
+      "default": null
+     },
+     "sub_excluir": {
+      "description": "Subcategorías a ignorar, p. ej. JBox",
+      "type": "string",
+      "default": null
+     },
+     "solo": {
+      "description": "Clase a listar o todos",
+      "type": "string",
+      "default": null
+     },
+     "page": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "page_size": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "units": {
+      "description": "ft o mm",
+      "type": "string",
+      "default": null
+     },
+     "reconstruir": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     }
+    },
+    "required": [
+     "name"
+    ]
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "revit_context",
+   "description": "Estado de Revit: versión, documento activo, usuario, si está modificado, worksharing y rev. Úsela primero. rev cuenta los cambios vistos desde que Revit abrió el modelo (0 = ninguno todavía); sirve para since. Con varios Revit abiertos lista 'instancias'; instancia=<pid o versión, p. ej. 2024> cambia a otro. Detalle de uso: guide.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "instancia": {
+      "description": "pid o versión del Revit a usar cuando hay varios abiertos (opcional)",
+      "type": "string",
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "show",
+   "description": "Muestra elementos al usuario en Revit: los selecciona y encuadra en la vista activa (vista=id cambia antes de vista). No modifica el modelo. Si no se ven en la vista activa, sugiere vistas donde buscarlos.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "ids": {
+      "description": "Ids separados por coma o $conjunto",
+      "type": "string",
+      "default": null
+     },
+     "vista": {
+      "description": "Vista a abrir antes (id, opcional)",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "seleccionar": {
+      "description": "false = no cambiar la selección",
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     },
+     "zoom": {
+      "description": "false = no mover el zoom",
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "capture",
+   "description": "Imagen de una vista de Revit para VERLA (no modifica el modelo). colorear=categorias distingue luminarias (naranja), interruptores (verde), tomas (azul), tableros (magenta)… resaltar=$conjunto (o \"$a=rojo;$b=azul\") marca elementos; encuadre=ids|$conjunto|resaltado recorta a ellos. Devuelve la imagen y una leyenda con lo visible por categoría.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "vista": {
+      "description": "Id de la vista (por defecto la activa)",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "colorear": {
+      "description": "categorias = un color por categoría",
+      "type": "string",
+      "default": null
+     },
+     "resaltar": {
+      "description": "Ids/$conjunto a resaltar; varios grupos con ; y color con =, p. ej. $sin_tag=rojo;$ok=verde",
+      "type": "string",
+      "default": null
+     },
+     "encuadre": {
+      "description": "Recortar a estos ids/$conjunto, o resaltado",
+      "type": "string",
+      "default": null
+     },
+     "px": {
+      "description": "Lado mayor en píxeles, 400–2400 (por defecto 1400)",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "sets",
+   "description": "Conjuntos guardados con save_as. op=list (por defecto) o op=drop con name.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "op": {
+      "description": "list o drop",
+      "type": "string",
+      "default": "list"
+     },
+     "name": {
+      "description": "Nombre del conjunto, p. ej. $l5_perimetro",
+      "type": "string",
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "query",
+   "description": "Consulta elementos sin modificar nada: tabla {total, cols, rows} o {cols, groups} con group_by. Longitudes en pies (units=mm). Indique cat, ids o view. Detalle: guide tema=consulta.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "cat": {
+      "description": "Categorías, p. ej. LightingFixtures,LightingDevices",
+      "type": "string",
+      "default": null
+     },
+     "lvl": {
+      "description": "Niveles por nombre, p. ej. LEVEL05",
+      "type": "string",
+      "default": null
+     },
+     "type": {
+      "description": "Filtro por familia o tipo (contiene)",
+      "type": "string",
+      "default": null
+     },
+     "ws": {
+      "description": "Worksets por nombre",
+      "type": "string",
+      "default": null
+     },
+     "ids": {
+      "description": "Ids \"1,2\" o $conjunto",
+      "type": "string",
+      "default": null
+     },
+     "view": {
+      "description": "Sólo elementos visibles en esta vista (id)",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "where": {
+      "description": "Condiciones: campo=valor, !=, >, <, >=, <=, ~ (contiene), campo? (no vacío), !campo (vacío)",
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": null
+     },
+     "f": {
+      "description": "Campos (por defecto id,fam,type,lvl): cat,ws,elev,mark,comments,host,x,y,z o un parámetro",
+      "type": "string",
+      "default": null
+     },
+     "group_by": {
+      "description": "Agrupar y contar por estos campos (máx. 3)",
+      "type": "string",
+      "default": null
+     },
+     "count": {
+      "description": "true = sólo el total",
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     },
+     "page": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "page_size": {
+      "description": "máx. 200",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "save_as": {
+      "description": "Guardar ids como $nombre",
+      "type": "string",
+      "default": null
+     },
+     "since": {
+      "description": "Sólo elementos cambiados después de esta rev",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "units": {
+      "description": "ft o mm (elev, x, y, z, where)",
+      "type": "string",
+      "default": null
+     },
+     "full": {
+      "description": "textos sin recortar",
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "get",
+   "description": "Detalle de elementos concretos: ids o $conjunto. Por defecto id,cat,fam,type,lvl,ws,elev,mark,host,x,y,z; f para pedir otros parámetros por nombre. f=* = TODOS los parámetros de instancia y de tipo (hasta 10 elementos; lo común una sola vez; buscar filtra nombres).",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "ids": {
+      "description": "Ids separados por coma o $conjunto",
+      "type": "string"
+     },
+     "f": {
+      "description": "Campos o nombres de parámetro, separados por coma; * = todos",
+      "type": "string",
+      "default": null
+     },
+     "page": {
+      "description": "Página (desde 1)",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "units": {
+      "description": "ft (por defecto) o mm",
+      "type": "string",
+      "default": null
+     },
+     "full": {
+      "description": "textos sin recortar",
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     },
+     "buscar": {
+      "description": "Con f=*: sólo parámetros cuyo nombre contenga este texto",
+      "type": "string",
+      "default": null
+     }
+    },
+    "required": [
+     "ids"
+    ]
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "guide",
+   "description": "Guía de uso bajo demanda (no toca Revit). tema: flujo, consulta, catalogo, geo, escritura, captura, lote. Para escritura, op=tag,place… devuelve sólo esas operaciones.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "tema": {
+      "description": "flujo (por defecto), consulta, catalogo, geo, escritura, captura o lote",
+      "type": "string",
+      "default": null
+     },
+     "op": {
+      "description": "Sólo con tema=escritura: operaciones separadas por coma",
+      "type": "string",
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   }
+  },
+  {
+   "name": "docs",
+   "description": "Documentos abiertos en este Revit (proyectos y familias) con su handle dN, tipo, ruta, si está modificado y último guardado/sync.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {}
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "commit",
+   "description": "Aplica un plan ya revisado por el usuario. Si el usuario tiene la cola activa, responde estado=retenido: el cambio espera a que el usuario lo aplique desde Revit; no lo repita. Si algo cambió desde el plan: estado=conflicto y no se aplica nada. Lo creado queda en $creados (y $creados_n por operación); 'verificacion' relee lo tocado.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "plan_id": {
+      "description": "plan_id devuelto por plan",
+      "type": "string"
+     },
+     "clave": {
+      "description": "Clave de idempotencia: con la misma clave no se aplica dos veces",
+      "type": "string",
+      "default": null
+     },
+     "tarea": {
+      "description": "Tarea autorizada",
+      "type": "string",
+      "default": null
+     }
+    },
+    "required": [
+     "plan_id"
+    ]
+   },
+   "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": false
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "exec",
+   "description": "C# sobre la API pública de Revit. Código: expresión, cuerpo con return, o clase con static object Run(ScriptContext ctx). Ya existen doc, uidoc, app, uiapp, args, ctx. modo=consulta (todo se revierte) | ejecutar (tx=auto|grupo|ninguna; ninguna para EditFamily/LoadFamily). Devuelve el valor en JSON, avisos de Revit y qué cambió.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "codigo": {
+      "description": "Código C#",
+      "type": "string",
+      "default": null
+     },
+     "modo": {
+      "description": "consulta | ejecutar",
+      "type": "string",
+      "default": "consulta"
+     },
+     "tx": {
+      "description": "auto | grupo | ninguna",
+      "type": "string",
+      "default": null
+     },
+     "doc": {
+      "description": "Documento dN",
+      "type": "string",
+      "default": null
+     },
+     "args": {
+      "description": "Argumentos (objeto JSON) → args",
+      "default": null
+     },
+     "nombre": {
+      "description": "Script guardado a repetir, o 'lista'",
+      "type": "string",
+      "default": null
+     },
+     "guardar": {
+      "description": "Guardar el código con ese nombre",
+      "type": "string",
+      "default": null
+     },
+     "clave": {
+      "description": "Clave de idempotencia",
+      "type": "string",
+      "default": null
+     },
+     "tarea": {
+      "description": "Tarea autorizada",
+      "type": "string",
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "catalog",
+   "description": "Catálogo del modelo en una llamada, tabla {total, cols, rows}. Detalle: guide tema=catalogo.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "que": {
+      "description": "resumen, categorias, tipos, familias, niveles, vistas, plantillas, laminas, worksets, vinculos o filtros",
+      "type": "string",
+      "default": null
+     },
+     "cat": {
+      "description": "Categorías (tipos y familias), p. ej. LightingFixtures",
+      "type": "string",
+      "default": null
+     },
+     "lvl": {
+      "description": "Niveles (vistas)",
+      "type": "string",
+      "default": null
+     },
+     "tipo": {
+      "description": "Tipo de vista: plano, rcp, seccion, alzado, 3d, leyenda, tabla…",
+      "type": "string",
+      "default": null
+     },
+     "buscar": {
+      "description": "Texto a buscar en cualquier columna",
+      "type": "string",
+      "default": null
+     },
+     "f": {
+      "description": "Parámetros extra (vistas, láminas), p. ej. Sub-Discipline,Set Group",
+      "type": "string",
+      "default": null
+     },
+     "page": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "page_size": {
+      "description": "máx. 200",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "units": {
+      "description": "ft o mm",
+      "type": "string",
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "check",
+   "description": "Revisiones completas en una llamada. name=lighting_audit: luminarias por nivel, workset y tipo; sin tag, tags huérfanos y duplicados por vista (guarda $sin_tag, $tags_huerfanos, $tags_sobrantes). views=rcp añade por cada plano de techo de iluminación (los que ya tienen tags) luminarias, tags y sin_tag_en_vista, estimado por nivel y sin regenerar. exacto=true cuenta lo realmente visible pero regenera cada vista: sólo con pocas vistas (máx. 12).",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "description": "lighting_audit",
+      "type": "string"
+     },
+     "lvl": {
+      "description": "Niveles por nombre, separados por coma (opcional)",
+      "type": "string",
+      "default": null
+     },
+     "views": {
+      "description": "rcp (planos de techo con tags de luminarias), rcp_todos, o ids de vista separados por coma (opcional)",
+      "type": "string",
+      "default": null
+     },
+     "exacto": {
+      "description": "true = luminarias realmente visibles por vista (lento: máx. 12 vistas)",
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     }
+    },
+    "required": [
+     "name"
+    ]
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "fam",
+   "description": "Familias y conectores. accion=info|caras (leen) | abrir (EditFamily → dN) | conector (crea o reconcilia por nombre: sistema, cara, radio/diametro con unidad, flujo) | param (valor/formula, crear, asociar) | cargar (en=dN, sobrescribir=no|valores). Argumentos en 'args' como objeto JSON.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "accion": {
+      "description": "info | caras | abrir | conector | param | cargar",
+      "type": "string"
+     },
+     "args": {
+      "description": "Argumentos, p. ej. {\"nombre\":\"fria\",\"sistema\":\"fria\",\"cara\":\"812:3\",\"radio\":\"6.5mm\"}",
+      "default": null
+     },
+     "doc": {
+      "description": "Documento dN",
+      "type": "string",
+      "default": null
+     },
+     "clave": {
+      "description": "Clave de idempotencia",
+      "type": "string",
+      "default": null
+     }
+    },
+    "required": [
+     "accion"
+    ]
+   },
+   "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "res",
+   "description": "Lee un resultado largo guardado (id r… o b…) por tramos de líneas.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "description": "Id del resultado",
+      "type": "string"
+     },
+     "desde": {
+      "description": "Línea inicial",
+      "type": "integer",
+      "default": 0
+     },
+     "lineas": {
+      "description": "Número de líneas",
+      "type": "integer",
+      "default": 300
+     }
+    },
+    "required": [
+     "id"
+    ]
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "lote",
+   "description": "Varias lecturas en UNA llamada (se ejecutan a la vez): llamadas=[{\"tool\":\"query\",\"cat\":\"LightingFixtures\",\"count\":true},{\"tool\":\"catalog\",\"que\":\"niveles\"}]. Admite revit_context, query, get, catalog, check, geo y sets; máx. 8. Devuelve resultados en el mismo orden.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "llamadas": {
+      "description": "Lista de llamadas: cada una con tool y sus argumentos"
+     }
+    },
+    "required": [
+     "llamadas"
+    ]
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "doc_op",
+   "description": "Operaciones de documento: guardar | guardar_como (como=ruta) | sync (comentario=) | pdf (conjunto= u hojas=, carpeta=, nombre=) | cerrar (guardar=si|descartar=si). Verifica el resultado (archivo, hash, páginas). Argumentos en 'args' como objeto JSON.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "accion": {
+      "description": "guardar | guardar_como | sync | pdf | cerrar",
+      "type": "string"
+     },
+     "args": {
+      "description": "Argumentos (objeto JSON)",
+      "default": null
+     },
+     "doc": {
+      "description": "Documento dN",
+      "type": "string",
+      "default": null
+     },
+     "clave": {
+      "description": "Clave de idempotencia",
+      "type": "string",
+      "default": null
+     }
+    },
+    "required": [
+     "accion"
+    ]
+   },
+   "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  }
+ ]
+}

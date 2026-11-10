@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Add-in de Revit. Se compila una vez por versión:
+      dotnet build -c Release -p:RevitVersion=2024   (net48)
+      dotnet build -c Release -p:RevitVersion=2025   (net8.0-windows)
+    En la PC de desarrollo se puede compilar contra la instalación real:
+      -p:RevitApiDir="C:\Program Files\Autodesk\Revit 2024"
+    Sin eso se usan los paquetes de referencia Nice3point.Revit.Api (sólo para compilar; no se copian ni se distribuyen).
+  -->
+  <PropertyGroup>
+    <RevitVersion Condition="'$(RevitVersion)' == ''">2024</RevitVersion>
+    <TargetFramework Condition="$(RevitVersion) &lt; 2025">net48</TargetFramework>
+    <TargetFramework Condition="$(RevitVersion) &gt;= 2025">net8.0-windows</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AssemblyName>PDI.RevitMcp.Addin</AssemblyName>
+    <RootNamespace>PDI.RevitMcp.Addin</RootNamespace>
+    <DefineConstants>$(DefineConstants);REVIT$(RevitVersion)</DefineConstants>
+    <DefineConstants Condition="$(RevitVersion) &gt;= 2023">$(DefineConstants);REVIT2023_OR_GREATER</DefineConstants>
+    <DefineConstants Condition="$(RevitVersion) &gt;= 2024">$(DefineConstants);REVIT2024_OR_GREATER</DefineConstants>
+    <DefineConstants Condition="$(RevitVersion) &gt;= 2025">$(DefineConstants);REVIT2025_OR_GREATER</DefineConstants>
+    <DefineConstants Condition="$(RevitVersion) &gt;= 2026">$(DefineConstants);REVIT2026_OR_GREATER</DefineConstants>
+    <OutputPath>bin\$(Configuration)\R$(RevitVersion)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <PlatformTarget>x64</PlatformTarget>
+    <!-- versión del paquete de referencia por versión de Revit -->
+    <RevitRefVersion Condition="'$(RevitVersion)' == '2022'">2022.1.80</RevitRefVersion>
+    <RevitRefVersion Condition="'$(RevitVersion)' == '2023'">2023.1.90</RevitRefVersion>
+    <RevitRefVersion Condition="'$(RevitVersion)' == '2024'">2024.3.60</RevitRefVersion>
+    <RevitRefVersion Condition="'$(RevitVersion)' == '2025'">2025.4.60</RevitRefVersion>
+    <RevitRefVersion Condition="'$(RevitVersion)' == '2026'">2026.4.10</RevitRefVersion>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(RevitApiDir)' == ''">
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPI" Version="$(RevitRefVersion)" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPIUI" Version="$(RevitRefVersion)" ExcludeAssets="runtime" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(RevitApiDir)' != ''">
+    <Reference Include="RevitAPI"><HintPath>$(RevitApiDir)\RevitAPI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="RevitAPIUI"><HintPath>$(RevitApiDir)\RevitAPIUI.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="System.Core" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
+  <!-- WPF para las ventanas. Sin UseWPF (no hay XAML): así compila también en Linux sin el SDK de escritorio. -->
+  <ItemGroup Condition="'$(TargetFramework)' != 'net48'">
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WPF" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- recetas\*.cs se compilan en Revit con Roslyn (tarea iniciar receta=…); no forman parte del ensamblado -->
+    <Compile Remove="recetas\**" />
+    <None Include="recetas\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PDI.RevitMcp.Protocol\PDI.RevitMcp.Protocol.csproj" />
+    <ProjectReference Include="..\PDI.RevitMcp.Engine\PDI.RevitMcp.Engine.csproj" />
+    <!-- Buscar instaladores nuevos y leer install.json (botón Actualizar) -->
+    <ProjectReference Include="..\PDI.RevitMcp.Setup.Core\PDI.RevitMcp.Setup.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="PDI.RevitMcp.addin" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

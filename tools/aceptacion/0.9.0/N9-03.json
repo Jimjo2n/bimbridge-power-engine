@@ -1,0 +1,45 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N9-03",
+ "titulo": "Colocación desde PDF en ensayo (aplica, verifica y revierte)",
+ "estado_inicial": "Copia desechable LOCAL, no workshared, de un modelo público o sintético autorizado (p. ej. muestra de Autodesk) con ejes rectos con nombre y una familia de luminaria OneLevelBased cargada. Revit 2024 con BIMBRIDGE 0.9.0 instalado; config.json niveles RPW, perfil laboratorio con la carpeta de la copia en laboratorio.carpetas y carpetas_documentos con la carpeta del PDF de prueba. NUNCA el modelo de trabajo del usuario.",
+ "estado": "BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION",
+ "variables": {
+  "ops": "@<salida de power-engine flujo-pdf>/ops.json"
+ },
+ "pasos": [
+  {
+   "nombre": "plan con las ops del flujo PDF",
+   "op": "plan",
+   "args": {
+    "ops": "${ops}",
+    "summary": "campaña 0.9.0 ensayo"
+   },
+   "guardar": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "nombre": "ensayo",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}",
+    "modo": "ensayo"
+   },
+   "escritura": true,
+   "contiene": [
+    "ensayo"
+   ]
+  },
+  {
+   "nombre": "el modelo no cambió",
+   "op": "query",
+   "args": {
+    "cat": [
+     "LightingFixtures"
+    ],
+    "count": true
+   }
+  }
+ ]
+}

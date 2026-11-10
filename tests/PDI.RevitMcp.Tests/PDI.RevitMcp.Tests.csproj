@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Pruebas sin Revit: motor, protocolo y el puente completo contra un add-in simulado. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="ModelContextProtocol" Version="1.4.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PDI.RevitMcp.Protocol\PDI.RevitMcp.Protocol.csproj" />
+    <ProjectReference Include="..\..\src\PDI.RevitMcp.Engine\PDI.RevitMcp.Engine.csproj" />
+    <ProjectReference Include="..\..\src\PDI.RevitMcp.Setup.Core\PDI.RevitMcp.Setup.Core.csproj" />
+    <ProjectReference Include="..\..\src\PDI.RevitMcp.Bridge\PDI.RevitMcp.Bridge.csproj" />
+    <ProjectReference Include="..\..\src\PDI.RevitMcp.Scripting\PDI.RevitMcp.Scripting.csproj" />
+    <ProjectReference Include="..\..\src\PDI.RevitMcp.AgentHost\PDI.RevitMcp.AgentHost.csproj" />
+    <ProjectReference Include="..\PDI.RevitMcp.LeaseProbe\PDI.RevitMcp.LeaseProbe.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <!-- 0.9.0 Power Engine: biblioteca Rust nativa (si se compiló con cargo) junto a las pruebas, para comparar C# = FFI = IPC. -->
+  <ItemGroup>
+    <None Include="..\..\native\power_engine\target\release\libbimbridge_power_engine.so" Condition="Exists('..\..\native\power_engine\target\release\libbimbridge_power_engine.so')" Link="libbimbridge_power_engine.so" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\native\power_engine\target\release\bimbridge_power_engine.dll" Condition="Exists('..\..\native\power_engine\target\release\bimbridge_power_engine.dll')" Link="bimbridge_power_engine.dll" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

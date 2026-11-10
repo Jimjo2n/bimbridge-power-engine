@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Banco de pruebas de la auditoría (sin Revit): edificio sintético del tamaño de SAMPLE PROJECT (14 niveles, 1442 luminarias),
+    mismo motor que corre dentro de Revit, y tamaños reales de lo que ve la IA (esquemas de herramientas y respuestas).
+      dotnet run -c Release -project tools/PDI.RevitMcp.Bench            → todo
+      dotnet run -c Release -project tools/PDI.RevitMcp.Bench cold       → primera llamada vs. segunda (JIT)
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol" Version="1.4.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PDI.RevitMcp.Protocol\PDI.RevitMcp.Protocol.csproj" />
+    <ProjectReference Include="..\..\src\PDI.RevitMcp.Engine\PDI.RevitMcp.Engine.csproj" />
+    <ProjectReference Include="..\..\src\PDI.RevitMcp.Bridge\PDI.RevitMcp.Bridge.csproj" />
+  </ItemGroup>
+</Project>

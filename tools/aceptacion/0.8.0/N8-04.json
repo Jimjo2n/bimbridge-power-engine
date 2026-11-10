@@ -1,0 +1,153 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N8-04",
+ "titulo": "Dibujo 2D",
+ "estado_inicial": "Copia desechable LOCAL, no workshared, de un modelo público (p. ej. muestra de Autodesk). Revit 2024 con BIMBRIDGE 0.8.0 instalado; config.json niveles RPW.",
+ "variables": {},
+ "pasos": [
+  {
+   "nombre": "vista de dibujo y geometría",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "view_create",
+      "tipo": "dibujo",
+      "nombre": "BB-N8-04 DIBUJO",
+      "escala": 48
+     },
+     {
+      "op": "detail_line",
+      "view": "@1",
+      "puntos": [
+       [
+        0,
+        0
+       ],
+       [
+        10,
+        0
+       ],
+       [
+        10,
+        5
+       ]
+      ]
+     },
+     {
+      "op": "detail_rect",
+      "view": "@1",
+      "esquinas": [
+       [
+        12,
+        0
+       ],
+       [
+        16,
+        2
+       ]
+      ]
+     },
+     {
+      "op": "detail_polygon",
+      "view": "@1",
+      "centro": [
+       20,
+       2
+      ],
+      "radio": 1,
+      "lados": 6
+     },
+     {
+      "op": "detail_arc",
+      "view": "@1",
+      "centro": [
+       25,
+       2
+      ],
+      "radio": "6 in",
+      "inicio": 0,
+      "fin": 180
+     },
+     {
+      "op": "text_note",
+      "view": "@1",
+      "punto": [
+       0,
+       8
+      ],
+      "texto": "BB-N8-04"
+     },
+     {
+      "op": "filled_region",
+      "view": "@1",
+      "puntos": [
+       [
+        0,
+        10
+       ],
+       [
+        4,
+        10
+       ],
+       [
+        4,
+        12
+       ],
+       [
+        0,
+        12
+       ]
+      ]
+     }
+    ],
+    "summary": "campaña 0.8.0"
+   },
+   "guardar": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "nombre": "aplicar",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "escritura": true
+  },
+  {
+   "nombre": "la vista existe",
+   "op": "catalog",
+   "args": {
+    "que": "vistas",
+    "buscar": "BB-N8-04"
+   },
+   "contiene": [
+    "BB-N8-04 DIBUJO"
+   ]
+  },
+  {
+   "nombre": "tramo inválido se rechaza antes de Revit",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "detail_line",
+      "view": 1,
+      "puntos": [
+       [
+        0,
+        0
+       ],
+       [
+        0.001,
+        0
+       ]
+      ]
+     }
+    ]
+   },
+   "esperar": "invalido"
+  }
+ ]
+}

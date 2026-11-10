@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Instalador de doble clic: PDI.RevitMcp.Setup.exe
+    net48 porque viene con Windows 10/11: no hay que instalar nada antes.
+    Lleva dentro payload.zip (add-in 2022-2026 + puente autocontenido), que arma build.sh/build.ps1.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>PDI.RevitMcp.Setup</AssemblyName>
+    <RootNamespace>PDI.RevitMcp.Setup</RootNamespace>
+    <ApplicationIcon>setup.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Description>Instalador de PDI Revit MCP</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="System.Core" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="Microsoft.VisualBasic" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PDI.RevitMcp.Protocol\PDI.RevitMcp.Protocol.csproj" />
+    <ProjectReference Include="..\PDI.RevitMcp.Setup.Core\PDI.RevitMcp.Setup.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Mismo estilo e iconos que el ribbon -->
+    <Compile Include="..\PDI.RevitMcp.Addin\Ui\Theme.cs" Link="Shared\Theme.cs" />
+    <Compile Include="..\PDI.RevitMcp.Addin\Ui\Icons.cs" Link="Shared\Icons.cs" />
+    <EmbeddedResource Include="payload.zip" LogicalName="payload.zip" Condition="Exists('payload.zip')" />
+  </ItemGroup>
+  <!-- Las DLL de Protocol y Setup.Core se incrustan en el .exe para que sea un solo archivo. -->
+  <Target Name="EmbedDeps" AfterTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <EmbeddedResource Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.Extension)' == '.dll'" LogicalName="lib.%(ReferenceCopyLocalPaths.Filename)%(ReferenceCopyLocalPaths.Extension)" />
+    </ItemGroup>
+  </Target>
+</Project>

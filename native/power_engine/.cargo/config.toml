@@ -1,0 +1,4 @@
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"
+# sin dependencias de DLL de MinGW en Windows (libgcc/libwinpthread estáticas)
+rustflags = ["-C", "target-feature=+crt-static"]

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Lógica del instalador, sin Windows ni UI: se prueba en cualquier sistema con carpetas temporales. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PDI.RevitMcp.Protocol\PDI.RevitMcp.Protocol.csproj" />
+  </ItemGroup>
+</Project>

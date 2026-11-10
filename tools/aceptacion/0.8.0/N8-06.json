@@ -1,0 +1,58 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N8-06",
+ "titulo": "Familias externas",
+ "estado_inicial": "Copia desechable LOCAL, no workshared, de un modelo público (p. ej. muestra de Autodesk). Revit 2024 con BIMBRIDGE 0.8.0 instalado; config.json niveles RPW. config.json: carpetas_familias = [carpeta de prueba con un RFA público]; nada corporativo.",
+ "variables": {
+  "consulta": "palabras de búsqueda",
+  "rfa_nombre": "nombre del archivo",
+  "rfa": "ruta completa del RFA (JSON escapado)",
+  "familia": "nombre de la familia"
+ },
+ "pasos": [
+  {
+   "nombre": "buscar en la carpeta autorizada",
+   "op": "fam",
+   "args": {
+    "accion": "buscar",
+    "q": "${consulta}"
+   },
+   "contiene": [
+    "${rfa_nombre}"
+   ]
+  },
+  {
+   "nombre": "ruta fuera de las carpetas se rechaza",
+   "op": "fam",
+   "args": {
+    "accion": "cargar_archivo",
+    "ruta": "C:\\Windows\\fuera.rfa"
+   },
+   "escritura": true,
+   "esperar": "invalido"
+  },
+  {
+   "nombre": "cargar el RFA indexado",
+   "op": "fam",
+   "args": {
+    "accion": "cargar_archivo",
+    "ruta": "${rfa}"
+   },
+   "escritura": true,
+   "contiene": [
+    "sha256"
+   ]
+  },
+  {
+   "nombre": "familia cargada",
+   "op": "catalog",
+   "args": {
+    "que": "familias",
+    "buscar": "${familia}"
+   },
+   "contiene": [
+    "${familia}"
+   ]
+  }
+ ]
+}

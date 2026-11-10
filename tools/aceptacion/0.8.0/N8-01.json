@@ -1,0 +1,47 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N8-01",
+ "titulo": "Identidad correcta de documento",
+ "estado_inicial": "Copia desechable LOCAL, no workshared, de un modelo público (p. ej. muestra de Autodesk). Revit 2024 con BIMBRIDGE 0.8.0 instalado; config.json niveles RPW.",
+ "variables": {
+  "ruta_json": "ruta del .rvt tal como sale en JSON (barras invertidas dobles)"
+ },
+ "pasos": [
+  {
+   "nombre": "contexto",
+   "op": "context",
+   "args": {},
+   "contiene": [
+    "${ruta_json}"
+   ]
+  },
+  {
+   "nombre": "documentos abiertos",
+   "op": "docs",
+   "args": {}
+  },
+  {
+   "nombre": "destino inexistente se rechaza",
+   "op": "query",
+   "args": {
+    "doc": "d999",
+    "cat": [
+     "Walls"
+    ],
+    "count": true
+   },
+   "doc_explicito": true,
+   "esperar": "destino_no_disponible"
+  },
+  {
+   "nombre": "lectura en el documento fijado",
+   "op": "query",
+   "args": {
+    "cat": [
+     "Walls"
+    ],
+    "count": true
+   }
+  }
+ ]
+}

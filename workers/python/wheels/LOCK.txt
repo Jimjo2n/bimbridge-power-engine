@@ -1,0 +1,4 @@
+# Dependencias puras (py3-none-any) del Python Document Worker, fijadas por SHA-256. Licencias: MIT (ambas).
+# Se extraen a power_engine/python/vendor en dist/ (tools/power_engine/vendor_python.py). Un hash distinto detiene la compilación.
+pdfminer_six-20260107-py3-none-any.whl 366585ba97e80dffa8f00cebe303d2f381884d8637af4ce422f1df3ef38111a9
+charset_normalizer-3.5.2-py3-none-any.whl b6b751274acb69d77b3323d6b7dbaa3c7fdfc1eb829b7eb61d262f32e1af9685

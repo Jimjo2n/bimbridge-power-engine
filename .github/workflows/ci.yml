@@ -1,0 +1,40 @@
+name: Windows distribution
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows-build:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Build, offline tests and packaging
+        shell: pwsh
+        run: |
+          rustup default stable-x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw "Rust setup failed" }
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          try { ./build.ps1 -Python (Get-Command python).Source *> artifacts/build.log }
+          catch { Get-Content artifacts/build.log -Tail 80; throw }
+      - name: Preserve bounded-lifetime build log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-build-log
+          path: artifacts/build.log
+          if-no-files-found: ignore
+          retention-days: 7

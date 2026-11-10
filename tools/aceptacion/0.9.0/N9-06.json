@@ -1,0 +1,38 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N9-06",
+ "titulo": "Etiquetado de lo colocado",
+ "estado_inicial": "Copia desechable LOCAL, no workshared, de un modelo público o sintético autorizado (p. ej. muestra de Autodesk) con ejes rectos con nombre y una familia de luminaria OneLevelBased cargada. Revit 2024 con BIMBRIDGE 0.9.0 instalado; config.json niveles RPW, perfil laboratorio con la carpeta de la copia en laboratorio.carpetas y carpetas_documentos con la carpeta del PDF de prueba. NUNCA el modelo de trabajo del usuario.",
+ "estado": "BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION",
+ "variables": {
+  "ids_colocados": "ids de N9-04 separados por comas",
+  "vista": "id del RCP del nivel"
+ },
+ "pasos": [
+  {
+   "nombre": "plan de etiquetas",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "tag",
+      "ids": "${ids_colocados}",
+      "view": "${vista}"
+     }
+    ],
+    "summary": "campaña 0.9.0 etiquetas"
+   },
+   "guardar": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "nombre": "aplicar",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "escritura": true
+  }
+ ]
+}

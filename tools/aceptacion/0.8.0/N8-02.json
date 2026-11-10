@@ -1,0 +1,58 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N8-02",
+ "titulo": "Configuración de vistas y plantillas",
+ "estado_inicial": "Copia desechable LOCAL, no workshared, de un modelo público (p. ej. muestra de Autodesk). Revit 2024 con BIMBRIDGE 0.8.0 instalado; config.json niveles RPW.",
+ "variables": {
+  "nivel": "nombre de un nivel del modelo"
+ },
+ "pasos": [
+  {
+   "nombre": "crear RCP y configurarla",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "view_create",
+      "tipo": "rcp",
+      "nivel": "${nivel}",
+      "nombre": "BB-N8-02 RCP"
+     },
+     {
+      "op": "view_set",
+      "ids": "@1",
+      "detalle": "medio"
+     },
+     {
+      "op": "view_hide",
+      "view": "@1",
+      "cats": "LightingDevices"
+     }
+    ],
+    "summary": "campaña 0.8.0"
+   },
+   "guardar": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "nombre": "aplicar",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "escritura": true
+  },
+  {
+   "nombre": "la vista existe",
+   "op": "catalog",
+   "args": {
+    "que": "vistas",
+    "buscar": "BB-N8-02"
+   },
+   "contiene": [
+    "BB-N8-02 RCP"
+   ]
+  }
+ ]
+}

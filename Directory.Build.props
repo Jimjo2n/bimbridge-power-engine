@@ -1,0 +1,15 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Company>BIMBRIDGE</Company>
+    <Product>BIMBRIDGE (PDI Revit MCP)</Product>
+    <Version>0.9.0</Version>
+    <InformationalVersion>0.9.0</InformationalVersion>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- sin rutas de la máquina de compilación dentro de las DLL (pdb) -->
+    <PathMap>$(MSBuildThisFileDirectory)=/pdi-revit-mcp/</PathMap>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+</Project>

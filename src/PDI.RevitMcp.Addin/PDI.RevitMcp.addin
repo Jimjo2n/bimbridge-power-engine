@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copiar a %APPDATA%\Autodesk\Revit\Addins\<versión>\ junto con la carpeta PDI.RevitMcp\
+  (o pedir a IT que lo despliegue). Assembly es relativo a este archivo.
+-->
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>BIMBRIDGE - Power Engine</Name>
+    <Assembly>PDI.RevitMcp\PDI.RevitMcp.Addin.dll</Assembly>
+    <AddInId>6F1C2B7E-4D0A-4E8B-9C3D-1A2B3C4D5E6F</AddInId>
+    <FullClassName>PDI.RevitMcp.Addin.App</FullClassName>
+    <VendorId>PDI</VendorId>
+    <VendorDescription>BIMBRIDGE (VDC)</VendorDescription>
+  </AddIn>
+</RevitAddIns>

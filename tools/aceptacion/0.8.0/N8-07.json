@@ -1,0 +1,37 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N8-07",
+ "titulo": "Operaciones por lotes",
+ "estado_inicial": "Copia desechable LOCAL, no workshared, de un modelo público (p. ej. muestra de Autodesk). Revit 2024 con BIMBRIDGE 0.8.0 instalado; config.json niveles RPW.",
+ "variables": {
+  "ids_lote": "50–200 ids separados por comas (además: revit nrt06 y B0 nativo, ver PROCEDIMIENTO)"
+ },
+ "pasos": [
+  {
+   "nombre": "lote 50–200 elementos",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "set_param",
+      "ids": "${ids_lote}",
+      "name": "Comments",
+      "value": "BB-N8-07"
+     }
+    ],
+    "summary": "campaña 0.8.0"
+   },
+   "guardar": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "nombre": "aplicar lote",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "escritura": true
+  }
+ ]
+}

@@ -1,0 +1,25 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N8-12",
+ "titulo": "Preparación y verificación de entregables",
+ "estado_inicial": "Copia desechable LOCAL, no workshared, de un modelo público (p. ej. muestra de Autodesk). Revit 2024 con BIMBRIDGE 0.8.0 instalado; config.json niveles RPW. Después de N8-05. config permite exportar (RPW sin lista 'permisos').",
+ "variables": {
+  "carpeta_pdf": "carpeta local de prueba (JSON escapado)"
+ },
+ "pasos": [
+  {
+   "nombre": "exportar el conjunto a PDF",
+   "op": "doc",
+   "args": {
+    "accion": "pdf",
+    "conjunto": "BB-N8-05 SET",
+    "carpeta": "${carpeta_pdf}",
+    "combinar": true
+   },
+   "escritura": true,
+   "contiene": [
+    ".pdf"
+   ]
+  }
+ ]
+}

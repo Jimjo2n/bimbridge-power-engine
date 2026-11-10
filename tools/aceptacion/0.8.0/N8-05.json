@@ -1,0 +1,96 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N8-05",
+ "titulo": "Creación y composición de láminas",
+ "estado_inicial": "Copia desechable LOCAL, no workshared, de un modelo público (p. ej. muestra de Autodesk). Revit 2024 con BIMBRIDGE 0.8.0 instalado; config.json niveles RPW.",
+ "variables": {
+  "vista_lamina": "id de una vista que no esté en ninguna lámina (p. ej. BB-N8-04 DIBUJO)"
+ },
+ "pasos": [
+  {
+   "nombre": "lámina y vista",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "sheet_create",
+      "numero": "BB-N8-05",
+      "nombre": "BIMBRIDGE CAMPAÑA"
+     },
+     {
+      "op": "sheet_place",
+      "hoja": "@1",
+      "vista": "${vista_lamina}"
+     }
+    ],
+    "summary": "campaña 0.8.0"
+   },
+   "guardar": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "nombre": "aplicar",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "escritura": true
+  },
+  {
+   "nombre": "conjunto de impresión",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "sheet_set",
+      "nombre": "BB-N8-05 SET",
+      "hojas": [
+       "BB-N8-05"
+      ]
+     }
+    ],
+    "summary": "campaña 0.8.0"
+   },
+   "guardar": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "nombre": "guardar conjunto",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "escritura": true
+  },
+  {
+   "nombre": "conjunto repetido sin reemplazar se rechaza",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "sheet_set",
+      "nombre": "BB-N8-05 SET",
+      "hojas": [
+       "BB-N8-05"
+      ]
+     }
+    ]
+   },
+   "esperar": "invalido",
+   "depende_del_modelo": true
+  },
+  {
+   "nombre": "la lámina existe",
+   "op": "catalog",
+   "args": {
+    "que": "laminas",
+    "buscar": "BB-N8-05"
+   },
+   "contiene": [
+    "BB-N8-05"
+   ]
+  }
+ ]
+}

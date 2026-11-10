@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 0.7.0 (inicio): proceso propio que convierte instrucciones estructuradas (BIM Task IR) en un plan, lo ejecuta contra un backend
+       (por ahora SÓLO el simulado), verifica y se recupera tras una interrupción. No tiene acceso a la API de Revit ni a concesiones. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>PDI.RevitMcp.AgentHost</AssemblyName>
+    <RootNamespace>PDI.RevitMcp.AgentHost</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PDI.RevitMcp.Protocol\PDI.RevitMcp.Protocol.csproj" />
+    <ProjectReference Include="..\PDI.RevitMcp.Engine\PDI.RevitMcp.Engine.csproj" />
+    <!-- alpha3: transporte tipado del puente (RevitConnection: saludo, pid del servidor del pipe, latido, timeouts inciertos) -->
+    <ProjectReference Include="..\PDI.RevitMcp.Bridge\PDI.RevitMcp.Bridge.csproj" />
+    <ProjectReference Include="..\PDI.RevitMcp.Setup.Core\PDI.RevitMcp.Setup.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- 0.9.0: Rust Geometry Engine (FFI) junto al ejecutable si está compilado; sin él, C# (degradación controlada) -->
+    <None Include="..\..\native\power_engine\target\release\libbimbridge_power_engine.so" Condition="Exists('..\..\native\power_engine\target\release\libbimbridge_power_engine.so')" CopyToOutputDirectory="PreserveNewest" Link="libbimbridge_power_engine.so" />
+    <None Include="..\..\native\power_engine\target\x86_64-pc-windows-gnu\release\bimbridge_power_engine.dll" Condition="Exists('..\..\native\power_engine\target\x86_64-pc-windows-gnu\release\bimbridge_power_engine.dll')" CopyToOutputDirectory="PreserveNewest" Link="bimbridge_power_engine.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+  </ItemGroup>
+</Project>

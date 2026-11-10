@@ -1,0 +1,104 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using PDI.RevitMcp.Engine;
+using PDI.RevitMcp.Engine.Tasks;
+using Xunit;
+
+namespace PDI.RevitMcp.Tests
+{
+    /// Reproducción de los hallazgos de la revisión sobre el código de rc2 (0222b6e). Cada prueba afirma el comportamiento CORRECTO:
+    /// que falle aquí demuestra el defecto.
+    public class ReproRc2
+    {
+        const string D = "archivo:c:\\practica.rvt";
+        static string R() { var r = Path.Combine(Path.GetTempPath(), "repro-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(r); return r; }
+
+        [Fact] public void P0_Key_GrantSurvivesRebuild()
+        {
+            var d = R(); new GrantStore(d).Approve("t", D, "P", new[] { Capability.Modificar }, TimeSpan.FromHours(1), "a", DateTime.UtcNow);
+            Assert.Null(new GrantStore(d).Check("t", D, "P", Capability.Modificar, DateTime.UtcNow));
+        }
+
+        [Fact] public void P0_Key_TwoInstancesAgree()
+        {
+            var d = R(); var a = new GrantStore(d); var b = new GrantStore(d);
+            a.Approve("t", D, "P", new[] { Capability.Modificar }, TimeSpan.FromHours(1), "a", DateTime.UtcNow);
+            Assert.Null(b.Check("t", D, "P", Capability.Modificar, DateTime.UtcNow));
+        }
+
+        sealed class Counting : ITaskBackend
+        {
+            public static int Enumerations;
+            readonly TaskEngineTests.FakeBackend _b; public Counting(TaskEngineTests.FakeModel m) { _b = new TaskEngineTests.FakeBackend(m); }
+            public BackendResult<bool> CheckContext(TaskRecord t) => _b.CheckContext(t);
+            public Task<BackendResult<List<UnitRef>>> EnumerateAsync(TaskRecord t, CancellationToken ct) { Interlocked.Increment(ref Enumerations); return _b.EnumerateAsync(t, ct); }
+            public Task<BackendResult<List<UnitOutcome>>> RunBatchAsync(TaskRecord t, IReadOnlyList<UnitRef> u, int b, CancellationToken ct) => _b.RunBatchAsync(t, u, b, ct);
+            public Task<BackendResult<UnitOutcome>> RunBarrierAsync(TaskRecord t, UnitRef u, CancellationToken ct) => _b.RunBarrierAsync(t, u, ct);
+            public Task<BackendResult<List<UnitOutcome>>> VerifyAsync(TaskRecord t, IReadOnlyList<UnitRecord> u, bool r, CancellationToken ct) => _b.VerifyAsync(t, u, r, ct);
+            public Task<BackendResult<Dictionary<string, object>>> PostconditionAsync(TaskRecord t, CancellationToken ct) => _b.PostconditionAsync(t, ct);
+            public string CurrentGeneration(TaskRecord t) => _b.CurrentGeneration(t);
+        }
+
+        [Fact] public async Task P0_Recipe_EnumerationNotReachedWithoutGrant()
+        {
+            Counting.Enumerations = 0;
+            var m = new TaskEngineTests.FakeModel();
+            var mgr = new TaskManager(new TaskStore(R()), "A", t => new Counting(m)) { Delay = (x, ct) => Task.Delay(5, ct), Authority = DenyWritesAuthority.Instance };
+            var draft = new TaskRecord { Id = "x", Objective = "x", RecipeName = "f", RecipeVersion = "1", RecipeHash = "h", ContentHash = "c",
+                Args = new Dictionary<string, object> { ["n"] = 3L }, Docs = new List<TaskDoc> { new TaskDoc { Key = D, Title = "p", Generation = "inst#1" } },
+                Policy = new Dictionary<string, object> { ["requiere"] = new List<object> { Capability.Modificar } } };
+            mgr.Start(draft, "//", "p"); await mgr.Completion("x");
+            Assert.Equal(0, Counting.Enumerations); // en rc2 el backend enumera (Preparar + MoveNext de la receta) antes de autorizar
+        }
+
+        [Fact] public void P1_Audit_LastRecordEditedSameSize_Detected()
+        {
+            var p = Path.Combine(R(), "a.jsonl"); var a = new AuditLog(p);
+            for (var i = 0; i < 5; i++) a.Append("s", "op", "ok");
+            var l = File.ReadAllText(p).Split('\n'); l[4] = l[4].Replace("\"ok\"", "\"KO\""); File.WriteAllText(p, string.Join("\n", l));
+            Assert.False(AuditLog.Verify(p).Ok);
+        }
+
+        [Fact] public void P1_Audit_MiddleEditSameSize_DetectedByLiveInstance()
+        {
+            var p = Path.Combine(R(), "a.jsonl"); var a = new AuditLog(p);
+            for (var i = 0; i < 5; i++) a.Append("s", "op", "ok");
+            var l = File.ReadAllText(p).Split('\n'); l[2] = l[2].Replace("\"ok\"", "\"KO\""); File.WriteAllText(p, string.Join("\n", l));
+            a.Append("s", "op", "ok");
+            Assert.Single(a.Quarantined);
+        }
+
+        [Fact] public void P1_Audit_QuarantineKeepsPendingIntents()
+        {
+            var p = Path.Combine(R(), "a.jsonl"); var a = new AuditLog(p);
+            var id = a.Intent("s", "aplicar_cola", "doc"); a.Append("s", "otro", "ok"); a.Append("s", "otro", "ok");
+            var l = File.ReadAllText(p).Split('\n'); l[1] = l[1].Replace("\"ok\"", "\"KO\""); File.WriteAllText(p, string.Join("\n", l));
+            new AuditLog(p);
+            Assert.Contains(AuditLog.PendingIntents(p), d => (string)d["intencion"] == id);
+        }
+
+        [Fact] public void P1_AuditGate_OutcomeFailure_NotReturnedAsNormal()
+        {
+            var a = new AuditLog(Path.Combine(R(), "a.jsonl")); var n = 0;
+            a.FaultBeforeWrite = _ => { if (++n == 2) throw new IOException("lleno"); };
+            var r = AuditGate.Apply(a, "s", "op", "doc", null, () => "aplicado", x => x, w => w, _ => { });
+            Assert.NotEqual("aplicado", r); // en rc2 vuelve como resultado normal
+        }
+
+        [Fact] public void P1_Print_MissingCurrentPrint_DoesNotWiden()
+        {
+            var g = new GrantStore(R()); g.Approve("t", D, "P1", new[] { Capability.Modificar }, TimeSpan.FromHours(1), "a", DateTime.UtcNow);
+            Assert.NotNull(g.Check("t", D, null, Capability.Modificar, DateTime.UtcNow));
+        }
+
+        [Fact] public void P1_Print_GrantWithoutPrint_DoesNotCoverPrintedDoc()
+        {
+            var g = new GrantStore(R()); g.Approve("t", D, null, new[] { Capability.Modificar }, TimeSpan.FromHours(1), "a", DateTime.UtcNow);
+            Assert.NotNull(g.Check("t", D, "P1", Capability.Modificar, DateTime.UtcNow));
+        }
+    }
+}

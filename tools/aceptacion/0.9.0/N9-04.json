@@ -1,0 +1,43 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N9-04",
+ "titulo": "Colocación persistente desde PDF y recuento",
+ "estado_inicial": "Copia desechable LOCAL, no workshared, de un modelo público o sintético autorizado (p. ej. muestra de Autodesk) con ejes rectos con nombre y una familia de luminaria OneLevelBased cargada. Revit 2024 con BIMBRIDGE 0.9.0 instalado; config.json niveles RPW, perfil laboratorio con la carpeta de la copia en laboratorio.carpetas y carpetas_documentos con la carpeta del PDF de prueba. NUNCA el modelo de trabajo del usuario.",
+ "estado": "BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION",
+ "variables": {
+  "ops": "@<salida de power-engine flujo-pdf>/ops.json",
+  "nivel": "nivel de las ops"
+ },
+ "pasos": [
+  {
+   "nombre": "plan",
+   "op": "plan",
+   "args": {
+    "ops": "${ops}",
+    "summary": "campaña 0.9.0"
+   },
+   "guardar": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "nombre": "aplicar",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "escritura": true
+  },
+  {
+   "nombre": "recuento en el nivel",
+   "op": "query",
+   "args": {
+    "cat": [
+     "LightingFixtures"
+    ],
+    "lvl": "${nivel}",
+    "count": true
+   }
+  }
+ ]
+}

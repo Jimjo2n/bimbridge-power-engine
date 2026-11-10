@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Lógica que no necesita Revit: sesiones, versiones, cola, consultas, formato, diario, servidor de pipe. -->
+  <PropertyGroup>
+    <!-- netstandard2.0 para Revit 2022–2024 (.NET Framework 4.8); net8.0 para Revit 2025–2026, el puente y las pruebas:
+         en net8 se compilan caminos más rápidos (AVX2 en las mallas). -->
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PDI.RevitMcp.Protocol\PDI.RevitMcp.Protocol.csproj" />
+  </ItemGroup>
+</Project>

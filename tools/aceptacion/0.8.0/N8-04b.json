@@ -1,0 +1,57 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N8-04b",
+ "titulo": "Dibujo 2D: componente de detalle y cota",
+ "estado_inicial": "Copia desechable LOCAL, no workshared, de un modelo público (p. ej. muestra de Autodesk). Revit 2024 con BIMBRIDGE 0.8.0 instalado; config.json niveles RPW. Después de N8-04.",
+ "variables": {
+  "vista_dibujo": "id de BB-N8-04 DIBUJO (catálogo de N8-04)",
+  "componente": "\"Familia: Tipo\" de un componente de detalle cargado",
+  "lineas_paralelas": "dos ids de líneas de detalle paralelas de BB-N8-04"
+ },
+ "pasos": [
+  {
+   "nombre": "componente y cota",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "detail_component",
+      "view": "${vista_dibujo}",
+      "tipo": "${componente}",
+      "punto": [
+       3,
+       -3
+      ]
+     },
+     {
+      "op": "dimension",
+      "view": "${vista_dibujo}",
+      "refs": "${lineas_paralelas}",
+      "linea": [
+       [
+        0,
+        -1
+       ],
+       [
+        10,
+        -1
+       ]
+      ]
+     }
+    ],
+    "summary": "campaña 0.8.0"
+   },
+   "guardar": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "nombre": "aplicar",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "escritura": true
+  }
+ ]
+}

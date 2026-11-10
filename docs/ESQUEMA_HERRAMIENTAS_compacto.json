@@ -1,0 +1,187 @@
+{
+ "instructions": "Revit abierto (proyectos y familias, handle doc=dN). Lea con revit (órdenes de una línea; varias líneas = en paralelo). Cambie con plan→commit (tipado, un Deshacer), exec (C# sobre la API de Revit) o act (familias, conectores, guardar, sync, PDF). Si el usuario autorizó la tarea, aplique sin pedir confirmación por lote. Use otras herramientas que él autorice si algo no está cubierto. Pausa del usuario: deténgase. retenido: espera en la cola, no repetir. clave= evita repetir una escritura. Ayuda: revit \"guide\".",
+ "tools": [
+  {
+   "name": "plan",
+   "description": "Prepara cambios SIN aplicarlos → diff + plan_id. Una operación por línea: \"op ids clave=valor\" (o JSON). set (set_param) $x name=Comments value=REVISAR | snap $flotando | tag $sin_tag view=123 | type $x to=\"Fam: Tipo\" | elev | ws | move rotate mirror copy delete place tag_move set_values set_type_param set_level group_* view_* sheet_* text_note filled_region. @n = lo creado por la línea n. Un plan = un Deshacer. Argumentos: revit \"guide escritura op=tag\".",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "ops": {
+      "description": "Operaciones",
+      "type": "string"
+     },
+     "summary": {
+      "description": "Resumen para el usuario",
+      "type": "string",
+      "default": null
+     },
+     "doc": {
+      "description": "Documento (dN); por defecto el activo",
+      "type": "string",
+      "default": null
+     },
+     "tarea": {
+      "description": "Tarea autorizada (permite commit tras reconectar)",
+      "type": "string",
+      "default": null
+     }
+    },
+    "required": [
+     "ops"
+    ]
+   },
+   "annotations": {
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "revit",
+   "description": "Lee (no cambia el modelo). Una orden por línea: verbo + palabras + clave=valor; doc=dN fija el documento.\nctx [instancia=2024] | docs | fam info|caras [familia=X] | res <id> desde= | cat [resumen|niveles|vistas|laminas|tipos|familias|plantillas|worksets|vinculos|filtros] | q <cat> lvl= t= ids= v= f= g=campos n=true s=$nombre elev>9 type~LT u=mm | get <ids|$x> [f=*] | chk lighting_audit | geo <receta> <cat> lvl= | sets | job <id> | show <ids> | cap [vista] colorear=categorias resaltar=$x | guide [tema]\ncat: LF luminarias, LD dispositivos, EF tomas, EE tableros, FA alarma. Texto compacto: fijo = valor común; col# = diccionario.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "c": {
+      "description": "Órdenes, p. ej. \"q LF g=lvl,type\"",
+      "type": "string"
+     }
+    },
+    "required": [
+     "c"
+    ]
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "commit",
+   "description": "Aplica un plan sobre SU documento. retenido = espera en la cola de Revit (no repetir); conflicto = no se aplicó. Lo creado: $creados. clave= (idempotencia): con la misma clave no se aplica dos veces aunque se corte la conexión.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "plan_id": {
+      "type": "string"
+     },
+     "clave": {
+      "type": "string",
+      "default": null
+     },
+     "tarea": {
+      "type": "string",
+      "default": null
+     }
+    },
+    "required": [
+     "plan_id"
+    ]
+   },
+   "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": false
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "exec",
+   "description": "C# sobre la API pública de Revit (sin lista de operaciones). Código: expresión (doc.Title), cuerpo con return, o clase con static object Run(ScriptContext ctx). Ya existen doc, uidoc, app, uiapp, args, ctx (ctx.Mm(), ctx.E(id), ctx.Set(\"$x\"), ctx.SaveSet, ctx.Log). modo=consulta (por defecto: TODO se revierte) | ejecutar (tx=auto: una transacción y un Deshacer; grupo; ninguna: el script abre las suyas, necesario para EditFamily/LoadFamily). Devuelve el valor en JSON, avisos de Revit y qué cambió. Un script largo bloquea Revit mientras corre.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "codigo": {
+      "description": "Código C# (o vacío con nombre= para repetir uno guardado)",
+      "type": "string",
+      "default": null
+     },
+     "modo": {
+      "description": "consulta | ejecutar",
+      "type": "string",
+      "default": "consulta"
+     },
+     "tx": {
+      "description": "auto | grupo | ninguna",
+      "type": "string",
+      "default": null
+     },
+     "doc": {
+      "description": "Documento dN (por defecto el activo)",
+      "type": "string",
+      "default": null
+     },
+     "args": {
+      "description": "Argumentos para el script (objeto JSON) → args",
+      "default": null
+     },
+     "nombre": {
+      "description": "Script guardado a repetir, o 'lista'",
+      "type": "string",
+      "default": null
+     },
+     "guardar": {
+      "description": "Guardar este código con ese nombre",
+      "type": "string",
+      "default": null
+     },
+     "clave": {
+      "description": "Clave de idempotencia (escrituras)",
+      "type": "string",
+      "default": null
+     },
+     "tarea": {
+      "description": "Tarea autorizada",
+      "type": "string",
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "act",
+   "description": "Acciones de documento, una por línea (doc=dN fija el destino; clave= evita repetir):\nabrir familia=\"X\" (EditFamily → dN del RFA) | conector nombre=fria sistema=fria|caliente|sanitario|<PipeSystemType> cara=elem:n radio=6.5mm|diametro= flujo=entrada|salida|bidireccional [cota=radio|diametro] (crea o reconcilia por nombre y verifica) | param nombre=X valor=6.5mm|formula= [tipo=T|todos_tipos=si] [crear=tipo|instancia dato=longitud] [asociar=elem:CONNECTOR_RADIUS] | cargar en=dN [sobrescribir=valores] | guardar [como=ruta] | sync [comentario=] | pdf conjunto=\"X\"|hojas=$x [carpeta= nombre=] | cerrar",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "c": {
+      "description": "Acciones, p. ej. \"conector nombre=fria sistema=fria cara=812:3 radio=6.5mm doc=d3\"",
+      "type": "string"
+     }
+    },
+    "required": [
+     "c"
+    ]
+   },
+   "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  }
+ ]
+}

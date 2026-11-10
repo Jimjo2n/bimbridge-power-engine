@@ -1,0 +1,33 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N9-01",
+ "titulo": "Identidad, versión y documento fijado",
+ "estado_inicial": "Copia desechable LOCAL, no workshared, de un modelo público o sintético autorizado (p. ej. muestra de Autodesk) con ejes rectos con nombre y una familia de luminaria OneLevelBased cargada. Revit 2024 con BIMBRIDGE 0.9.0 instalado; config.json niveles RPW, perfil laboratorio con la carpeta de la copia en laboratorio.carpetas y carpetas_documentos con la carpeta del PDF de prueba. NUNCA el modelo de trabajo del usuario.",
+ "estado": "BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION",
+ "variables": {},
+ "pasos": [
+  {
+   "nombre": "contexto",
+   "op": "context",
+   "args": {},
+   "contiene": [
+    "0.9.0"
+   ]
+  },
+  {
+   "nombre": "documentos",
+   "op": "docs",
+   "args": {}
+  },
+  {
+   "nombre": "luminarias antes",
+   "op": "query",
+   "args": {
+    "cat": [
+     "LightingFixtures"
+    ],
+    "count": true
+   }
+  }
+ ]
+}

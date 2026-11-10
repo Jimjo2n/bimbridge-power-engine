@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Puente MCP: lo lanza Claude Code o Codex por stdio y habla con Revit por named pipe. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>PDI.RevitMcp.Bridge</AssemblyName>
+    <RootNamespace>PDI.RevitMcp.Bridge</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol" Version="1.4.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PDI.RevitMcp.Protocol\PDI.RevitMcp.Protocol.csproj" />
+    <!-- Sólo para las guías (texto) y el catálogo de operaciones: el motor geométrico vive en Revit. -->
+    <ProjectReference Include="..\PDI.RevitMcp.Engine\PDI.RevitMcp.Engine.csproj" />
+  </ItemGroup>
+</Project>

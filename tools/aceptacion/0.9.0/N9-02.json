@@ -1,0 +1,23 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N9-02",
+ "titulo": "Ejes del modelo para el registro plano–modelo (sólo lectura)",
+ "estado_inicial": "Copia desechable LOCAL, no workshared, de un modelo público o sintético autorizado (p. ej. muestra de Autodesk) con ejes rectos con nombre y una familia de luminaria OneLevelBased cargada. Revit 2024 con BIMBRIDGE 0.9.0 instalado; config.json niveles RPW, perfil laboratorio con la carpeta de la copia en laboratorio.carpetas y carpetas_documentos con la carpeta del PDF de prueba. NUNCA el modelo de trabajo del usuario.",
+ "estado": "BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION",
+ "variables": {
+  "codigo_ejes": "@tools/aceptacion/0.9.0/ejes_modelo_090.cs"
+ },
+ "pasos": [
+  {
+   "nombre": "leer ejes (consulta, sin transacción)",
+   "op": "exec",
+   "args": {
+    "modo": "consulta",
+    "codigo": "${codigo_ejes}"
+   },
+   "contiene": [
+    "ejes_modelo_090.json"
+   ]
+  }
+ ]
+}

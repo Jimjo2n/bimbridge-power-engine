@@ -1,0 +1,36 @@
+name: Dependency review
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  nuget-vulnerabilities:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: dotnet restore tests/PDI.RevitMcp.Tests/PDI.RevitMcp.Tests.csproj
+      - name: Check known NuGet vulnerabilities
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          dotnet list tests/PDI.RevitMcp.Tests/PDI.RevitMcp.Tests.csproj package --vulnerable --include-transitive --format json > artifacts/nuget-vulnerabilities.json
+          python tools/repository/check_nuget_audit.py artifacts/nuget-vulnerabilities.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: nuget-vulnerability-report
+          path: artifacts/nuget-vulnerabilities.json
+          if-no-files-found: ignore
+          retention-days: 7
