@@ -121,6 +121,9 @@ namespace PDI.RevitMcp.Addin.Revit
             ["hilo_revit"] = _main.Stats(),
             ["cache"] = new Dictionary<string, object> { ["aciertos"] = (long)_cache.Hits, ["fallos"] = (long)_cache.Misses, ["guardados"] = (long)_cache.Count },
             ["trabajos_en_curso"] = (long)_jobs.Running,
+            // #9 / #5: caché de compilación C# (single-flight) e instantáneas de consulta (#2).
+            ["compilacion_csharp"] = Scripting.ScriptHost.CacheStats(),
+            ["instantaneas_consulta"] = new Dictionary<string, object> { ["guardadas"] = (long)_snapshots.Count, ["celdas"] = _snapshots.Cells },
         };
 
         // ---------------- geo (trabajos largos con espera y caché) ----------------

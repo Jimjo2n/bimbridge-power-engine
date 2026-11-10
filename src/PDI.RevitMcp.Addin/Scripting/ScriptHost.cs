@@ -36,7 +36,7 @@ namespace PDI.RevitMcp.Addin.Scripting
         }
 
         private static readonly object Lock = new object();
-        private static readonly ConcurrentDictionary<string, Compiled> Cache = new ConcurrentDictionary<string, Compiled>(StringComparer.Ordinal);
+        private static readonly CompileCache<Compiled> Cache = new CompileCache<Compiled>();
         private static MethodInfo _compile;
         private static Func<string> _roslynVersion;
         private static string[] _references;
@@ -259,13 +259,28 @@ namespace PDI.RevitMcp.Addin.Scripting
             // La clave de caché no depende del nombre de clase: se envuelve con un nombre fijo para la huella.
             var probe = ScriptSource.Wrap(code, "S");
             var key = ScriptSource.CacheKey(probe.Source, revitVersion, addinVersion, _refFingerprint + extraFp);
-            if (Cache.TryGetValue(key, out var hit))
-                return new Compiled
-                {
-                    Run = hit.Run, Key = key, CompileMs = 0, FromCache = true, Diagnostics = hit.Diagnostics, Kind = hit.Kind, RecipeType = hit.RecipeType, Capabilities = hit.Capabilities,
-                    ExtraRefs = extraReport.Count > 0 ? extraReport : null,
-                };
+            // Issue #9: single-flight. Dos peticiones simultáneas del mismo código compilan una sola vez.
+            string compileError = null;
+            var got = Cache.GetOrCompile(key, () =>
+            {
+                var c = CompileNew(code, className, refs, key, out compileError);
+                return c == null ? null : Tuple.Create(c, c.CompileMs);
+            }, out var fromCache);
+            if (got == null) { error = compileError ?? "no compila"; return null; }
+            if (!fromCache) { got.ExtraRefs = extraReport.Count > 0 ? extraReport : null; return got; }
+            return new Compiled
+            {
+                Run = got.Run, Key = key, CompileMs = 0, FromCache = true, Diagnostics = got.Diagnostics, Kind = got.Kind, RecipeType = got.RecipeType, Capabilities = got.Capabilities,
+                ExtraRefs = extraReport.Count > 0 ? extraReport : null,
+            };
+        }
 
+        /// <summary>Contadores de la caché de compilación (panel Estado, diagnóstico).</summary>
+        public static Dictionary<string, object> CacheStats() => Cache.Stats();
+
+        private static Compiled CompileNew(string code, string className, string[] refs, string key, out string error)
+        {
+            error = null;
             var wrapped = ScriptSource.Wrap(code, className);
             var args = new object[] { wrapped.Source, refs, "PdiScript_" + key.Substring(0, 12) + "_" + className, null, null, 0L, null };
             var image = (byte[])_compile.Invoke(null, args);
@@ -302,13 +317,10 @@ namespace PDI.RevitMcp.Addin.Scripting
                     : "compiló, pero no hay 'public static object Run(ScriptContext ctx)' en ninguna clase";
                 return null;
             }
-            var c = new Compiled
+            return new Compiled
             {
                 Run = run, Key = key, CompileMs = ms, FromCache = false, Diagnostics = diags, Kind = wrapped.Kind, RecipeType = recipe, Capabilities = caps,
-                ExtraRefs = extraReport.Count > 0 ? extraReport : null,
             };
-            Cache[key] = c;
-            return c;
         }
 
         /// <summary>Carga Roslyn y compila algo trivial en segundo plano (el primer exec real tarda menos). Nunca lanza.</summary>

@@ -30,7 +30,7 @@ namespace PDI.RevitMcp.Addin.Ui
         private readonly TextBlock _subtitle, _pillText;
         private readonly Border _pill;
         private readonly StackPanel _summary = new StackPanel(), _agents = new StackPanel(), _activity = new StackPanel(),
-            _safety = new StackPanel(), _perf = new StackPanel();
+            _safety = new StackPanel(), _perf = new StackPanel(), _engine = new StackPanel();
         private readonly Button _pause;
         private readonly DispatcherTimer _timer;
         private string _lastSignature;
@@ -83,6 +83,7 @@ namespace PDI.RevitMcp.Addin.Ui
             body.Children.Add(Section("Resumen", _summary));
             body.Children.Add(Section("Agentes", _agents));
             body.Children.Add(Section("Seguridad y recuperación", _safety));
+            body.Children.Add(Section("Motor C#", _engine));
             body.Children.Add(Section("Rendimiento (últimas 200 solicitudes)", _perf));
             body.Children.Add(Section("Actividad", _activity));
             root.Children.Add(Theme.Scroll(body));
@@ -136,6 +137,7 @@ namespace PDI.RevitMcp.Addin.Ui
             FillSummary(sessions, activity, now);
             FillAgents(sessions, closed, now);
             FillSafety();
+            FillEngine();
             FillPerf(activity);
             FillActivity(activity);
         }
@@ -179,7 +181,7 @@ namespace PDI.RevitMcp.Addin.Ui
                 head.Children.Add(new TextBlock
                 {
                     Text = "  " + presence + " · " + Theme.ClientName(s.ClientName) + (s.ClientVersion != null ? " " + s.ClientVersion : "") +
-                           " · identidad " + (s.AgentName == null ? "insuficiente" : "declarada (" + s.IdentitySource + ")") +
+                           " · identidad " + (s.AgentName == null ? "insuficiente: sólo lectura" + (s.IdentityNote != null ? " (" + s.IdentityNote + ")" : "") : "declarada (" + s.IdentitySource + ") · " + s.AgentId) +
                            (s.Principal != null ? " · usuario " + s.Principal + " (verificado)" : ""),
                     Foreground = Theme.B(presence == "inactivo" ? Theme.Muted : Theme.Ink), VerticalAlignment = VerticalAlignment.Center,
                 });
@@ -218,6 +220,27 @@ namespace PDI.RevitMcp.Addin.Ui
             }
             var execs = (Runtime.Journal?.Recent(200) ?? new List<Dictionary<string, object>>()).Where(e => Str(e, "op") == "exec" || Str(e, "op") == "exec_codigo").Reverse().Take(5).ToList();
             Kv("Últimas ejecuciones dinámicas", execs.Count == 0 ? "ninguna" : string.Join(" · ", execs.Select(e => (Str(e, "agente") ?? "sin nombre") + " " + Str(e, "estado"))), _safety);
+        }
+
+        /// <summary>
+        /// #5: motor C# con datos medidos en memoria (hilo de Revit, caché de compilación con single-flight, instantáneas de consulta,
+        /// trabajos de fondo). Rust y Python se consultan con la herramienta power cap: el panel no los arranca para mirarlos.
+        /// </summary>
+        private void FillEngine()
+        {
+            _engine.Children.Clear();
+            Dictionary<string, object> d = null;
+            try { d = Runtime.EngineDiagnostics?.Invoke(); } catch (Exception ex) { Kv("Estado", "no disponible: " + ex.Message, _engine); return; }
+            if (d == null) { Kv("Estado", "no disponible", _engine); return; }
+            foreach (var kv in d)
+            {
+                var label = kv.Key.Replace('_', ' ');
+                var text = kv.Value is Dictionary<string, object> sub
+                    ? string.Join(" · ", sub.Select(x => x.Key.Replace('_', ' ') + " " + Convert.ToString(x.Value, CultureInfo.InvariantCulture)))
+                    : Convert.ToString(kv.Value, CultureInfo.InvariantCulture);
+                Kv(char.ToUpperInvariant(label[0]) + label.Substring(1), string.IsNullOrEmpty(text) ? "—" : text, _engine);
+            }
+            Kv("Rust / Python", "se consultan con la herramienta power cap (el panel no arranca workers para mirarlos)", _engine);
         }
 
         private void FillPerf(List<Dictionary<string, object>> activity)
