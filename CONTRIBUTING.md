@@ -8,7 +8,7 @@ Changes to transport, transactions, execution permissions, installation, signing
 
 By submitting original contributions you agree to license them under GPL-3.0-only. Preserve third-party notices. Do not submit credentials, private documents, Autodesk binaries or material you cannot contribute.
 
-Maintainer: @Jimjo2n. Contributors must communicate respectfully, address technical evidence and avoid harassment or disclosure of private information.
+Maintainer: Jose Jimenez (@Jimjo2n). Contributors must communicate respectfully, address technical evidence and avoid harassment or disclosure of private information.
 
 ## Branches and commits
 

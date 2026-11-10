@@ -68,3 +68,36 @@ El build del commit final se registra en el paquete de auditoría (`SHA256SUMS`,
 
 - Cerrar tras el CI del PR: #21, #1, #2, #7, #3, #4.
 - Mantener abiertos: #5 (PARTIAL), #6 (BLOCKED), #8 (PARTIAL), #9 (mejora entregada; falta validación multiversión nativa).
+
+## 6. Cierre de la consolidación y pendientes para la siguiente versión
+
+Autor y mantenedor: Jose Jimenez ([Jimjo2n](https://github.com/Jimjo2n)). Los commits posteriores a `521f7cf` usan la identidad Git configurada en esta máquina.
+
+### 6.1 Correcciones tras los controles de GitHub en `521f7cf`
+
+- **Repository checks:** faltaba el encabezado `SPDX-License-Identifier: GPL-3.0-only` en cinco archivos de prueba nuevos. Añadido siguiendo la convención existente. Los controles del repositorio (`check_repository.py`, `inspect_history.py`, pruebas del repositorio) pasan en local.
+- **Windows distribution, `WriteSafetyTests.IsAlive_ProtectedProcess_DoesNotThrow`:** la prueba suponía que Windows siempre niega abrir el pid 4 (System). Eso depende del entorno: un usuario normal recibe acceso denegado, y `IsAlive` lo trata como «no es nuestro Revit». Un runner elevado puede abrirlo, y entonces el proceso existe y está vivo. El comportamiento de `IsAlive` es correcto; se corrigió el supuesto de la prueba, que ahora exige que nunca lance y que coincida con lo que el sistema permite en ese entorno. **Hipótesis:** se dedujo del código y de la diferencia de entorno, sin poder leer el registro de la ejecución (sin acceso a la API). Se confirma con el resultado del control en GitHub.
+
+### 6.2 Pendientes
+
+| Issue | Estado real | Prioridad | Depende de | Criterio de aceptación |
+|---|---|---|---|---|
+| #5 panel | PARTIAL. Hecho: resumen, agentes con agent_id y «sólo lectura», sección «Motor C#» desde memoria, rendimiento (mediana, p95 con ≥20 muestras), recuperación y actividad. Falta: tabla de agentes con búsqueda, filtros y ordenamiento; vista detallada e historial por agente; cancelación segura de trabajos desde el panel; control de nuevas autorizaciones; estadísticas de Rust y Python; **notificación de operación larga** (propuesta no implementada: debe indicar agente, operación, documento, tiempo transcurrido y estado comprobado, y explicar que Revit está procesando y conviene dejarlo trabajar, sin afirmar salud ni fin de escritura sin evidencia). | Alta | Estados de sesión y trabajo (hechos en #1/#7) | Prueba funcional del modelo de vista sin Revit, más prueba visual nativa autorizada |
+| #6 aceptación nativa | BLOCKED. No se ejecutó nada dentro de Revit. | Alta | Autorización explícita para una instancia y un modelo desechable de prueba | Campaña con commit, versión de Revit, modelo, fecha, resultado y evidencia saneada, Revit 2022–2026 según disponibilidad |
+| #8 rendimiento | PARTIAL. Verificado offline: la lectura completa pasa de 51 recorridos del modelo a 1, y las 50 páginas siguientes salen de memoria. Falta medir dentro de Revit. | Alta | #6 | Mismo modelo, parámetros y unidades; orden alternado, frío y caliente; mediana, p95 con muestra suficiente, llamadas, tiempo de API, serialización, memoria; comparación con pyRevit sin digest |
+| #9 C# dinámico | Mejora entregada (single-flight). Falta validación multiversión dentro de Revit y telemetría de entrada al dispatcher. | Media | #6 | Compilación fría y caliente medida en Revit 2022–2026 |
+| Traza en workers | La traza llega al AgentHost; Python y Rust no la registran. | Media | — | `trace_id` en los diarios de los workers |
+| Workflows BIM y PDF→Revit | Sin ampliar en esta entrega. | Media | #6 para ejecución | Escenario sintético reproducible con incertidumbre explícita |
+| Scheduler (equidad entre agentes, colas por documento) | No iniciado. | Baja | Perfiles nativos de #8 | Medición que lo justifique |
+
+### 6.3 Cierres propuestos (tras el CI del PR)
+
+#21 (`5bd2017`), #1 (`d649162`), #2 (`42125ed`, con medición nativa pendiente en #8), #7 (`d6a61c3`), #3 y #4 (`1e1e8b8`). Ninguno se cierra sólo por una prueba aislada: se enlaza el commit, la prueba de regresión y el resultado del control en GitHub.
+
+### 6.4 Regresiones
+
+Ninguna descubierta. Los dos fallos de GitHub eran de metadatos y de un supuesto de entorno de una prueba.
+
+### 6.5 Protecciones de la rama
+
+El repositorio es privado. Si GitHub no ofrece reglas de protección de rama en el plan vigente, el procedimiento de revisión mientras tanto es: todo cambio por pull request hacia `main`, controles de GitHub Actions en verde sobre el commit exacto, revisión del mantenedor (CODEOWNERS) y sin push directo a `main`.

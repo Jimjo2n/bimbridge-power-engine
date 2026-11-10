@@ -64,6 +64,6 @@ Known work includes the long-operation session timeout, paginated-read regressio
 
 ## Maintenance
 
-Maintainer: [Jimjo2n](https://github.com/Jimjo2n). Report reproducible defects through issues using synthetic or sanitized data. Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md). Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md).
+Maintainer: Jose Jimenez ([Jimjo2n](https://github.com/Jimjo2n)). Report reproducible defects through issues using synthetic or sanitized data. Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md). Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Original code: **GPL-3.0-only**. See [LICENSE](LICENSE), [license guide](docs/LICENSING.md) and [third-party notices](THIRD_PARTY_NOTICES.md). Autodesk reference binaries, credentials, live models and private audit logs are excluded.
