@@ -9,8 +9,7 @@ Geometry kernels are exposed as a native library and an IPC worker.
 Keep both supported boundaries and choose based on workload and measured benefit.
 
 ## Alternatives
-Alternatives may be proposed through a reviewed change with compatibility and validation evidence. No undocumented historical comparison is asserted by this record.
-
+FFI executes the native library in-process and avoids some serialization; IPC gives the worker a separate process and lifecycle. The C# backend remains relevant where measured cross-language overhead outweighs a kernel's benefit.
 ## Consequences
 FFI reduces some transport costs but shares a process boundary; IPC has serialization and lifecycle costs.
 

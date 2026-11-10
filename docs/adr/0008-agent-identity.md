@@ -9,8 +9,7 @@ Sessions carry client metadata and agent aliases; local transport has a Windows-
 Separate attribution labels from authenticated identity and keep per-session state.
 
 ## Alternatives
-Alternatives may be proposed through a reviewed change with compatibility and validation evidence. No undocumented historical comparison is asserted by this record.
-
+Client labels alone cannot authenticate an agent. Treating all sessions as one identity loses attribution. The implemented design separates declared session metadata from the verified local principal.
 ## Consequences
 Aliases improve observability but must not grant privileges or be inherited from unrelated sessions.
 

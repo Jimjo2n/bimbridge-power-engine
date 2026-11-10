@@ -9,8 +9,7 @@ PDF/DOCX work is isolated in a document worker with a versioned JSONL contract.
 Keep Python focused on documents with explicit authorized paths; Revit ownership stays in C#.
 
 ## Alternatives
-Alternatives may be proposed through a reviewed change with compatibility and validation evidence. No undocumented historical comparison is asserted by this record.
-
+A C# document parser would keep one language but change the library and maintenance surface. A general Python orchestration core would broaden worker responsibility. The source uses a bounded document worker with explicit inputs.
 ## Consequences
 CPython selection, encoding and dependency notices are release concerns. PDF features are constrained by packaged dependencies.
 

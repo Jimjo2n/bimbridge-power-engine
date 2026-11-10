@@ -32,3 +32,9 @@ No live Revit model, installation or UI acceptance was performed by repository p
 At the time this record was prepared, hosted CI had not yet run. Consult actual [GitHub Actions](https://github.com/Jimjo2n/bimbridge-power-engine/actions) and the separately delivered acceptance report for completed run conclusions. This record does not turn an unexecuted workflow into PASS.
 
 No stable tag, public release or visibility change is authorized by these checks.
+
+## First hosted execution and clean-environment correction
+
+The first hosted commit (`7f20fd8`) passed repository and NuGet checks and both Rust jobs, but Python jobs and Windows distribution failed because fresh interpreters had no pdfminer installed. The local interpreter's installed packages had masked that setup dependency.
+
+CI now calls `prepare_python_tests.py`, which reuses the existing hash-verifying packaging routine and prepares the ignored vendor directory without downloads or changes to the Revit engine. A clean local virtual environment reproduced 29 Python passes with 2 platform skips using these packaged dependencies. The original failed runs remain visible in Actions; subsequent hosted results are separate evidence.

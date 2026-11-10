@@ -5,6 +5,7 @@ The .NET SDK supplies the CLI/MSBuild used by the scripts. Visual Studio is opti
 Windows, Git, .NET 8 SDK, Rust x64 with Cargo, and CPython 3. Install .NET Framework 4.8 targeting support for Revit 2022–2024. The add-in targets .NET 8 for Revit 2025–2026. Reference packages can compile the add-in without an installed Revit; they do not prove native compatibility.
 
 ## Checks without Revit
+In a clean interpreter/checkout, first run `python tools/repository/prepare_python_tests.py`. It reuses the existing packaging routine to verify and prepare the checked-in pure wheels in the ignored worker vendor directory, without downloading dependencies. Use a fresh checkout if that directory already exists. AES-encrypted PDF support remains limited by the packaged cryptography substitute; this is not a full cryptography installation.
 ```powershell
 cargo test --locked --release --manifest-path native/power_engine/Cargo.toml
 cargo build --locked --release --manifest-path native/power_engine/Cargo.toml

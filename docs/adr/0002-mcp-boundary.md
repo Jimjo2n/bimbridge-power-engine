@@ -9,8 +9,7 @@ The bridge registers tools and transports requests over stdio.
 Expose client-facing operations through MCP and isolate protocol stdout from diagnostics.
 
 ## Alternatives
-Alternatives may be proposed through a reviewed change with compatibility and validation evidence. No undocumented historical comparison is asserted by this record.
-
+Client-specific direct integrations would couple tool definitions to individual clients. MCP provides a shared client-facing boundary, while the local Revit transport remains an implementation concern.
 ## Consequences
 Different client profiles require explicit registration and schema compatibility. Client metadata remains declared.
 

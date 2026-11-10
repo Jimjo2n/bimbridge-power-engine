@@ -9,8 +9,7 @@ Revit API operations run through the add-in dispatcher and ExternalEvent context
 Schedule model operations in the supported Revit context rather than arbitrary worker threads.
 
 ## Alternatives
-Alternatives may be proposed through a reviewed change with compatibility and validation evidence. No undocumented historical comparison is asserted by this record.
-
+Arbitrary background-thread Revit calls are outside the supported execution model. UI automation would couple operations to window state. The implemented dispatcher uses Revit's API execution context.
 ## Consequences
 Long work may affect UI responsiveness; cancellation and batching must respect transaction boundaries.
 

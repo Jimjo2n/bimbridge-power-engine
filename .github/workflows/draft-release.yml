@@ -62,6 +62,8 @@ jobs:
         run: |
           rustup default stable-x86_64-pc-windows-msvc
           if ($LASTEXITCODE -ne 0) { throw "Rust setup failed" }
+          python tools/repository/prepare_python_tests.py
+          if ($LASTEXITCODE -ne 0) { throw "Python dependency preparation failed" }
           ./build.ps1 -Python (Get-Command python).Source
       - name: Create draft and checksums
         shell: pwsh

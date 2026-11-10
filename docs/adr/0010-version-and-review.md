@@ -9,8 +9,7 @@ The baseline remains 0.9.0 with partial native acceptance.
 Use 0.9.0+commit during consolidation, reviewed PRs and manually prepared draft releases. Reserve 1.0.0 for product acceptance.
 
 ## Alternatives
-Alternatives may be proposed through a reviewed change with compatibility and validation evidence. No undocumented historical comparison is asserted by this record.
-
+A version for every commit would fragment consolidated acceptance. Automatic publication would remove the explicit distribution review. The implemented policy uses commit identifiers during development and manually reviewed draft releases.
 ## Consequences
 A Git tag, compiled package and accepted release are different artifacts. No workflow changes visibility.
 

@@ -9,8 +9,7 @@ Plans, write intent, journal state and reconciliation exist in the source.
 Treat missing evidence as uncertainty, check conflicts and reconcile rather than blindly repeating writes.
 
 ## Alternatives
-Alternatives may be proposed through a reviewed change with compatibility and validation evidence. No undocumented historical comparison is asserted by this record.
-
+In-memory state alone would disappear at process exit. Blind retries after lost responses can duplicate effects. The implemented journal/reconciliation design instead retains uncertainty until document evidence resolves it.
 ## Consequences
 Disk failures may block new writes. A timeout does not imply rollback or that an operation stopped.
 

@@ -9,8 +9,7 @@ The current implementation enables dynamic C# for authorized local agents and pr
 Document the actual default and trust boundary; do not label it a sandbox.
 
 ## Alternatives
-Alternatives may be proposed through a reviewed change with compatibility and validation evidence. No undocumented historical comparison is asserted by this record.
-
+Typed operations alone offer a narrower fixed contract; general C# offers broader Revit API access with user-level privileges. Blocking dynamic code is available without treating typed writes and arbitrary code as equivalent trust surfaces.
 ## Consequences
 User-level file/network privileges and external side effects exceed document rollback guarantees. Typed operations retain a narrower contract.
 

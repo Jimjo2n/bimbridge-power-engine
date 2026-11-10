@@ -9,8 +9,7 @@ The source implements Revit access, orchestration and durable state in C#/.NET.
 Keep C# responsible for Revit API access and coordination; specialized workers do not own the model.
 
 ## Alternatives
-Alternatives may be proposed through a reviewed change with compatibility and validation evidence. No undocumented historical comparison is asserted by this record.
-
+A core split across C#, Python and Rust would add ownership and IPC boundaries. The implemented architecture keeps orchestration in C# and limits workers to specialized tasks. This records the architectural tradeoff, not an undocumented historical meeting.
 ## Consequences
 A single transaction and recovery authority is easier to reason about. Cross-language tasks still require explicit contracts.
 
