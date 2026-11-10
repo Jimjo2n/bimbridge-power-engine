@@ -265,8 +265,19 @@ namespace PDI.RevitMcp.Addin.Revit
         {
             // Registro de identidad (agent.register): ctx agente="Integration client" [conversacion=… modelo=…]. Sólo afecta a esta sesión.
             var agentArg = Arg.GetString(request.Args, "agente");
-            if (agentArg != null && !Ui.Runtime.Sessions.Register(session, agentArg, Arg.GetString(request.Args, "conversacion"), Arg.GetString(request.Args, "modelo")))
-                return Response.Fail(request.Id, Status.Invalido, "agente= necesita un nombre legible de 1 a " + AgentIdentity.MaxName + " caracteres");
+            if (Arg.GetBool(request.Args, "desregistrar") == true) Ui.Runtime.Sessions.Unregister(session);
+            else if (agentArg != null)
+            {
+                // Issue #3: un alias en uso por otra sesión activa se rechaza (no se reasigna ni se comparte).
+                switch (Ui.Runtime.Sessions.TryRegister(session, agentArg, Arg.GetString(request.Args, "conversacion"), Arg.GetString(request.Args, "modelo"), out var holder))
+                {
+                    case RegisterResult.Invalid:
+                        return Response.Fail(request.Id, Status.Invalido, "agente= necesita un nombre legible de 1 a " + AgentIdentity.MaxName + " caracteres");
+                    case RegisterResult.Duplicate:
+                        return Response.Fail(request.Id, Status.Conflicto, "el alias \"" + AgentIdentity.Clean(agentArg) + "\" ya lo usa otra sesión activa (" +
+                            holder.ClientName + "); elija otro nombre, p. ej. añadiendo el cliente o la conversación");
+                }
+            }
             Dictionary<string, object> data = null;
             long rev = 0;
             var result = await RunMain((app, sw, budget) =>
@@ -342,7 +353,11 @@ namespace PDI.RevitMcp.Addin.Revit
             if (!result.Ok) return FromWork(request.Id, result);
             Scripting.ScriptHost.WarmInBackground(Ui.Runtime.Log);
             data["agente"] = session.AgentName;
-            data["identidad"] = session.AgentName == null ? "insuficiente: registre un nombre con ctx agente=\"…\"" : "declarada (" + session.IdentitySource + ")";
+            data["identidad"] = session.AgentName == null
+                ? "insuficiente" + (session.IdentityNote != null ? " (" + session.IdentityNote + ")" : "") + ": registre un nombre con ctx agente=\"…\"; hasta entonces sólo lectura"
+                : "declarada (" + session.IdentitySource + ")";
+            if (session.AgentId != null) data["agent_id"] = session.AgentId;
+            data["session_id"] = session.Id;
             return new Response { Id = request.Id, Rev = rev, Datos = data };
         }
 

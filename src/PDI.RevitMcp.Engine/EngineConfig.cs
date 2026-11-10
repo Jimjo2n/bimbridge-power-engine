@@ -47,6 +47,11 @@ namespace PDI.RevitMcp.Engine
         public string Geometry = "auto";
         /// <summary>«Bloquear inyección de código C#». Por defecto false: exec permitido a los agentes locales autorizados.</summary>
         public bool BlockDynamicCode;
+        /// <summary>
+        /// Issue #3: las operaciones que cambian algo exigen un agente con nombre (config "identidad_obligatoria", por defecto true).
+        /// false sólo para integraciones antiguas que IT decida tolerar; el diario sigue marcando esas sesiones como sin nombre.
+        /// </summary>
+        public bool IdentityRequired = true;
         private HashSet<string> _perms;
         public HashSet<string> EffectivePermissions => _perms ?? (_perms = Permissions.Effective(PermissionList, Levels));
 
@@ -93,6 +98,7 @@ namespace PDI.RevitMcp.Engine
                 c.PermissionList = Arg.GetStringList(o, "permisos");
                 c.DocumentFolders = Arg.GetStringList(o, "carpetas_documentos");
                 c.BlockDynamicCode = Arg.GetBool(o, DynamicCodePolicy.ConfigKey) ?? false;
+                c.IdentityRequired = Arg.GetBool(o, "identidad_obligatoria") ?? true;
                 // 0.9.0: "power_engine": { "python": "C:\\…\\python.exe", "worker_python": "…\\run_worker.py", "rust_worker": "…exe", "geometria": "auto" }
                 if (o.TryGetValue("power_engine", out var po) && po is Dictionary<string, object> pe)
                 {

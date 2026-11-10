@@ -102,7 +102,7 @@ namespace PDI.RevitMcp.Protocol
         /// <summary>Campos que no forman parte del contenido lógico de una operación (control/transporte).</summary>
         public static readonly HashSet<string> ControlArgs = new HashSet<string>(StringComparer.Ordinal)
         {
-            Wire.KeyArg, Wire.TaskArg, Wire.ToolArg, "reconciliar", "deadline_ms", "esperar", "espera_s", "page", "_cliente", "_bytes",
+            Wire.KeyArg, Wire.TaskArg, Wire.ToolArg, "reconciliar", "deadline_ms", "esperar", "espera_s", "page", "_cliente", "_bytes", "_traza",
         };
 
         private static void WriteCanonical(StringBuilder sb, object v, int depth)

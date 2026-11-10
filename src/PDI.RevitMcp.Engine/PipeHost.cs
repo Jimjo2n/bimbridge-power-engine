@@ -177,11 +177,23 @@ namespace PDI.RevitMcp.Engine
                         // si contara, un agente ocioso aparecería "activo" para siempre en el panel.
                         _sessions.Touch(session);
                         var s = session;
-                        var traceId = s.Id + ":" + req.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        var corr = Correlation.For(s, req);
                         var reqDoc = Arg.GetString(req.Args, Wire.DocArg);
+                        // Issue #3: sin nombre de agente, sólo lectura y registro. El rechazo queda en el diario con su correlación.
+                        if (_config.IdentityRequired && s.AgentName == null && IdentityPolicy.RequiresIdentity(req.Op))
+                        {
+                            var refused = Response.Fail(req.Id, Status.Rechazado, IdentityPolicy.RefusalMessage(s));
+                            var rj = new Dictionary<string, object> { ["aviso"] = "identidad_insuficiente", ["cliente"] = s.ClientName };
+                            corr.WriteTo(rj);
+                            if (reqDoc != null) rj["doc"] = reqDoc;
+                            _journal?.Log(s.Id, ToolName(req), refused.Estado, 0, rj);
+                            await Send(stream, writeLock, refused, connCts.Token).ConfigureAwait(false);
+                            continue;
+                        }
                         _sessions.RequestStarted(s, ToolName(req), reqDoc);
                         _ = Task.Run(async () =>
                         {
+                            Correlation.Current = corr;
                             var sw = Stopwatch.StartNew();
                             Response resp;
                             // Plazo real: si el puente deja de esperar, el trabajo pendiente en Revit también se cancela
@@ -207,7 +219,9 @@ namespace PDI.RevitMcp.Engine
                             // Atribución: cada línea del diario lleva el agente, el cliente, la traza y el documento pedido.
                             extra["agente"] = s.AgentName;
                             extra["cliente"] = s.ClientName;
-                            extra["traza"] = traceId;
+                            extra["traza"] = corr.TraceId;
+                            corr.Complete(req, resp);
+                            corr.WriteTo(extra);
                             if (reqDoc != null) extra["doc"] = reqDoc;
                             _journal?.Log(s.Id, ToolName(req), resp.Estado, ms, extra);
                             try { await Send(stream, writeLock, resp, connCts.Token).ConfigureAwait(false); }

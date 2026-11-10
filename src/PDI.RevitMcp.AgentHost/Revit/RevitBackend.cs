@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using PDI.RevitMcp.Bridge;
+using PDI.RevitMcp.Engine;
 using PDI.RevitMcp.Protocol;
 
 namespace PDI.RevitMcp.AgentHost
@@ -27,10 +28,19 @@ namespace PDI.RevitMcp.AgentHost
         /// <summary>Se llama tras cada respuesta (para volcar evidencia a disco al momento).</summary>
         public Action<Dictionary<string, object>> OnCall;
 
+        /// <summary>Issue #4: traza de esta ejecución del AgentHost; cada llamada la envía en _traza y el diario del add-in la registra.</summary>
+        public readonly string TraceId = "ah-" + Correlation.NewTraceId();
+
         private RevitLink(int pid, string pipe, InstanceDescriptor d)
         {
             ExpectedPid = pid;
             _c.FixedTarget = (pipe, d);
+            // Issue #3: el AgentHost es un agente con nombre. Sin BIMBRIDGE_AGENTE se declara por configuración como "AgentHost <pid>".
+            if (string.IsNullOrWhiteSpace(_c.AgentName))
+            {
+                _c.AgentName = "AgentHost " + Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture);
+                _c.AgentSource = AgentIdentity.SourceConfig;
+            }
         }
 
         /// <summary>Por pid: debe existir un descriptor de instancia con ese pid (el add-in cargado en ESE Revit).</summary>
@@ -59,6 +69,7 @@ namespace PDI.RevitMcp.AgentHost
         {
             var sw = Stopwatch.StartNew();
             var reqBytes = Json.Write(args ?? new Dictionary<string, object>()).Length;
+            args = new Dictionary<string, object>(args ?? new Dictionary<string, object>()) { [Correlation.TraceArg] = TraceId };
             // rc1.1: Revit en reposo a veces tarda >5 s en atender el ExternalEvent (medido en la campaña nativa rc1).
             // Solo las LECTURAS se reintentan ante revit_ocupado: no cambian nada, así que repetirlas es seguro.
             // Las escrituras nunca se reintentan aquí; su incertidumbre la resuelve el runner leyendo el modelo.
