@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.IO.Pipes;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using PDI.RevitMcp.Engine;
@@ -18,10 +20,18 @@ namespace PDI.RevitMcp.Tests
             public readonly List<string> Ops = new List<string>();
             public Correlation LastCorrelation;
             public Dictionary<string, object> LastArgs;
+            /// <summary>Si se fija, ctx agente=… registra como lo hace el add-in (TryRegister sobre el registro de sesiones).</summary>
+            public SessionRegistry Registry;
             public Dictionary<string, object> HelloInfo() => new Dictionary<string, object>();
             public Task<Response> HandleAsync(Session session, Request request, CancellationToken ct)
             {
                 lock (Ops) { Ops.Add(request.Op); LastCorrelation = Correlation.Current; LastArgs = request.Args; }
+                if (request.Op == Wire.OpContext && Registry != null && Arg.GetString(request.Args, "agente") is string ag)
+                {
+                    var rr = Registry.TryRegister(session, ag, null, null, out _);
+                    if (rr == RegisterResult.Duplicate) return Task.FromResult(Response.Fail(request.Id, Status.Conflicto, "alias en uso"));
+                    if (rr == RegisterResult.Invalid) return Task.FromResult(Response.Fail(request.Id, Status.Invalido, "alias inválido"));
+                }
                 var d = new Dictionary<string, object> { ["ok"] = true };
                 if (request.Op == Wire.OpCommit) d["plan_id"] = "P-0001";
                 return Task.FromResult(new Response { Id = request.Id, Estado = Status.Ok, Datos = d });
@@ -49,7 +59,7 @@ namespace PDI.RevitMcp.Tests
         private static string NewPipe() => "PDI.RevitMcp.test.id." + Guid.NewGuid().ToString("N").Substring(0, 8);
 
         [Fact]
-        public async Task UnnamedSession_CanRead_ButCannotOperate()
+        public async Task UnnamedSession_CannotReadOrOperate_OnlyHandshakeAndRegistration()
         {
             var pipe = NewPipe();
             var h = new Recorder();
@@ -58,18 +68,85 @@ namespace PDI.RevitMcp.Tests
                 host.Start();
                 using (var c = await Connect(pipe))
                 {
-                    Assert.Equal(Status.Ok, (await Call(c, 2, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).Estado);
-                    Assert.Equal(Status.Ok, (await Call(c, 3, Wire.OpContext)).Estado);
-                    foreach (var op in new[] { Wire.OpPlan, Wire.OpCommit, Wire.OpExec, Wire.OpFam, Wire.OpDoc, Wire.OpShow, Wire.OpCapture, Wire.OpTask, "desconocida" })
+                    Assert.Equal(Status.Ok, (await Call(c, 2, Wire.OpPing)).Estado);
+                    // Lecturas anónimas: rechazadas (revisión PR #22). También ctx sin agente=, que devolvería datos del modelo.
+                    foreach (var op in new[] { Wire.OpQuery, Wire.OpSets, Wire.OpCheck, Wire.OpCatalog, Wire.OpParams, Wire.OpDocs, Wire.OpGeo, Wire.OpJob, Wire.OpContext,
+                                               Wire.OpPlan, Wire.OpCommit, Wire.OpExec, Wire.OpFam, Wire.OpDoc, Wire.OpShow, Wire.OpCapture, Wire.OpTask, "desconocida" })
                     {
-                        var r = await Call(c, 10, op);
+                        var r = await Call(c, 10, op, new Dictionary<string, object> { ["cat"] = "LightingFixtures" });
                         Assert.Equal(Status.Rechazado, r.Estado);
                         Assert.Contains("ctx agente=", r.Aviso);
                     }
                 }
             }
-            Assert.DoesNotContain(Wire.OpCommit, h.Ops);
-            Assert.DoesNotContain(Wire.OpExec, h.Ops);
+            Assert.Empty(h.Ops);   // nada anónimo llegó al manejador (a Revit)
+        }
+
+        [Fact]
+        public async Task Registration_ThenReads_AreAttributedInTheJournal()
+        {
+            var pipe = NewPipe();
+            var sessions = new SessionRegistry();
+            var h = new Recorder { Registry = sessions };
+            var dir = Path.Combine(Path.GetTempPath(), "pdi-idjournal-" + Guid.NewGuid().ToString("N"));
+            var journal = new Journal(dir, 1);
+            try
+            {
+                using (var host = new PipeHost(pipe, null, sessions, h, new EngineConfig(), journal))
+                {
+                    host.Start();
+                    using (var c = await Connect(pipe))
+                    {
+                        Assert.Equal(Status.Rechazado, (await Call(c, 2, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).Estado);
+                        // Alias vacío o ilegible: no es un registro válido; no da nombre ni abre lecturas.
+                        var bad = await Call(c, 3, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "\n" });
+                        Assert.Contains(bad.Estado, new[] { Status.Rechazado, Status.Invalido });
+                        Assert.Equal(Status.Rechazado, (await Call(c, 31, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).Estado);
+                        Assert.Equal(Status.Ok, (await Call(c, 4, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "Revisor QA" })).Estado);
+                        Assert.Equal(Status.Ok, (await Call(c, 5, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).Estado);
+                    }
+                }
+                var entries = journal.Recent(50);
+                Assert.Equal(2, entries.Count(e => Arg.GetString(e, "op") == Wire.OpQuery && Arg.GetString(e, "estado") == Status.Rechazado));
+                var rejected = entries.Single(e => Arg.GetString(e, "op") == Wire.OpQuery && (Arg.GetString(e, "request_id") ?? "").EndsWith("#2"));
+                Assert.Equal(Status.Rechazado, Arg.GetString(rejected, "estado"));
+                Assert.Equal("identidad_insuficiente", Arg.GetString(rejected, "aviso"));
+                Assert.Null(Arg.GetString(rejected, "agent_id"));
+                var read = entries.Single(e => Arg.GetString(e, "op") == Wire.OpQuery && Arg.GetString(e, "estado") == Status.Ok);
+                Assert.Equal("Revisor QA", Arg.GetString(read, "agente"));
+                Assert.StartsWith("A-", Arg.GetString(read, "agent_id"));
+                Assert.EndsWith("#5", Arg.GetString(read, "request_id"));
+                Assert.Null(Arg.GetString(read, "identidad"));                 // atribuida: no lleva marca de anónima
+            }
+            finally { (journal as IDisposable)?.Dispose(); }
+        }
+
+        [Fact]
+        public async Task ConcurrentSessions_DistinctClients_EachAttributed_DuplicateAliasRejected()
+        {
+            var pipe = NewPipe();
+            var sessions = new SessionRegistry();
+            var h = new Recorder { Registry = sessions };
+            using (var host = new PipeHost(pipe, null, sessions, h, new EngineConfig()))
+            {
+                host.Start();
+                using (var a = await Connect(pipe, client: "claude-code", pid: 100))
+                using (var b = await Connect(pipe, client: "codex", pid: 200))
+                {
+                    Assert.Equal(Status.Ok, (await Call(a, 2, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "Modelador" })).Estado);
+                    Assert.Equal(Status.Conflicto, (await Call(b, 2, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "modelador" })).Estado);
+                    Assert.Equal(Status.Rechazado, (await Call(b, 3, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).Estado);   // sigue sin nombre
+                    Assert.Equal(Status.Ok, (await Call(b, 4, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "Revisor" })).Estado);
+                    var qa = Call(a, 5, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" });
+                    var qb = Call(b, 5, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" });
+                    Assert.Equal(Status.Ok, (await qa).Estado);
+                    Assert.Equal(Status.Ok, (await qb).Estado);
+                }
+            }
+            var ids = sessions.Closed().Select(x => x.Id).ToList();
+            Assert.Equal(2, ids.Distinct().Count());
+            Assert.Contains(sessions.Closed(), x => x.AgentName == "Modelador");
+            Assert.Contains(sessions.Closed(), x => x.AgentName == "Revisor");
         }
 
         [Fact]
@@ -151,15 +228,22 @@ namespace PDI.RevitMcp.Tests
         }
 
         [Fact]
-        public void Unregister_ReturnsToReadOnly()
+        public void Unregister_RemovesTheName_AndPolicyAllowsOnlyHandshakeAndRegistration()
         {
             var reg = new SessionRegistry();
             var s = reg.Open("x", 1);
             Assert.True(reg.Register(s, "Agente", null, null));
             reg.Unregister(s);
             Assert.Null(s.AgentName);
-            Assert.True(IdentityPolicy.RequiresIdentity(Wire.OpCommit));
-            Assert.False(IdentityPolicy.RequiresIdentity(Wire.OpQuery));
+            Request R(string op, Dictionary<string, object> a = null) => new Request { Id = 1, Op = op, Args = a ?? new Dictionary<string, object>() };
+            Assert.True(IdentityPolicy.RequiresIdentity(R(Wire.OpCommit)));
+            Assert.True(IdentityPolicy.RequiresIdentity(R(Wire.OpQuery)));                 // lectura: exige nombre
+            Assert.True(IdentityPolicy.RequiresIdentity(R(Wire.OpContext)));               // ctx sin agente=: exige nombre
+            Assert.True(IdentityPolicy.RequiresIdentity(R(Wire.OpContext, new Dictionary<string, object> { ["agente"] = "  " })));
+            Assert.True(IdentityPolicy.RequiresIdentity(R(null)));                         // desconocida: fail-closed
+            Assert.False(IdentityPolicy.RequiresIdentity(R(Wire.OpHello)));
+            Assert.False(IdentityPolicy.RequiresIdentity(R(Wire.OpPing)));
+            Assert.False(IdentityPolicy.RequiresIdentity(R(Wire.OpContext, new Dictionary<string, object> { ["agente"] = "Revisor" })));
             Assert.Contains("desregistrada", IdentityPolicy.RefusalMessage(s));
         }
 

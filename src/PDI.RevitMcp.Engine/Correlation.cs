@@ -12,7 +12,7 @@ namespace PDI.RevitMcp.Engine
     /// Issue #4: identificadores de correlación de una petición. Se fijan en PipeHost y viajan por AsyncLocal (no por los argumentos, para
     /// no alterar huellas de idempotencia ni validaciones). El diario los registra en cada línea.
     ///   agent_id       = huella estable de (principal de Windows, alias). Igual al reconectar; distinto si cambia el alias o el usuario.
-    ///   session_id     = sesión lógica (S-cliente-pid[-n]).
+    ///   session_id     = instancia de sesión lógica (S-cliente-pid-&lt;64 bits aleatorios&gt;): nunca se reutiliza, tampoco al reconectar con el mismo pid.
     ///   request_id     = session_id + "#" + id de la petición en esa conexión (único en la ejecución de Revit).
     ///   trace_id       = el que trae el cliente en _traza (AgentHost, puente) o uno nuevo; une procesos.
     ///   job_id         = trabajo de fondo, si la respuesta lo trae.
@@ -108,16 +108,26 @@ namespace PDI.RevitMcp.Engine
     /// </summary>
     public static class IdentityPolicy
     {
-        private static readonly HashSet<string> Free = new HashSet<string>(StringComparer.Ordinal)
-        {
-            Wire.OpHello, Wire.OpPing, Wire.OpContext, Wire.OpQuery, Wire.OpSets, Wire.OpCheck, Wire.OpCatalog, Wire.OpParams,
-            Wire.OpDocs, Wire.OpGeo, Wire.OpJob,
-        };
+        // Revisión del coordinador (PR #22): con identidad_obligatoria=true un agente sin nombre NO lee ni modifica nada. Antes del registro sólo
+        // quedan el saludo, el latido y el propio registro (ctx agente=…). Un ctx sin agente= devolvería datos del modelo: también exige nombre.
+        // Única política, aplicada en PipeHost antes de despachar: ningún comando la reimplementa por su cuenta.
+        private static readonly HashSet<string> Handshake = new HashSet<string>(StringComparer.Ordinal) { Wire.OpHello, Wire.OpPing };
 
-        public static bool RequiresIdentity(string op) => op == null || !Free.Contains(op);
+        /// <summary>¿La petición exige un agente con nombre? Desconocida = sí (fail-closed).</summary>
+        public static bool RequiresIdentity(Request req)
+        {
+            if (req?.Op == null) return true;
+            if (Handshake.Contains(req.Op)) return false;
+            return !IsRegistration(req);
+        }
+
+        /// <summary>Registro de identidad: ctx con agente= (o desregistrar=true, que sólo quita el nombre).</summary>
+        public static bool IsRegistration(Request req) =>
+            req.Op == Wire.OpContext && req.Args != null &&
+            (!string.IsNullOrWhiteSpace(Arg.GetString(req.Args, "agente")) || Arg.GetBool(req.Args, "desregistrar") == true);
 
         public static string RefusalMessage(Session s) =>
             "esta sesión no tiene nombre de agente" + (s?.IdentityNote != null ? " (" + s.IdentityNote + ")" : "") +
-            ": regístrese con revit ctx agente=\"Nombre\" o configure BIMBRIDGE_AGENTE en el puente. Las lecturas siguen disponibles.";
+            ": regístrese con revit ctx agente=\"Nombre\" o configure BIMBRIDGE_AGENTE en el puente. Sin nombre no se permiten lecturas ni cambios.";
     }
 }

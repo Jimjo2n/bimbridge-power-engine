@@ -106,10 +106,14 @@ namespace PDI.RevitMcp.Engine
         {
             lock (_lock)
             {
+                // Revisión PR #22: identificador único por INSTANCIA de sesión. Antes "S-cliente-pid" se reutilizaba al reconectar con el mismo
+                // pid y, como request_id = session_id#contador y el contador reinicia, dos solicitudes distintas podían compartir request_id.
+                // Se conserva el prefijo legible (cliente y pid, útil en el diario) y se añade un sufijo aleatorio de 64 bits.
                 var baseId = "S-" + Slug(clientName) + "-" + (clientPid > 0 ? clientPid.ToString() : "0");
-                var id = baseId;
-                var n = 2;
-                while (_sessions.ContainsKey(id)) id = baseId + "-" + n++;
+                string id;
+                do id = baseId + "-" + NewInstanceSuffix();
+                while (_sessions.ContainsKey(id) || _issued.Contains(id));
+                _issued.Add(id);
                 var t = _now();
                 var s = new Session
                 {
@@ -243,6 +247,16 @@ namespace PDI.RevitMcp.Engine
         }
 
         public int Count { get { lock (_lock) return _sessions.Count; } }
+
+        /// <summary>Ids emitidos en esta ejecución (abiertos o cerrados): nunca se vuelve a emitir uno.</summary>
+        private readonly HashSet<string> _issued = new HashSet<string>(StringComparer.Ordinal);
+
+        private static string NewInstanceSuffix()
+        {
+            var b = new byte[8];
+            using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create()) rng.GetBytes(b);
+            return BitConverter.ToString(b).Replace("-", "").ToLowerInvariant();
+        }
 
         internal static string Slug(string name)
         {

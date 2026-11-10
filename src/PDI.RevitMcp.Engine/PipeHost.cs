@@ -179,8 +179,10 @@ namespace PDI.RevitMcp.Engine
                         var s = session;
                         var corr = Correlation.For(s, req);
                         var reqDoc = Arg.GetString(req.Args, Wire.DocArg);
-                        // Issue #3: sin nombre de agente, sólo lectura y registro. El rechazo queda en el diario con su correlación.
-                        if (_config.IdentityRequired && s.AgentName == null && IdentityPolicy.RequiresIdentity(req.Op))
+                        // Issue #3 (revisión PR #22): sin nombre de agente sólo saludo, latido y registro. Ni lecturas ni cambios.
+                        // El rechazo queda en el diario con su correlación.
+                        var anonymous = s.AgentName == null;
+                        if (_config.IdentityRequired && anonymous && IdentityPolicy.RequiresIdentity(req))
                         {
                             var refused = Response.Fail(req.Id, Status.Rechazado, IdentityPolicy.RefusalMessage(s));
                             var rj = new Dictionary<string, object> { ["aviso"] = "identidad_insuficiente", ["cliente"] = s.ClientName };
@@ -222,6 +224,8 @@ namespace PDI.RevitMcp.Engine
                             extra["traza"] = corr.TraceId;
                             corr.Complete(req, resp);
                             corr.WriteTo(extra);
+                            // Modo heredado explícito (identidad_obligatoria=false): la operación anónima queda marcada como tal en el diario.
+                            if (anonymous && !IdentityPolicy.IsRegistration(req)) extra["identidad"] = _config.IdentityRequired ? "sin_nombre" : "sin_nombre_modo_heredado";
                             if (reqDoc != null) extra["doc"] = reqDoc;
                             _journal?.Log(s.Id, ToolName(req), resp.Estado, ms, extra);
                             try { await Send(stream, writeLock, resp, connCts.Token).ConfigureAwait(false); }

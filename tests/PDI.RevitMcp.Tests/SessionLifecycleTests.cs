@@ -34,7 +34,11 @@ namespace PDI.RevitMcp.Tests
         {
             var c = new NamedPipeClientStream(".", pipe, PipeDirection.InOut, PipeOptions.Asynchronous);
             await c.ConnectAsync(5000);
-            await Frame.WriteAsync(c, Json.Write(new Request { Id = 1, Op = Wire.OpHello, Args = new Dictionary<string, object> { ["protocol"] = (long)Wire.ProtocolVersion, ["client"] = "prueba" } }), CancellationToken.None);
+            await Frame.WriteAsync(c, Json.Write(new Request { Id = 1, Op = Wire.OpHello, Args = new Dictionary<string, object>
+            {
+                // Identidad obligatoria: cada conexión de prueba declara un agente único por configuración.
+                ["protocol"] = (long)Wire.ProtocolVersion, ["client"] = "prueba", ["agente"] = "Prueba " + Guid.NewGuid().ToString("N").Substring(0, 6), ["agente_fuente"] = AgentIdentity.SourceConfig,
+            } }), CancellationToken.None);
             Assert.Equal(Status.Ok, Response.FromJson(await Frame.ReadAsync(c, CancellationToken.None)).Estado);
             return c;
         }

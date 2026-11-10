@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using PDI.RevitMcp.Engine;
 using PDI.RevitMcp.Engine.Tasks;
+using PDI.RevitMcp.Protocol;
 using PDI.RevitMcp.Scripting;
 using Xunit;
 using FakeModel = PDI.RevitMcp.Tests.TaskEngineTests.FakeModel;
@@ -197,25 +198,100 @@ namespace PDI.RevitMcp.Tests
             var p = Path.Combine(root, "a.jsonl");
             new AuditLog(p).Append("s", "genesis", "ok");
             var start = DateTime.UtcNow.AddSeconds(4).Ticks.ToString();
-            var procs = Enumerable.Range(0, 8).Select(i => LeaseFencingTests.StartProbe(p, "50", "proc" + i, "audit", start)).ToList();
-            // #27: stdout y stderr se drenan a la vez (sin bloqueo) y cada hijo se valida por código de salida, no sólo por su salida.
-            var reports = new List<string>();
-            foreach (var pr in procs)
+            // #27: supervisión acotada de procesos reales. Drenado de stdout/stderr desde el arranque, un plazo de reloj para todos, terminación
+            // del árbol si vence, liberación en finally, y la cadena se verifica AUNQUE algún hijo falle (el diagnóstico no oculta un append roto).
+            var runs = ProbeRun.StartAll(8, i => new[] { p, "50", "proc" + i, "audit", start }, TimeSpan.FromSeconds(180));
+            try
             {
-                var outTask = pr.StandardOutput.ReadToEndAsync();
-                var errTask = pr.StandardError.ReadToEndAsync();
-                var exited = pr.WaitForExit(120000);
-                var o = outTask.Result.Trim(); var e = errTask.Result.Trim();
-                reports.Add("pid=" + pr.Id + " exit=" + (exited ? pr.ExitCode.ToString() : "timeout") + " out='" + o + "' err='" + e + "'");
-                Assert.True(exited, "proceso " + pr.Id + " no terminó: " + string.Join(" | ", reports));
-                Assert.True(pr.ExitCode == 0, "proceso " + pr.Id + " salió con " + pr.ExitCode + ": " + string.Join(" | ", reports));
-                Assert.Equal("APPENDED 50", o);
-                pr.Dispose();
+                var report = string.Join(" | ", runs.Select(r => r.Describe()));
+                var v = AuditLog.Verify(p);
+                Assert.True(v.Ok, "cadena: " + string.Join("; ", v.Errors.Take(5)) + " || " + report);
+                Assert.All(runs, r => Assert.True(r.Exited && r.ExitCode == 0 && r.Stdout.Trim() == "APPENDED 50", report));
+                Assert.Equal(1 + 8 * 50, v.Lines);
+                Assert.Empty(Directory.GetFiles(root, "*.cuarentena-*"));
+                // Ni pérdidas ni duplicados: exactamente 50 líneas por proceso, seq sin huecos (Verify) y cid único donde existe.
+                var lines = File.ReadAllLines(p).Where(l => l.Length > 0).Select(Json.ParseObject).ToList();
+                for (var i = 0; i < 8; i++) Assert.Equal(50, lines.Count(l => Arg.GetString(l, "autor") == "proc" + i));
+                var cids = lines.Select(l => Arg.GetString(l, "cid")).Where(c => c != null).ToList();
+                Assert.Equal(cids.Count, cids.Distinct().Count());
+                Assert.Empty(Directory.Exists(p + ".pend") ? Directory.GetFiles(p + ".pend", "*.json") : new string[0]);
             }
-            var v = AuditLog.Verify(p);
-            Assert.True(v.Ok, string.Join("; ", v.Errors.Take(5)));
-            Assert.Equal(1 + 8 * 50, v.Lines);
-            Assert.Empty(Directory.GetFiles(root, "*.cuarentena-*"));
+            finally
+            {
+                foreach (var r in runs) r.Dispose();
+                try { Directory.Delete(root, true); } catch (Exception) { /* limpieza best-effort del directorio temporal */ }
+            }
+        }
+
+        /// <summary>
+        /// Proceso auxiliar supervisado (#27): pid, inicio y fin, código de salida, stdout/stderr acotados, terminación del árbol al vencer el plazo,
+        /// y liberación garantizada. Un fallo de arranque queda registrado como tal (no como salida vacía).
+        /// </summary>
+        private sealed class ProbeRun : IDisposable
+        {
+            private const int MaxChars = 4000;
+            public System.Diagnostics.Process Proc;
+            public int Pid;
+            public DateTime StartedUtc, EndedUtc;
+            public bool Exited, Killed;
+            public int ExitCode = int.MinValue;
+            public string Stdout = "", Stderr = "", StartError;
+            private Task<string> _out, _err;
+
+            public static List<ProbeRun> StartAll(int n, Func<int, string[]> args, TimeSpan deadline)
+            {
+                var runs = new List<ProbeRun>();
+                for (var i = 0; i < n; i++)
+                {
+                    var r = new ProbeRun { StartedUtc = DateTime.UtcNow };
+                    try
+                    {
+                        r.Proc = LeaseFencingTests.StartProbe(args(i));
+                        r.Pid = r.Proc.Id;
+                        r._out = r.Proc.StandardOutput.ReadToEndAsync();   // drenado desde el arranque: un hijo nunca se bloquea por un buffer lleno
+                        r._err = r.Proc.StandardError.ReadToEndAsync();
+                    }
+                    catch (Exception ex) { r.StartError = ex.GetType().Name + ": " + ex.Message; }
+                    runs.Add(r);
+                }
+                var until = DateTime.UtcNow + deadline;
+                foreach (var r in runs.Where(x => x.Proc != null))
+                {
+                    var left = until - DateTime.UtcNow;
+                    r.Exited = r.Proc.WaitForExit((int)Math.Max(0, left.TotalMilliseconds));
+                    if (!r.Exited)
+                    {
+                        try { r.Proc.Kill(entireProcessTree: true); r.Killed = true; } catch (Exception) { }
+                        r.Exited = r.Proc.WaitForExit(5000);
+                    }
+                    r.EndedUtc = DateTime.UtcNow;
+                    if (r.Exited) r.ExitCode = r.Proc.ExitCode;
+                    // Lectura acotada: si un nieto conserva el stream abierto, no se espera indefinidamente.
+                    r.Stdout = Bounded(r._out); r.Stderr = Bounded(r._err);
+                }
+                return runs;
+            }
+
+            private static string Bounded(Task<string> t)
+            {
+                if (t == null) return "";
+                if (!t.Wait(5000)) return "<stream sin cerrar tras 5 s>";
+                var s = t.Result ?? "";
+                return s.Length > MaxChars ? s.Substring(0, MaxChars) + "…" : s;
+            }
+
+            public string Describe() =>
+                StartError != null ? "arranque fallido: " + StartError
+                : "pid=" + Pid + " exit=" + (Exited ? ExitCode.ToString() : "sin salir") + (Killed ? " (terminado por plazo)" : "") +
+                  " t=" + (EndedUtc - StartedUtc).TotalSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "s" +
+                  " out='" + Stdout.Trim() + "' err='" + Stderr.Trim() + "'";
+
+            public void Dispose()
+            {
+                if (Proc == null) return;
+                try { if (!Proc.HasExited) Proc.Kill(entireProcessTree: true); } catch (Exception) { }   // sin huérfanos
+                Proc.Dispose();
+            }
         }
 
         // =========================== R03 autoridad independiente ===========================
