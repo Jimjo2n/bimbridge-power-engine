@@ -198,7 +198,20 @@ namespace PDI.RevitMcp.Tests
             new AuditLog(p).Append("s", "genesis", "ok");
             var start = DateTime.UtcNow.AddSeconds(4).Ticks.ToString();
             var procs = Enumerable.Range(0, 8).Select(i => LeaseFencingTests.StartProbe(p, "50", "proc" + i, "audit", start)).ToList();
-            foreach (var pr in procs) { var o = pr.StandardOutput.ReadToEnd(); Assert.True(pr.WaitForExit(120000)); Assert.Contains("APPENDED 50", o); pr.Dispose(); }
+            // #27: stdout y stderr se drenan a la vez (sin bloqueo) y cada hijo se valida por código de salida, no sólo por su salida.
+            var reports = new List<string>();
+            foreach (var pr in procs)
+            {
+                var outTask = pr.StandardOutput.ReadToEndAsync();
+                var errTask = pr.StandardError.ReadToEndAsync();
+                var exited = pr.WaitForExit(120000);
+                var o = outTask.Result.Trim(); var e = errTask.Result.Trim();
+                reports.Add("pid=" + pr.Id + " exit=" + (exited ? pr.ExitCode.ToString() : "timeout") + " out='" + o + "' err='" + e + "'");
+                Assert.True(exited, "proceso " + pr.Id + " no terminó: " + string.Join(" | ", reports));
+                Assert.True(pr.ExitCode == 0, "proceso " + pr.Id + " salió con " + pr.ExitCode + ": " + string.Join(" | ", reports));
+                Assert.Equal("APPENDED 50", o);
+                pr.Dispose();
+            }
             var v = AuditLog.Verify(p);
             Assert.True(v.Ok, string.Join("; ", v.Errors.Take(5)));
             Assert.Equal(1 + 8 * 50, v.Lines);
