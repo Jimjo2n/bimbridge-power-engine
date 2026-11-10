@@ -29,7 +29,7 @@ namespace PDI.RevitMcp.Tests
 
         private static Process Start(string lockTimeoutMs, string[] args)
         {
-            var psi = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, UseShellExecute = false };
+            var psi = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
             if (lockTimeoutMs != null) psi.Environment["PDI_PROBE_LOCK_TIMEOUT_MS"] = lockTimeoutMs;
             psi.ArgumentList.Add(ProbeDll());
             foreach (var a in args) psi.ArgumentList.Add(a);

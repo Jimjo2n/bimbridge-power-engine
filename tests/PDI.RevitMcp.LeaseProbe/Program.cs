@@ -39,8 +39,16 @@ internal static class Program
                     var log = new PDI.RevitMcp.Engine.AuditLog(a[0]);
                     while (DateTime.UtcNow < startA) Thread.SpinWait(100);
                     var n = int.Parse(a[1], CultureInfo.InvariantCulture);
-                    for (var i = 0; i < n; i++) log.Append(owner, "prueba", "ok");
+                    try { for (var i = 0; i < n; i++) log.Append(owner, "prueba", "ok"); }
+                    catch (PDI.RevitMcp.Engine.JournalUnavailableException)
+                    {
+                        // Diagnóstico de la sonda: contadores antes de propagar el fallo (el código de salida sigue siendo distinto de cero).
+                        Console.Error.WriteLine("PROBE_FAIL " + PDI.RevitMcp.Engine.AuditProfile.BatchReport() + " reply_errors=" + PDI.RevitMcp.Engine.AuditProfile.ReplyErrors + " sent=[" + PDI.RevitMcp.Engine.AuditProfile.RepliesSent + "]"
+                            + " pend=[" + string.Join(",", System.IO.Directory.Exists(a[0] + ".pend") ? System.IO.Directory.GetFiles(a[0] + ".pend") : new string[0]) + "]");
+                        throw;
+                    }
                     Console.WriteLine("APPENDED " + n);
+                    if (Environment.GetEnvironmentVariable("PDI_PROBE_PROFILE") == "1") Console.Error.WriteLine("PROFILE " + PDI.RevitMcp.Engine.AuditProfile.Report() + " " + PDI.RevitMcp.Engine.AuditProfile.BatchReport() + " " + PDI.RevitMcp.Engine.AuditProfile.PhaseReport());
                     return 0;
                 case "clave":
                     // a[0]=carpeta de concesiones; a[4]=inicio. Crea el almacén a la vez que otros procesos y aprueba una concesión propia.

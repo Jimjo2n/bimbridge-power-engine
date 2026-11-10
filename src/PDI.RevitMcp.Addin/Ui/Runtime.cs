@@ -26,6 +26,8 @@ namespace PDI.RevitMcp.Addin.Ui
         public static AuditLog Audit;
         /// <summary>Concesiones de capacidades (R03). Sólo las crea una persona con el botón «Autorizar» de la cinta.</summary>
         public static GrantStore Grants;
+        /// <summary>#5: estadísticas del motor C# (hilo de Revit, cachés de compilación y de consultas, trabajos). Sólo memoria; nunca la API de Revit.</summary>
+        public static Func<System.Collections.Generic.Dictionary<string, object>> EngineDiagnostics;
 
         /// <summary>
         /// «Bloquear inyección de código C#» (revisión consolidada). Por defecto NO bloqueado: exec corre para los agentes locales autorizados.

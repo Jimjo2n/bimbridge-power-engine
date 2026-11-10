@@ -114,17 +114,82 @@ namespace PDI.RevitMcp.Tests
             {
                 var dir = TempRoot();
                 var stores = new GrantStore[16];
+                // Issue #21: una excepción en un Thread suelto abortaba el proceso de pruebas entero. Se captura y se informa como fallo.
+                var errors = new Exception[stores.Length];
                 using (var go = new ManualResetEventSlim(false))
                 {
-                    var threads = Enumerable.Range(0, stores.Length).Select(i => new Thread(() => { go.Wait(); stores[i] = new GrantStore(dir); })).ToList();
+                    var threads = Enumerable.Range(0, stores.Length).Select(i => new Thread(() =>
+                    {
+                        go.Wait();
+                        try { stores[i] = new GrantStore(dir); } catch (Exception ex) { errors[i] = ex; }
+                    })).ToList();
                     threads.ForEach(t => t.Start());
                     go.Set();
                     threads.ForEach(t => t.Join());
                 }
+                Assert.True(errors.All(e => e == null), "ronda " + round + ": " + string.Join(" | ", errors.Where(e => e != null).Select(e => e.GetType().Name + ": " + e.Message)));
                 stores[0].Approve("t", DocKey, "P", new[] { Capability.Modificar }, TimeSpan.FromHours(1), "operator", Now);
                 Assert.All(stores, s => Assert.Null(s.Check("t", DocKey, "P", Capability.Modificar, Now)));
                 Assert.Empty(Directory.GetFiles(dir, "clave.bin.tmp-*"));
             }
+        }
+
+        /// <summary>Issue #21, reproducción determinista: otro handle tiene clave.bin abierto SIN compartir lectura (como un escáner
+        /// recién creada la clave). Antes: GrantKeyException inmediata. Ahora: espera acotada y lee la MISMA clave.</summary>
+        [Fact]
+        public void Key_TransientSharingViolation_WaitsAndReadsSameKey()
+        {
+            var dir = TempRoot();
+            var first = new GrantStore(dir);
+            first.Approve("t", DocKey, "P", new[] { Capability.Modificar }, TimeSpan.FromHours(1), "operator", Now);
+            var keyPath = Path.Combine(dir, "clave.bin");
+            using (var held = new ManualResetEventSlim(false))
+            {
+                var holder = new Thread(() =>
+                {
+                    using (new FileStream(keyPath, FileMode.Open, FileAccess.Read, FileShare.None)) { held.Set(); Thread.Sleep(400); }
+                });
+                holder.Start();
+                held.Wait();
+                var again = new GrantStore(dir);   // se abre mientras el otro handle no comparte
+                holder.Join();
+                Assert.Null(again.Check("t", DocKey, "P", Capability.Modificar, Now));
+            }
+        }
+
+        /// <summary>Si la violación de compartición persiste más allá de la ventana, falla cerrado y controlado (sin abortar, sin regenerar,
+        /// sin el secreto en el mensaje).</summary>
+        [Fact]
+        public void Key_PersistentSharingViolation_FailsClosedWithoutSecret()
+        {
+            var dir = TempRoot();
+            new GrantStore(dir);
+            var keyPath = Path.Combine(dir, "clave.bin");
+            var secret = File.ReadAllText(keyPath);
+            var saved = GrantStore.ReadRetryWindow;
+            GrantStore.ReadRetryWindow = TimeSpan.FromMilliseconds(150);
+            try
+            {
+                using (new FileStream(keyPath, FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    var ex = Assert.Throws<GrantStore.GrantKeyException>(() => new GrantStore(dir));
+                    var b64 = secret.Replace("\r", "").Split('\n').Where(l => l.Length > 0).Last();
+                    Assert.DoesNotContain(b64, ex.Message);
+                }
+                Assert.Equal(secret, File.ReadAllText(keyPath));   // no se regeneró
+            }
+            finally { GrantStore.ReadRetryWindow = saved; }
+        }
+
+        [Fact]
+        public void Key_AccessDenied_IsNotRetriedAndFailsClosed()
+        {
+            // Un error que no es de compartición (aquí: la ruta es un directorio) no entra en la espera.
+            var dir = TempRoot();
+            Directory.CreateDirectory(Path.Combine(dir, "clave.bin"));
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            Assert.Throws<GrantStore.GrantKeyException>(() => new GrantStore(dir));
+            Assert.True(sw.ElapsedMilliseconds < 2000);
         }
 
         [Fact]

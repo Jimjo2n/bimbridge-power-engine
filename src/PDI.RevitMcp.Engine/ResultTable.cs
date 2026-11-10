@@ -18,6 +18,10 @@ namespace PDI.RevitMcp.Engine
     {
 
         public static object Build(QuerySpec q, IEnumerable<Dictionary<string, object>> rows, out List<long> matchedIds, int maxGroups = 500)
+            => Render(q, Filter(q, rows, out matchedIds), q.Page, q.PageSize, maxGroups);
+
+        /// <summary>Convierte unidades (en el sitio) y aplica where. Lo que devuelve ya no debe volver a pasar por aquí.</summary>
+        public static List<Dictionary<string, object>> Filter(QuerySpec q, IEnumerable<Dictionary<string, object>> rows, out List<long> matchedIds)
         {
             matchedIds = new List<long>();
             var filtered = new List<Dictionary<string, object>>();
@@ -31,7 +35,15 @@ namespace PDI.RevitMcp.Engine
                 filtered.Add(r);
                 if (Get(r, "id") is long id) matchedIds.Add(id);
             }
+            return filtered;
+        }
 
+        /// <summary>True si la consulta devuelve filas paginables (ni digest, ni conteo, ni agrupación).</summary>
+        public static bool IsPagedListing(QuerySpec q) => !q.Digest && !q.CountOnly && q.GroupBy.Count == 0;
+
+        /// <summary>Formatea filas ya filtradas. Puro: no modifica las filas (sirve para paginar una instantánea).</summary>
+        public static object Render(QuerySpec q, IReadOnlyList<Dictionary<string, object>> filtered, int page, int pageSize, int maxGroups = 500)
+        {
             var result = new Dictionary<string, object> { ["total"] = (long)filtered.Count };
 
             if (q.Digest)
@@ -83,11 +95,11 @@ namespace PDI.RevitMcp.Engine
                 return result;
             }
 
-            var pages = Math.Max(1, (filtered.Count + q.PageSize - 1) / q.PageSize);
-            var start = (q.Page - 1) * q.PageSize;
+            var pages = Math.Max(1, (filtered.Count + pageSize - 1) / pageSize);
+            var start = (page - 1) * pageSize;
             var outRows = new List<object>();
             var trimmed = 0;
-            for (var i = start; i < filtered.Count && i < start + q.PageSize; i++)
+            for (var i = start; i < filtered.Count && i < start + pageSize; i++)
             {
                 var r = filtered[i];
                 var arr = new object[q.Fields.Count];
@@ -109,7 +121,7 @@ namespace PDI.RevitMcp.Engine
             if (trimmed > 0) result["aviso_texto"] = trimmed + " textos recortados a " + QuerySpec.MaxTextLength + " caracteres; use full=true para verlos completos";
             if (pages > 1)
             {
-                result["page"] = (long)q.Page;
+                result["page"] = (long)page;
                 result["pages"] = (long)pages;
             }
             return result;

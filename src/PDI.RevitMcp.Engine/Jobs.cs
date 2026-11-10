@@ -174,8 +174,10 @@ namespace PDI.RevitMcp.Engine
         /// <summary>
         /// Lanza el cuerpo del trabajo y garantiza un estado final: si el cuerpo termina sin completar ni fallar el trabajo, o lanza una
         /// excepción, el trabajo queda en error con el motivo. Nunca queda "en_proceso" para siempre.
+        /// Issue #7: devuelve void a propósito. El trabajo es supervisado (la continuación observa cualquier excepción) y quien
+        /// quiera esperarlo usa <see cref="Job.Work"/> o <see cref="WhenFinal"/>; así no hay tareas sin observar (CS4014) en los llamadores.
         /// </summary>
-        public Task Run(Job j, Func<Task> body)
+        public void Run(Job j, Func<Task> body)
         {
             var work = Task.Run(body);
             j.Work = work.ContinueWith(t =>
@@ -190,7 +192,6 @@ namespace PDI.RevitMcp.Engine
                 else if (t.IsCanceled) Fail(j, JobStatus.Cancelado, "cancelado");
                 else if (!j.IsFinal) Fail(j, PDI.RevitMcp.Protocol.Status.Desconocido, "el trabajo terminó sin registrar su resultado; reconcilie antes de repetir");
             }, TaskScheduler.Default);
-            return j.Work;
         }
 
         public bool Cancel(Job j)

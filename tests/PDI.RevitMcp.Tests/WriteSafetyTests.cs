@@ -375,7 +375,15 @@ namespace PDI.RevitMcp.Tests
         public void IsAlive_ProtectedProcess_DoesNotThrow()
         {
             if (!OperatingSystem.IsWindows()) return;
-            Assert.False(InstanceDescriptor.IsAlive(4)); // pid 4 es System: Windows niega abrirlo
+            // pid 4 es System. Que Windows deje abrirlo depende del entorno: un usuario normal recibe acceso denegado (Win32Exception,
+            // que IsAlive trata como «no es un Revit nuestro»), y un runner elevado puede abrirlo (el proceso existe y sigue vivo).
+            // El contrato probado es: nunca lanza, y su respuesta coincide con lo que el sistema permite en este entorno.
+            bool expected;
+            try { using (var p = System.Diagnostics.Process.GetProcessById(4)) expected = !p.HasExited; }
+            catch (System.ComponentModel.Win32Exception) { expected = false; }
+            catch (ArgumentException) { expected = false; }
+            catch (InvalidOperationException) { expected = false; }
+            Assert.Equal(expected, InstanceDescriptor.IsAlive(4));
         }
 
         // ---- Instalador ----

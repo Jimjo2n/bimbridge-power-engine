@@ -292,9 +292,26 @@ namespace PDI.RevitMcp.Tests
             var a = r.Open("Claude Code", 4812);
             var b = r.Open("codex-mcp-client", 900);
             var c = r.Open("Claude Code", 4812);
-            Assert.Equal("S-claude-code-4812", a.Id);
-            Assert.Equal("S-codex-mcp-client-900", b.Id);
-            Assert.Equal("S-claude-code-4812-2", c.Id);
+            // Prefijo legible (cliente y pid) + sufijo aleatorio por instancia (revisión PR #22): distintos aunque coincidan cliente y pid.
+            Assert.Matches("^S-claude-code-4812-[0-9a-f]{16}$", a.Id);
+            Assert.Matches("^S-codex-mcp-client-900-[0-9a-f]{16}$", b.Id);
+            Assert.StartsWith("S-claude-code-4812-", c.Id);
+            Assert.Equal(3, new[] { a.Id, b.Id, c.Id }.Distinct().Count());
+        }
+
+        [Fact]
+        public void Sessions_IdsAreNeverReused_AfterCloseAndReconnectWithSamePid()
+        {
+            var r = new SessionRegistry();
+            var seen = new HashSet<string>();
+            for (var i = 0; i < 200; i++)
+            {
+                var s = r.Open("Claude Code", 4812);          // mismo cliente, mismo pid, contador de peticiones reiniciado
+                Assert.True(seen.Add(s.Id), "session_id repetido: " + s.Id);
+                var req = new PDI.RevitMcp.Protocol.Request { Id = 1, Op = PDI.RevitMcp.Protocol.Wire.OpPing, Args = new Dictionary<string, object>() };
+                Assert.True(seen.Add(Correlation.For(s, req).RequestId), "request_id repetido");
+                r.Close(s);
+            }
         }
     }
 }

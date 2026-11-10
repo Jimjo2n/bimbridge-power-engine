@@ -27,6 +27,10 @@ namespace PDI.RevitMcp.Engine
         public string IdentitySource { get; internal set; } = AgentIdentity.SourceNone;
         /// <summary>Usuario de Windows: verificado por la ACL de la tubería (sólo ese usuario puede conectarse). El alias NO está verificado.</summary>
         public string Principal { get; internal set; }
+        /// <summary>Issue #3: por qué la sesión no tiene nombre (p. ej. alias en uso por otra sesión). Null si no hay nada que decir.</summary>
+        public string IdentityNote { get; internal set; }
+        /// <summary>Issue #4: huella estable del agente (principal + alias). Null sin alias.</summary>
+        public string AgentId => Correlation.AgentIdOf(Principal, AgentName);
 
         // ---- Contadores (los escribe PipeHost; se leen desde la ventana sin bloquear Revit) ----
         internal long _requests, _errors, _active, _totalMs;
@@ -70,6 +74,18 @@ namespace PDI.RevitMcp.Engine
             s.Active > 0 ? "ejecutando" : (now - s.LastSeenUtc).TotalSeconds <= 60 ? "activo" : "inactivo";
     }
 
+    /// <summary>
+    /// Ciclo de vida de la sesión frente al umbral de inactividad (issue #1). La sesión lógica no muere por la duración de una solicitud:
+    /// sólo expira por inactividad cuando no tiene solicitudes en curso. Una conexión rota (EOF/IOException) se cierra siempre; lo que
+    /// estuviera escribiendo conserva su propia evidencia (intención durable, estado desconocido, reconciliación) y nunca se reintenta solo.
+    /// </summary>
+    public static class SessionLifecycle
+    {
+        public static bool ShouldExpireOnIdle(long activeRequests) => activeRequests <= 0;
+    }
+
+    public enum RegisterResult { Ok, Invalid, Duplicate }
+
     /// <summary>Sesión ya cerrada, para el historial del panel (acotado).</summary>
     public sealed class ClosedSession
     {
@@ -90,10 +106,14 @@ namespace PDI.RevitMcp.Engine
         {
             lock (_lock)
             {
+                // Revisión PR #22: identificador único por INSTANCIA de sesión. Antes "S-cliente-pid" se reutilizaba al reconectar con el mismo
+                // pid y, como request_id = session_id#contador y el contador reinicia, dos solicitudes distintas podían compartir request_id.
+                // Se conserva el prefijo legible (cliente y pid, útil en el diario) y se añade un sufijo aleatorio de 64 bits.
                 var baseId = "S-" + Slug(clientName) + "-" + (clientPid > 0 ? clientPid.ToString() : "0");
-                var id = baseId;
-                var n = 2;
-                while (_sessions.ContainsKey(id)) id = baseId + "-" + n++;
+                string id;
+                do id = baseId + "-" + NewInstanceSuffix();
+                while (_sessions.ContainsKey(id) || _issued.Contains(id));
+                _issued.Add(id);
                 var t = _now();
                 var s = new Session
                 {
@@ -121,25 +141,66 @@ namespace PDI.RevitMcp.Engine
                 s.ClientVersion = AgentIdentity.Clean(clientVersion);
                 s.Principal = principal;
                 var a = AgentIdentity.Clean(agent);
-                if (a != null) { s.AgentName = a; s.IdentitySource = source ?? AgentIdentity.SourceHello; }
+                if (a != null)
+                {
+                    var holder = HolderOf(s, a);
+                    if (holder == null) { s.AgentName = a; s.IdentitySource = source ?? AgentIdentity.SourceHello; s.IdentityNote = null; }
+                    else s.IdentityNote = "el alias \"" + a + "\" ya lo usa la sesión activa " + holder.Id;
+                }
                 s.Conversation = AgentIdentity.Clean(conversation);
                 s.Model = AgentIdentity.Clean(model);
             }
         }
 
-        /// <summary>Registro explícito (ctx agente=…). Sólo cambia ESTA sesión. Devuelve false si el alias no es válido.</summary>
-        public bool Register(Session s, string agent, string conversation, string model)
+        /// <summary>Registro explícito (ctx agente=…). Sólo cambia ESTA sesión. Devuelve false si el alias no es válido o está en uso.</summary>
+        public bool Register(Session s, string agent, string conversation, string model) =>
+            TryRegister(s, agent, conversation, model, out _) == RegisterResult.Ok;
+
+        /// <summary>
+        /// Issue #3: registro con detección de duplicados. Un alias que ya usa OTRA sesión abierta de otro proceso cliente se rechaza
+        /// (evita suplantación accidental y reasignación indebida). La misma instancia del puente (mismo cliente y pid) que reconecta
+        /// mientras su sesión anterior aún no se cerró sí puede reutilizarlo.
+        /// </summary>
+        public RegisterResult TryRegister(Session s, string agent, string conversation, string model, out Session holder)
         {
+            holder = null;
             var a = AgentIdentity.Clean(agent);
-            if (a == null) return false;
+            if (a == null) return RegisterResult.Invalid;
             lock (_lock)
             {
+                holder = HolderOf(s, a);
+                if (holder != null) return RegisterResult.Duplicate;
                 s.AgentName = a;
                 s.IdentitySource = AgentIdentity.SourceRegister;
+                s.IdentityNote = null;
                 var c = AgentIdentity.Clean(conversation); if (c != null) s.Conversation = c;
                 var m = AgentIdentity.Clean(model); if (m != null) s.Model = m;
             }
-            return true;
+            return RegisterResult.Ok;
+        }
+
+        /// <summary>Desregistro (ctx desregistrar=true): la sesión vuelve a "sin nombre" y pierde lecturas y cambios hasta registrarse de nuevo.</summary>
+        public void Unregister(Session s)
+        {
+            lock (_lock)
+            {
+                s.AgentName = null;
+                s.IdentitySource = AgentIdentity.SourceNone;
+                s.IdentityNote = "desregistrada";
+            }
+        }
+
+        /// <summary>Otra sesión abierta que ya usa ese alias (ignorando mayúsculas), salvo la misma instancia del cliente que reconecta.</summary>
+        private Session HolderOf(Session s, string alias)
+        {
+            foreach (var o in _sessions.Values)
+            {
+                if (ReferenceEquals(o, s) || !string.Equals(o.AgentName, alias, StringComparison.OrdinalIgnoreCase)) continue;
+                var sameInstance = o.ClientPid > 0 && o.ClientPid == s.ClientPid && string.Equals(o.ClientName, s.ClientName, StringComparison.Ordinal)
+                                   && string.Equals(o.Principal, s.Principal, StringComparison.OrdinalIgnoreCase);
+                if (!sameInstance) return o;
+            }
+            return null;
         }
 
         public void RequestStarted(Session s, string op, string doc)
@@ -186,6 +247,16 @@ namespace PDI.RevitMcp.Engine
         }
 
         public int Count { get { lock (_lock) return _sessions.Count; } }
+
+        /// <summary>Ids emitidos en esta ejecución (abiertos o cerrados): nunca se vuelve a emitir uno.</summary>
+        private readonly HashSet<string> _issued = new HashSet<string>(StringComparer.Ordinal);
+
+        private static string NewInstanceSuffix()
+        {
+            var b = new byte[8];
+            using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create()) rng.GetBytes(b);
+            return BitConverter.ToString(b).Replace("-", "").ToLowerInvariant();
+        }
 
         internal static string Slug(string name)
         {

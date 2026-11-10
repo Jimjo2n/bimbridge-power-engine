@@ -162,7 +162,8 @@ namespace PDI.RevitMcp.Tests
             foreach (var k in new[] { "extra[\"agente\"]", "extra[\"cliente\"]", "extra[\"traza\"]", "RequestStarted(", "RequestFinished(" })
                 Assert.Contains(k, host);
             Assert.Contains("[\"agente\"] = AgentName", Source("src/PDI.RevitMcp.Bridge/RevitConnection.cs"));
-            Assert.Contains("Sessions.Register(session", Source("src/PDI.RevitMcp.Addin/Revit/RequestHandler.cs"));
+            Assert.Contains("Sessions.TryRegister(session", Source("src/PDI.RevitMcp.Addin/Revit/RequestHandler.cs"));
+            Assert.Contains("corr.WriteTo(extra)", host);   // issue #4: ids de correlación en cada línea del diario
         }
 
         // ---- Consultas ----

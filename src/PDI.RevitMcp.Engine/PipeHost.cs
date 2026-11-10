@@ -98,6 +98,8 @@ namespace PDI.RevitMcp.Engine
         private async Task ServeConnection(NamedPipeServerStream stream)
         {
             Session session = null;
+            Task<string> pendingRead = null;
+            string closeReason = null;
             var writeLock = new SemaphoreSlim(1, 1);
             using (var connCts = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token))
             using (stream)
@@ -142,7 +144,22 @@ namespace PDI.RevitMcp.Engine
                     // 2) Peticiones. Sin latido ni petición en HeartbeatTimeoutMs, la sesión se da por muerta.
                     while (!connCts.IsCancellationRequested)
                     {
-                        var text = await ReadWithTimeout(stream, _config.HeartbeatTimeoutMs, connCts).ConfigureAwait(false);
+                        // Issue #1: el umbral de inactividad sólo cierra sesiones OCIOSAS. Con solicitudes en curso se sigue esperando la
+                        // misma lectura: la duración de una escritura no es abandono. Una conexión realmente rota termina la lectura con
+                        // EOF o IOException, y eso sí cierra la sesión (las escrituras en curso quedan con su propia evidencia y su estado).
+                        pendingRead = pendingRead ?? Frame.ReadAsync(stream, connCts.Token);
+                        var waited = await Task.WhenAny(pendingRead, Task.Delay(_config.HeartbeatTimeoutMs, connCts.Token)).ConfigureAwait(false);
+                        if (waited != pendingRead)
+                        {
+                            if (!SessionLifecycle.ShouldExpireOnIdle(session.Active)) continue;
+                            closeReason = "inactividad";
+                            connCts.Cancel();
+                            stream.Dispose();
+                            try { await pendingRead.ConfigureAwait(false); } catch (Exception) { }
+                            break;
+                        }
+                        var text = await pendingRead.ConfigureAwait(false);
+                        pendingRead = null;
                         if (text == null) break;
                         Request req;
                         try { req = Request.FromJson(text); }
@@ -160,11 +177,25 @@ namespace PDI.RevitMcp.Engine
                         // si contara, un agente ocioso aparecería "activo" para siempre en el panel.
                         _sessions.Touch(session);
                         var s = session;
-                        var traceId = s.Id + ":" + req.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        var corr = Correlation.For(s, req);
                         var reqDoc = Arg.GetString(req.Args, Wire.DocArg);
+                        // Issue #3 (revisión PR #22): sin nombre de agente sólo saludo, latido y registro. Ni lecturas ni cambios.
+                        // El rechazo queda en el diario con su correlación.
+                        var anonymous = s.AgentName == null;
+                        if (_config.IdentityRequired && anonymous && IdentityPolicy.RequiresIdentity(req))
+                        {
+                            var refused = Response.Fail(req.Id, Status.Rechazado, IdentityPolicy.RefusalMessage(s));
+                            var rj = new Dictionary<string, object> { ["aviso"] = "identidad_insuficiente", ["cliente"] = s.ClientName };
+                            corr.WriteTo(rj);
+                            if (reqDoc != null) rj["doc"] = reqDoc;
+                            _journal?.Log(s.Id, ToolName(req), refused.Estado, 0, rj);
+                            await Send(stream, writeLock, refused, connCts.Token).ConfigureAwait(false);
+                            continue;
+                        }
                         _sessions.RequestStarted(s, ToolName(req), reqDoc);
                         _ = Task.Run(async () =>
                         {
+                            Correlation.Current = corr;
                             var sw = Stopwatch.StartNew();
                             Response resp;
                             // Plazo real: si el puente deja de esperar, el trabajo pendiente en Revit también se cancela
@@ -190,7 +221,11 @@ namespace PDI.RevitMcp.Engine
                             // Atribución: cada línea del diario lleva el agente, el cliente, la traza y el documento pedido.
                             extra["agente"] = s.AgentName;
                             extra["cliente"] = s.ClientName;
-                            extra["traza"] = traceId;
+                            extra["traza"] = corr.TraceId;
+                            corr.Complete(req, resp);
+                            corr.WriteTo(extra);
+                            // Modo heredado explícito (identidad_obligatoria=false): la operación anónima queda marcada como tal en el diario.
+                            if (anonymous && !IdentityPolicy.IsRegistration(req)) extra["identidad"] = _config.IdentityRequired ? "sin_nombre" : "sin_nombre_modo_heredado";
                             if (reqDoc != null) extra["doc"] = reqDoc;
                             _journal?.Log(s.Id, ToolName(req), resp.Estado, ms, extra);
                             try { await Send(stream, writeLock, resp, connCts.Token).ConfigureAwait(false); }
@@ -208,7 +243,7 @@ namespace PDI.RevitMcp.Engine
                     connCts.Cancel();
                     if (session != null)
                     {
-                        _sessions.Close(session, lost ? "conexion_cerrada" : "revit_cerrando");
+                        _sessions.Close(session, closeReason ?? (lost ? "conexion_cerrada" : "revit_cerrando"));
                         try { _handler.OnSessionClosed(session); } catch (Exception ex) { _log("OnSessionClosed: " + ex.Message); }
                         _journal?.Log(session.Id, "desconectar", Status.Ok, 0);
                         _log("sesión cerrada: " + session.Id);

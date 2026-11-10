@@ -232,9 +232,11 @@ namespace PDI.RevitMcp.Bridge
             [Description("Sólo elementos cambiados después de esta rev")] long? since = null,
             [Description("ft o mm (elev, x, y, z, where)")] string units = null,
             [Description("textos sin recortar")] bool? full = null,
+            [Description("Cursor devuelto por la primera página: con page=N sirve las siguientes sin releer el modelo (se rechaza si el documento cambió)")] string cursor = null,
             CancellationToken ct = default)
         {
             var a = new Dictionary<string, object>();
+            if (cursor != null) a["cursor"] = cursor;
             if (units != null) a["units"] = units;
             if (full != null) a["full"] = full;
             void Put(string k, object v) { if (v != null) a[k] = v; }

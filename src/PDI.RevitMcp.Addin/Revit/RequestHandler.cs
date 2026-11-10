@@ -33,6 +33,8 @@ namespace PDI.RevitMcp.Addin.Revit
         private readonly PauseSwitch _pause;
         private readonly JobStore _jobs = new JobStore();
         private readonly ResultCache _cache = new ResultCache();
+        /// <summary>Issue #2: instantáneas de consultas paginadas (una lectura del modelo, páginas desde memoria).</summary>
+        private readonly QuerySnapshotStore _snapshots = new QuerySnapshotStore();
 
         public RequestHandler(MainThread main, DocumentTracker tracker, EngineConfig config, string revitVersion, string addinVersion,
             PlanStore plans, HoldSwitch hold, PauseSwitch pause)
@@ -47,6 +49,7 @@ namespace PDI.RevitMcp.Addin.Revit
             _addinVersion = addinVersion;
             // Guardar como cambia la clave duradera: el diario y las tareas siguen al documento nuevo.
             _tracker.DocumentRekeyed += OnRekeyed;
+            _tracker.DocumentHandleClosed += _snapshots.DropDocument;
             InitTasks();
         }
 
@@ -109,6 +112,7 @@ namespace PDI.RevitMcp.Addin.Revit
             // Nadie va a leer esos resultados: se cancelan dentro de Revit en su siguiente tramo.
             _jobs.CancelSession(session.Id);
             session.Sets.Clear();
+            _snapshots.DropSession(session.Id);
         }
 
         /// <summary>Estadísticas para el estado y la auditoría: hilo de Revit, caché y trabajos.</summary>
@@ -117,6 +121,13 @@ namespace PDI.RevitMcp.Addin.Revit
             ["hilo_revit"] = _main.Stats(),
             ["cache"] = new Dictionary<string, object> { ["aciertos"] = (long)_cache.Hits, ["fallos"] = (long)_cache.Misses, ["guardados"] = (long)_cache.Count },
             ["trabajos_en_curso"] = (long)_jobs.Running,
+            // #9 / #5: caché de compilación C# (single-flight) e instantáneas de consulta (#2).
+            ["compilacion_csharp"] = Scripting.ScriptHost.CacheStats(),
+            ["instantaneas_consulta"] = new Dictionary<string, object>
+            {
+                ["guardadas"] = (long)_snapshots.Count, ["celdas"] = _snapshots.Cells,
+                ["bytes_estimados"] = _snapshots.EstimatedBytes, ["presupuesto_bytes"] = _snapshots.MaxBytes,   // estimación, no medición del heap
+            },
         };
 
         // ---------------- geo (trabajos largos con espera y caché) ----------------
@@ -261,8 +272,19 @@ namespace PDI.RevitMcp.Addin.Revit
         {
             // Registro de identidad (agent.register): ctx agente="Integration client" [conversacion=… modelo=…]. Sólo afecta a esta sesión.
             var agentArg = Arg.GetString(request.Args, "agente");
-            if (agentArg != null && !Ui.Runtime.Sessions.Register(session, agentArg, Arg.GetString(request.Args, "conversacion"), Arg.GetString(request.Args, "modelo")))
-                return Response.Fail(request.Id, Status.Invalido, "agente= necesita un nombre legible de 1 a " + AgentIdentity.MaxName + " caracteres");
+            if (Arg.GetBool(request.Args, "desregistrar") == true) Ui.Runtime.Sessions.Unregister(session);
+            else if (agentArg != null)
+            {
+                // Issue #3: un alias en uso por otra sesión activa se rechaza (no se reasigna ni se comparte).
+                switch (Ui.Runtime.Sessions.TryRegister(session, agentArg, Arg.GetString(request.Args, "conversacion"), Arg.GetString(request.Args, "modelo"), out var holder))
+                {
+                    case RegisterResult.Invalid:
+                        return Response.Fail(request.Id, Status.Invalido, "agente= necesita un nombre legible de 1 a " + AgentIdentity.MaxName + " caracteres");
+                    case RegisterResult.Duplicate:
+                        return Response.Fail(request.Id, Status.Conflicto, "el alias \"" + AgentIdentity.Clean(agentArg) + "\" ya lo usa otra sesión activa (" +
+                            holder.ClientName + "); elija otro nombre, p. ej. añadiendo el cliente o la conversación");
+                }
+            }
             Dictionary<string, object> data = null;
             long rev = 0;
             var result = await RunMain((app, sw, budget) =>
@@ -338,7 +360,11 @@ namespace PDI.RevitMcp.Addin.Revit
             if (!result.Ok) return FromWork(request.Id, result);
             Scripting.ScriptHost.WarmInBackground(Ui.Runtime.Log);
             data["agente"] = session.AgentName;
-            data["identidad"] = session.AgentName == null ? "insuficiente: registre un nombre con ctx agente=\"…\"" : "declarada (" + session.IdentitySource + ")";
+            data["identidad"] = session.AgentName == null
+                ? "insuficiente" + (session.IdentityNote != null ? " (" + session.IdentityNote + ")" : "") + ": registre un nombre con ctx agente=\"…\"; hasta entonces no se permiten lecturas ni cambios"
+                : "declarada (" + session.IdentitySource + ")";
+            if (session.AgentId != null) data["agent_id"] = session.AgentId;
+            data["session_id"] = session.Id;
             return new Response { Id = request.Id, Rev = rev, Datos = data };
         }
 
@@ -353,6 +379,9 @@ namespace PDI.RevitMcp.Addin.Revit
 
         private async Task<Response> Query(Session session, Request request, CancellationToken ct)
         {
+            var cursor = Arg.GetString(request.Args, "cursor");
+            if (!string.IsNullOrEmpty(cursor)) return QueryFromCursor(session, request, cursor);
+
             QuerySpec q;
             try { q = QuerySpec.Parse(request.Args); }
             catch (Exception ex) when (ex is QueryException || ex is ArgumentException)
@@ -398,8 +427,18 @@ namespace PDI.RevitMcp.Addin.Revit
 
             var dispatchMs = sw.Elapsed.TotalMilliseconds;
             // Filtrar, agrupar, paginar y formatear: fuera del hilo de Revit.
-            var datos = (Dictionary<string, object>)ResultTable.Build(q, runner.Rows, out var matched);
+            var filtered = ResultTable.Filter(q, runner.Rows, out var matched);
+            var datos = (Dictionary<string, object>)ResultTable.Render(q, filtered, q.Page, q.PageSize);
             if (runner.FastCount.HasValue) datos["total"] = runner.FastCount.Value;
+            // Issue #2: si hay más de una página, las siguientes se sirven desde esta lectura (cursor), sin volver al hilo de Revit.
+            // La lectura puede ocupar varias visitas al hilo de Revit: sólo hay cursor si la revisión no cambió durante ella.
+            if (ResultTable.IsPagedListing(q) && datos.ContainsKey("pages") && runner.Registry != null && runner.Registry.Rev == runner.Rev)
+            {
+                var reg = runner.Registry;
+                var id = _snapshots.Put(session.Id, runner.DocId, runner.Rev, q, filtered, () => reg.Rev, out var refusal);
+                if (id != null) { datos["cursor"] = id; datos["rev_instantanea"] = runner.Rev; }
+                else if (refusal != null) datos["cursor_no_disponible"] = refusal;   // nunca se omite en silencio
+            }
             if (q.SaveAs != null)
             {
                 try
@@ -420,6 +459,40 @@ namespace PDI.RevitMcp.Addin.Revit
             }
             datos["ms"] = sw.ElapsedMilliseconds;
             return new Response { Id = request.Id, Rev = runner.Rev, Datos = datos };
+        }
+
+        /// <summary>
+        /// Issue #2: página N de una instantánea. No toca el hilo de Revit. Se rechaza si el cursor es de otra sesión, venció,
+        /// apunta a otro documento o el documento cambió de revisión (nunca se mezclan filas de dos revisiones).
+        /// </summary>
+        private Response QueryFromCursor(Session session, Request request, string cursor)
+        {
+            var sw = Stopwatch.StartNew();
+            var page = Arg.GetLong(request.Args, "page") ?? 1;
+            if (page < 1) return Response.Fail(request.Id, Status.Invalido, "page empieza en 1");
+            switch (_snapshots.Get(cursor, session.Id, TargetId, out var snap))
+            {
+                case SnapshotLookup.Unknown:
+                    return Response.Fail(request.Id, Status.Vencido, "cursor desconocido o vencido (duran " + (int)_snapshots.Ttl.TotalMinutes +
+                        " min sin uso y sólo valen en la sesión que los creó); repita la consulta sin cursor");
+                case SnapshotLookup.Evicted:
+                    return Response.Fail(request.Id, Status.Vencido, "el cursor se descartó (" + (_snapshots.EvictionReason(cursor, session.Id) ?? "presupuesto o vencimiento") +
+                        "); repita la consulta sin cursor");
+                case SnapshotLookup.OtherDocument:
+                    return Response.Fail(request.Id, Status.Invalido, "el cursor es de otro documento; repita la consulta en el documento destino");
+                case SnapshotLookup.Stale:
+                    return Response.Fail(request.Id, Status.Conflicto, "el documento cambió desde la primera página; repita la consulta (las páginas no se mezclan entre revisiones)");
+            }
+            var pageSize = snap.Spec.PageSize;
+            var datos = (Dictionary<string, object>)ResultTable.Render(snap.Spec, snap.Rows, (int)page, pageSize);
+            var pages = Math.Max(1, (snap.Rows.Count + pageSize - 1) / pageSize);
+            if (page > pages) return Response.Fail(request.Id, Status.Invalido, "page " + page + " fuera de rango (hay " + pages + ")");
+            datos["page"] = page;
+            datos["pages"] = (long)pages;
+            datos["cursor"] = snap.Id;
+            datos["rev_instantanea"] = snap.Rev;
+            datos["ms"] = sw.ElapsedMilliseconds;
+            return new Response { Id = request.Id, Rev = snap.Rev, Datos = datos };
         }
 
         // ---------------- check ----------------

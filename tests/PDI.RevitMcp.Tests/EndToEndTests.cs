@@ -55,7 +55,8 @@ namespace PDI.RevitMcp.Tests
                 {
                     ["PDI_REVITMCP_PIPE"] = _pipe, ["PDI_REVITMCP_PERFIL"] = perfil,
                     ["PDI_REVITMCP_CONFIG"] = Path.Combine(Path.GetTempPath(), "pdi-e2e-config-" + Guid.NewGuid().ToString("N") + ".json"),
-                    ["BIMBRIDGE_AGENTE"] = "",
+                    // Issue #3: operar exige un agente con nombre; cada conexión de prueba declara uno único por configuración.
+                    ["BIMBRIDGE_AGENTE"] = "E2E " + clientName + " " + Guid.NewGuid().ToString("N").Substring(0, 6),
                 },
             });
             return McpClient.CreateAsync(transport, new McpClientOptions
@@ -384,7 +385,10 @@ namespace PDI.RevitMcp.Tests
             // Antes: el puente se rendía a los 60 s pero Revit seguía trabajando ~10 min (check views=rcp).
             using var pipe = new System.IO.Pipes.NamedPipeClientStream(".", _pipe, System.IO.Pipes.PipeDirection.InOut, System.IO.Pipes.PipeOptions.Asynchronous);
             await pipe.ConnectAsync(5000);
-            await Frame.WriteAsync(pipe, Json.Write(new Request { Id = 1, Op = Wire.OpHello, Args = new Dictionary<string, object> { ["protocol"] = (long)Wire.ProtocolVersion, ["client"] = "prueba" } }), CancellationToken.None);
+            await Frame.WriteAsync(pipe, Json.Write(new Request { Id = 1, Op = Wire.OpHello, Args = new Dictionary<string, object>
+            {
+                ["protocol"] = (long)Wire.ProtocolVersion, ["client"] = "prueba", ["agente"] = "E2E plazo " + Guid.NewGuid().ToString("N").Substring(0, 6), ["agente_fuente"] = AgentIdentity.SourceConfig,
+            } }), CancellationToken.None);
             Assert.Equal(Status.Ok, Response.FromJson(await Frame.ReadAsync(pipe, CancellationToken.None)).Estado);
 
             var sw = System.Diagnostics.Stopwatch.StartNew();

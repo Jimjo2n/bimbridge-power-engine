@@ -166,19 +166,61 @@ namespace PDI.RevitMcp.Engine
                     var key = new byte[KeyBytes];
                     using (var rng = RandomNumberGenerator.Create()) rng.GetBytes(key);
                     var tmp = path + ".tmp-" + Guid.NewGuid().ToString("N");
-                    File.WriteAllText(tmp, KeyHeader + "\n" + Convert.ToBase64String(key) + "\n", new UTF8Encoding(false));
-                    try { File.Move(tmp, path); }
+                    // Un fallo al publicar es un error controlado (sin autoridad), no una excepción que tumbe al proceso.
+                    try
+                    {
+                        File.WriteAllText(tmp, KeyHeader + "\n" + Convert.ToBase64String(key) + "\n", new UTF8Encoding(false));
+                        File.Move(tmp, path);
+                    }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                    {
+                        throw new GrantKeyException("no se pudo crear la clave de concesiones: " + ex.GetType().Name + " (" + (ex.HResult & 0xFFFF) + ")");
+                    }
                     finally { try { if (File.Exists(tmp)) File.Delete(tmp); } catch (Exception) { } }
                     return ReadKey(path);   // devuelve lo que quedó en disco, nunca una copia en memoria distinta
                 }
             }
         }
 
+        /// <summary>Espera máxima ante una violación de compartición transitoria al leer la clave (issue #21).</summary>
+        public static TimeSpan ReadRetryWindow = TimeSpan.FromSeconds(3);
+
+        /// <summary>ERROR_SHARING_VIOLATION (32) o ERROR_LOCK_VIOLATION (33): otro handle tiene el archivo abierto sin compartir.</summary>
+        private static bool IsSharingViolation(IOException ex)
+        {
+            var code = ex.HResult & 0xFFFF;
+            return code == 32 || code == 33;
+        }
+
+        /// <summary>
+        /// Issue #21 (causa raíz): en Windows, un archivo recién publicado puede estar abierto un instante por otro proceso sin compartir
+        /// lectura (antivirus o indexador, o un handle de otro proceso de prueba). File.ReadAllText fallaba con violación de compartición
+        /// y eso se convertía en GrantKeyException. En la prueba multihilo, la excepción en un Thread suelto abortaba el proceso de pruebas.
+        /// Ahora: lectura con FileShare.ReadWrite|Delete (no bloquea a otros lectores) y espera acotada SÓLO ante violación de compartición.
+        /// Cualquier otro error, o la violación que persiste más allá de la ventana, sigue siendo GrantKeyException (fail-closed).
+        /// Nunca se regenera la clave y el mensaje nunca incluye su contenido.
+        /// </summary>
         private static byte[] ReadKey(string path)
         {
-            string text;
-            try { text = File.ReadAllText(path, Encoding.UTF8); }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { throw new GrantKeyException("clave de concesiones ilegible: " + ex.Message); }
+            string text = null;
+            var deadline = DateTime.UtcNow + ReadRetryWindow;
+            for (var attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    using (var f = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                    using (var r = new StreamReader(f, Encoding.UTF8)) text = r.ReadToEnd();
+                    break;
+                }
+                catch (IOException ex) when (!(ex is FileNotFoundException) && IsSharingViolation(ex) && DateTime.UtcNow < deadline)
+                {
+                    Thread.Sleep(Math.Min(10 * (attempt + 1), 100));
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    throw new GrantKeyException("clave de concesiones ilegible: " + ex.GetType().Name + " (" + (ex.HResult & 0xFFFF) + ")");
+                }
+            }
             var lines = text.Replace("\r", "").Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
             if (lines.Count > 0 && lines[0] == KeyHeader) lines.RemoveAt(0);   // v1; sin cabecera = formato rc2 (Base64 suelto)
             if (lines.Count != 1) throw new GrantKeyException("clave de concesiones inválida o truncada en " + path + " (no se regenera)");
