@@ -101,8 +101,7 @@ namespace PDI.RevitMcp.Engine
     }
 
     /// <summary>
-    /// Issue #3: qué operaciones exigen un agente con nombre. Las de lectura y el registro quedan libres para que un agente sin nombre
-    /// pueda orientarse y registrarse; todo lo que cambia el modelo, la interfaz, ejecuta código o autoriza tareas exige alias.
+    /// Issue #3: qué operaciones exigen un agente con nombre: todas salvo saludo, latido y el propio registro (lecturas incluidas).
     /// Una operación desconocida exige alias (fail-closed). El alias es declarado, no autenticación: el principal sigue siendo el
     /// usuario de Windows que admite la ACL de la tubería.
     /// </summary>

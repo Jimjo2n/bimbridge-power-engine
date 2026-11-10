@@ -101,3 +101,27 @@ Ninguna descubierta. Los dos fallos de GitHub eran de metadatos y de un supuesto
 ### 6.5 Protecciones de la rama
 
 El repositorio es privado. Si GitHub no ofrece reglas de protección de rama en el plan vigente, el procedimiento de revisión mientras tanto es: todo cambio por pull request hacia `main`, controles de GitHub Actions en verde sobre el commit exacto, revisión del mantenedor (CODEOWNERS) y sin push directo a `main`.
+
+## 7. Revisión del PR #22 e issue #27
+
+Bloqueos señalados por la coordinación sobre `3e09581`, resueltos en esta rama. Los SHA de cada cambio están en el historial del PR; el SHA final y sus checks se publican en el propio PR.
+
+| Bloqueo | Cambio | Evidencia offline | Estado |
+|---|---|---|---|
+| #27, fallo intermitente de la prueba de 8 procesos en Windows CI | Causa confirmada en el log del run 42882010373: un escritor agotó la espera de 10 s del bloqueo de auditoría. Group commit entre procesos (D53), harness supervisado (plazo único, terminación, liberación, cadena verificada aunque falle un hijo) | 8 pruebas deterministas de group commit; R02 (8×50, 401 líneas, 50 por proceso, cid únicos); medición 8×50 y 8×1500 sin fallos | Resuelto offline; pendiente de varios CI verdes en Windows sobre el SHA final |
+| Lecturas anónimas con `identidad_obligatoria=true` | Política única: sin nombre sólo `hello`, `ping` y el registro (D49) | Rechazo de las 9 lecturas y de `ctx` sin `agente=`; registro y lectura atribuida en el diario; alias duplicado; sesiones concurrentes; modo heredado marcado | Resuelto offline |
+| Reutilización de `session_id` y `request_id` al reconectar | Id único por instancia con 64 bits aleatorios (D51) | 200 reconexiones con el mismo pid sin repetir `session_id` ni `request_id` | Resuelto offline |
+| «Presupuesto de memoria» medido en celdas | Bytes estimados sobre una proyección compacta, con límites global y por documento y descartes informados (D52) | Textos largos, LRU por documento y global, 64 escrituras concurrentes de 16 agentes sobre 5 documentos, vencimiento y cierre | Resuelto offline (estimación, no medición del heap) |
+
+Medición local de la auditoría, con el mismo harness antes y después:
+
+| Escenario | Antes | Después |
+|---|---|---|
+| 8×50: tiempo de las escrituras | ≈21,7 s | ≈9,3 s |
+| 8×50: espera del bloqueo p95 / máx. | 1,3–1,8 s / 4,7 s | 0,14–0,26 s / 0,28 s |
+| 8×1500: tiempo total | 438,8 s | 274,9 s |
+| 8×1500: throughput | ≈27,6 escrituras/s | ≈44 escrituras/s |
+
+El perfil mostró que el fsync de la línea cuesta ≈1 ms. Lo caro era la reescritura atómica de la cabeza (≈19 ms), la relectura de la cola y la apertura de archivos con el antivirus activo, y eso es lo que el lote amortiza. Las cifras son de una sola máquina de desarrollo y no son un benchmark nativo.
+
+Pruebas no ejecutadas: ninguna dentro de Revit. La campaña nativa única de 0.9.1 sigue pendiente de autorización.

@@ -123,7 +123,11 @@ namespace PDI.RevitMcp.Addin.Revit
             ["trabajos_en_curso"] = (long)_jobs.Running,
             // #9 / #5: caché de compilación C# (single-flight) e instantáneas de consulta (#2).
             ["compilacion_csharp"] = Scripting.ScriptHost.CacheStats(),
-            ["instantaneas_consulta"] = new Dictionary<string, object> { ["guardadas"] = (long)_snapshots.Count, ["celdas"] = _snapshots.Cells },
+            ["instantaneas_consulta"] = new Dictionary<string, object>
+            {
+                ["guardadas"] = (long)_snapshots.Count, ["celdas"] = _snapshots.Cells,
+                ["bytes_estimados"] = _snapshots.EstimatedBytes, ["presupuesto_bytes"] = _snapshots.MaxBytes,   // estimación, no medición del heap
+            },
         };
 
         // ---------------- geo (trabajos largos con espera y caché) ----------------
@@ -357,7 +361,7 @@ namespace PDI.RevitMcp.Addin.Revit
             Scripting.ScriptHost.WarmInBackground(Ui.Runtime.Log);
             data["agente"] = session.AgentName;
             data["identidad"] = session.AgentName == null
-                ? "insuficiente" + (session.IdentityNote != null ? " (" + session.IdentityNote + ")" : "") + ": registre un nombre con ctx agente=\"…\"; hasta entonces sólo lectura"
+                ? "insuficiente" + (session.IdentityNote != null ? " (" + session.IdentityNote + ")" : "") + ": registre un nombre con ctx agente=\"…\"; hasta entonces no se permiten lecturas ni cambios"
                 : "declarada (" + session.IdentitySource + ")";
             if (session.AgentId != null) data["agent_id"] = session.AgentId;
             data["session_id"] = session.Id;
@@ -431,8 +435,9 @@ namespace PDI.RevitMcp.Addin.Revit
             if (ResultTable.IsPagedListing(q) && datos.ContainsKey("pages") && runner.Registry != null && runner.Registry.Rev == runner.Rev)
             {
                 var reg = runner.Registry;
-                var id = _snapshots.Put(session.Id, runner.DocId, runner.Rev, q, filtered, () => reg.Rev);
+                var id = _snapshots.Put(session.Id, runner.DocId, runner.Rev, q, filtered, () => reg.Rev, out var refusal);
                 if (id != null) { datos["cursor"] = id; datos["rev_instantanea"] = runner.Rev; }
+                else if (refusal != null) datos["cursor_no_disponible"] = refusal;   // nunca se omite en silencio
             }
             if (q.SaveAs != null)
             {
@@ -470,6 +475,9 @@ namespace PDI.RevitMcp.Addin.Revit
                 case SnapshotLookup.Unknown:
                     return Response.Fail(request.Id, Status.Vencido, "cursor desconocido o vencido (duran " + (int)_snapshots.Ttl.TotalMinutes +
                         " min sin uso y sólo valen en la sesión que los creó); repita la consulta sin cursor");
+                case SnapshotLookup.Evicted:
+                    return Response.Fail(request.Id, Status.Vencido, "el cursor se descartó (" + (_snapshots.EvictionReason(cursor, session.Id) ?? "presupuesto o vencimiento") +
+                        "); repita la consulta sin cursor");
                 case SnapshotLookup.OtherDocument:
                     return Response.Fail(request.Id, Status.Invalido, "el cursor es de otro documento; repita la consulta en el documento destino");
                 case SnapshotLookup.Stale:

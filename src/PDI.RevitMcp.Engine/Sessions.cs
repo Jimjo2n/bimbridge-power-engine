@@ -179,7 +179,7 @@ namespace PDI.RevitMcp.Engine
             return RegisterResult.Ok;
         }
 
-        /// <summary>Desregistro (ctx desregistrar=true): la sesión vuelve a "sin nombre" y pierde las herramientas operativas.</summary>
+        /// <summary>Desregistro (ctx desregistrar=true): la sesión vuelve a "sin nombre" y pierde lecturas y cambios hasta registrarse de nuevo.</summary>
         public void Unregister(Session s)
         {
             lock (_lock)

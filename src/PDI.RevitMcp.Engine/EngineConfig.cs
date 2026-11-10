@@ -49,7 +49,7 @@ namespace PDI.RevitMcp.Engine
         public bool BlockDynamicCode;
         /// <summary>
         /// Issue #3: las operaciones que cambian algo exigen un agente con nombre (config "identidad_obligatoria", por defecto true).
-        /// false sólo para integraciones antiguas que IT decida tolerar; el diario sigue marcando esas sesiones como sin nombre.
+        /// false sólo para integraciones antiguas que IT decida tolerar; cada operación anónima queda marcada en el diario (sin_nombre_modo_heredado).
         /// </summary>
         public bool IdentityRequired = true;
         private HashSet<string> _perms;

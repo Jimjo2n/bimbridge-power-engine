@@ -17,16 +17,17 @@
 3. **Latido:** el puente envía ping cada 10 s. Si no hay tráfico durante 30 s **y la sesión no tiene solicitudes en curso**, el add-in la cierra con motivo `inactividad` (#1). Una operación larga no la cierra.
 4. **Solicitudes:** cada línea del diario lleva `agente`, `cliente`, `doc` y la correlación (#4): `agent_id`, `session_id`, `request_id`, `trace_id` (también en `traza`), `job_id` y `transaction_id` cuando corresponden. Un cliente puede enviar `_traza` (8–64 caracteres `[A-Za-z0-9-_.:]`) para unir sus procesos; el AgentHost envía una por ejecución. Los contadores por sesión llevan solicitudes, errores, en ejecución y ms acumulados.
 5. **Desconexión:** la sesión pasa al historial acotado de cerradas (50) con su motivo (`conexion_cerrada`, `inactividad` o `revit_cerrando`). Un reinicio de Revit vacía el historial: nada de agentes fantasma.
-6. **Desregistro:** `ctx desregistrar=true` devuelve la sesión a «sin nombre» (sólo lectura).
+6. **Desregistro:** `ctx desregistrar=true` devuelve la sesión a «sin nombre» (sin lecturas ni cambios).
+7. **Identificadores:** `session_id` es único por instancia (`S-cliente-pid-<64 bits aleatorios>`) y nunca se reutiliza, ni siquiera al reconectar con el mismo pid. Así `request_id = session_id#n` no se repite. `agent_id` es estable entre reconexiones del mismo alias y usuario.
 
 ## Sin nombre (#3)
 
-Una sesión sin alias aparece como «(sin nombre) · cliente», con identidad **insuficiente**, y `ctx` le indica cómo registrarse.
+Una sesión sin alias aparece como «(sin nombre) · cliente», con identidad **insuficiente**.
 
-- **Libres:** `hello`, `ping`, `ctx`, `query`, `sets`, `check`, `catalog`, `params`, `docs`, `geo` y `job`.
-- **Exigen alias:** `plan`, `commit`, `exec`, `fam`, `doc`, `show`, `capture`, `tarea` y cualquier operación desconocida. Responden `rechazado` con instrucciones, y el rechazo queda en el diario.
+- **Permitido sin nombre:** sólo `hello`, `ping` y el registro (`ctx agente="…"`, o `ctx desregistrar=true`).
+- **Exige alias:** todo lo demás. Incluye las lecturas (`query`, `sets`, `check`, `catalog`, `params`, `docs`, `geo`, `job`) y un `ctx` sin `agente=`, porque devolvería datos del modelo. También `plan`, `commit`, `exec`, `fam`, `doc`, `show`, `capture`, `tarea` y cualquier operación desconocida. Responden `rechazado` con instrucciones de registro, y el rechazo queda en el diario con su correlación (`aviso: identidad_insuficiente`).
 - **Alias duplicado:** si otra sesión activa de otro proceso cliente ya usa el alias (sin distinguir mayúsculas), `ctx agente=` responde `conflicto`, y el saludo deja la sesión sin nombre y explica el motivo. La misma instancia del puente que reconecta antes de que se cierre su sesión anterior conserva el nombre. Nunca se hereda el nombre de otra sesión.
-- **Integraciones antiguas:** `"identidad_obligatoria": false` en `config.json` las tolera. Es una decisión explícita del usuario o de IT, y el diario sigue marcándolas como sin nombre.
+- **Integraciones antiguas:** `"identidad_obligatoria": false` en `config.json` las tolera. Es una decisión explícita del usuario o de IT, y cada operación anónima queda marcada en el diario (`identidad: sin_nombre_modo_heredado`).
 - **AgentHost:** sin `BIMBRIDGE_AGENTE`, se declara por configuración como `AgentHost <pid>`.
 
 ## Presencia

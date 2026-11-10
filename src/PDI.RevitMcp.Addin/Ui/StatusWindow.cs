@@ -181,7 +181,7 @@ namespace PDI.RevitMcp.Addin.Ui
                 head.Children.Add(new TextBlock
                 {
                     Text = "  " + presence + " · " + Theme.ClientName(s.ClientName) + (s.ClientVersion != null ? " " + s.ClientVersion : "") +
-                           " · identidad " + (s.AgentName == null ? "insuficiente: sólo lectura" + (s.IdentityNote != null ? " (" + s.IdentityNote + ")" : "") : "declarada (" + s.IdentitySource + ") · " + s.AgentId) +
+                           " · identidad " + (s.AgentName == null ? "insuficiente: sin lecturas ni cambios hasta registrarse" + (s.IdentityNote != null ? " (" + s.IdentityNote + ")" : "") : "declarada (" + s.IdentitySource + ") · " + s.AgentId) +
                            (s.Principal != null ? " · usuario " + s.Principal + " (verificado)" : ""),
                     Foreground = Theme.B(presence == "inactivo" ? Theme.Muted : Theme.Ink), VerticalAlignment = VerticalAlignment.Center,
                 });
