@@ -1,6 +1,7 @@
 # Development
 
 ## Prerequisites
+The repository selects SDK 8.0.427 through `global.json`, allowing later patches in the same feature band and excluding prereleases. Installing .NET 8 without selecting it is insufficient on a machine that also has newer SDKs. See [Microsoft SDK selection](https://learn.microsoft.com/en-us/dotnet/core/tools/global-json). CI reads this file when installing the SDK.
 The .NET SDK supplies the CLI/MSBuild used by the scripts. Visual Studio is optional for editing/debugging. The net48 projects use Microsoft.NETFramework.ReferenceAssemblies packages; see [installation](getting-started/INSTALLATION.md) for build inputs and offline-cache requirements.
 Windows, Git, .NET 8 SDK, Rust x64 with Cargo, and CPython 3. Install .NET Framework 4.8 targeting support for Revit 2022–2024. The add-in targets .NET 8 for Revit 2025–2026. Reference packages can compile the add-in without an installed Revit; they do not prove native compatibility.
 
