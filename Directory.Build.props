@@ -8,6 +8,8 @@
     <Version>0.9.0</Version>
     <InformationalVersion>0.9.0</InformationalVersion>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Issue #7: una tarea sin await ni supervisión pierde sus excepciones; se trata como error de compilación. -->
+    <WarningsAsErrors>$(WarningsAsErrors);CS4014</WarningsAsErrors>
     <!-- sin rutas de la máquina de compilación dentro de las DLL (pdb) -->
     <PathMap>$(MSBuildThisFileDirectory)=/pdi-revit-mcp/</PathMap>
     <Deterministic>true</Deterministic>
