@@ -1,0 +1,34 @@
+[
+  {
+    "de": 2022,
+    "a": 2023,
+    "introducidos": 755,
+    "retirados": 423,
+    "modificados": 50,
+    "obsoletos_nuevos": 47
+  },
+  {
+    "de": 2023,
+    "a": 2024,
+    "introducidos": 823,
+    "retirados": 126,
+    "modificados": 40,
+    "obsoletos_nuevos": 35
+  },
+  {
+    "de": 2024,
+    "a": 2025,
+    "introducidos": 754,
+    "retirados": 257,
+    "modificados": 22,
+    "obsoletos_nuevos": 16
+  },
+  {
+    "de": 2025,
+    "a": 2026,
+    "introducidos": 867,
+    "retirados": 112,
+    "modificados": 99,
+    "obsoletos_nuevos": 92
+  }
+]

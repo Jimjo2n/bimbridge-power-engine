@@ -64,6 +64,7 @@ internal static class Program
     {
         if (args.Length < 1) { Console.Error.WriteLine("uso: RevitApiInventory <carpeta-salida> [raíz-paquetes-nuget] | registry <carpeta-salida> <carpeta-inventario>"); return 2; }
         if (args[0] == "registry") return Registry(args[1], args[2]);
+        if (args[0] == "symbols") return SymbolsMode(args[1], args.Length > 2 ? args[2] : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages"));
         var outDir = args[0];
         var root = args.Length > 1 ? args[1] : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
         Directory.CreateDirectory(outDir);
@@ -200,6 +201,80 @@ internal static class Program
             sb.AppendLine("| " + c.Id + " | " + c.Name + " | `" + c.Status + "` | " + c.Strategy + " | " + (c.Limitations ?? "").Replace("|", "/") + " |");
         File.WriteAllText(Path.Combine(outDir, "coverage.md"), sb.ToString(), new UTF8Encoding(false));
         Console.WriteLine("capacidades " + catalog.Count + ", comandos " + commands.Count + ", UNKNOWN " + commands.Count(c => (string)c["status"] == "UNKNOWN"));
+        return 0;
+    }
+
+    /// <summary>
+    /// Indexador completo: todos los símbolos públicos de RevitAPI.dll y RevitAPIUI.dll por versión (revit-symbols-&lt;año&gt;.txt.gz),
+    /// resumen con trazabilidad (SHA-256 de cada ensamblado de referencia y del listado) y diferencias entre versiones
+    /// (introducidos, retirados, modificados, obsoletos nuevos).
+    /// </summary>
+    private static int SymbolsMode(string outDir, string root)
+    {
+        Directory.CreateDirectory(outDir);
+        var per = new SortedDictionary<int, Dictionary<string, string>>();
+        var summary = new List<Dictionary<string, object>>();
+        foreach (var (year, ver) in Versions)
+        {
+            var api = FindDll(root, "nice3point.revit.api.revitapi", ver, "RevitAPI.dll");
+            var ui = FindDll(root, "nice3point.revit.api.revitapiui", ver, "RevitAPIUI.dll");
+            if (api == null || ui == null) { Console.Error.WriteLine("falta el paquete de referencia " + year + " (" + ver + ")"); return 3; }
+            var lines = Symbols.Extract(api).Select(l => "RevitAPI|" + l).Concat(Symbols.Extract(ui).Select(l => "RevitAPIUI|" + l)).OrderBy(l => l, StringComparer.Ordinal).ToList();
+            var sha = Symbols.WriteGz(Path.Combine(outDir, "revit-symbols-" + year + ".txt.gz"), lines);
+            var map = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var l in lines)
+            {
+                var p = l.Split('|');
+                map[p[0] + "|" + p[1] + "|" + p[2]] = l;
+            }
+            per[year] = map;
+            var byKind = lines.GroupBy(l => l.Split('|')[1]).ToDictionary(g => g.Key switch { "T" => "tipos", "C" => "constructores", "M" => "metodos", "P" => "propiedades", "F" => "campos", "E" => "eventos", _ => g.Key }, g => (object)g.Count());
+            var types = lines.Where(l => l.Split('|')[1] == "T").Select(l => l.Split('|')).ToList();
+            summary.Add(new Dictionary<string, object>
+            {
+                ["revit"] = year, ["paquete_referencia"] = ver,
+                ["revitapi_sha256"] = Symbols.Sha256(File.ReadAllBytes(api)), ["revitapiui_sha256"] = Symbols.Sha256(File.ReadAllBytes(ui)),
+                ["simbolos"] = lines.Count, ["simbolos_sha256"] = sha, ["por_clase"] = byKind,
+                ["tipos_por_tipo"] = types.GroupBy(p => p[3]).ToDictionary(g => g.Key, g => (object)g.Count()),
+                ["obsoletos"] = lines.Count(l => l.Contains("|obsolete")),
+                ["metodos_estaticos"] = lines.Count(l => l.Split('|')[1] == "M" && l.Contains("|static")),
+                ["espacios_de_nombres"] = types.Select(p => { var n = p[2].Split('+')[0]; var d = n.LastIndexOf('.'); return d > 0 ? n.Substring(0, d) : ""; })
+                                              .GroupBy(n => n).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => (object)g.Count()),
+            });
+            Console.WriteLine(year + ": " + lines.Count + " símbolos (" + string.Join(", ", byKind.Select(kv => kv.Key + " " + kv.Value)) + ")");
+        }
+        var diffs = new List<Dictionary<string, object>>();
+        var years = per.Keys.ToList();
+        for (var i = 1; i < years.Count; i++)
+        {
+            var a = per[years[i - 1]]; var b = per[years[i]];
+            var added = b.Keys.Where(k => !a.ContainsKey(k)).OrderBy(k => k, StringComparer.Ordinal).ToList();
+            var removed = a.Keys.Where(k => !b.ContainsKey(k)).OrderBy(k => k, StringComparer.Ordinal).ToList();
+            var changed = b.Keys.Where(k => a.TryGetValue(k, out var old) && old != b[k]).OrderBy(k => k, StringComparer.Ordinal).ToList();
+            var newlyObsolete = changed.Where(k => b[k].Contains("|obsolete") && !a[k].Contains("|obsolete")).ToList();
+            diffs.Add(new Dictionary<string, object>
+            {
+                ["de"] = years[i - 1], ["a"] = years[i],
+                ["introducidos"] = added.Count, ["retirados"] = removed.Count, ["modificados"] = changed.Count, ["obsoletos_nuevos"] = newlyObsolete.Count,
+                ["lista_introducidos"] = added, ["lista_retirados"] = removed,
+                ["lista_modificados"] = changed.Select(k => (object)new Dictionary<string, object> { ["antes"] = a[k], ["despues"] = b[k] }).ToList(),
+            });
+            Console.WriteLine(years[i - 1] + "→" + years[i] + ": +" + added.Count + " −" + removed.Count + " ~" + changed.Count + " obsoletos nuevos " + newlyObsolete.Count);
+        }
+        var o = new JsonSerializerOptions { WriteIndented = true };
+        File.WriteAllText(Path.Combine(outDir, "revit-symbols-summary.json"), JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["metodo"] = "System.Reflection.Metadata sobre ensamblados de referencia Nice3point; sin cargar ni ejecutar Revit. Presencia técnica: no implica semántica, precondiciones ni transacciones.",
+            ["formato_listado"] = "Ensamblado|Clase|Símbolo|atributos (T tipo, C constructor, M método, P propiedad, F campo, E evento)",
+            ["versiones"] = summary,
+        }, o), new UTF8Encoding(false));
+        using (var gzOut = File.Create(Path.Combine(outDir, "revit-symbols-diff.json.gz")))
+        using (var gz = new System.IO.Compression.GZipStream(gzOut, System.IO.Compression.CompressionLevel.SmallestSize))
+        {
+            var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(diffs, o));
+            gz.Write(bytes, 0, bytes.Length);
+        }
+        File.WriteAllText(Path.Combine(outDir, "revit-symbols-diff-summary.json"), JsonSerializer.Serialize(diffs.Select(d => d.Where(kv => !kv.Key.StartsWith("lista_")).ToDictionary(kv => kv.Key, kv => kv.Value)).ToList(), o), new UTF8Encoding(false));
         return 0;
     }
 
