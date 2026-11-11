@@ -6,10 +6,10 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 
 ## Capacidades por estado
 
-- `OFFLINE_VERIFIED`: 8
-- `IMPLEMENTED_UNVERIFIED`: 60
+- `OFFLINE_VERIFIED`: 11
+- `IMPLEMENTED_UNVERIFIED`: 61
 - `DYNAMIC_CSHARP_ONLY`: 40
-- `MISSING`: 9
+- `MISSING`: 8
 - `UNKNOWN`: 1
 - `UNSUPPORTED_BY_PUBLIC_API`: 2
 
@@ -52,7 +52,7 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 | F26 | 2 | IMPLEMENTED_UNVERIFIED 1, MISSING 1 | 8 |
 | F27 | 5 | IMPLEMENTED_UNVERIFIED 3, DYNAMIC_CSHARP_ONLY 2 | 5 |
 | F28 | 2 | DYNAMIC_CSHARP_ONLY 2 | 25 |
-| F29 | 2 | UNSUPPORTED_BY_PUBLIC_API 2 | 4 |
+| F29 | 3 | IMPLEMENTED_UNVERIFIED 1, UNSUPPORTED_BY_PUBLIC_API 2 | 4 |
 | F30 | 2 | IMPLEMENTED_UNVERIFIED 1, DYNAMIC_CSHARP_ONLY 1 | 14 |
 | F31 | 4 | IMPLEMENTED_UNVERIFIED 1, DYNAMIC_CSHARP_ONLY 3 | 15 |
 | F32 | 2 | IMPLEMENTED_UNVERIFIED 1, MISSING 1 | 11 |
@@ -60,7 +60,7 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 | F34 | 3 | DYNAMIC_CSHARP_ONLY 3 | 20 |
 | F35 | 6 | OFFLINE_VERIFIED 5, IMPLEMENTED_UNVERIFIED 1 | 4 |
 | F36 | 2 | OFFLINE_VERIFIED 1, IMPLEMENTED_UNVERIFIED 1 | 0 |
-| F37 | 2 | OFFLINE_VERIFIED 1, MISSING 1 | 65 |
+| F37 | 4 | OFFLINE_VERIFIED 4 | 65 |
 
 ## Capacidades
 
@@ -162,7 +162,8 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 | F27-SHEET-SET-001 | Editar parámetros de lámina | `IMPLEMENTED_UNVERIFIED` | typed:sheet_set | efecto en Revit pendiente de la campaña nativa única de 0.9.1 |
 | F28-LINK-CAD-001 | Vincular o importar CAD | `DYNAMIC_CSHARP_ONLY` | exec | accesible sólo con C# dinámico: falta operación tipada, verificador y pruebas |
 | F28-LINK-RVT-001 | Vincular modelo RVT con posicionamiento | `DYNAMIC_CSHARP_ONLY` | exec | accesible sólo con C# dinámico: falta operación tipada, verificador y pruebas |
-| F29-CM-BATCH-001 | Copy/Monitor: copia por lotes con monitorización | `UNSUPPORTED_BY_PUBLIC_API` | postcommand | el inventario confirma que CopyMonitorOptions no existe en la API pública 2022–2026. PostCommand sólo abre la herramienta: no completa ni verifica el workflow (#23, #24). Requiere el motor de workflows nativos supervisados |
+| F29-CM-BATCH-001 | Copy/Monitor: copia por lotes con monitorización | `UNSUPPORTED_BY_PUBLIC_API` | postcommand | el inventario confirma que CopyMonitorOptions no existe en la API pública 2022–2026. PostCommand sólo abre la herramienta: no completa ni verifica el workflow (#23, #24). 0.9.1: preflight, traspaso manual veraz y verificación posterior en F29-CM-VERIFY-001 |
+| F29-CM-VERIFY-001 | Copy/Monitor: preflight, traspaso manual y verificación de aparatos supervisados | `IMPLEMENTED_UNVERIFIED` | query:check copy_monitor | sólo lectura: la copia la hace el usuario con los pasos devueltos (no hay ejecutor de UI). Lectura en Revit pendiente de la campaña nativa |
 | F29-CR-001 | Coordination Review: revisar y resolver avisos de monitorización | `UNSUPPORTED_BY_PUBLIC_API` | postcommand | sin API pública para Coordination Review; sólo flujo de UI supervisado |
 | F30-WS-CREATE-001 | Crear workset | `DYNAMIC_CSHARP_ONLY` | exec | accesible sólo con C# dinámico: falta operación tipada, verificador y pruebas |
 | F30-WS-SET-001 | Mover elementos a otro workset | `IMPLEMENTED_UNVERIFIED` | typed:set_workset | efecto en Revit pendiente de la campaña nativa única de 0.9.1 |
@@ -184,5 +185,7 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 | F35-RECIPE-001 | Tareas por recetas con concesión de capacidades | `OFFLINE_VERIFIED` | engine |  |
 | F36-QC-INDEP-001 | Verificación independiente contra fuente declarada | `OFFLINE_VERIFIED` | engine |  |
 | F36-QC-MANIFEST-001 | QC uno a uno contra manifiesto | `IMPLEMENTED_UNVERIFIED` | exec |  |
-| F37-NWE-001 | Motor de workflows nativos supervisados (UI asistida con recibos) | `MISSING` | none | PostCommand sólo encola un comando; no hay recibo ni verificación. Pendiente del motor de #23 |
+| F37-DIAG-001 | Diagnóstico de conexión: Bridge, registro del cliente, herramientas, Revit | `OFFLINE_VERIFIED` | engine | las observaciones de registro por cliente se miden fuera del motor (instalador / Bridge) |
+| F37-NWE-001 | Motor de workflows nativos: estados por evidencia, recibos e idempotencia | `OFFLINE_VERIFIED` | engine | sin ejecutor de UI en el producto: los flujos interactivos terminan en traspaso manual; la observación del modo nativo en Revit queda para la campaña nativa |
 | F37-PDF-PLAN-001 | Plan de colocación desde PDF (documento → plan) | `OFFLINE_VERIFIED` | engine | valida el documento y el plan; la ejecución en Revit queda pendiente de campaña |
+| F37-TARGET-001 | Destino estable por instancia y documento (multi-Revit) | `OFFLINE_VERIFIED` | engine | falta conectar la lista real de instancias del Bridge (diagnóstico de #25) |

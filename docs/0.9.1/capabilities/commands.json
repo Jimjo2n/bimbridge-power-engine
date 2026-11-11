@@ -1391,9 +1391,10 @@
       2026
     ],
     "capabilities": [
-      "F29-CM-BATCH-001"
+      "F29-CM-BATCH-001",
+      "F29-CM-VERIFY-001"
     ],
-    "status": "UNSUPPORTED_BY_PUBLIC_API"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "CopyMonitorUseCurrentProject",

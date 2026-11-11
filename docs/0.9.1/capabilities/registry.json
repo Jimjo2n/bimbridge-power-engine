@@ -3591,10 +3591,49 @@
     "verifier": null,
     "idempotency": null,
     "recovery": null,
-    "limitations": "el inventario confirma que CopyMonitorOptions no existe en la API p\u00FAblica 2022\u20132026. PostCommand s\u00F3lo abre la herramienta: no completa ni verifica el workflow (#23, #24). Requiere el motor de workflows nativos supervisados",
+    "limitations": "el inventario confirma que CopyMonitorOptions no existe en la API p\u00FAblica 2022\u20132026. PostCommand s\u00F3lo abre la herramienta: no completa ni verifica el workflow (#23, #24). 0.9.1: preflight, traspaso manual veraz y verificaci\u00F3n posterior en F29-CM-VERIFY-001",
     "ui_command": [
       "CopyMonitorSelectLink",
       "CopyMonitorUseCurrentProject"
+    ],
+    "priority": "P0",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F29-CM-VERIFY-001",
+    "domain": "F29",
+    "subdomain": "copy/monitor",
+    "name": "Copy/Monitor: preflight, traspaso manual y verificaci\u00F3n de aparatos supervisados",
+    "name_en": "Copy/Monitor preflight and verification",
+    "operation": "VERIFY",
+    "expected_postconditions": "inventario del v\u00EDnculo y del anfitri\u00F3n; tras la copia, cada aparato con tipo esperado, posici\u00F3n, orientaci\u00F3n y relaci\u00F3n de supervisi\u00F3n; duplicados y ausentes detectados",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "query:check copy_monitor",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/CopyMonitorProbe.cs",
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.CopyMonitor.cs",
+      "src/PDI.RevitMcp.Engine/Workflows/CopyMonitorVerifier.cs",
+      "src/PDI.RevitMcp.Engine/Workflows/NativeCapabilities.cs"
+    ],
+    "test_ids": [
+      "NativeWorkflowTests"
+    ],
+    "verifier": "CopyMonitorVerifier (correspondencia inferida por tipo y posici\u00F3n; supervisi\u00F3n por IsMonitoringLinkElement)",
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "s\u00F3lo lectura: la copia la hace el usuario con los pasos devueltos (no hay ejecutor de UI). Lectura en Revit pendiente de la campa\u00F1a nativa",
+    "ui_command": [
+      "CopyMonitorSelectLink"
     ],
     "priority": "P0",
     "native_status": "not_tested"
@@ -4247,16 +4286,14 @@
     "capability_id": "F37-NWE-001",
     "domain": "F37",
     "subdomain": "workflows nativos",
-    "name": "Motor de workflows nativos supervisados (UI asistida con recibos)",
+    "name": "Motor de workflows nativos: estados por evidencia, recibos e idempotencia",
     "name_en": "Native Workflow Engine",
     "operation": "VERIFY",
-    "expected_postconditions": "workflow de UI con estados, recibos de ejecuci\u00F3n, verificaci\u00F3n del resultado y recuperaci\u00F3n",
+    "expected_postconditions": "workflow con estados que s\u00F3lo avanzan con evidencia observada, recibos persistentes por clave de intento, reconciliaci\u00F3n ante lo incierto y sin re-PostCommand a ciegas",
     "categories": [],
-    "document_kind": "project",
-    "implementation_path": "none",
-    "api_surface": [
-      "Autodesk.Revit.UI.UIApplication::PostCommand"
-    ],
+    "document_kind": "any",
+    "implementation_path": "engine",
+    "api_surface": [],
     "revit_versions": [
       2022,
       2023,
@@ -4264,13 +4301,86 @@
       2025,
       2026
     ],
-    "status": "MISSING",
-    "source_files": [],
-    "test_ids": [],
-    "verifier": null,
+    "status": "OFFLINE_VERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Engine/Workflows/WorkflowReceipt.cs",
+      "src/PDI.RevitMcp.Engine/Workflows/NativeCapabilities.cs"
+    ],
+    "test_ids": [
+      "NativeWorkflowTests"
+    ],
+    "verifier": "m\u00E1quina de estados \u002B almac\u00E9n de recibos con inyecci\u00F3n de fallos sint\u00E9tica",
     "idempotency": null,
     "recovery": null,
-    "limitations": "PostCommand s\u00F3lo encola un comando; no hay recibo ni verificaci\u00F3n. Pendiente del motor de #23",
+    "limitations": "sin ejecutor de UI en el producto: los flujos interactivos terminan en traspaso manual; la observaci\u00F3n del modo nativo en Revit queda para la campa\u00F1a nativa",
+    "ui_command": [],
+    "priority": "P0",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F37-TARGET-001",
+    "domain": "F37",
+    "subdomain": "destino",
+    "name": "Destino estable por instancia y documento (multi-Revit)",
+    "name_en": "Stable instance/document targeting",
+    "operation": "VERIFY",
+    "expected_postconditions": "operaci\u00F3n vinculada a (pid, inicio del proceso) y a la identidad del documento; ambig\u00FCedad, dN de otra sesi\u00F3n y pid reutilizado se rechazan",
+    "categories": [],
+    "document_kind": "any",
+    "implementation_path": "engine",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "OFFLINE_VERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Engine/Workflows/TargetBinding.cs"
+    ],
+    "test_ids": [
+      "NativeWorkflowTests.TwoRevitInstances_RequireAnExplicitTarget_AndStaleHandlesCannotWrite"
+    ],
+    "verifier": "resoluci\u00F3n y revalidaci\u00F3n del destino con instancias sint\u00E9ticas",
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "falta conectar la lista real de instancias del Bridge (diagn\u00F3stico de #25)",
+    "ui_command": [],
+    "priority": "P0",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F37-DIAG-001",
+    "domain": "F37",
+    "subdomain": "diagn\u00F3stico",
+    "name": "Diagn\u00F3stico de conexi\u00F3n: Bridge, registro del cliente, herramientas, Revit",
+    "name_en": "Connection diagnostics",
+    "operation": "VERIFY",
+    "expected_postconditions": "veredicto preciso que separa registro/permisos del cliente de la disponibilidad de Revit",
+    "categories": [],
+    "document_kind": "any",
+    "implementation_path": "engine",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "OFFLINE_VERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Engine/Workflows/TargetBinding.cs"
+    ],
+    "test_ids": [
+      "NativeWorkflowTests.Diagnostics_SeparateClientRegistrationFromRevitAvailability"
+    ],
+    "verifier": "clasificaci\u00F3n con observaciones sint\u00E9ticas",
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "las observaciones de registro por cliente se miden fuera del motor (instalador / Bridge)",
     "ui_command": [],
     "priority": "P0",
     "native_status": "not_tested"
