@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased — 0.9.1 functional coverage candidate (0.9.0+commit)
-Branch `feat/revit-functional-coverage-0.9.1`. Status and decisions D54–D57 in [DELIVERY_STATUS](docs/0.9.1/DELIVERY_STATUS.md). No native campaign yet: nothing is NATIVE_VERIFIED.
+Branch `feat/revit-functional-coverage-0.9.1`. Status and decisions D54–D62 in [DELIVERY_STATUS](docs/0.9.1/DELIVERY_STATUS.md). No native campaign yet: nothing is NATIVE_VERIFIED.
 - fix(audit) AUD-01/01B: batch-aware head recovery, durable claims, tail repair into fragments; crash-point tests for batches of 1–64.
 - fix(query) AUD-02/03: snapshot revalidation after LiveRev; incremental projection within budget.
 - fix(agenthost) AUD-04 #28: deterministic reproduction; crash injection separated from lease expiry.
@@ -10,6 +10,11 @@ Branch `feat/revit-functional-coverage-0.9.1`. Status and decisions D54–D57 in
 - feat(write): typed level/grid/wall/floor/ceiling/room/duct/pipe/circuit/schedule creation with offline validation and `verificacion_creacion` (44 ops).
 - feat(workflows) #23–#25: evidence-driven receipts, idempotent attempt keys, reconciliation, native capability descriptors, `check copy_monitor` (read-only preflight, manual handoff, verification), stable multi-Revit targeting, connection diagnostics.
 - feat(export): `doc ifc` (transaction always rolled back) and `doc tabla_csv`.
+- fix AUD-06…AUD-11: non-finite verification values, cross-process receipts with privileged evidence, Copy/Monitor dimensions and manual-handoff continuity, commit vs postconditions, durable tail-repair fragment, full link transforms.
+- feat(inventory): every public RevitAPI/RevitAPIUI symbol with full signatures per version, deterministic gzip listings with SHA-256 traceability and version diffs.
+- feat(coverage): immutable capability index, `check name=cobertura` paged discovery, offline benchmarks up to 10,000 entries; 222 capabilities; all 596 PostableCommands linked (189 UNKNOWN with recorded pending research, 48 NOT_APPLICABLE).
+- feat(qa): `check name=model_health` (warnings, duplicates, required parameters, free MEP connectors, documentation).
+- feat(ops): persistent operation history with filters, cancellation and safe-retry advice (`check name=historial`).
 
 ## Unreleased — consolidated engineering delivery (0.9.0+commit)
 Branch `feat/power-engine-consolidation-0.9.0`. Decisions D45–D53 in [ARCHITECTURE_DECISIONS](docs/0.9.0/ARCHITECTURE_DECISIONS.md).
