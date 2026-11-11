@@ -122,6 +122,15 @@ namespace PDI.RevitMcp.Tests
         }
 
         [Fact]
+        public void TypedStrategies_ReferenceOperationsThatExistInTheOpCatalog()
+        {
+            // Una capacidad "typed:<op>" sólo puede citar una operación de escritura que exista de verdad (OpCatalog).
+            var kinds = new HashSet<string>(PDI.RevitMcp.Engine.OpCatalog.All.Select(o => o.Kind), StringComparer.Ordinal);
+            foreach (var c in CapabilityCatalog.All.Where(c => c.Strategy != null && c.Strategy.StartsWith("typed:", StringComparison.Ordinal)))
+                Assert.True(kinds.Contains(c.Strategy.Substring(6)), c.Id + ": la operación " + c.Strategy + " no existe en OpCatalog");
+        }
+
+        [Fact]
         public void Summary_CountsMatchTheCatalog()
         {
             var s = CapabilityCatalog.Summary();

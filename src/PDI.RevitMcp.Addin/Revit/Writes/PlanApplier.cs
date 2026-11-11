@@ -21,7 +21,7 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
     ///  4. Movimientos, borrados y ocultaciones iguales se agrupan en una sola llamada a la API (MoveElements, Delete, HideElements).
     ///  5. Al terminar relee lo que tocó y compara con lo planificado ("verificacion").
     /// </summary>
-    internal sealed class PlanApplier
+    internal sealed partial class PlanApplier
     {
         private readonly Document _doc;
         private readonly Plan _plan;
@@ -179,7 +179,7 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                     return "";
                 }
                 default:
-                    return "";
+                    return ModelGuard(entry.Op, t) ?? "";
             }
         }
 
@@ -933,7 +933,10 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 case "detail_arc": return new[] { DetailArcCreate(t) };
                 case "detail_component": return new[] { DetailComponentCreate(t) };
                 case "dimension": return new[] { DimensionCreate(t) };
-                default: throw new InvalidOperationException("no sé crear con " + op);
+                default:
+                    var made = ModelCreate(op, t, opIndex);
+                    if (made != null) return made;
+                    throw new InvalidOperationException("no sé crear con " + op);
             }
         }
 
@@ -1335,6 +1338,8 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 d["creados_por_op"] = _plan.CreatedByOp.OrderBy(k => k.Key).ToDictionary(k => "@" + k.Key.ToString(CultureInfo.InvariantCulture), k => (object)(long)k.Value.Count);
             if (_skipped.Count > 0)
                 d["omitidos"] = _skipped.ToDictionary(k => k.Key, k => (object)(long)k.Value.Count);
+            var mv = VerifyModelCreations();
+            if (mv != null) d["verificacion_creacion"] = mv;
             return d;
         }
 

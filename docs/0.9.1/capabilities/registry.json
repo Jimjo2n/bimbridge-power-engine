@@ -620,10 +620,10 @@
     "name": "Crear nivel",
     "name_en": "Create level",
     "operation": "CREATE",
-    "expected_postconditions": "nivel a la elevaci\u00F3n pedida con su vista de planta opcional",
+    "expected_postconditions": "nivel a la elevaci\u00F3n pedida con sus vistas de planta y RCP opcionales",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "exec",
+    "implementation_path": "typed:level_create",
     "api_surface": [
       "Autodesk.Revit.DB.Level::Create"
     ],
@@ -634,15 +634,22 @@
       2025,
       2026
     ],
-    "status": "DYNAMIC_CSHARP_ONLY",
+    "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
+      "src/PDI.RevitMcp.Engine/ModelOps.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
-    "test_ids": [],
-    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
-    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
-    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
-    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "test_ids": [
+      "ModelOpsTests"
+    ],
+    "verifier": "relectura de cada elemento creado frente a lo pedido (verificacion_creacion)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "efecto en Revit pendiente de la campa\u00F1a nativa \u00FAnica de 0.9.1",
     "ui_command": [
       "Level"
     ],
@@ -653,13 +660,13 @@
     "capability_id": "F03-DATUM-GRID-001",
     "domain": "F03",
     "subdomain": "rejillas",
-    "name": "Crear rejilla",
+    "name": "Crear rejilla recta",
     "name_en": "Create grid",
     "operation": "CREATE",
-    "expected_postconditions": "rejilla recta o en arco con su nombre",
+    "expected_postconditions": "rejilla recta con su nombre",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "exec",
+    "implementation_path": "typed:grid_create",
     "api_surface": [
       "Autodesk.Revit.DB.Grid::Create"
     ],
@@ -670,15 +677,22 @@
       2025,
       2026
     ],
-    "status": "DYNAMIC_CSHARP_ONLY",
+    "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
+      "src/PDI.RevitMcp.Engine/ModelOps.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
-    "test_ids": [],
-    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
-    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
-    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
-    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "test_ids": [
+      "ModelOpsTests"
+    ],
+    "verifier": "relectura de cada elemento creado frente a lo pedido (verificacion_creacion)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "s\u00F3lo rejillas rectas; arcos y rejillas multisegmento siguen por C# din\u00E1mico. Efecto en Revit pendiente de la campa\u00F1a nativa",
     "ui_command": [
       "Grid"
     ],
@@ -725,13 +739,13 @@
     "capability_id": "F03-DATUM-SCOPEBOX-001",
     "domain": "F03",
     "subdomain": "cajas de referencia",
-    "name": "Crear caja de referencia",
-    "name_en": "Create scope box",
-    "operation": "CREATE",
-    "expected_postconditions": "caja de referencia con extensi\u00F3n y nombre",
+    "name": "Asignar caja de referencia a vistas",
+    "name_en": "Assign scope box to views",
+    "operation": "ASSOCIATE",
+    "expected_postconditions": "vistas recortadas por la caja de referencia pedida (view_set scope_box)",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "typed:scope_box",
+    "implementation_path": "typed:view_set",
     "api_surface": [],
     "revit_versions": [
       2022,
@@ -754,10 +768,40 @@
     "idempotency": "clave= por commit; plan_id \u00FAnico",
     "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
     "limitations": "efecto en Revit pendiente de la campa\u00F1a nativa \u00FAnica de 0.9.1",
+    "ui_command": [],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F03-DATUM-SCOPEBOX-002",
+    "domain": "F03",
+    "subdomain": "cajas de referencia",
+    "name": "Crear caja de referencia",
+    "name_en": "Create scope box",
+    "operation": "CREATE",
+    "expected_postconditions": "caja de referencia con extensi\u00F3n y nombre",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "no se ha identificado una API p\u00FAblica de creaci\u00F3n de cajas de referencia; investigar antes de clasificar",
     "ui_command": [
       "ScopeBox"
     ],
-    "priority": "P1",
+    "priority": "P3",
     "native_status": "not_tested"
   },
   {
@@ -1097,13 +1141,13 @@
     "capability_id": "F05-WALL-CREATE-001",
     "domain": "F05",
     "subdomain": "muros",
-    "name": "Crear muro por l\u00EDnea",
+    "name": "Crear muros por polil\u00EDnea",
     "name_en": "Create wall",
     "operation": "CREATE",
-    "expected_postconditions": "muro del tipo, nivel, altura y desfase pedidos",
+    "expected_postconditions": "un muro por tramo con el tipo, nivel, altura (o nivel superior) y desfase pedidos",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "exec",
+    "implementation_path": "typed:wall_create",
     "api_surface": [
       "Autodesk.Revit.DB.Wall::Create"
     ],
@@ -1114,15 +1158,22 @@
       2025,
       2026
     ],
-    "status": "DYNAMIC_CSHARP_ONLY",
+    "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
+      "src/PDI.RevitMcp.Engine/ModelOps.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
-    "test_ids": [],
-    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
-    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
-    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
-    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "test_ids": [
+      "ModelOpsTests"
+    ],
+    "verifier": "relectura de cada elemento creado frente a lo pedido (verificacion_creacion)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "tramos rectos; sin uniones forzadas ni muros de perfil. Efecto en Revit pendiente de la campa\u00F1a nativa",
     "ui_command": [
       "ArchitecturalWall",
       "StructuralWall"
@@ -1206,10 +1257,10 @@
     "name": "Crear suelo por contorno",
     "name_en": "Create floor",
     "operation": "CREATE",
-    "expected_postconditions": "suelo del tipo y nivel pedidos con contorno cerrado",
+    "expected_postconditions": "suelo del tipo y nivel pedidos con contorno cerrado y desfase",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "exec",
+    "implementation_path": "typed:floor_create",
     "api_surface": [
       "Autodesk.Revit.DB.Floor::Create"
     ],
@@ -1220,15 +1271,22 @@
       2025,
       2026
     ],
-    "status": "DYNAMIC_CSHARP_ONLY",
+    "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
+      "src/PDI.RevitMcp.Engine/ModelOps.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
-    "test_ids": [],
-    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
-    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
-    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
-    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "test_ids": [
+      "ModelOpsTests"
+    ],
+    "verifier": "relectura de cada elemento creado frente a lo pedido (verificacion_creacion)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "un contorno sin huecos ni pendiente. Efecto en Revit pendiente de la campa\u00F1a nativa",
     "ui_command": [
       "ArchitecturalFloor",
       "StructuralFloor"
@@ -1243,10 +1301,10 @@
     "name": "Crear techo por contorno",
     "name_en": "Create ceiling",
     "operation": "CREATE",
-    "expected_postconditions": "techo a la altura pedida",
+    "expected_postconditions": "techo del tipo pedido a la altura pedida sobre el nivel",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "exec",
+    "implementation_path": "typed:ceiling_create",
     "api_surface": [
       "Autodesk.Revit.DB.Ceiling::Create"
     ],
@@ -1257,15 +1315,22 @@
       2025,
       2026
     ],
-    "status": "DYNAMIC_CSHARP_ONLY",
+    "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
+      "src/PDI.RevitMcp.Engine/ModelOps.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
-    "test_ids": [],
-    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
-    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
-    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
-    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "test_ids": [
+      "ModelOpsTests"
+    ],
+    "verifier": "relectura de cada elemento creado frente a lo pedido (verificacion_creacion)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "contorno expl\u00EDcito (no detecci\u00F3n autom\u00E1tica de recinto). Efecto en Revit pendiente de la campa\u00F1a nativa",
     "ui_command": [
       "AutomaticCeiling"
     ],
@@ -1538,10 +1603,10 @@
     "name": "Crear habitaci\u00F3n en circuito cerrado",
     "name_en": "Create room",
     "operation": "CREATE",
-    "expected_postconditions": "habitaci\u00F3n delimitada con nombre y n\u00FAmero",
+    "expected_postconditions": "habitaci\u00F3n delimitada (\u00E1rea \u003E 0) con nombre y n\u00FAmero",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "exec",
+    "implementation_path": "typed:room_create",
     "api_surface": [
       "Autodesk.Revit.DB.Architecture.Room"
     ],
@@ -1552,15 +1617,22 @@
       2025,
       2026
     ],
-    "status": "DYNAMIC_CSHARP_ONLY",
+    "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
+      "src/PDI.RevitMcp.Engine/ModelOps.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
-    "test_ids": [],
-    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
-    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
-    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
-    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "test_ids": [
+      "ModelOpsTests"
+    ],
+    "verifier": "relectura de cada elemento creado frente a lo pedido (verificacion_creacion)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "efecto en Revit pendiente de la campa\u00F1a nativa \u00FAnica de 0.9.1",
     "ui_command": [
       "Room"
     ],
@@ -1925,13 +1997,13 @@
     "capability_id": "F17-DUCT-CREATE-001",
     "domain": "F17",
     "subdomain": "conductos",
-    "name": "Crear conducto entre puntos o conectores",
+    "name": "Crear conducto entre puntos",
     "name_en": "Create duct",
     "operation": "CREATE",
-    "expected_postconditions": "conducto con tipo, sistema y nivel",
+    "expected_postconditions": "conducto recto con tipo, sistema, nivel y tama\u00F1o",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "exec",
+    "implementation_path": "typed:duct_create",
     "api_surface": [
       "Autodesk.Revit.DB.Mechanical.Duct::Create"
     ],
@@ -1942,15 +2014,22 @@
       2025,
       2026
     ],
-    "status": "DYNAMIC_CSHARP_ONLY",
+    "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
+      "src/PDI.RevitMcp.Engine/ModelOps.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
-    "test_ids": [],
-    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
-    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
-    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
-    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "test_ids": [
+      "ModelOpsTests"
+    ],
+    "verifier": "relectura de cada elemento creado frente a lo pedido (verificacion_creacion)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "entre puntos; la conexi\u00F3n a conectores y los accesorios siguen por C# din\u00E1mico. Efecto en Revit pendiente de la campa\u00F1a nativa",
     "ui_command": [
       "Duct"
     ],
@@ -1995,13 +2074,13 @@
     "capability_id": "F18-PIPE-CREATE-001",
     "domain": "F18",
     "subdomain": "tuber\u00EDas",
-    "name": "Crear tuber\u00EDa entre puntos o conectores",
+    "name": "Crear tuber\u00EDa entre puntos",
     "name_en": "Create pipe",
     "operation": "CREATE",
-    "expected_postconditions": "tuber\u00EDa con tipo, sistema y nivel",
+    "expected_postconditions": "tuber\u00EDa recta con tipo, sistema, nivel y di\u00E1metro",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "exec",
+    "implementation_path": "typed:pipe_create",
     "api_surface": [
       "Autodesk.Revit.DB.Plumbing.Pipe::Create"
     ],
@@ -2012,15 +2091,22 @@
       2025,
       2026
     ],
-    "status": "DYNAMIC_CSHARP_ONLY",
+    "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
+      "src/PDI.RevitMcp.Engine/ModelOps.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
-    "test_ids": [],
-    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
-    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
-    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
-    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "test_ids": [
+      "ModelOpsTests"
+    ],
+    "verifier": "relectura de cada elemento creado frente a lo pedido (verificacion_creacion)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "entre puntos; la conexi\u00F3n a conectores y los accesorios siguen por C# din\u00E1mico. Efecto en Revit pendiente de la campa\u00F1a nativa",
     "ui_command": [
       "Pipe"
     ],
@@ -2097,13 +2183,13 @@
     "capability_id": "F20-CIRCUIT-CREATE-001",
     "domain": "F20",
     "subdomain": "circuitos",
-    "name": "Crear circuito el\u00E9ctrico",
+    "name": "Crear circuito el\u00E9ctrico de fuerza",
     "name_en": "Create power circuit",
     "operation": "CREATE",
-    "expected_postconditions": "circuito con miembros compatibles, tensi\u00F3n, polos y clasificaci\u00F3n de carga",
+    "expected_postconditions": "circuito con los miembros pedidos (conector de fuerza libre comprobado al planificar y al aplicar)",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "exec",
+    "implementation_path": "typed:circuit_create",
     "api_surface": [
       "Autodesk.Revit.DB.Electrical.ElectricalSystem::Create"
     ],
@@ -2114,15 +2200,22 @@
       2025,
       2026
     ],
-    "status": "DYNAMIC_CSHARP_ONLY",
+    "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
+      "src/PDI.RevitMcp.Engine/ModelOps.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
-    "test_ids": [],
-    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
-    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
-    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
-    "limitations": "sin verificaci\u00F3n tipada de compatibilidad de conectores, tensi\u00F3n, polos ni panel; prioridad del bloque D",
+    "test_ids": [
+      "ModelOpsTests"
+    ],
+    "verifier": "relectura de cada elemento creado frente a lo pedido (verificacion_creacion)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "verifica miembros y cuadro; la compatibilidad de tensi\u00F3n y polos la decide Revit (si la rechaza, el plan se revierte). Efecto en Revit pendiente de la campa\u00F1a nativa",
     "ui_command": [
       "CheckCircuits"
     ],
@@ -2133,13 +2226,13 @@
     "capability_id": "F20-CIRCUIT-PANEL-001",
     "domain": "F20",
     "subdomain": "circuitos",
-    "name": "Asignar panel a circuito",
+    "name": "Asignar panel al crear el circuito",
     "name_en": "Select panel",
     "operation": "ASSOCIATE",
-    "expected_postconditions": "circuito alimentado por el panel pedido",
+    "expected_postconditions": "circuito alimentado por el cuadro pedido (BaseEquipment verificado)",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "exec",
+    "implementation_path": "typed:circuit_create",
     "api_surface": [
       "Autodesk.Revit.DB.Electrical.ElectricalSystem::Create"
     ],
@@ -2150,15 +2243,22 @@
       2025,
       2026
     ],
-    "status": "DYNAMIC_CSHARP_ONLY",
+    "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
+      "src/PDI.RevitMcp.Engine/ModelOps.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
-    "test_ids": [],
-    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
-    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
-    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
-    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "test_ids": [
+      "ModelOpsTests"
+    ],
+    "verifier": "relectura de cada elemento creado frente a lo pedido (verificacion_creacion)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "s\u00F3lo al crear; reasignar el cuadro de un circuito existente sigue por C# din\u00E1mico. Efecto en Revit pendiente de la campa\u00F1a nativa",
     "ui_command": [],
     "priority": "P0",
     "native_status": "not_tested"
@@ -2485,7 +2585,7 @@
     "capability_id": "F24-VIEW-CREATE-001",
     "domain": "F24",
     "subdomain": "vistas",
-    "name": "Crear vista (planta, RCP, secci\u00F3n, alzado, callout)",
+    "name": "Crear vista (planta, RCP, secci\u00F3n, callout)",
     "name_en": "Create view",
     "operation": "CREATE",
     "expected_postconditions": "vista del tipo pedido con nivel, escala y plantilla",
@@ -2518,23 +2618,57 @@
       "FloorPlan",
       "ReflectedCeilingPlan",
       "Section",
-      "BuildingElevation",
       "Callout"
     ],
     "priority": "P0",
     "native_status": "not_tested"
   },
   {
+    "capability_id": "F24-VIEW-ELEV-001",
+    "domain": "F24",
+    "subdomain": "vistas",
+    "name": "Crear alzado (marcador y vista)",
+    "name_en": "Create elevation",
+    "operation": "CREATE",
+    "expected_postconditions": "marcador de alzado con su vista",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "view_create no admite alzados: s\u00F3lo C# din\u00E1mico",
+    "ui_command": [
+      "BuildingElevation",
+      "FramingElevation"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
     "capability_id": "F24-VIEW-DUP-001",
     "domain": "F24",
     "subdomain": "vistas",
-    "name": "Duplicar vista",
+    "name": "Duplicar vista (simple, con detalles o dependiente)",
     "name_en": "Duplicate view",
     "operation": "DUPLICATE",
-    "expected_postconditions": "copia con o sin detalle",
+    "expected_postconditions": "copia con o sin detalle o dependiente (view_create tipo=duplicar)",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "typed:duplicar",
+    "implementation_path": "typed:view_create",
     "api_surface": [],
     "revit_versions": [
       2022,
@@ -2688,13 +2822,11 @@
     "name": "Crear vista 3D isom\u00E9trica con caja de secci\u00F3n",
     "name_en": "Create 3D view",
     "operation": "CREATE",
-    "expected_postconditions": "vista 3D con caja de secci\u00F3n opcional",
+    "expected_postconditions": "vista 3D con caja de secci\u00F3n opcional (view_create tipo=3d)",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "exec",
-    "api_surface": [
-      "Autodesk.Revit.DB.View3D::CreateIsometric"
-    ],
+    "implementation_path": "typed:view_create",
+    "api_surface": [],
     "revit_versions": [
       2022,
       2023,
@@ -2702,19 +2834,24 @@
       2025,
       2026
     ],
-    "status": "DYNAMIC_CSHARP_ONLY",
+    "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
     ],
-    "test_ids": [],
-    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
-    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
-    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
-    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "test_ids": [
+      "PlanTests",
+      "WriteEngineTests"
+    ],
+    "verifier": "postcondiciones del plan \u002B relectura del modelo tras commit (diff por elemento)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "efecto en Revit pendiente de la campa\u00F1a nativa \u00FAnica de 0.9.1",
     "ui_command": [
       "Default3DView"
     ],
-    "priority": "P2",
+    "priority": "P1",
     "native_status": "not_tested"
   },
   {
@@ -2724,13 +2861,11 @@
     "name": "Crear vista de dibujo",
     "name_en": "Drafting view",
     "operation": "CREATE",
-    "expected_postconditions": "vista de dibujo con escala",
+    "expected_postconditions": "vista de dibujo con escala (view_create tipo=dibujo)",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "exec",
-    "api_surface": [
-      "Autodesk.Revit.DB.ViewDrafting::Create"
-    ],
+    "implementation_path": "typed:view_create",
+    "api_surface": [],
     "revit_versions": [
       2022,
       2023,
@@ -2738,19 +2873,24 @@
       2025,
       2026
     ],
-    "status": "DYNAMIC_CSHARP_ONLY",
+    "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
     ],
-    "test_ids": [],
-    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
-    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
-    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
-    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "test_ids": [
+      "PlanTests",
+      "WriteEngineTests"
+    ],
+    "verifier": "postcondiciones del plan \u002B relectura del modelo tras commit (diff por elemento)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "efecto en Revit pendiente de la campa\u00F1a nativa \u00FAnica de 0.9.1",
     "ui_command": [
       "DraftingView"
     ],
-    "priority": "P2",
+    "priority": "P1",
     "native_status": "not_tested"
   },
   {
@@ -3098,13 +3238,13 @@
     "capability_id": "F26-SCHED-CREATE-001",
     "domain": "F26",
     "subdomain": "tablas",
-    "name": "Crear tabla de planificaci\u00F3n con campos y filtros",
+    "name": "Crear tabla de planificaci\u00F3n con campos",
     "name_en": "Create schedule",
     "operation": "SCHEDULE",
-    "expected_postconditions": "tabla con campos, filtros, orden y agrupaci\u00F3n",
+    "expected_postconditions": "tabla de la categor\u00EDa con los campos pedidos en orden",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "exec",
+    "implementation_path": "typed:schedule_create",
     "api_surface": [
       "Autodesk.Revit.DB.ViewSchedule::CreateSchedule"
     ],
@@ -3115,15 +3255,22 @@
       2025,
       2026
     ],
-    "status": "DYNAMIC_CSHARP_ONLY",
+    "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
+      "src/PDI.RevitMcp.Engine/ModelOps.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
-    "test_ids": [],
-    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
-    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
-    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
-    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "test_ids": [
+      "ModelOpsTests"
+    ],
+    "verifier": "relectura de cada elemento creado frente a lo pedido (verificacion_creacion)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "campos en orden; filtros, orden y agrupaci\u00F3n siguen por C# din\u00E1mico. Efecto en Revit pendiente de la campa\u00F1a nativa",
     "ui_command": [
       "ScheduleOrQuantities"
     ],

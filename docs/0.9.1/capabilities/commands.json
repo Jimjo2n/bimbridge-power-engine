@@ -454,7 +454,7 @@
     "capabilities": [
       "F06-FLOOR-CREATE-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "ArchitecturalWall",
@@ -470,7 +470,7 @@
     "capabilities": [
       "F05-WALL-CREATE-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "Area",
@@ -643,7 +643,7 @@
     "capabilities": [
       "F06-CEIL-CREATE-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "AutomationCustomization",
@@ -822,9 +822,9 @@
       2026
     ],
     "capabilities": [
-      "F24-VIEW-CREATE-001"
+      "F24-VIEW-ELEV-001"
     ],
-    "status": "IMPLEMENTED_UNVERIFIED"
+    "status": "DYNAMIC_CSHARP_ONLY"
   },
   {
     "command": "BuildingOperatingSchedules",
@@ -991,7 +991,7 @@
     "capabilities": [
       "F20-CIRCUIT-CREATE-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "CheckDuctSystems",
@@ -1748,7 +1748,7 @@
     "capabilities": [
       "F24-VIEW-3D-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "Delete",
@@ -1956,7 +1956,7 @@
     "capabilities": [
       "F24-VIEW-DRAFT-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "DrawOnFace",
@@ -2000,7 +2000,7 @@
     "capabilities": [
       "F17-DUCT-CREATE-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "DuctAccessory",
@@ -2931,8 +2931,10 @@
       2025,
       2026
     ],
-    "capabilities": [],
-    "status": "UNKNOWN"
+    "capabilities": [
+      "F24-VIEW-ELEV-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
   },
   {
     "command": "Generate",
@@ -3028,7 +3030,7 @@
     "capabilities": [
       "F03-DATUM-GRID-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "GuideGrid",
@@ -3476,7 +3478,7 @@
     "capabilities": [
       "F03-DATUM-LEVEL-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "Lighting",
@@ -5119,7 +5121,7 @@
     "capabilities": [
       "F18-PIPE-CREATE-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "PipeAccessory",
@@ -6095,7 +6097,7 @@
     "capabilities": [
       "F09-ROOM-CREATE-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "RoomSeparator",
@@ -6389,7 +6391,7 @@
     "capabilities": [
       "F26-SCHED-CREATE-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "ScopeBox",
@@ -6403,9 +6405,9 @@
       2026
     ],
     "capabilities": [
-      "F03-DATUM-SCOPEBOX-001"
+      "F03-DATUM-SCOPEBOX-002"
     ],
-    "status": "IMPLEMENTED_UNVERIFIED"
+    "status": "UNKNOWN"
   },
   {
     "command": "Section",
@@ -7370,7 +7372,7 @@
     "capabilities": [
       "F06-FLOOR-CREATE-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "StructuralPathReinforcement",
@@ -7469,7 +7471,7 @@
     "capabilities": [
       "F05-WALL-CREATE-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "Subregion",

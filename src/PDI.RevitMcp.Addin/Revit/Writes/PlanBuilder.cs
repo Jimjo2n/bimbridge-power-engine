@@ -31,7 +31,7 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
     /// Planificar: valida cada operación contra el modelo y la convierte en entradas (antes → después) sin tocar nada.
     /// Los problemas de un elemento lo omiten con un aviso; los de la operación entera (tipo, vista o nivel inexistente) la rechazan.
     /// </summary>
-    internal static class PlanBuilder
+    internal static partial class PlanBuilder
     {
         /// <summary>Operaciones que aceptan ids=@n (elementos que crea una operación anterior del mismo plan).</summary>
         private static readonly HashSet<string> RefIdsOk = new HashSet<string>(StringComparer.Ordinal)
@@ -83,6 +83,14 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 case "detail_arc": DetailArcOp(ctx, op, c); break;
                 case "detail_component": DetailComponentOp(ctx, op, c); break;
                 case "dimension": DimensionOp(ctx, op, c); break;
+                case "level_create": LevelCreateOp(ctx, op, c); break;
+                case "grid_create": GridCreateOp(ctx, op, c); break;
+                case "wall_create": WallCreateOp(ctx, op, c); break;
+                case "floor_create": case "ceiling_create": SlabCreateOp(ctx, op, c); break;
+                case "room_create": RoomCreateOp(ctx, op, c); break;
+                case "duct_create": case "pipe_create": MepCurveCreateOp(ctx, op, c); break;
+                case "circuit_create": CircuitCreateOp(ctx, op, ids, c); break;
+                case "schedule_create": ScheduleCreateOp(ctx, op, c); break;
                 default: throw new QueryException("operación no implementada: " + op.Kind);
             }
             c.Finish();

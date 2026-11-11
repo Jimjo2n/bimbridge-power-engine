@@ -237,6 +237,18 @@ namespace PDI.RevitMcp.Engine
                 case "text_note":
                     OpCatalog.Point(o["punto"], "text_note punto", false);
                     break;
+                case "level_create":
+                case "grid_create":
+                case "wall_create":
+                case "floor_create":
+                case "ceiling_create":
+                case "room_create":
+                case "duct_create":
+                case "pipe_create":
+                case "circuit_create":
+                case "schedule_create":
+                    ModelOps.Validate(s.Kind, o, s);
+                    break;
                 case "filled_region":
                 {
                     var fp = OpCatalog.Points(o["puntos"], "filled_region puntos", 3, 200, false);
