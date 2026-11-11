@@ -240,7 +240,8 @@
     "recovery": null,
     "limitations": null,
     "ui_command": [
-      "ExportPDF"
+      "ExportPDF",
+      "PDF"
     ],
     "priority": "P1",
     "native_status": "not_tested"
@@ -952,7 +953,9 @@
     "idempotency": "clave= por commit; plan_id \u00FAnico",
     "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
     "limitations": "efecto en Revit pendiente de la campa\u00F1a nativa \u00FAnica de 0.9.1",
-    "ui_command": [],
+    "ui_command": [
+      "TypeProperties"
+    ],
     "priority": "P1",
     "native_status": "not_tested"
   },
@@ -1176,7 +1179,8 @@
     "limitations": "tramos rectos; sin uniones forzadas ni muros de perfil. Efecto en Revit pendiente de la campa\u00F1a nativa",
     "ui_command": [
       "ArchitecturalWall",
-      "StructuralWall"
+      "StructuralWall",
+      "Wall"
     ],
     "priority": "P1",
     "native_status": "not_tested"
@@ -2691,7 +2695,11 @@
     "idempotency": "clave= por commit; plan_id \u00FAnico",
     "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
     "limitations": "efecto en Revit pendiente de la campa\u00F1a nativa \u00FAnica de 0.9.1",
-    "ui_command": [],
+    "ui_command": [
+      "DuplicateView",
+      "DuplicateAsDependent",
+      "DuplicateWithDetailing"
+    ],
     "priority": "P1",
     "native_status": "not_tested"
   },
@@ -2730,7 +2738,9 @@
     "limitations": "efecto en Revit pendiente de la campa\u00F1a nativa \u00FAnica de 0.9.1",
     "ui_command": [
       "ManageViewTemplates",
-      "ApplyTemplatePropertiesToCurrentView"
+      "ApplyTemplatePropertiesToCurrentView",
+      "DetailLevel",
+      "SelectionBox"
     ],
     "priority": "P1",
     "native_status": "not_tested"
@@ -2810,7 +2820,9 @@
     "limitations": "efecto en Revit pendiente de la campa\u00F1a nativa \u00FAnica de 0.9.1",
     "ui_command": [
       "Filters",
-      "VisibilityOrGraphics"
+      "VisibilityOrGraphics",
+      "OverrideByCategory",
+      "OverrideByElement"
     ],
     "priority": "P1",
     "native_status": "not_tested"
@@ -3076,7 +3088,8 @@
     "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
     "limitations": "efecto en Revit pendiente de la campa\u00F1a nativa \u00FAnica de 0.9.1",
     "ui_command": [
-      "AlignedDimension"
+      "AlignedDimension",
+      "LinearDimension"
     ],
     "priority": "P1",
     "native_status": "not_tested"
@@ -3596,7 +3609,8 @@
     "limitations": "el inventario confirma que CopyMonitorOptions no existe en la API p\u00FAblica 2022\u20132026. PostCommand s\u00F3lo abre la herramienta: no completa ni verifica el workflow (#23, #24). 0.9.1: preflight, traspaso manual veraz y verificaci\u00F3n posterior en F29-CM-VERIFY-001",
     "ui_command": [
       "CopyMonitorSelectLink",
-      "CopyMonitorUseCurrentProject"
+      "CopyMonitorUseCurrentProject",
+      "CoordinationSettings"
     ],
     "priority": "P0",
     "native_status": "not_tested"
@@ -3926,7 +3940,9 @@
     "idempotency": null,
     "recovery": null,
     "limitations": null,
-    "ui_command": [],
+    "ui_command": [
+      "RunInterferenceCheck"
+    ],
     "priority": "P1",
     "native_status": "not_tested"
   },
@@ -3994,7 +4010,9 @@
     "idempotency": "no garantizada (c\u00F3digo arbitrario)",
     "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
     "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
-    "ui_command": [],
+    "ui_command": [
+      "ExportImagesandAnimationsImage"
+    ],
     "priority": "P3",
     "native_status": "not_tested"
   },
@@ -4030,7 +4048,8 @@
     "recovery": null,
     "limitations": "sin mapeo de property sets ni archivo de configuraci\u00F3n IFC (siguen por C# din\u00E1mico). Efecto en Revit pendiente de la campa\u00F1a nativa",
     "ui_command": [
-      "ExportIFC"
+      "ExportIFC",
+      "ExportOptionsIFCOptions"
     ],
     "priority": "P1",
     "native_status": "not_tested"
@@ -4067,7 +4086,8 @@
     "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
     "ui_command": [
       "ExportCADFormatsDWG",
-      "ExportCADFormatsDXF"
+      "ExportCADFormatsDXF",
+      "ExportOptionsExportSetupsDWGOrDXF"
     ],
     "priority": "P2",
     "native_status": "not_tested"
@@ -4526,6 +4546,3836 @@
     "limitations": null,
     "ui_command": [],
     "priority": "P0",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F01-DOC-CLOUD-001",
+    "domain": "F01",
+    "subdomain": "documentos en la nube",
+    "name": "Guardar, abrir y gestionar modelos en la nube",
+    "name_en": "Cloud models",
+    "operation": "SAVE",
+    "expected_postconditions": "modelo guardado o abierto en ACC/BIM 360 con su ruta en la nube",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Document::SaveAsCloudModel"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "requiere sesi\u00F3n de Autodesk y permisos del proyecto en la nube",
+    "ui_command": [
+      "SaveAsCloudModel",
+      "OpenCloudModel",
+      "ManageCloudModels"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F01-DOC-TEMPLATE-001",
+    "domain": "F01",
+    "subdomain": "plantillas",
+    "name": "Guardar como plantilla y crear proyecto desde plantilla",
+    "name_en": "Templates",
+    "operation": "SAVE",
+    "expected_postconditions": "archivo .rte o proyecto nuevo desde la plantilla pedida",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Document::SaveAs"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "SaveAsTemplate",
+      "NewProject",
+      "ManageTemplates",
+      "EditATemplate"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F01-DOC-STANDARDS-001",
+    "domain": "F01",
+    "subdomain": "est\u00E1ndares",
+    "name": "Transferir normas de proyecto",
+    "name_en": "Transfer project standards",
+    "operation": "UPDATE",
+    "expected_postconditions": "tipos y estilos copiados del proyecto origen",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: no se ha localizado una API p\u00FAblica equivalente al di\u00E1logo; candidato: ElementTransformUtils.CopyElements entre documentos para tipos (no equivale a todas las categor\u00EDas del di\u00E1logo)",
+    "ui_command": [
+      "TransferProjectStandards"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F01-DOC-REPAIR-001",
+    "domain": "F01",
+    "subdomain": "recuperaci\u00F3n",
+    "name": "Reparar modelo central y restaurar copia de seguridad",
+    "name_en": "Repair central / restore backup",
+    "operation": "RECOVER",
+    "expected_postconditions": "modelo recuperado con evidencia",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: sin API p\u00FAblica identificada para ambos di\u00E1logos; requiere flujo manual",
+    "ui_command": [
+      "RepairCentralModel",
+      "RestoreBackup"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F01-UI-SESSION-001",
+    "domain": "F01",
+    "subdomain": "sesi\u00F3n",
+    "name": "Salir de Revit, opciones de la aplicaci\u00F3n y archivos de ejemplo",
+    "name_en": "Session and application UI",
+    "operation": "UI",
+    "expected_postconditions": "no aplica: acciones de la aplicaci\u00F3n o de la sesi\u00F3n del usuario; no son operaciones sobre el modelo (cerrar un documento ya est\u00E1 en F01-DOC-CLOSE-001)",
+    "categories": [],
+    "document_kind": "any",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "NOT_APPLICABLE",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "acciones de la aplicaci\u00F3n o de la sesi\u00F3n del usuario; no son operaciones sobre el modelo (cerrar un documento ya est\u00E1 en F01-DOC-CLOSE-001)",
+    "ui_command": [
+      "ExitRevit",
+      "Options",
+      "OpenSampleFiles",
+      "Close",
+      "OpenBuildingComponent"
+    ],
+    "priority": "P3",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F02-EDIT-PIN-001",
+    "domain": "F02",
+    "subdomain": "edici\u00F3n",
+    "name": "Fijar y liberar elementos",
+    "name_en": "Pin / unpin",
+    "operation": "UPDATE",
+    "expected_postconditions": "elementos con Pinned seg\u00FAn lo pedido",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Element::Pinned"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "Pin",
+      "Unpin"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F02-EDIT-PASTE-001",
+    "domain": "F02",
+    "subdomain": "edici\u00F3n",
+    "name": "Copiar al portapapeles y pegar alineado (vistas, niveles, mismo lugar)",
+    "name_en": "Paste aligned",
+    "operation": "COPY",
+    "expected_postconditions": "copias en los niveles o vistas pedidos con el desplazamiento correcto",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.ElementTransformUtils::CopyElements"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "el portapapeles de Revit no tiene API: el equivalente es CopyElements con transformaci\u00F3n (copy tipado cubre traslado y nivel)",
+    "ui_command": [
+      "CopyToClipboard",
+      "CutToClipboard",
+      "PasteFromClipboard",
+      "AlignedToCurrentView",
+      "AlignedToPickedLevel",
+      "AlignedToSamePlace",
+      "AlignedToSelectedLevels",
+      "AlignedToSelectedViews"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F02-EDIT-CUT-001",
+    "domain": "F02",
+    "subdomain": "edici\u00F3n",
+    "name": "Cortar y unir geometr\u00EDa, cambiar orden de uni\u00F3n",
+    "name_en": "Cut / join geometry",
+    "operation": "JOIN",
+    "expected_postconditions": "relaciones de corte/uni\u00F3n seg\u00FAn lo pedido",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.SolidSolidCutUtils::AddCutBetweenSolids",
+      "Autodesk.Revit.DB.InstanceVoidCutUtils::AddInstanceVoidCut",
+      "Autodesk.Revit.DB.JoinGeometryUtils::SwitchJoinOrder"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "CutGeometry",
+      "UncutGeometry",
+      "SwitchJoinOrder",
+      "CutBy"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F02-EDIT-TRIM-001",
+    "domain": "F02",
+    "subdomain": "edici\u00F3n",
+    "name": "Recortar/extender y dividir con hueco",
+    "name_en": "Trim / extend / split with gap",
+    "operation": "UPDATE",
+    "expected_postconditions": "curvas de ubicaci\u00F3n recortadas o extendidas",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: no hay m\u00E9todo p\u00FAblico de recorte; posible v\u00EDa LocationCurve.Curve por categor\u00EDa, a validar por tipo de elemento",
+    "ui_command": [
+      "TrimOrExtendToCorner",
+      "TrimOrExtendSingleElement",
+      "TrimOrExtendMultipleElements",
+      "SplitWithGap",
+      "DisplaceElements"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F02-EDIT-MATCH-001",
+    "domain": "F02",
+    "subdomain": "edici\u00F3n",
+    "name": "Igualar propiedades de tipo",
+    "name_en": "Match type properties",
+    "operation": "UPDATE",
+    "expected_postconditions": "elementos con el tipo del elemento de referencia",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "typed:change_type",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+    ],
+    "test_ids": [
+      "PlanTests",
+      "WriteEngineTests"
+    ],
+    "verifier": "postcondiciones del plan \u002B relectura del modelo tras commit (diff por elemento)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "change_type necesita el tipo expl\u00EDcito; el \u00ABpincel\u00BB de la cinta lo toma de un elemento elegido. Efecto en Revit pendiente de la campa\u00F1a nativa",
+    "ui_command": [
+      "MatchTypeProperties"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F02-EDIT-SIMILAR-001",
+    "domain": "F02",
+    "subdomain": "edici\u00F3n",
+    "name": "Crear similar (colocar otro del mismo tipo)",
+    "name_en": "Create similar",
+    "operation": "CREATE",
+    "expected_postconditions": "instancia del mismo tipo en la posici\u00F3n pedida",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "typed:place",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+    ],
+    "test_ids": [
+      "PlanTests",
+      "WriteEngineTests"
+    ],
+    "verifier": "postcondiciones del plan \u002B relectura del modelo tras commit (diff por elemento)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "place con el tipo del elemento de referencia; familias alojadas requieren anfitri\u00F3n. Efecto en Revit pendiente de la campa\u00F1a nativa",
+    "ui_command": [
+      "CreateSimilar"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F02-SEL-FILTER-001",
+    "domain": "F02",
+    "subdomain": "selecci\u00F3n",
+    "name": "Guardar, cargar y editar selecciones guardadas",
+    "name_en": "Saved selections",
+    "operation": "QUERY",
+    "expected_postconditions": "SelectionFilterElement con los elementos pedidos",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.SelectionFilterElement::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "los conjuntos con nombre de BIMBRIDGE ($conjunto) viven en la sesi\u00F3n; esto persiste en el modelo",
+    "ui_command": [
+      "SaveSelection",
+      "LoadSelection",
+      "EditSelection",
+      "AddToSet"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F02-UI-SELECT-001",
+    "domain": "F02",
+    "subdomain": "selecci\u00F3n",
+    "name": "Seleccionar por id, ids de la selecci\u00F3n y deshacer/rehacer",
+    "name_en": "Selection UI and undo",
+    "operation": "UI",
+    "expected_postconditions": "no aplica: herramientas de la interfaz; BIMBRIDGE lee ids con query y deshace con un TransactionGroup por plan",
+    "categories": [],
+    "document_kind": "any",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "NOT_APPLICABLE",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "herramientas de la interfaz; BIMBRIDGE lee ids con query y deshace con un TransactionGroup por plan",
+    "ui_command": [
+      "SelectById",
+      "IdsOfSelection",
+      "Undo",
+      "Redo",
+      "ActivateControlsAndDimensions"
+    ],
+    "priority": "P3",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F03-COORD-SHARED-001",
+    "domain": "F03",
+    "subdomain": "coordenadas",
+    "name": "Coordenadas compartidas: informar, especificar, reubicar y girar norte",
+    "name_en": "Shared coordinates",
+    "operation": "UPDATE",
+    "expected_postconditions": "ProjectLocation/SiteLocation con la posici\u00F3n y el norte pedidos",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.ProjectLocation",
+      "Autodesk.Revit.DB.SiteLocation"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "ReportSharedCoordinates",
+      "SpecifyCoordinatesAtPoint",
+      "ResetSharedCoordinates",
+      "RelocateProject",
+      "RotateProjectNorth",
+      "RotateTrueNorth",
+      "Location",
+      "MirrorProject"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F03-WORKPLANE-001",
+    "domain": "F03",
+    "subdomain": "planos de trabajo",
+    "name": "Definir y mostrar plano de trabajo",
+    "name_en": "Work plane",
+    "operation": "UPDATE",
+    "expected_postconditions": "SketchPlane activo seg\u00FAn lo pedido",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.SketchPlane::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "SetWorkPlane",
+      "ShowWorkPlane",
+      "PickAPlane",
+      "FormWorkPlaneView"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F04-STD-STYLES-001",
+    "domain": "F04",
+    "subdomain": "estilos",
+    "name": "Patrones de l\u00EDnea y relleno, estilos y grosores de l\u00EDnea, estilos de objeto",
+    "name_en": "Line/fill patterns and object styles",
+    "operation": "UPDATE",
+    "expected_postconditions": "patrones y estilos creados o ajustados",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.LinePatternElement::Create",
+      "Autodesk.Revit.DB.FillPatternElement::Create",
+      "Autodesk.Revit.DB.Category::SetLineWeight"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "LinePatterns",
+      "FillPatterns",
+      "LineStyles",
+      "LineWeights",
+      "ObjectStyles",
+      "Arrowheads"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F04-PROJ-INFO-001",
+    "domain": "F04",
+    "subdomain": "proyecto",
+    "name": "Informaci\u00F3n y unidades del proyecto",
+    "name_en": "Project information and units",
+    "operation": "UPDATE",
+    "expected_postconditions": "ProjectInfo y Units seg\u00FAn lo pedido",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.ProjectInfo",
+      "Autodesk.Revit.DB.Document::SetUnits"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "ProjectInformation",
+      "ProjectUnits"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F04-PARAM-PROJ-001",
+    "domain": "F04",
+    "subdomain": "par\u00E1metros",
+    "name": "Par\u00E1metros de proyecto y de categor\u00EDa de familia",
+    "name_en": "Project parameters",
+    "operation": "CREATE",
+    "expected_postconditions": "par\u00E1metros enlazados a las categor\u00EDas pedidas",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.ParameterElement"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "ProjectParameters",
+      "FamilyCategoryAndParameters",
+      "ParametersService"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F04-KEYNOTE-001",
+    "domain": "F04",
+    "subdomain": "notas clave",
+    "name": "Configuraci\u00F3n de notas clave",
+    "name_en": "Keynoting settings",
+    "operation": "UPDATE",
+    "expected_postconditions": "tabla de notas clave cargada",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.KeynoteTable"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "KeynotingSettings"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F04-MAT-ASSET-001",
+    "domain": "F04",
+    "subdomain": "materiales",
+    "name": "Recursos de apariencia y f\u00EDsica de materiales",
+    "name_en": "Material assets",
+    "operation": "UPDATE",
+    "expected_postconditions": "material con los recursos pedidos",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: AppearanceAssetElement existe pero la edici\u00F3n de recursos tiene restricciones por versi\u00F3n; no verificado",
+    "ui_command": [
+      "MaterialAssets"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F05-WALL-OPEN-001",
+    "domain": "F05",
+    "subdomain": "muros",
+    "name": "Hueco en muro",
+    "name_en": "Wall opening",
+    "operation": "CREATE",
+    "expected_postconditions": "hueco rectangular en el muro",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.Creation.Document::NewOpening"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "WallOpening"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F05-WALL-JOINS-001",
+    "domain": "F05",
+    "subdomain": "muros",
+    "name": "Uniones de muros (permitir/impedir en extremos)",
+    "name_en": "Wall joins",
+    "operation": "JOIN",
+    "expected_postconditions": "uni\u00F3n del extremo seg\u00FAn lo pedido",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.WallUtils::DisallowWallJoinAtEnd"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "WallJoins"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F05-WALL-SWEEP-001",
+    "domain": "F05",
+    "subdomain": "muros",
+    "name": "Barridos y telares de muro, muro por cara",
+    "name_en": "Wall sweeps / reveals / by face",
+    "operation": "CREATE",
+    "expected_postconditions": "barrido o telar en el muro",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: WallSweep.Create existe en algunas versiones; muro por cara depende de masas; sin verificar",
+    "ui_command": [
+      "SweepWall",
+      "RevealWall",
+      "WallByFaceWall"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F06-OPENING-001",
+    "domain": "F06",
+    "subdomain": "huecos",
+    "name": "Huecos verticales, de patinillo, buhardilla y por cara",
+    "name_en": "Shaft / vertical / dormer openings",
+    "operation": "CREATE",
+    "expected_postconditions": "hueco con el contorno y los niveles pedidos",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.Creation.Document::NewOpening"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "ShaftOpening",
+      "VerticalOpening",
+      "DormerOpening",
+      "OpeningByFace",
+      "Opening"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F06-EDGES-001",
+    "domain": "F06",
+    "subdomain": "bordes",
+    "name": "Impostas, canalones, sofitos y bordes de losa; suelo y cubierta por cara",
+    "name_en": "Fascia, gutter, soffit, slab edge, by face",
+    "operation": "CREATE",
+    "expected_postconditions": "perfil barrido sobre los bordes pedidos",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: API de creaci\u00F3n de estos barridos no confirmada en el listado; requiere investigaci\u00F3n por versi\u00F3n",
+    "ui_command": [
+      "Fascia",
+      "Gutter",
+      "Soffit",
+      "SlabEdgeFloor",
+      "FloorByFaceFloor",
+      "RoofByFace",
+      "JoinOrUnjoinRoof"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F07-MODELLINE-001",
+    "domain": "F07",
+    "subdomain": "l\u00EDneas de modelo",
+    "name": "L\u00EDneas de modelo y simb\u00F3licas",
+    "name_en": "Model / symbolic lines",
+    "operation": "CREATE",
+    "expected_postconditions": "curvas de modelo en el plano de trabajo pedido",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.Creation.ItemFactoryBase::NewModelCurve"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "ModelLine",
+      "SymbolicLine"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F07-MODELTEXT-001",
+    "domain": "F07",
+    "subdomain": "texto de modelo",
+    "name": "Texto de modelo 3D",
+    "name_en": "Model text",
+    "operation": "CREATE",
+    "expected_postconditions": "texto de modelo con el tipo y el texto pedidos",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.ModelText"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "ModelText"
+    ],
+    "priority": "P3",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F07-INPLACE-001",
+    "domain": "F07",
+    "subdomain": "familias in situ",
+    "name": "Modelar in situ y dibujar en cara/plano de trabajo",
+    "name_en": "Model in place",
+    "operation": "CREATE",
+    "expected_postconditions": "familia in situ",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: modelado in situ no tiene API p\u00FAblica de edici\u00F3n de familia in situ; colocaci\u00F3n en cara/plano son opciones de place",
+    "ui_command": [
+      "ModelInPlace",
+      "DrawOnFace",
+      "DrawOnWorkPlane",
+      "ArchitecturalColumn",
+      "RepeatComponent"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F16-MEP-PLACE-001",
+    "domain": "F16",
+    "subdomain": "MEP",
+    "name": "Colocar equipos, terminales, aparatos y dispositivos MEP (familia cargada)",
+    "name_en": "Place MEP equipment and devices",
+    "operation": "CREATE",
+    "expected_postconditions": "instancia del tipo pedido en la posici\u00F3n y nivel pedidos",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "typed:place",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+    ],
+    "test_ids": [
+      "PlanTests",
+      "WriteEngineTests"
+    ],
+    "verifier": "postcondiciones del plan \u002B relectura del modelo tras commit (diff por elemento)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "colocaci\u00F3n gen\u00E9rica: no conecta a sistemas ni a conectores, ni aloja en caras. Efecto en Revit pendiente de la campa\u00F1a nativa",
+    "ui_command": [
+      "AirTerminal",
+      "MechanicalEquipment",
+      "MechanicalControlDevice",
+      "PlumbingFixture",
+      "PlumbingEquipment",
+      "ElectricalEquipment",
+      "ElectricalFixture",
+      "LightingFixture",
+      "Communication",
+      "Telephone",
+      "NurseCall",
+      "Security",
+      "Control"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F08-STAIR-EDIT-001",
+    "domain": "F08",
+    "subdomain": "escaleras",
+    "name": "Recorrido, numeraci\u00F3n y elementos sobre escaleras/rampas",
+    "name_en": "Stair path, numbering, place on stair",
+    "operation": "CREATE",
+    "expected_postconditions": "anotaci\u00F3n o elemento sobre la escalera",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.StairsEditScope"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "StairPath",
+      "StairTreadOrRiserNumber",
+      "PlaceOnStairOrRamp",
+      "Ramp"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F08-CURTAIN-SYS-001",
+    "domain": "F08",
+    "subdomain": "muros cortina",
+    "name": "Sistema cortina por cara y montantes",
+    "name_en": "Curtain system by face, mullions",
+    "operation": "CREATE",
+    "expected_postconditions": "sistema cortina con rejilla y montantes",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: montantes v\u00EDa CurtainGrid/Mullion; sistema por cara depende de masas; sin verificar",
+    "ui_command": [
+      "CurtainSystemByFace",
+      "CurtainWallMullion"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F09-BOUNDARY-001",
+    "domain": "F09",
+    "subdomain": "l\u00EDmites",
+    "name": "Separadores de habitaci\u00F3n y de espacio",
+    "name_en": "Room / space separators",
+    "operation": "CREATE",
+    "expected_postconditions": "l\u00EDneas de separaci\u00F3n que delimitan el recinto",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.Creation.Document::NewRoomBoundaryLines",
+      "Autodesk.Revit.Creation.Document::NewSpaceBoundaryLines"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "RoomSeparator",
+      "SpaceSeparator"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F09-AREA-001",
+    "domain": "F09",
+    "subdomain": "\u00E1reas",
+    "name": "\u00C1reas, contornos de \u00E1rea y c\u00E1lculo de \u00E1reas/vol\u00FAmenes",
+    "name_en": "Areas and area boundaries",
+    "operation": "CREATE",
+    "expected_postconditions": "\u00E1rea delimitada en el esquema pedido",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.AreaScheme",
+      "Autodesk.Revit.Creation.Document::NewAreaBoundaryLine",
+      "Autodesk.Revit.DB.ViewPlan::CreateAreaPlan"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "Area",
+      "AreaBoundary",
+      "AreaAndVolumeComputations"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F09-TAG-001",
+    "domain": "F09",
+    "subdomain": "etiquetas",
+    "name": "Etiquetas de habitaci\u00F3n, \u00E1rea y espacio",
+    "name_en": "Room / area / space tags",
+    "operation": "TAG",
+    "expected_postconditions": "etiqueta en la vista pedida sobre el recinto",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.Creation.Document::NewRoomTag",
+      "Autodesk.Revit.Creation.Document::NewAreaTag"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "tag tipado usa IndependentTag y no etiqueta recintos",
+    "ui_command": [
+      "RoomTag",
+      "AreaTag",
+      "SpaceTag"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F09-COLORFILL-001",
+    "domain": "F09",
+    "subdomain": "esquemas de color",
+    "name": "Esquemas de color y leyendas de relleno",
+    "name_en": "Color fill schemes",
+    "operation": "UPDATE",
+    "expected_postconditions": "esquema de color aplicado y leyenda colocada",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.ColorFillScheme"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "ColorFillLegend",
+      "ColorSchemes",
+      "DuctLegend",
+      "PipeLegend"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F09-SPACE-001",
+    "domain": "F09",
+    "subdomain": "espacios",
+    "name": "Espacios MEP y su nomenclatura",
+    "name_en": "MEP spaces",
+    "operation": "CREATE",
+    "expected_postconditions": "espacio delimitado con nombre y n\u00FAmero",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.Creation.Document::NewSpace"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "Space",
+      "SpaceNaming"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F10-MASS-002",
+    "domain": "F10",
+    "subdomain": "masas",
+    "name": "Masas conceptuales: crear, colocar, mostrar y suelos de masa",
+    "name_en": "Conceptual mass",
+    "operation": "CREATE",
+    "expected_postconditions": "masa con su forma y suelos",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: edici\u00F3n de formas conceptuales en familias de masa; algunas tienen API (FamilyItemFactory), otras s\u00F3lo UI",
+    "ui_command": [
+      "NewConceptualMass",
+      "PlaceMass",
+      "ShowMassByViewSettings",
+      "ShowMassFormAndFloors",
+      "ShowMassSurfaceTypes",
+      "ShowMassZonesAndShades",
+      "SplitFace",
+      "Paint",
+      "RemovePaint",
+      "PanelByBoundary",
+      "PanelByExtrusion"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F11-PAD-001",
+    "domain": "F11",
+    "subdomain": "emplazamiento",
+    "name": "Plataformas de construcci\u00F3n",
+    "name_en": "Building pad",
+    "operation": "CREATE",
+    "expected_postconditions": "plataforma con contorno y nivel",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Architecture.BuildingPad::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "BuildingPad"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F11-SITE-002",
+    "domain": "F11",
+    "subdomain": "emplazamiento",
+    "name": "Subregiones, l\u00EDneas de propiedad, contornos, regi\u00F3n explanada y componentes de emplazamiento",
+    "name_en": "Site tools",
+    "operation": "CREATE",
+    "expected_postconditions": "elementos de emplazamiento",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: superficies topogr\u00E1ficas (2022\u20132023) y Toposolid (2024\u002B) tienen APIs distintas; cada herramienta requiere su verificaci\u00F3n",
+    "ui_command": [
+      "Subregion",
+      "PropertyLine",
+      "PropertyLineData",
+      "LabelContours",
+      "GradedRegion",
+      "SplitSurface",
+      "MergeSurfaces",
+      "SiteComponent",
+      "ParkingComponent",
+      "ToposolidByFace",
+      "ToposolidSmoothShading",
+      "TopographyCutVoidStability",
+      "LinkTopography"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F12-BEAMSYS-001",
+    "domain": "F12",
+    "subdomain": "estructura",
+    "name": "Sistemas de vigas y cerchas",
+    "name_en": "Beam systems and trusses",
+    "operation": "CREATE",
+    "expected_postconditions": "sistema de vigas o cercha con su tipo",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.BeamSystem::Create",
+      "Autodesk.Revit.DB.Structure.Truss::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "AutomaticBeamSystem",
+      "StructuralTrusses",
+      "BeamSystemSymbol",
+      "TopChord",
+      "BottomChord",
+      "Web"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F12-JOINS-001",
+    "domain": "F12",
+    "subdomain": "estructura",
+    "name": "Uniones viga/pilar y anotaciones de viga",
+    "name_en": "Beam/column joins, beam annotations",
+    "operation": "UPDATE",
+    "expected_postconditions": "uniones ajustadas",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: parte en API de StructuralFramingUtils; sin verificar por herramienta",
+    "ui_command": [
+      "BeamOrColumnJoins",
+      "BeamAnnotations",
+      "Brace",
+      "StructuralPlan",
+      "Slab",
+      "MajorSegment",
+      "Miter"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F13-STEEL-CONN-001",
+    "domain": "F13",
+    "subdomain": "acero",
+    "name": "Conexiones estructurales",
+    "name_en": "Structural connections",
+    "operation": "CREATE",
+    "expected_postconditions": "conexi\u00F3n entre los elementos pedidos con su tipo",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Structure.StructuralConnectionHandler::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "StructuralConnection",
+      "ConnectionSettings"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F13-STEEL-FAB-002",
+    "domain": "F13",
+    "subdomain": "acero",
+    "name": "Placas, pernos, soldaduras, anclajes, conectores, despuntes y cortes",
+    "name_en": "Steel fabrication elements",
+    "operation": "CREATE",
+    "expected_postconditions": "elementos de fabricaci\u00F3n de acero",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED",
+    "ui_command": [
+      "Plate",
+      "Bolts",
+      "Welds",
+      "Anchors",
+      "ShearStuds",
+      "Cope",
+      "CopeSkewed",
+      "ApplyCoping",
+      "RemoveCoping",
+      "CornerCut",
+      "SawCutFlange",
+      "SawCutWeb",
+      "Holes",
+      "Shorten",
+      "ContourCut",
+      "CutThrough",
+      "CutProfile"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F14-REBAR-SETS-001",
+    "domain": "F14",
+    "subdomain": "armadura",
+    "name": "Armadura por \u00E1rea, camino, malla y acopladores; recubrimientos",
+    "name_en": "Area/path/fabric reinforcement, couplers, cover",
+    "operation": "CREATE",
+    "expected_postconditions": "armadura con su tipo y recubrimiento",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Structure.AreaReinforcement::Create",
+      "Autodesk.Revit.DB.Structure.PathReinforcement::Create",
+      "Autodesk.Revit.DB.Structure.FabricArea::Create",
+      "Autodesk.Revit.DB.Structure.FabricSheet::Create",
+      "Autodesk.Revit.DB.Structure.RebarCoupler::Create",
+      "Autodesk.Revit.DB.Structure.RebarCoverType::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "StructuralAreaReinforcement",
+      "StructuralPathReinforcement",
+      "StructuralFabricArea",
+      "SingleFabricSheetPlacement",
+      "StructuralRebarCoupler",
+      "InsertCoupler",
+      "RebarCoverSettings",
+      "EditRebarCover",
+      "ReinforcementSettings",
+      "ReinforcementNumbers",
+      "AreaReinforcementSymbol",
+      "PathReinforcementSymbol",
+      "FabricReinforcementSymbol",
+      "AllowableBarTypes",
+      "RebarBendingDetail",
+      "AlignedMultiRebarAnnotation",
+      "LinearMultiRebarAnnotation",
+      "LoadRebarShapeIntoProjectAndClose"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F15-LOADS-001",
+    "domain": "F15",
+    "subdomain": "cargas",
+    "name": "Casos, combinaciones y cargas estructurales; v\u00EDnculos anal\u00EDticos",
+    "name_en": "Load cases, combinations, loads, analytical links",
+    "operation": "CREATE",
+    "expected_postconditions": "cargas y combinaciones con su naturaleza",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Structure.LoadCase::Create",
+      "Autodesk.Revit.DB.Structure.LoadCombination::Create",
+      "Autodesk.Revit.DB.Structure.PointLoad::Create",
+      "Autodesk.Revit.DB.Structure.AnalyticalLink::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "LoadCases",
+      "LoadCombinations",
+      "LoadCasesAndCombinations",
+      "Loads",
+      "LoadCasesDisplay",
+      "LoadsScalingDisplay",
+      "AnalyticalLink",
+      "CreateAnalyticalLink",
+      "BoundaryConditions",
+      "BoundaryConditionsSettings",
+      "AnalyticalMember",
+      "AdjustAnalyticalModel",
+      "ResetAnalyticalModel",
+      "AnalyticalAutomation",
+      "RunAnalyticalToPhysicalForBuildings",
+      "RunPhysicalToAnalyticalForBuildings"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F17-FLEX-001",
+    "domain": "F17",
+    "subdomain": "conductos",
+    "name": "Conducto flexible y conversi\u00F3n a flexible",
+    "name_en": "Flex duct",
+    "operation": "CREATE",
+    "expected_postconditions": "conducto flexible conectado",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Mechanical.FlexDuct::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "FlexDuct",
+      "ConvertToFlexDuct"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F17-PLACEHOLDER-001",
+    "domain": "F17",
+    "subdomain": "conductos",
+    "name": "Marcadores de conducto y tuber\u00EDa y su conversi\u00F3n",
+    "name_en": "Duct / pipe placeholders",
+    "operation": "CREATE",
+    "expected_postconditions": "marcador creado o convertido en conducto/tuber\u00EDa",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Mechanical.Duct::CreatePlaceholder",
+      "Autodesk.Revit.DB.Mechanical.MechanicalUtils::ConvertDuctPlaceholders",
+      "Autodesk.Revit.DB.Plumbing.Pipe::CreatePlaceholder",
+      "Autodesk.Revit.DB.Plumbing.PlumbingUtils::ConvertPipePlaceholders"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "DuctPlaceholder",
+      "PipePlaceholder"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F17-INSUL-001",
+    "domain": "F17",
+    "subdomain": "aislamiento",
+    "name": "Aislamiento de conductos y tuber\u00EDas",
+    "name_en": "Duct / pipe insulation",
+    "operation": "CREATE",
+    "expected_postconditions": "aislamiento con tipo y espesor",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Mechanical.DuctInsulation::Create",
+      "Autodesk.Revit.DB.Plumbing.PipeInsulation::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "Insulation"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F17-FITTINGS-001",
+    "domain": "F17",
+    "subdomain": "accesorios",
+    "name": "Accesorios, uniones y conectores de conducto/tuber\u00EDa/bandeja/tubo",
+    "name_en": "Fittings, accessories, connectors",
+    "operation": "CREATE",
+    "expected_postconditions": "accesorio conectado en el punto pedido",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos",
+    "ui_command": [
+      "DuctFitting",
+      "DuctAccessory",
+      "DuctConnector",
+      "PipeFitting",
+      "PipeAccessory",
+      "PipeConnector",
+      "CableTrayFitting",
+      "CableTrayConnector",
+      "ConduitFitting",
+      "ConduitConnector",
+      "ElectricalConnector",
+      "ParallelPipes",
+      "ParallelConduits",
+      "MultiPointRouting",
+      "OneWayIndicator"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F17-REPORTS-001",
+    "domain": "F17",
+    "subdomain": "an\u00E1lisis",
+    "name": "Informes de p\u00E9rdida de presi\u00F3n y ajustes mec\u00E1nicos",
+    "name_en": "Pressure loss reports and mechanical settings",
+    "operation": "VERIFY",
+    "expected_postconditions": "informe con las secciones del sistema",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: API de informes de presi\u00F3n no identificada; zonas y an\u00E1lisis de sistemas cambian entre 2022 y 2026",
+    "ui_command": [
+      "DuctPressureLossReport",
+      "PipePressureLossReport",
+      "MechanicalSettings",
+      "SystemsAnalysis",
+      "SystemZone",
+      "Zone",
+      "ZoneBySketch",
+      "ZoneBySpace",
+      "BuildingOperatingSchedules",
+      "OperatingSchedules",
+      "BuildingOrSpaceTypeSettings"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F18-FLEX-001",
+    "domain": "F18",
+    "subdomain": "tuber\u00EDas",
+    "name": "Tuber\u00EDa flexible",
+    "name_en": "Flex pipe",
+    "operation": "CREATE",
+    "expected_postconditions": "tuber\u00EDa flexible conectada",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Plumbing.FlexPipe::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "FlexPipe"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F20-SETTINGS-001",
+    "domain": "F20",
+    "subdomain": "electricidad",
+    "name": "Ajustes el\u00E9ctricos, factores de demanda, clasificaciones de carga y cables",
+    "name_en": "Electrical settings",
+    "operation": "UPDATE",
+    "expected_postconditions": "ajustes el\u00E9ctricos seg\u00FAn lo pedido",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Electrical.ElectricalSetting"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "ElectricalSettings",
+      "DemandFactors",
+      "LoadClassifications",
+      "ElectricalConductorAndCableSettings",
+      "ElectricalAnalyticalLoadTypeSettings"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F20-ANALYTICAL-001",
+    "domain": "F20",
+    "subdomain": "electricidad",
+    "name": "Cargas de equipo y cargas por \u00E1rea (an\u00E1lisis el\u00E9ctrico)",
+    "name_en": "Equipment and area-based loads",
+    "operation": "CREATE",
+    "expected_postconditions": "carga anal\u00EDtica con su clasificaci\u00F3n",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: API de cargas anal\u00EDticas el\u00E9ctricas introducida en versiones recientes; verificar por versi\u00F3n",
+    "ui_command": [
+      "EquipmentLoad",
+      "CreateAnAreaBasedLoad",
+      "AreaBasedLoadBoundary"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F22-FAB-PART-001",
+    "domain": "F22",
+    "subdomain": "fabricaci\u00F3n",
+    "name": "Piezas de fabricaci\u00F3n MEP y ajustes",
+    "name_en": "Fabrication parts",
+    "operation": "CREATE",
+    "expected_postconditions": "pieza de fabricaci\u00F3n con servicio y bot\u00F3n",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.FabricationPart::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "FabricationPart",
+      "FabricationSettings",
+      "MEPFabricationDuctworkStiffener"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F22-PID-001",
+    "domain": "F22",
+    "subdomain": "P\u0026ID",
+    "name": "P\u0026ID Modeler",
+    "name_en": "P\u0026ID Modeler",
+    "operation": "CREATE",
+    "expected_postconditions": "modelo desde P\u0026ID",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: complemento de Autodesk con su propia API; no inventariado",
+    "ui_command": [
+      "PAndIDModeler",
+      "PAndIDSettings"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F23-FAM-GEOM-001",
+    "domain": "F23",
+    "subdomain": "geometr\u00EDa de familia",
+    "name": "S\u00F3lidos y vac\u00EDos: extrusi\u00F3n, fundido, revoluci\u00F3n, barrido y barrido fundido",
+    "name_en": "Family solids and voids",
+    "operation": "CREATE",
+    "expected_postconditions": "forma con su boceto y plano",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.Creation.FamilyItemFactory::NewExtrusion",
+      "Autodesk.Revit.Creation.FamilyItemFactory::NewBlend",
+      "Autodesk.Revit.Creation.FamilyItemFactory::NewRevolution",
+      "Autodesk.Revit.Creation.FamilyItemFactory::NewSweep",
+      "Autodesk.Revit.Creation.FamilyItemFactory::NewSweptBlend"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "SolidExtrusion",
+      "SolidBlend",
+      "SolidRevolve",
+      "SolidSweep",
+      "SolidSweptBlend",
+      "VoidExtrusion",
+      "VoidBlend",
+      "VoidRevolve",
+      "VoidSweep",
+      "VoidSweptBlend",
+      "ReferenceLine",
+      "Label"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F23-FAM-TYPES-001",
+    "domain": "F23",
+    "subdomain": "tipos de familia",
+    "name": "Tipos de familia",
+    "name_en": "Family types",
+    "operation": "CREATE",
+    "expected_postconditions": "tipo nuevo con sus valores",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.FamilyManager::NewType"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "FamilyTypes"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F23-FAM-NEW-001",
+    "domain": "F23",
+    "subdomain": "familias",
+    "name": "Nueva familia, cajet\u00EDn o s\u00EDmbolo; guardar como familia de biblioteca",
+    "name_en": "New family / save as library",
+    "operation": "CREATE",
+    "expected_postconditions": "archivo de familia nuevo",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Document::SaveAs"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "NewFamily",
+      "NewTitleBlock",
+      "NewAnnotationSymbol",
+      "SaveAsFamily",
+      "SaveAsLibraryFamily",
+      "SaveAsLibraryView",
+      "SaveAsLibraryGroup",
+      "LoadIntoProject",
+      "LoadFamilyIntoProjectAndClose"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F23-FAM-CLOUD-001",
+    "domain": "F23",
+    "subdomain": "familias",
+    "name": "Cargar familia de Autodesk (contenido en la nube)",
+    "name_en": "Load Autodesk family",
+    "operation": "CREATE",
+    "expected_postconditions": "familia descargada y cargada",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: servicio en la nube sin API p\u00FAblica conocida",
+    "ui_command": [
+      "LoadAutodeskFamily"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F24-VIEW-FILTER-001",
+    "domain": "F24",
+    "subdomain": "filtros",
+    "name": "Filtros de vista y sustituci\u00F3n por filtro",
+    "name_en": "View filters",
+    "operation": "UPDATE",
+    "expected_postconditions": "filtro creado y aplicado con sus gr\u00E1ficos",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.ParameterFilterElement::Create",
+      "Autodesk.Revit.DB.View::SetFilterOverrides"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "OverrideByFilter"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F24-VIEW-TEMPLATE-001",
+    "domain": "F24",
+    "subdomain": "plantillas de vista",
+    "name": "Crear plantilla desde la vista y aplicar sus par\u00E1metros",
+    "name_en": "View templates",
+    "operation": "CREATE",
+    "expected_postconditions": "plantilla creada o aplicada",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.View::CreateViewTemplate",
+      "Autodesk.Revit.DB.View::ApplyViewTemplateParameters"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "CreateTemplateFromCurrentView"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F24-VIEW-CAMERA-001",
+    "domain": "F24",
+    "subdomain": "vistas",
+    "name": "C\u00E1mara (vista 3D en perspectiva) y planta estructural",
+    "name_en": "Camera / structural plan",
+    "operation": "CREATE",
+    "expected_postconditions": "vista con orientaci\u00F3n y tipo pedidos",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.View3D::CreatePerspective",
+      "Autodesk.Revit.DB.ViewPlan::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "Camera"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F24-VIEW-MISC-001",
+    "domain": "F24",
+    "subdomain": "vistas",
+    "name": "Regi\u00F3n de plano, l\u00EDneas ocultas por elemento, recorrido y etiquetas de vista",
+    "name_en": "Plan region, hidden lines, walkthrough, view tags",
+    "operation": "UPDATE",
+    "expected_postconditions": "vista con la configuraci\u00F3n pedida",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: cada herramienta tiene una API distinta o ninguna; sin verificar",
+    "ui_command": [
+      "PlanRegion",
+      "ShowHiddenLinesByElement",
+      "RemoveHiddenLinesByElement",
+      "Walkthrough",
+      "SectionTags",
+      "ElevationTags",
+      "CalloutTags",
+      "Linework",
+      "HalftoneOrUnderlay",
+      "ShowBoundaryOpenEnds",
+      "HideBoundaryOpenEnds",
+      "Isolated",
+      "Multiplanar",
+      "SharedViews"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F24-UI-001",
+    "domain": "F24",
+    "subdomain": "interfaz de vistas",
+    "name": "Navegaci\u00F3n, ventanas, ViewCube y modos de visualizaci\u00F3n de la interfaz",
+    "name_en": "View UI",
+    "operation": "UI",
+    "expected_postconditions": "no aplica: estado de la interfaz o de la ventana; no cambia datos del modelo que BIMBRIDGE deba planificar",
+    "categories": [],
+    "document_kind": "any",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "NOT_APPLICABLE",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "estado de la interfaz o de la ventana; no cambia datos del modelo que BIMBRIDGE deba planificar",
+    "ui_command": [
+      "ViewCube",
+      "NavigationBar",
+      "TabViews",
+      "TileViews",
+      "CloseInactiveViews",
+      "ThinLines",
+      "ToggleRevealHiddenElementsMode",
+      "ActivateView",
+      "DeactivateView",
+      "StartingView"
+    ],
+    "priority": "P3",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F25-DIM-002",
+    "domain": "F25",
+    "subdomain": "cotas",
+    "name": "Cotas angulares, radiales, de di\u00E1metro y de longitud de arco; cotas temporales",
+    "name_en": "Angular / radial / diameter / arc length dimensions",
+    "operation": "CREATE",
+    "expected_postconditions": "cota con las referencias pedidas",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: NewDimension s\u00F3lo crea cotas lineales; las dem\u00E1s necesitan API espec\u00EDfica por versi\u00F3n",
+    "ui_command": [
+      "AngularDimension",
+      "RadialDimension",
+      "DiameterDimension",
+      "ArcLengthDimension",
+      "AngularDimensionTypes",
+      "RadialDimensionTypes",
+      "DiameterDimensionTypes",
+      "LinearDimensionTypes",
+      "AlignmentStation",
+      "AlignmentStationLabelTypes",
+      "AlignmentStationSet"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F25-SPOT-001",
+    "domain": "F25",
+    "subdomain": "cotas de punto",
+    "name": "Cotas y coordenadas de punto y pendiente",
+    "name_en": "Spot elevation / coordinate / slope",
+    "operation": "CREATE",
+    "expected_postconditions": "cota de punto sobre la referencia pedida",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.Creation.Document::NewSpotElevation",
+      "Autodesk.Revit.Creation.Document::NewSpotCoordinate"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "SpotElevation",
+      "SpotCoordinate",
+      "SpotSlope",
+      "SpotElevationTypes",
+      "SpotCoordinateTypes",
+      "SpotSlopeTypes"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F25-KEYNOTE-001",
+    "domain": "F25",
+    "subdomain": "notas clave",
+    "name": "Notas clave de elemento, material y usuario; leyenda de notas clave",
+    "name_en": "Keynotes",
+    "operation": "TAG",
+    "expected_postconditions": "nota clave colocada con su valor",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: IndependentTag cubre algunas; verificar tipos de etiqueta por categor\u00EDa",
+    "ui_command": [
+      "ElementKeynote",
+      "MaterialKeynote",
+      "UserKeynote",
+      "KeynoteLegend",
+      "MaterialTag",
+      "MultiCategoryTag",
+      "LoadedTagsAndSymbols",
+      "SpanDirectionSymbol",
+      "MultipleValuesIndication",
+      "MeasureAlongAnElement",
+      "MeasureBetweenTwoReferences"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F25-TAG-ALL-001",
+    "domain": "F25",
+    "subdomain": "etiquetas",
+    "name": "Etiquetar todo lo no etiquetado (por vista)",
+    "name_en": "Tag all not tagged",
+    "operation": "TAG",
+    "expected_postconditions": "un tag por elemento sin etiquetar en la vista",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "typed:tag",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+    ],
+    "test_ids": [
+      "PlanTests",
+      "WriteEngineTests"
+    ],
+    "verifier": "postcondiciones del plan \u002B relectura del modelo tras commit (diff por elemento)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "composici\u00F3n: query de lo no etiquetado \u002B tag; no etiqueta recintos. Efecto en Revit pendiente de la campa\u00F1a nativa",
+    "ui_command": [
+      "TagAllNotTagged"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F25-SYMBOL-001",
+    "domain": "F25",
+    "subdomain": "s\u00EDmbolos",
+    "name": "Colocar s\u00EDmbolo de anotaci\u00F3n",
+    "name_en": "Place annotation symbol",
+    "operation": "CREATE",
+    "expected_postconditions": "s\u00EDmbolo (familia basada en vista) en la vista",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "typed:detail_component",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+    ],
+    "test_ids": [
+      "Draw2DTests",
+      "PlanTests"
+    ],
+    "verifier": "postcondiciones del plan \u002B relectura del modelo tras commit (diff por elemento)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "familias basadas en vista; sin directrices. Efecto en Revit pendiente de la campa\u00F1a nativa",
+    "ui_command": [
+      "Symbol"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F25-DETAIL-002",
+    "domain": "F25",
+    "subdomain": "detalle",
+    "name": "Regi\u00F3n de m\u00E1scara, componente de detalle repetido, aislamiento de detalle, leyendas y componentes de leyenda",
+    "name_en": "Masking region, repeating detail, legends",
+    "operation": "CREATE",
+    "expected_postconditions": "elemento de detalle en la vista",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: regi\u00F3n de m\u00E1scara = FilledRegion con tipo de m\u00E1scara (no verificado); leyendas sin API de creaci\u00F3n directa",
+    "ui_command": [
+      "MaskingRegion",
+      "RepeatingDetailComponent",
+      "Legend",
+      "LegendComponent",
+      "Matchline"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F26-SCHED-SPECIAL-001",
+    "domain": "F26",
+    "subdomain": "tablas",
+    "name": "Listas de l\u00E1minas, de vistas, bloques de notas, tablas de revisiones, c\u00F3mputo de materiales y tablas clave",
+    "name_en": "Special schedules",
+    "operation": "SCHEDULE",
+    "expected_postconditions": "tabla especial con sus campos",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.ViewSchedule::CreateSheetList",
+      "Autodesk.Revit.DB.ViewSchedule::CreateViewList",
+      "Autodesk.Revit.DB.ViewSchedule::CreateNoteBlock",
+      "Autodesk.Revit.DB.ViewSchedule::CreateRevisionSchedule",
+      "Autodesk.Revit.DB.ViewSchedule::CreateMaterialTakeoff",
+      "Autodesk.Revit.DB.ViewSchedule::CreateKeySchedule"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "schedule_create tipado s\u00F3lo crea tablas de categor\u00EDa",
+    "ui_command": [
+      "SheetList",
+      "ViewList",
+      "NoteBlock",
+      "RevisionSchedule",
+      "MaterialTakeoff"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F26-SCHED-GRAPH-001",
+    "domain": "F26",
+    "subdomain": "tablas",
+    "name": "Tabla gr\u00E1fica de pilares",
+    "name_en": "Graphical column schedule",
+    "operation": "SCHEDULE",
+    "expected_postconditions": "tabla gr\u00E1fica",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: sin API de creaci\u00F3n identificada",
+    "ui_command": [
+      "GraphicalColumnSchedule"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F27-SHEET-VIEW-001",
+    "domain": "F27",
+    "subdomain": "l\u00E1minas",
+    "name": "Colocar vista en l\u00E1mina",
+    "name_en": "Place view",
+    "operation": "CREATE",
+    "expected_postconditions": "viewport en la l\u00E1mina",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "typed:sheet_place",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+    ],
+    "test_ids": [
+      "PlanTests",
+      "WriteEngineTests"
+    ],
+    "verifier": "postcondiciones del plan \u002B relectura del modelo tras commit (diff por elemento)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "efecto en Revit pendiente de la campa\u00F1a nativa",
+    "ui_command": [
+      "PlaceView"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F27-SHEET-PH-001",
+    "domain": "F27",
+    "subdomain": "l\u00E1minas",
+    "name": "L\u00E1minas de marcador de posici\u00F3n y cajet\u00EDn",
+    "name_en": "Placeholder sheets, title block",
+    "operation": "CREATE",
+    "expected_postconditions": "l\u00E1mina de marcador o cajet\u00EDn colocado",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.ViewSheet::CreatePlaceholder"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "TitleBlock",
+      "GuideGrid",
+      "ViewReference"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F27-PRINT-001",
+    "domain": "F27",
+    "subdomain": "impresi\u00F3n",
+    "name": "Imprimir, configurar impresi\u00F3n y conjuntos",
+    "name_en": "Print / print setup",
+    "operation": "EXPORT",
+    "expected_postconditions": "trabajo de impresi\u00F3n con la configuraci\u00F3n pedida",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Document::Print",
+      "Autodesk.Revit.DB.PrintManager",
+      "Autodesk.Revit.DB.ViewSheetSet"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "impresora del sistema: efecto externo sin rollback; doc pdf cubre PDF",
+    "ui_command": [
+      "Print",
+      "PrintSetup",
+      "PrintPreview",
+      "BatchPrint"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F28-LINK-IFC-001",
+    "domain": "F28",
+    "subdomain": "v\u00EDnculos",
+    "name": "Vincular y abrir IFC",
+    "name_en": "Link / open IFC",
+    "operation": "CREATE",
+    "expected_postconditions": "v\u00EDnculo IFC con su transformaci\u00F3n",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.RevitLinkType::CreateFromIFC"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "LinkIFC",
+      "OpenIFC",
+      "OpenIFCOptions"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F28-IMAGE-PDF-001",
+    "domain": "F28",
+    "subdomain": "v\u00EDnculos",
+    "name": "Vincular o importar imagen y PDF; gestionar im\u00E1genes",
+    "name_en": "Link / import image and PDF",
+    "operation": "CREATE",
+    "expected_postconditions": "imagen o p\u00E1gina PDF colocada en la vista",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.ImageType::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "PDF como ImageType seg\u00FAn opciones por versi\u00F3n; sin verificar",
+    "ui_command": [
+      "LinkImage",
+      "ImportImage",
+      "ManageImages",
+      "LinkPDF",
+      "ImportPDF"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F28-POINTCLOUD-001",
+    "domain": "F28",
+    "subdomain": "v\u00EDnculos",
+    "name": "Nubes de puntos",
+    "name_en": "Point clouds",
+    "operation": "CREATE",
+    "expected_postconditions": "instancia de nube de puntos",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.PointCloudInstance"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "PointCloud"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F28-MANAGE-001",
+    "domain": "F28",
+    "subdomain": "v\u00EDnculos",
+    "name": "Gestionar v\u00EDnculos, modelos de coordinaci\u00F3n, FormIt e insertar desde archivo",
+    "name_en": "Manage links, coordination models, insert from file",
+    "operation": "UPDATE",
+    "expected_postconditions": "v\u00EDnculos recargados o descargados",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: RevitLinkType.Reload/Unload existen; modelos de coordinaci\u00F3n y FormIt sin verificar",
+    "ui_command": [
+      "ManageLinks",
+      "CoordinationModel",
+      "CoordinationModelAutodeskDocs",
+      "CoordinationModelChanges",
+      "CoordinationModelLocal",
+      "LinkFormit",
+      "Insert2DElementsFromFile",
+      "InsertViewsFromFile",
+      "CreateFromImport",
+      "ImportTypes",
+      "ImportGBXML",
+      "ManageConnectionToARevitServerAccelerator",
+      "DecalTypes",
+      "PlaceDecal"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F30-OWN-001",
+    "domain": "F30",
+    "subdomain": "worksharing",
+    "name": "Liberar lo m\u00EDo, recargar lo \u00FAltimo y habilitar colaboraci\u00F3n",
+    "name_en": "Relinquish / reload latest / enable worksharing",
+    "operation": "SYNC",
+    "expected_postconditions": "propiedad liberada o modelo recargado",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.WorksharingUtils::RelinquishOwnership",
+      "Autodesk.Revit.DB.Document::ReloadLatest",
+      "Autodesk.Revit.DB.Document::EnableWorksharing"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "RelinquishAllMine",
+      "ReloadLatest",
+      "Collaborate"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F30-CLOUD-001",
+    "domain": "F30",
+    "subdomain": "worksharing",
+    "name": "Colaborar en la nube, solicitudes de edici\u00F3n, historial y publicaci\u00F3n",
+    "name_en": "Cloud collaboration, editing requests, history",
+    "operation": "SYNC",
+    "expected_postconditions": "estado de colaboraci\u00F3n",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: sin API p\u00FAblica identificada para estos di\u00E1logos",
+    "ui_command": [
+      "CollaborateInCloud",
+      "EditingRequests",
+      "ShowHistory",
+      "PublishSettings"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F31-PARTS-001",
+    "domain": "F31",
+    "subdomain": "piezas",
+    "name": "Crear piezas",
+    "name_en": "Create parts",
+    "operation": "CREATE",
+    "expected_postconditions": "piezas de los elementos pedidos",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.PartUtils::CreateParts"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "CreateParts"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F31-DEMOLISH-001",
+    "domain": "F31",
+    "subdomain": "fases",
+    "name": "Derribar (fase de derribo)",
+    "name_en": "Demolish",
+    "operation": "UPDATE",
+    "expected_postconditions": "elementos con la fase de derribo pedida",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "typed:set_param",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+    ],
+    "test_ids": [
+      "PlanTests",
+      "WriteEngineTests"
+    ],
+    "verifier": "postcondiciones del plan \u002B relectura del modelo tras commit (diff por elemento)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "set_param sobre el par\u00E1metro de fase de derribo; la herramienta de la cinta usa la fase de la vista. Efecto en Revit pendiente de la campa\u00F1a nativa",
+    "ui_command": [
+      "Demolish"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F31-GROUP-DETAIL-001",
+    "domain": "F31",
+    "subdomain": "grupos",
+    "name": "Colocar grupo de detalle",
+    "name_en": "Place detail group",
+    "operation": "CREATE",
+    "expected_postconditions": "grupo colocado",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "typed:group_place",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+    ],
+    "test_ids": [
+      "PlanTests",
+      "WriteEngineTests"
+    ],
+    "verifier": "postcondiciones del plan \u002B relectura del modelo tras commit (diff por elemento)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "efecto en Revit pendiente de la campa\u00F1a nativa",
+    "ui_command": [
+      "PlaceDetailGroup"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F31-GROUP-LOAD-001",
+    "domain": "F31",
+    "subdomain": "grupos",
+    "name": "Cargar grupo en proyectos abiertos y asignar c\u00F3digo de ensamblaje",
+    "name_en": "Load group into projects, assembly code",
+    "operation": "CREATE",
+    "expected_postconditions": "grupo cargado en los proyectos pedidos",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: sin API equivalente verificada",
+    "ui_command": [
+      "LoadAsGroupIntoOpenProjects",
+      "AssemblyCode"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F32-ENERGY-002",
+    "domain": "F32",
+    "subdomain": "an\u00E1lisis energ\u00E9tico",
+    "name": "Crear y borrar modelo energ\u00E9tico; generar an\u00E1lisis",
+    "name_en": "Energy model",
+    "operation": "CREATE",
+    "expected_postconditions": "modelo de an\u00E1lisis energ\u00E9tico",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Analysis.EnergyAnalysisDetailModel::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "CreateEnergyModel",
+      "DeleteEnergyModel",
+      "Generate",
+      "GenerateAnalysis",
+      "Optimize",
+      "ViewAnalysis",
+      "Lighting"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F32-PATH-001",
+    "domain": "F32",
+    "subdomain": "an\u00E1lisis espacial",
+    "name": "Recorrido de evacuaci\u00F3n",
+    "name_en": "Path of travel",
+    "operation": "CREATE",
+    "expected_postconditions": "recorrido entre dos puntos con su longitud",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.Analysis.PathOfTravel::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "PathOfTravel",
+      "RevealObstacles",
+      "SpatialGrid",
+      "PeopleContent"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F33-RENDER-002",
+    "domain": "F33",
+    "subdomain": "visualizaci\u00F3n",
+    "name": "Renderizar, galer\u00EDa, nube y ajustes de sol",
+    "name_en": "Render and sun settings",
+    "operation": "EXPORT",
+    "expected_postconditions": "imagen renderizada",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: motor de render sin API p\u00FAblica de lanzamiento; SunAndShadowSettings s\u00ED existe para el sol",
+    "ui_command": [
+      "Render",
+      "RenderInCloud",
+      "RenderGallery",
+      "SunSettings",
+      "AnalysisDisplayStyles"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F34-EXPORT-OTHER-001",
+    "domain": "F34",
+    "subdomain": "exportaci\u00F3n",
+    "name": "Exportar FBX, DWF/DWFx, DGN, STL, OBJ, SAT y gbXML",
+    "name_en": "Export FBX/DWF/DGN/STL/OBJ/SAT/gbXML",
+    "operation": "EXPORT",
+    "expected_postconditions": "archivo del formato pedido",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.FBXExportOptions",
+      "Autodesk.Revit.DB.DWFExportOptions",
+      "Autodesk.Revit.DB.DGNExportOptions",
+      "Autodesk.Revit.DB.STLExportOptions",
+      "Autodesk.Revit.DB.OBJExportOptions",
+      "Autodesk.Revit.DB.SATExportOptions",
+      "Autodesk.Revit.DB.GBXMLExportOptions"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "ui_command": [
+      "ExportFBX",
+      "ExportDWFOrDWFx",
+      "ExportCADFormatsDGN",
+      "ExportCADFormatsSTL",
+      "ExportCADFormatsOBJ",
+      "ExportCADFormatsACIS_SAT",
+      "ExportGBXML",
+      "ExportOptionsExportSetupsDGN"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F34-EXPORT-STEP-001",
+    "domain": "F34",
+    "subdomain": "exportaci\u00F3n",
+    "name": "Exportar STEP (2025\u002B)",
+    "name_en": "Export STEP",
+    "operation": "EXPORT",
+    "expected_postconditions": "archivo STEP",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "exec",
+    "api_surface": [
+      "Autodesk.Revit.DB.STEPExportOptions"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+    ],
+    "test_ids": [],
+    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
+    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
+    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
+    "limitations": "s\u00F3lo Revit 2025\u20132026 (inventario)",
+    "ui_command": [
+      "ExportCADFormatsSTEP"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F34-EXPORT-REPORTS-001",
+    "domain": "F34",
+    "subdomain": "exportaci\u00F3n",
+    "name": "Informes de habitaci\u00F3n/\u00E1rea, ODBC, animaciones y tipos",
+    "name_en": "Room/area report, ODBC, animations, export types",
+    "operation": "EXPORT",
+    "expected_postconditions": "archivo del informe",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: sin API p\u00FAblica identificada para estos asistentes",
+    "ui_command": [
+      "ExportReportsRoomOrAreaReport",
+      "ExportODBCDatabase",
+      "ExportImagesandAnimationsSolarStudy",
+      "ExportImagesandAnimationsWalkthrough",
+      "ExportExportTypes",
+      "DWFMarkup"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F35-OTHER-TOOLS-001",
+    "domain": "F35",
+    "subdomain": "automatizaci\u00F3n",
+    "name": "Dynamo, macros, gestor de complementos y personalizaci\u00F3n",
+    "name_en": "Dynamo, macros, add-ins",
+    "operation": "UI",
+    "expected_postconditions": "no aplica: otras herramientas de automatizaci\u00F3n o personalizaci\u00F3n de la interfaz; BIMBRIDGE tiene su propio motor (exec, tareas, planes)",
+    "categories": [],
+    "document_kind": "any",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "NOT_APPLICABLE",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "otras herramientas de automatizaci\u00F3n o personalizaci\u00F3n de la interfaz; BIMBRIDGE tiene su propio motor (exec, tareas, planes)",
+    "ui_command": [
+      "Dynamo",
+      "DynamoPlayer",
+      "DynamoPlayerForSteel",
+      "MacroManager",
+      "MacroSecurity",
+      "AddInsManager",
+      "AutomationCustomization",
+      "KeyboardShortcuts",
+      "CanvasTheme"
+    ],
+    "priority": "P3",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F36-HEALTH-001",
+    "domain": "F36",
+    "subdomain": "model health",
+    "name": "Salud del modelo: avisos, duplicados, par\u00E1metros vac\u00EDos y conectores MEP desconectados",
+    "name_en": "Model health",
+    "operation": "VERIFY",
+    "expected_postconditions": "informe con avisos por tipo, duplicados en la misma posici\u00F3n, par\u00E1metros requeridos vac\u00EDos y conectores sin conectar, con ids",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "query:check model_health",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Engine/Qa/ModelHealth.cs",
+      "src/PDI.RevitMcp.Addin/Revit/ModelHealthProbe.cs"
+    ],
+    "test_ids": [
+      "ModelHealthTests"
+    ],
+    "verifier": "reglas offline sobre el inventario le\u00EDdo (ModelHealthTests); lectura en Revit pendiente de campa\u00F1a",
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "s\u00F3lo lectura; las comprobaciones estructurales de Revit (apoyos, consistencia anal\u00EDtica) no se reproducen. Lectura en Revit pendiente de la campa\u00F1a nativa",
+    "ui_command": [
+      "ReviewWarnings",
+      "ShowWarningsInViews",
+      "ShowDisconnects",
+      "CheckDuctSystems",
+      "CheckPipeSystems",
+      "AnalyticalConsistencyChecks",
+      "CheckMemberSupports"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F37-CONTEXT-001",
+    "domain": "F37",
+    "subdomain": "modos contextuales",
+    "name": "Modos de edici\u00F3n y boceto contextuales (editar boceto, centrar referencia, estado de forma, rutas, sustituciones, reconciliar alojamiento)",
+    "name_en": "Contextual edit/sketch modes",
+    "operation": "UPDATE",
+    "expected_postconditions": "elemento editado en su modo contextual con verificaci\u00F3n",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: dependen del modo de edici\u00F3n activo de la interfaz; sin API p\u00FAblica equivalente identificada para cada uno",
+    "ui_command": [
+      "PickToEdit",
+      "ReCenterReference",
+      "ShapeStatus",
+      "MultiplePaths",
+      "SubstitutionSettings",
+      "ReconcileHosting"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F02-EDIT-SCALE-001",
+    "domain": "F02",
+    "subdomain": "edici\u00F3n",
+    "name": "Escalar elementos",
+    "name_en": "Scale",
+    "operation": "UPDATE",
+    "expected_postconditions": "elementos escalados respecto a un punto",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: Revit s\u00F3lo escala ciertos elementos 2D, im\u00E1genes y v\u00EDnculos; sin m\u00E9todo gen\u00E9rico en la API",
+    "ui_command": [
+      "Scale"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F25-TEXT-REPLACE-001",
+    "domain": "F25",
+    "subdomain": "texto",
+    "name": "Buscar y reemplazar texto",
+    "name_en": "Find / replace text",
+    "operation": "UPDATE",
+    "expected_postconditions": "notas de texto con el texto reemplazado",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: factible con TextNote.Text \u002B set_param, pero sin contrato ni verificador todav\u00EDa",
+    "ui_command": [
+      "FindOrReplace"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F15-SETTINGS-001",
+    "domain": "F15",
+    "subdomain": "estructura",
+    "name": "Ajustes estructurales",
+    "name_en": "Structural settings",
+    "operation": "UPDATE",
+    "expected_postconditions": "ajustes estructurales seg\u00FAn lo pedido",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "UNKNOWN",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "investigaci\u00F3n pendiente: clase de ajustes estructurales a localizar en el listado por versi\u00F3n",
+    "ui_command": [
+      "StructuralSettings"
+    ],
+    "priority": "P2",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F37-UI-002",
+    "domain": "F37",
+    "subdomain": "interfaz",
+    "name": "Paletas, barras de estado, temas y controles de la interfaz",
+    "name_en": "UI palettes and bars",
+    "operation": "UI",
+    "expected_postconditions": "no aplica: estado de la interfaz de Revit; no son operaciones del modelo",
+    "categories": [],
+    "document_kind": "any",
+    "implementation_path": "none",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "NOT_APPLICABLE",
+    "source_files": [],
+    "test_ids": [],
+    "verifier": null,
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "estado de la interfaz de Revit; no son operaciones del modelo",
+    "ui_command": [
+      "ProjectBrowser",
+      "SystemBrowser",
+      "StatusBar",
+      "StatusBarDesignOptions",
+      "StatusBarWorksets",
+      "TogglePropertiesPalette",
+      "ToggleHome",
+      "TogglePAndIDModelerBrowser",
+      "LaunchAsApp",
+      "LaunchInBrowser",
+      "LaunchInDockedWindow",
+      "Snaps",
+      "TemporaryDimensions",
+      "ShowWorksharingMakeEditableControls",
+      "GrayInactiveWorksets",
+      "WorksharingMonitor",
+      "ShowLastReport",
+      "CheckSpelling",
+      "BrowserOrganization"
+    ],
+    "priority": "P3",
     "native_status": "not_tested"
   }
 ]

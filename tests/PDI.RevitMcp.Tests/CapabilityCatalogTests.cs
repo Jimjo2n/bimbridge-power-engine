@@ -82,19 +82,43 @@ namespace PDI.RevitMcp.Tests
             }
         }
 
+        /// <summary>Nombres de símbolo ("Tipo" y "Tipo::Miembro", sin firma) del listado completo de una versión.</summary>
+        private static HashSet<string> SymbolNames(int year)
+        {
+            using var fs = File.OpenRead(Path.Combine(Root(), "docs", "0.9.1", "inventory", "revit-symbols-" + year + ".txt.gz"));
+            using var gz = new System.IO.Compression.GZipStream(fs, System.IO.Compression.CompressionMode.Decompress);
+            using var r = new StreamReader(gz);
+            var set = new HashSet<string>(StringComparer.Ordinal);
+            string line;
+            while ((line = r.ReadLine()) != null)
+            {
+                var s = line.Split('|')[2];
+                var p = s.IndexOf('('); if (p > 0) s = s.Substring(0, p);
+                var b = s.IndexOf('['); if (b > 0) s = s.Substring(0, b);
+                set.Add(s.Replace('+', '.'));
+            }
+            return set;
+        }
+
+        /// <summary>¿Existe la superficie en esa versión? Lista curada de superficies o, si no está en ella, el listado completo de símbolos.</summary>
+        private static bool Exists(Dictionary<int, Dictionary<string, bool>> surfaces, Dictionary<int, HashSet<string>> symbols, int y, string s) =>
+            surfaces[y].TryGetValue(s, out var v) ? v : symbols[y].Contains(s);
+
         [Fact]
         public void ApiClaims_MatchTheOfflineInventory()
         {
             var surfaces = Years.ToDictionary(y => y, Surfaces);
+            var symbols = Years.ToDictionary(y => y, SymbolNames);
             foreach (var c in CapabilityCatalog.All)
             {
                 foreach (var s in c.ApiSurfaces)
-                    Assert.True(surfaces[2026].ContainsKey(s), c.Id + ": la superficie " + s + " no está en el inventario");
+                    Assert.True(surfaces[2026].ContainsKey(s) || Years.Any(y => symbols[y].Contains(s)) || c.Status == CoverageStatus.UNSUPPORTED_BY_PUBLIC_API,
+                        c.Id + ": la superficie " + s + " no está en el inventario (ni curado ni listado completo)");
                 if (c.Status == CoverageStatus.DYNAMIC_CSHARP_ONLY && c.ApiSurfaces.Length > 0)
-                    Assert.True(c.ApiSurfaces.Any(s => Years.Any(y => surfaces[y][s])), c.Id + ": DYNAMIC_CSHARP_ONLY sin API pública en ninguna versión");
+                    Assert.True(c.ApiSurfaces.Any(s => Years.Any(y => Exists(surfaces, symbols, y, s))), c.Id + ": DYNAMIC_CSHARP_ONLY sin API pública en ninguna versión");
                 // "No hay API pública" se demuestra: la superficie citada no existe en NINGUNA versión 2022–2026.
                 if (c.Status == CoverageStatus.UNSUPPORTED_BY_PUBLIC_API)
-                    Assert.All(c.ApiSurfaces, s => Assert.True(Years.All(y => !surfaces[y][s]), c.Id + ": " + s + " sí existe en alguna versión"));
+                    Assert.All(c.ApiSurfaces, s => Assert.True(Years.All(y => !Exists(surfaces, symbols, y, s)), c.Id + ": " + s + " sí existe en alguna versión"));
             }
         }
 

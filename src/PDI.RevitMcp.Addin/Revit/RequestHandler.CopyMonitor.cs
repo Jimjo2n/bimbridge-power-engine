@@ -27,6 +27,21 @@ namespace PDI.RevitMcp.Addin.Revit
         /// id=F20-CIRCUIT-CREATE-001 devuelve el contrato completo; si no, filas compactas paginadas filtradas por
         /// q (texto), dominio, estado, estrategia, version, categoria, documento, prioridad, pagina, por_pagina.
         /// </summary>
+        /// <summary>0.9.1 (Bloque H): check name=model_health [cats=…] [requeridos=Param1,Param2] — salud del modelo, sólo lectura, por tramos.</summary>
+        private async Task<Response> ModelHealthCheck(Request request, CancellationToken ct)
+        {
+            var probe = new ModelHealthProbe(Arg.GetStringList(request.Args, "cats"), Arg.GetStringList(request.Args, "requeridos"), out var err);
+            if (err != null) return Response.Fail(request.Id, Status.Invalido, "model_health: " + err);
+            var sw = Stopwatch.StartNew();
+            var result = await RunMain((app, watch, budget) => probe.Step(app, watch, budget, _tracker),
+                highPriority: false, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
+            if (!result.Ok) return FromWork(request.Id, result);
+            if (probe.Error != null) return Response.Fail(request.Id, Status.Invalido, probe.Error);
+            var datos = Engine.Qa.ModelHealth.Report(probe.Warnings, probe.Elements, probe.Connectors, probe.Sheets, probe.Views, Arg.GetStringList(request.Args, "requeridos"));
+            datos["ms"] = sw.ElapsedMilliseconds;
+            return new Response { Id = request.Id, Rev = probe.Rev, Datos = datos };
+        }
+
         private static Response CoverageCheck(Request request)
         {
             var a = request.Args;

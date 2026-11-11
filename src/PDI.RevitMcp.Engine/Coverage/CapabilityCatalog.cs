@@ -58,7 +58,7 @@ namespace PDI.RevitMcp.Engine.Coverage
     /// Las estrategias tipadas existentes se marcan IMPLEMENTED_UNVERIFIED: tienen pruebas de planificación offline, pero su efecto en Revit
     /// sólo lo demuestra la campaña nativa única de 0.9.1.
     /// </summary>
-    public static class CapabilityCatalog
+    public static partial class CapabilityCatalog
     {
         private const string PlanBuilder = "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs";
         private const string PlanApplier = "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs";
@@ -318,6 +318,7 @@ namespace PDI.RevitMcp.Engine.Coverage
                     "toda operación atribuida a un agente con nombre e ids de correlación únicos", new[] { "src/PDI.RevitMcp.Engine/Correlation.cs", "src/PDI.RevitMcp.Engine/Sessions.cs" },
                     new[] { "AgentIdentityGateTests" }, "diario con agent_id, session_id, request_id, trace_id"),
             };
+            Expand(l);
             return l;
         }
 

@@ -64,6 +64,17 @@ internal static class Program
     {
         if (args.Length < 1) { Console.Error.WriteLine("uso: RevitApiInventory <carpeta-salida> [raíz-paquetes-nuget] | registry <carpeta-salida> <carpeta-inventario>"); return 2; }
         if (args[0] == "registry") return Registry(args[1], args[2]);
+        if (args[0] == "has")
+        {
+            // has <carpeta-inventario> <símbolo>… : por cada símbolo (Tipo o Tipo::Miembro, nombre completo o sufijo) las versiones donde existe.
+            var sets = Versions.Select(v => (v.Year, Lines: Symbols.ReadGz(Path.Combine(args[1], "revit-symbols-" + v.Year + ".txt.gz")).Select(l => l.Split('|')[2]).ToList())).ToList();
+            foreach (var s in args.Skip(2))
+            {
+                bool Match(string sym) => sym == s || sym.EndsWith("." + s, StringComparison.Ordinal) || sym.StartsWith(s + "(", StringComparison.Ordinal) || sym.Contains("." + s + "(", StringComparison.Ordinal) || (sym.EndsWith(s, StringComparison.Ordinal) && sym.Length > s.Length && (sym[sym.Length - s.Length - 1] == '.' || sym[sym.Length - s.Length - 1] == ':'));
+                Console.WriteLine(s + " = " + string.Join(",", sets.Where(x => x.Lines.Any(Match)).Select(x => x.Year)));
+            }
+            return 0;
+        }
         if (args[0] == "symbols") return SymbolsMode(args[1], args.Length > 2 ? args[2] : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages"));
         var outDir = args[0];
         var root = args.Length > 1 ? args[1] : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
@@ -154,9 +165,13 @@ internal static class Program
             var linked = PDI.RevitMcp.Engine.Coverage.CommandClassifier.LinkedCapabilities(kv.Key);
             return new Dictionary<string, object>
             {
-                ["command"] = kv.Key, ["domain"] = domain, ["classified_by_rule"] = byRule, ["revit_versions"] = kv.Value,
+                // Dominio de la capacidad enlazada (análisis); el de la regla por nombre queda como referencia.
+                ["command"] = kv.Key, ["domain"] = linked.Count > 0 ? linked[0].Domain : domain, ["domain_by_name"] = domain, ["classified_by_rule"] = byRule, ["revit_versions"] = kv.Value,
                 ["capabilities"] = linked.Select(c => c.Id).ToArray(),
                 ["status"] = linked.Count == 0 ? "UNKNOWN" : linked.Select(c => c.Status).Min().ToString(),
+                ["analysis"] = linked.Count == 0 ? "sin_analizar" : linked.All(c => c.Status == PDI.RevitMcp.Engine.Coverage.CoverageStatus.UNKNOWN) ? "analizado_sin_evidencia" : "enlazado",
+                ["executor"] = linked.Count == 0 ? "UNAVAILABLE" : PDI.RevitMcp.Engine.Coverage.CapabilityIndex.ExecutorOf(linked.OrderBy(c => c.Status).First()),
+                ["pending_research"] = linked.Where(c => c.Status == PDI.RevitMcp.Engine.Coverage.CoverageStatus.UNKNOWN).Select(c => c.Limitations).FirstOrDefault(),
             };
         }).ToList();
         File.WriteAllText(Path.Combine(outDir, "commands.json"), JsonSerializer.Serialize(commands, opts), new UTF8Encoding(false));
@@ -178,8 +193,13 @@ internal static class Program
         sb.AppendLine();
         sb.AppendLine("- Total distintos: " + commands.Count);
         sb.AppendLine("- Con capacidad enlazada: " + commands.Count(c => ((string[])c["capabilities"]).Length > 0));
-        sb.AppendLine("- Sin analizar (`UNKNOWN`): " + commands.Count(c => (string)c["status"] == "UNKNOWN"));
-        sb.AppendLine("- Clasificados por regla de dominio: " + commands.Count(c => (bool)c["classified_by_rule"]) + "; sin regla (F37 por defecto): " + commands.Count(c => !(bool)c["classified_by_rule"]));
+        sb.AppendLine("- Estado `UNKNOWN`: " + commands.Count(c => (string)c["status"] == "UNKNOWN") + " (sin analizar: " + commands.Count(c => (string)c["analysis"] == "sin_analizar") +
+                      "; analizados sin evidencia suficiente, con investigación pendiente registrada: " + commands.Count(c => (string)c["analysis"] == "analizado_sin_evidencia") + ")");
+        sb.AppendLine("- Por estado: " + string.Join(", ", commands.GroupBy(c => (string)c["status"]).OrderBy(g => g.Key).Select(g => "`" + g.Key + "` " + g.Count())));
+        sb.AppendLine("- Por ejecutor: " + string.Join(", ", commands.GroupBy(c => (string)c["executor"]).OrderBy(g => g.Key).Select(g => "`" + g.Key + "` " + g.Count())));
+        sb.AppendLine("- Un comando enlazado a una capacidad DYNAMIC_CSHARP_ONLY sólo tiene API pública identificada; no es automatización completa.");
+        sb.AppendLine("- Dominio: el de la capacidad enlazada (" + commands.Count(c => ((string[])c["capabilities"]).Length > 0) + "); la regla por nombre (`domain_by_name`) sólo es referencia y difiere en " +
+                      commands.Count(c => (string)c["domain"] != (string)c["domain_by_name"]) + " comandos.");
         sb.AppendLine();
         sb.AppendLine("## Por dominio");
         sb.AppendLine();

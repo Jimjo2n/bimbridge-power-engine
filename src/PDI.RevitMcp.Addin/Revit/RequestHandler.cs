@@ -502,6 +502,7 @@ namespace PDI.RevitMcp.Addin.Revit
             var name = (Arg.GetString(request.Args, "name") ?? "").ToLowerInvariant();
             if (name == "copy_monitor") return await CopyMonitorCheck(session, request, ct).ConfigureAwait(false);
             if (name == "cobertura") return CoverageCheck(request);
+            if (name == "model_health") return await ModelHealthCheck(request, ct).ConfigureAwait(false);
             if (name != "lighting_audit")
                 return Response.Fail(request.Id, Status.Invalido, "check disponible en esta versión: lighting_audit, copy_monitor");
 
