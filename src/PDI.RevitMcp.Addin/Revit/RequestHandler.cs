@@ -500,8 +500,9 @@ namespace PDI.RevitMcp.Addin.Revit
         private async Task<Response> Check(Session session, Request request, CancellationToken ct)
         {
             var name = (Arg.GetString(request.Args, "name") ?? "").ToLowerInvariant();
+            if (name == "copy_monitor") return await CopyMonitorCheck(session, request, ct).ConfigureAwait(false);
             if (name != "lighting_audit")
-                return Response.Fail(request.Id, Status.Invalido, "check disponible en esta versión: lighting_audit");
+                return Response.Fail(request.Id, Status.Invalido, "check disponible en esta versión: lighting_audit, copy_monitor");
 
             var tagRule = Arg.GetString(request.Args, "tags") ?? "uno";
             if (tagRule != "uno" && tagRule != "ninguno" && tagRule != "ignorar")

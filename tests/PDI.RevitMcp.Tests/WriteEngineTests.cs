@@ -82,9 +82,9 @@ namespace PDI.RevitMcp.Tests
         }
 
         [Fact]
-        public void Catalog_Has34Ops_AndGuideMentionsEach()
+        public void Catalog_Has44Ops_AndGuideMentionsEach()
         {
-            Assert.Equal(34, OpCatalog.All.Count);   // 0.8.0: +6 de dibujo 2D, +sheet_set
+            Assert.Equal(44, OpCatalog.All.Count);   // 0.8.0: +6 de dibujo 2D, +sheet_set; 0.9.1: +10 de modelado (niveles … tablas)
             var guide = OpCatalog.Guide();
             foreach (var i in OpCatalog.All)
             {
