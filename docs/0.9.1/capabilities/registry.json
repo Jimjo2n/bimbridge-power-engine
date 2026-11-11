@@ -3287,7 +3287,7 @@
     "expected_postconditions": "CSV verificado con las filas de la tabla",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "none",
+    "implementation_path": "doc:tabla_csv",
     "api_surface": [],
     "revit_versions": [
       2022,
@@ -3296,17 +3296,19 @@
       2025,
       2026
     ],
-    "status": "MISSING",
-    "source_files": [],
+    "status": "IMPLEMENTED_UNVERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/Families/ExportOps.cs"
+    ],
     "test_ids": [],
-    "verifier": null,
-    "idempotency": null,
+    "verifier": "archivo nuevo, tama\u00F1o, hash y l\u00EDneas frente a filas del cuerpo",
+    "idempotency": "sobrescribir=si expl\u00EDcito",
     "recovery": null,
-    "limitations": "sin implementaci\u00F3n en BIMBRIDGE",
+    "limitations": "efecto en Revit pendiente de la campa\u00F1a nativa",
     "ui_command": [
       "ExportReportsSchedule"
     ],
-    "priority": "P2",
+    "priority": "P1",
     "native_status": "not_tested"
   },
   {
@@ -4003,10 +4005,10 @@
     "name": "Exportar IFC con opciones",
     "name_en": "Export IFC",
     "operation": "EXPORT",
-    "expected_postconditions": "archivo IFC con la configuraci\u00F3n pedida",
+    "expected_postconditions": "archivo IFC con la versi\u00F3n y la vista pedidas, sin modificar el modelo",
     "categories": [],
     "document_kind": "project",
-    "implementation_path": "exec",
+    "implementation_path": "doc:ifc",
     "api_surface": [
       "Autodesk.Revit.DB.IFCExportOptions",
       "Autodesk.Revit.DB.Document::Export"
@@ -4018,15 +4020,15 @@
       2025,
       2026
     ],
-    "status": "DYNAMIC_CSHARP_ONLY",
+    "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/PDI.RevitMcp.Addin/Revit/Families/ExportOps.cs"
     ],
     "test_ids": [],
-    "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
-    "idempotency": "no garantizada (c\u00F3digo arbitrario)",
-    "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
-    "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
+    "verifier": "archivo nuevo, tama\u00F1o y hash; transacci\u00F3n revertida",
+    "idempotency": "sobrescribir=si expl\u00EDcito",
+    "recovery": null,
+    "limitations": "sin mapeo de property sets ni archivo de configuraci\u00F3n IFC (siguen por C# din\u00E1mico). Efecto en Revit pendiente de la campa\u00F1a nativa",
     "ui_command": [
       "ExportIFC"
     ],

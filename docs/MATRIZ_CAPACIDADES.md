@@ -23,6 +23,8 @@ Generada desde `src/PDI.RevitMcp.Engine/Capabilities.cs` (una prueba comprueba q
 | doc guardar / guardar_como | Save / SaveAs con verificación de archivo y hash | sí | sí | D o W | 2022 | compila 2022–2026 |  |
 | doc sync | sincronizar con central y verificar | sí | no | D o W | 2022 | compila 2022–2026 | sólo modelos con worksharing |
 | doc pdf | exportar hojas o un conjunto a PDF y verificar archivos | sí | no | D o W | 2022 | compila 2022–2026 | Document.Export(PDFExportOptions), existe desde 2022 |
+| doc ifc | exportar IFC (2x3, 4 RV, 4 DTV; modelo o vista) y verificar el archivo | sí | no | D o W | 2022 | compila 2022–2026 | la transacción que Revit exige se revierte siempre: el modelo no cambia |
+| doc tabla_csv | exportar una tabla de planificación a CSV y comparar filas | sí | no | D o W | 2022 | compila 2022–2026 | ViewSchedule.Export con coma y comillas dobles |
 | doc cerrar | cerrar un documento que no es el activo | sí | sí | D o W | 2022 | compila 2022–2026 | Revit no permite cerrar el activo por la API |
 | res | leer resultados largos guardados por handle | sí | sí | R | 2022 | compila + prueba sin Revit | 7 días en disco |
 | clave= / tarea= | idempotencia y diario de operaciones durable | sí | sí | — | 2022 | compila + prueba sin Revit | commit, exec ejecutar, fam y doc |

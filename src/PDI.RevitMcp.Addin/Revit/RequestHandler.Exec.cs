@@ -938,8 +938,8 @@ namespace PDI.RevitMcp.Addin.Revit
             var a = request.Args;
             var verb = (Arg.GetString(a, "accion") ?? "").Trim().ToLowerInvariant();
             if (verb == "guardar_como") { verb = "guardar"; if (Arg.GetString(a, "como") == null) return Response.Fail(request.Id, Status.Invalido, "guardar_como necesita como=ruta"); }
-            if (verb != "guardar" && verb != "sync" && verb != "sincronizar" && verb != "pdf" && verb != "cerrar" && verb != "verificar_disco")
-                return Response.Fail(request.Id, Status.Invalido, "doc: guardar, guardar_como, sync, pdf, cerrar o verificar_disco");
+            if (verb != "guardar" && verb != "sync" && verb != "sincronizar" && verb != "pdf" && verb != "ifc" && verb != "tabla_csv" && verb != "cerrar" && verb != "verificar_disco")
+                return Response.Fail(request.Id, Status.Invalido, "doc: guardar, guardar_como, sync, pdf, ifc, tabla_csv, cerrar o verificar_disco");
             if (!_config.AllowsDocOps)
                 return Response.Fail(request.Id, Status.Rechazado, "este Revit no tiene habilitado guardar, sincronizar ni exportar por este conector (niveles " + _config.Levels + "). Dígaselo al usuario.");
             var diffs = new List<string>();
@@ -964,6 +964,8 @@ namespace PDI.RevitMcp.Addin.Revit
                             case "guardar": datos = DocOps.Save(app, doc, a, pend, diffs); break;
                             case "sync": case "sincronizar": datos = DocOps.Sync(doc, a, diffs, _tracker); break;
                             case "pdf": datos = DocOps.Pdf(doc, a, session.Sets, DocRegistry.Instance.IdOf(doc), pend, diffs); break;
+                            case "ifc": datos = ExportOps.Ifc(doc, a, pend, diffs); break;
+                            case "tabla_csv": datos = ExportOps.ScheduleCsv(doc, a, pend, diffs); break;
                             case "cerrar": datos = DocOps.Close(app, doc, a); break;
                             case "verificar_disco": datos = DocOps.VerifyOnDisk(app, doc, a); break;
                         }

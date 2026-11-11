@@ -7,9 +7,9 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 ## Capacidades por estado
 
 - `OFFLINE_VERIFIED`: 11
-- `IMPLEMENTED_UNVERIFIED`: 61
-- `DYNAMIC_CSHARP_ONLY`: 40
-- `MISSING`: 8
+- `IMPLEMENTED_UNVERIFIED`: 63
+- `DYNAMIC_CSHARP_ONLY`: 39
+- `MISSING`: 7
 - `UNKNOWN`: 1
 - `UNSUPPORTED_BY_PUBLIC_API`: 2
 
@@ -49,7 +49,7 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 | F23 | 3 | IMPLEMENTED_UNVERIFIED 3 | 24 |
 | F24 | 9 | IMPLEMENTED_UNVERIFIED 8, DYNAMIC_CSHARP_ONLY 1 | 45 |
 | F25 | 8 | IMPLEMENTED_UNVERIFIED 7, DYNAMIC_CSHARP_ONLY 1 | 41 |
-| F26 | 2 | IMPLEMENTED_UNVERIFIED 1, MISSING 1 | 8 |
+| F26 | 2 | IMPLEMENTED_UNVERIFIED 2 | 8 |
 | F27 | 5 | IMPLEMENTED_UNVERIFIED 3, DYNAMIC_CSHARP_ONLY 2 | 5 |
 | F28 | 2 | DYNAMIC_CSHARP_ONLY 2 | 25 |
 | F29 | 3 | IMPLEMENTED_UNVERIFIED 1, UNSUPPORTED_BY_PUBLIC_API 2 | 4 |
@@ -57,7 +57,7 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 | F31 | 4 | IMPLEMENTED_UNVERIFIED 1, DYNAMIC_CSHARP_ONLY 3 | 15 |
 | F32 | 2 | IMPLEMENTED_UNVERIFIED 1, MISSING 1 | 11 |
 | F33 | 1 | DYNAMIC_CSHARP_ONLY 1 | 6 |
-| F34 | 3 | DYNAMIC_CSHARP_ONLY 3 | 20 |
+| F34 | 3 | IMPLEMENTED_UNVERIFIED 1, DYNAMIC_CSHARP_ONLY 2 | 20 |
 | F35 | 6 | OFFLINE_VERIFIED 5, IMPLEMENTED_UNVERIFIED 1 | 4 |
 | F36 | 2 | OFFLINE_VERIFIED 1, IMPLEMENTED_UNVERIFIED 1 | 0 |
 | F37 | 4 | OFFLINE_VERIFIED 4 | 65 |
@@ -154,7 +154,7 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 | F25-TAG-MOVE-001 | Mover etiquetas | `IMPLEMENTED_UNVERIFIED` | typed:tag_move | efecto en Revit pendiente de la campaña nativa única de 0.9.1 |
 | F25-TEXT-001 | Crear nota de texto | `IMPLEMENTED_UNVERIFIED` | typed:text_note | efecto en Revit pendiente de la campaña nativa única de 0.9.1 |
 | F26-SCHED-CREATE-001 | Crear tabla de planificación con campos | `IMPLEMENTED_UNVERIFIED` | typed:schedule_create | campos en orden; filtros, orden y agrupación siguen por C# dinámico. Efecto en Revit pendiente de la campaña nativa |
-| F26-SCHED-EXPORT-001 | Exportar tabla a CSV | `MISSING` | none | sin implementación en BIMBRIDGE |
+| F26-SCHED-EXPORT-001 | Exportar tabla a CSV | `IMPLEMENTED_UNVERIFIED` | doc:tabla_csv | efecto en Revit pendiente de la campaña nativa |
 | F27-REVISION-001 | Crear y asignar revisiones a láminas | `DYNAMIC_CSHARP_ONLY` | exec | accesible sólo con C# dinámico: falta operación tipada, verificador y pruebas |
 | F27-SCHED-ONSHEET-001 | Colocar tabla en lámina | `DYNAMIC_CSHARP_ONLY` | exec | accesible sólo con C# dinámico: falta operación tipada, verificador y pruebas |
 | F27-SHEET-CREATE-001 | Crear lámina con cajetín | `IMPLEMENTED_UNVERIFIED` | typed:sheet_create | efecto en Revit pendiente de la campaña nativa única de 0.9.1 |
@@ -175,7 +175,7 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 | F32-GEO-CLASH-001 | Detección de interferencias y montaje real | `IMPLEMENTED_UNVERIFIED` | query:geo |  |
 | F33-RENDER-IMG-001 | Exportar imagen de vista | `DYNAMIC_CSHARP_ONLY` | exec | accesible sólo con C# dinámico: falta operación tipada, verificador y pruebas |
 | F34-EXPORT-DWG-001 | Exportar DWG | `DYNAMIC_CSHARP_ONLY` | exec | accesible sólo con C# dinámico: falta operación tipada, verificador y pruebas |
-| F34-EXPORT-IFC-001 | Exportar IFC con opciones | `DYNAMIC_CSHARP_ONLY` | exec | accesible sólo con C# dinámico: falta operación tipada, verificador y pruebas |
+| F34-EXPORT-IFC-001 | Exportar IFC con opciones | `IMPLEMENTED_UNVERIFIED` | doc:ifc | sin mapeo de property sets ni archivo de configuración IFC (siguen por C# dinámico). Efecto en Revit pendiente de la campaña nativa |
 | F34-EXPORT-NWC-001 | Exportar NWC | `DYNAMIC_CSHARP_ONLY` | exec | requiere el exportador de Navisworks instalado |
 | F35-AGENTHOST-001 | Planes IR durables con recuperación entre procesos | `OFFLINE_VERIFIED` | engine | verificado contra el backend simulado; contra Revit, pendiente de campaña |
 | F35-AUDIT-001 | Auditoría durable con group commit y recuperación | `OFFLINE_VERIFIED` | engine |  |

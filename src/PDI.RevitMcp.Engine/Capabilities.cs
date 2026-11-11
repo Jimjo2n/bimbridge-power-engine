@@ -57,6 +57,8 @@ namespace PDI.RevitMcp.Engine
             R("doc guardar / guardar_como", "Save / SaveAs con verificación de archivo y hash", Si, Si, "D o W", Compila, ""),
             R("doc sync", "sincronizar con central y verificar", Si, No, "D o W", Compila, "sólo modelos con worksharing"),
             R("doc pdf", "exportar hojas o un conjunto a PDF y verificar archivos", Si, No, "D o W", Compila, "Document.Export(PDFExportOptions), existe desde 2022"),
+            R("doc ifc", "exportar IFC (2x3, 4 RV, 4 DTV; modelo o vista) y verificar el archivo", Si, No, "D o W", Compila, "la transacción que Revit exige se revierte siempre: el modelo no cambia"),
+            R("doc tabla_csv", "exportar una tabla de planificación a CSV y comparar filas", Si, No, "D o W", Compila, "ViewSchedule.Export con coma y comillas dobles"),
             R("doc cerrar", "cerrar un documento que no es el activo", Si, Si, "D o W", Compila, "Revit no permite cerrar el activo por la API"),
             R("res", "leer resultados largos guardados por handle", Si, Si, "R", Unitaria, "7 días en disco"),
             R("clave= / tarea=", "idempotencia y diario de operaciones durable", Si, Si, "—", Unitaria, "commit, exec ejecutar, fam y doc"),

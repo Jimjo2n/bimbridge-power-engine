@@ -2545,7 +2545,7 @@
     "capabilities": [
       "F34-EXPORT-IFC-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "ExportImagesandAnimationsImage",
@@ -2687,7 +2687,7 @@
     "capabilities": [
       "F26-SCHED-EXPORT-001"
     ],
-    "status": "MISSING"
+    "status": "IMPLEMENTED_UNVERIFIED"
   },
   {
     "command": "FabricReinforcementSymbol",
