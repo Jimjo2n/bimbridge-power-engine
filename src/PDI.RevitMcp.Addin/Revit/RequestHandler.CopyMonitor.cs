@@ -22,6 +22,41 @@ namespace PDI.RevitMcp.Addin.Revit
     /// </summary>
     public sealed partial class RequestHandler
     {
+        /// <summary>
+        /// 0.9.1: check name=cobertura — descubrimiento bajo demanda del catálogo de capacidades sin entrar al hilo de Revit.
+        /// id=F20-CIRCUIT-CREATE-001 devuelve el contrato completo; si no, filas compactas paginadas filtradas por
+        /// q (texto), dominio, estado, estrategia, version, categoria, documento, prioridad, pagina, por_pagina.
+        /// </summary>
+        private static Response CoverageCheck(Request request)
+        {
+            var a = request.Args;
+            var idx = Engine.Coverage.CapabilityIndex.Default;
+            var id = Arg.GetString(a, "id");
+            if (id != null)
+            {
+                var c = idx.Get(id);
+                return c == null ? Response.Fail(request.Id, Status.Invalido, "no existe la capacidad " + id)
+                                 : new Response { Id = request.Id, Datos = Engine.Coverage.CapabilityIndex.Contract(c) };
+            }
+            var q = new Engine.Coverage.CapabilityQuery
+            {
+                Text = Arg.GetString(a, "q"), Domain = Arg.GetString(a, "dominio"), Status = Arg.GetString(a, "estado"), Strategy = Arg.GetString(a, "estrategia"),
+                Category = Arg.GetString(a, "categoria"), DocumentKind = Arg.GetString(a, "documento"), Priority = Arg.GetString(a, "prioridad"),
+                Version = (int?)Arg.GetLong(a, "version"), Page = (int)(Arg.GetLong(a, "pagina") ?? 1), PageSize = (int)(Arg.GetLong(a, "por_pagina") ?? 20),
+            };
+            var (page, total) = idx.Search(q);
+            return new Response
+            {
+                Id = request.Id,
+                Datos = new Dictionary<string, object>
+                {
+                    ["total"] = (long)total, ["pagina"] = (long)Math.Max(1, q.Page), ["catalogo"] = idx.Version,
+                    ["cols"] = Engine.Coverage.CapabilityIndex.RowColumns, ["rows"] = page.Select(c => (object)Engine.Coverage.CapabilityIndex.Row(c)).ToList(),
+                    ["detalle"] = "check name=cobertura id=<id> para el contrato completo",
+                },
+            };
+        }
+
         private async Task<Response> CopyMonitorCheck(Session session, Request request, CancellationToken ct)
         {
             var link = Arg.GetString(request.Args, "vinculo");
