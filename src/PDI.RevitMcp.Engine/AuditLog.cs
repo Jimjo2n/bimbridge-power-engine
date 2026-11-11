@@ -54,6 +54,13 @@ namespace PDI.RevitMcp.Engine
         public TimeSpan ClaimWait = ClaimGrace;
         /// <summary>Sólo para pruebas: se llama justo antes de escribir; puede lanzar IOException para simular disco lleno.</summary>
         public Action<string> FaultBeforeWrite;
+        /// <summary>
+        /// Sólo para pruebas (AUD-01): devuelve true en el punto donde debe simularse la caída del proceso. Puntos: antes_bloqueo, inicio_lider, tras_reclamo,
+        /// antes_escribir, durante_escritura, tras_escribir_antes_fsync, tras_fsync_antes_cabeza, tras_cabeza, antes_confirmar,
+        /// tras_confirmar_parcial. La caída es una <see cref="AuditCrashException"/>: ni se confirma ni se limpia nada, como si el proceso muriera.
+        /// </summary>
+        public Func<string, bool> CrashPoint;
+        private void Crash(string point) { if (CrashPoint != null && CrashPoint(point)) throw new AuditCrashException(point); }
 
         public AuditLog(string path)
         {
@@ -114,6 +121,7 @@ namespace PDI.RevitMcp.Engine
                     if (done.HasValue) return done.Value;
                 }
                 var waited = sw.ElapsedTicks;
+                Crash("antes_bloqueo");
                 var fs = TryOpenLock();
                 if (fs != null)
                 {
@@ -122,15 +130,29 @@ namespace PDI.RevitMcp.Engine
                     // y así el bloqueo no espera a escribir un archivo por seguidor.
                     var after = new List<Action>();
                     long led = 0;
+                    var crashed = false;
                     try
                     {
                         using (fs)
                         {
                             try { lock (_lock) led = Lead(me, pendName, after); }
+                            catch (AuditCrashException) { crashed = true; throw; }
                             finally { AuditProfile.Lock(waited, held.ElapsedTicks); }
                         }
                     }
-                    finally { foreach (var send in after) send(); }
+                    finally
+                    {
+                        // Una caída simulada no envía nada: el proceso "murió". La reconciliación la hará el siguiente líder.
+                        if (!crashed)
+                        {
+                            Crash("antes_confirmar");
+                            for (var k = 0; k < after.Count; k++)
+                            {
+                                after[k]();
+                                if (k == 0 && after.Count > 1) Crash("tras_confirmar_parcial");
+                            }
+                        }
+                    }
                     if (led != AwaitClaimed) return led;
                     var grace = System.Diagnostics.Stopwatch.StartNew();
                     while (grace.Elapsed < ClaimWait) { var d = Collect(me); if (d.HasValue) return d.Value; Thread.Sleep(2); }
@@ -152,12 +174,17 @@ namespace PDI.RevitMcp.Engine
             }
         }
 
-        /// <summary>Reclama un archivo pendiente (apertura exclusiva que lo borra al cerrar). true = lo reclamé yo; false = ya no estaba o lo tiene otro.</summary>
+        /// <summary>
+        /// Retira una entrada pendiente propia con la MISMA primitiva atómica que usa el líder para reclamarla (renombrar): o la retira el
+        /// escritor (nadie la escribió) o ya la reclamó un líder; nunca las dos cosas.
+        /// </summary>
         private static bool TryReclaim(string file)
         {
             try
             {
-                using (new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None, 4096, FileOptions.DeleteOnClose)) { }
+                var withdrawn = file + ".retirada";
+                File.Move(file, withdrawn);
+                try { File.Delete(withdrawn); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                 return true;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return false; }
@@ -221,11 +248,17 @@ namespace PDI.RevitMcp.Engine
         /// <summary>Con el bloqueo tomado: reclama los pendientes, los escribe con un solo fsync y confirma a cada seguidor.</summary>
         private long Lead(AuditItem me, string pendName, List<Action> after)
         {
+            Crash("inicio_lider");
             if (pendName != null) { var early = Collect(me); if (early.HasValue) return early.Value; }
             var tp = System.Diagnostics.Stopwatch.StartNew();
             Resync(fullCheck: false);
             AuditProfile.Phase(0, tp.ElapsedTicks); tp.Restart();
+            // AUD-01B: reclamos que dejó un líder anterior que soltó el bloqueo sin terminar (sólo puede ser una caída: reclamar, persistir y
+            // borrar el reclamo ocurren con el bloqueo tomado). Se decide con la evidencia del diario, no con la memoria de nadie.
+            long? recoveredMine = RecoverAbandonedClaims(me, after);
+            if (recoveredMine.HasValue) return recoveredMine.Value;
             var batch = new List<AuditItem>();
+            var claimFiles = new List<string>();
             var mineClaimed = false;
             if (Directory.Exists(PendDir))
             {
@@ -234,17 +267,21 @@ namespace PDI.RevitMcp.Engine
                 Array.Sort(files, StringComparer.Ordinal);
                 foreach (var f in files)
                 {
-                    if (batch.Count >= MaxBatch - 1) break;
+                    if (batch.Count >= MaxBatch - (pendName == null ? 1 : 0)) break;   // el lote nunca pasa de MaxBatch líneas
                     Dictionary<string, object> o;
-                    try
+                    // AUD-01B: reclamo DURABLE. La entrada se renombra a ".reclamada" (atómico: sólo un líder lo consigue) y sigue en disco hasta
+                    // que su línea está persistida y sellada por la cabeza. Si el líder muere en medio, el reclamo queda como evidencia.
+                    var claimed = Path.Combine(PendDir, Path.GetFileNameWithoutExtension(f) + ".reclamada");
+                    try { File.Move(f, claimed); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { continue; }   // la retiró su escritor
+                    try { o = Json.ParseObject(File.ReadAllText(claimed)); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is FormatException)
                     {
-                        // Reclamo atómico en una sola apertura: exclusiva (FileShare.None) y se borra al cerrar. Dos líderes no pueden reclamar la misma.
-                        string text;
-                        using (var cs = new FileStream(f, FileMode.Open, FileAccess.Read, FileShare.None, 4096, FileOptions.DeleteOnClose))
-                        using (var sr = new StreamReader(cs, Encoding.UTF8)) text = sr.ReadToEnd();
-                        o = Json.ParseObject(text);
+                        // Ilegible: no se escribe. Queda el reclamo para la reconciliación y el escritor recibe un error definitivo.
+                        var bad = Path.GetFileNameWithoutExtension(f); var badId = bad.Length > 20 ? bad.Substring(20) : bad; var reason = ex.GetType().Name;
+                        after.Add(() => Reply(badId, ".err", "entrada de auditoría ilegible en la cola (" + reason + "): no se escribió"));
+                        continue;
                     }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is FormatException) { continue; }
                     var it = new AuditItem
                     {
                         Id = Arg.GetString(o, "id"), Author = Arg.GetString(o, "autor"), Op = Arg.GetString(o, "op"), Estado = Arg.GetString(o, "estado"),
@@ -254,9 +291,11 @@ namespace PDI.RevitMcp.Engine
                     it.Cid = it.Id;
                     if (it.Id == me.Id) { mineClaimed = true; me.Cid = me.Id; }
                     batch.Add(it);
+                    claimFiles.Add(claimed);
                 }
                 if ((DateTime.UtcNow - _lastClean).TotalSeconds > 30) { _lastClean = DateTime.UtcNow; CleanStaleReplies(); }
             }
+            Crash("tras_reclamo");
             AuditProfile.Phase(1, tp.ElapsedTicks); tp.Restart();
             // Mi entrada ya la reclamó otro líder: su respuesta se envía justo después de soltar el bloqueo, así que se espera (acotado) en vez de fallar.
             // Lo que YO reclamé de otros se escribe siempre: una entrada reclamada nunca se pierde.
@@ -267,11 +306,14 @@ namespace PDI.RevitMcp.Engine
             try { seqs = WriteBatch(batch); }
             catch (JournalUnavailableException ex)
             {
-                var msg = ex.Message;
+                // Estado INCIERTO (pudo quedar algo escrito): los reclamos se conservan para que el siguiente líder decida con el diario.
+                var msg = ex.Message + " (estado incierto: se reconcilia con el diario)";
                 foreach (var it in batch) if (it.Id != me.Id) { var id = it.Id; after.Add(() => Reply(id, ".err", msg)); }
                 if (meInBatch) throw;
                 return AwaitClaimed;   // mi propia entrada la tiene otro líder, que me responderá; lo que yo reclamé ya recibió su error
             }
+            // Persistido y sellado por la cabeza: los reclamos ya no hacen falta (con el bloqueo todavía tomado).
+            foreach (var cf in claimFiles) { try { File.Delete(cf); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { } }
             AuditProfile.Phase(2, tp.ElapsedTicks); tp.Restart();
             AuditProfile.Batch(batch.Count);
             long mySeq = 0;
@@ -282,6 +324,79 @@ namespace PDI.RevitMcp.Engine
             }
             AuditProfile.Phase(3, tp.ElapsedTicks);
             return meInBatch ? mySeq : AwaitClaimed;
+        }
+
+        /// <summary>
+        /// AUD-01B: resuelve los reclamos de un líder que cayó. Para cada entrada reclamada se busca su cid en la cadena (ya reparada o
+        /// verificada por Resync): si está, se SELLA con un registro de recuperación (append + fsync + cabeza, que también hace durable la línea
+        /// que el líder caído pudo dejar sin fsync) y sólo entonces se confirma a su escritor; si no está, no se reescribe nunca (el escritor
+        /// pudo haber informado ya de un fallo y actuar en consecuencia) y se le comunica un error DEFINITIVO: no consta escrita.
+        /// Devuelve el seq de MI entrada si estaba entre las reclamadas y consta escrita.
+        /// </summary>
+        private long? RecoverAbandonedClaims(AuditItem me, List<Action> after)
+        {
+            if (!Directory.Exists(PendDir)) return null;
+            string[] claims;
+            try { claims = Directory.GetFiles(PendDir, "*.reclamada"); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return null; }
+            if (claims.Length == 0) return null;
+            var byId = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var f in claims)
+            {
+                var name = Path.GetFileNameWithoutExtension(f);
+                byId[name.Length > 20 ? name.Substring(20) : name] = f;
+            }
+            var found = FindCids(_path, byId.Keys);
+            var inQuarantine = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var q in Quarantined) foreach (var kv in FindCids(q, byId.Keys)) inQuarantine.Add(kv.Key);
+            // Sello y evidencia ANTES de confirmar nada.
+            WriteLine("sistema", "recuperacion_reclamos", "reclamos_de_lider_caido", new Dictionary<string, object>
+            {
+                ["confirmados"] = byId.Keys.Where(found.ContainsKey).Cast<object>().ToList(),
+                ["no_escritos"] = byId.Keys.Where(k => !found.ContainsKey(k) && !inQuarantine.Contains(k)).Cast<object>().ToList(),
+                ["en_cadena_apartada"] = byId.Keys.Where(inQuarantine.Contains).Cast<object>().ToList(),
+                ["motivo"] = "un líder soltó el bloqueo sin terminar (caída) dejando entradas reclamadas",
+            });
+            long? mine = null;
+            string mineError = null;
+            foreach (var kv in byId)
+            {
+                var id = kv.Key;
+                if (found.TryGetValue(id, out var seq))
+                {
+                    if (id == me.Id) mine = seq;
+                    else { var text = seq.ToString(CultureInfo.InvariantCulture); after.Add(() => Reply(id, ".done", text)); }
+                }
+                else
+                {
+                    var msg = inQuarantine.Contains(id)
+                        ? "entrada de auditoría escrita en una cadena que después se apartó a cuarentena: estado incierto, reconcilie"
+                        : "entrada de auditoría no escrita: el líder que la reclamó cayó antes de persistirla (no se escribió nada)";
+                    if (id == me.Id) mineError = msg; else after.Add(() => Reply(id, ".err", msg));
+                }
+                try { File.Delete(kv.Value); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            }
+            if (mineError != null) throw new JournalUnavailableException(mineError, null);
+            return mine;
+        }
+
+        /// <summary>cid → seq de las líneas de <paramref name="path"/> cuyo cid está en <paramref name="ids"/> (camino de recuperación, poco frecuente).</summary>
+        private static Dictionary<string, long> FindCids(string path, IEnumerable<string> ids)
+        {
+            var want = new HashSet<string>(ids, StringComparer.Ordinal);
+            var res = new Dictionary<string, long>(StringComparer.Ordinal);
+            if (!File.Exists(path) || want.Count == 0) return res;
+            string text;
+            try { text = ReadFrom(path, 0); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return res; }
+            foreach (var raw in text.Split('\n'))
+            {
+                if (raw.IndexOf("\"cid\":", StringComparison.Ordinal) < 0) continue;
+                Dictionary<string, object> o;
+                try { o = Json.ParseObject(raw); } catch (FormatException) { continue; }
+                var cid = Arg.GetString(o, "cid");
+                if (cid != null && want.Contains(cid)) res[cid] = Arg.GetLong(o, "seq") ?? 0;
+            }
+            return res;
         }
 
         private void Reply(string id, string ext, string content)
@@ -367,9 +482,11 @@ namespace PDI.RevitMcp.Engine
             var seqs = new List<long>(items.Count);
             var buf = new MemoryStream();
             long lastLineStart = 0;
+            var index = 0;
             foreach (var it in items)
             {
                 seq++;
+                index++;
                 var e = new Dictionary<string, object>
                 {
                     ["seq"] = seq,
@@ -382,6 +499,8 @@ namespace PDI.RevitMcp.Engine
                 };
                 if (it.Extra != null) foreach (var kv in it.Extra) if (!e.ContainsKey(kv.Key)) e[kv.Key] = kv.Value;
                 if (it.Cid != null) e["cid"] = it.Cid;
+                // AUD-01: marca de lote para que la verificación distinga un lote completo no confirmado de una cola truncada.
+                if (items.Count > 1) e["lote"] = index.ToString(CultureInfo.InvariantCulture) + "/" + items.Count.ToString(CultureInfo.InvariantCulture);
                 var line = Json.Write(e);
                 lastLineStart = buf.Length;
                 var b = Encoding.UTF8.GetBytes(line + "\n");
@@ -392,21 +511,32 @@ namespace PDI.RevitMcp.Engine
             try
             {
                 foreach (var it in items) FaultBeforeWrite?.Invoke(it.Op);
+                Crash("antes_escribir");
                 var bytes = buf.ToArray();
                 long offset, length;
                 using (var fs = new FileStream(_path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.WriteThrough))
                 {
                     offset = fs.Position;
                     var tw = System.Diagnostics.Stopwatch.StartNew();
+                    if (CrashPoint != null && CrashPoint("durante_escritura"))
+                    {
+                        // Sólo pruebas: escritura cortada a la mitad (deja líneas completas y un fragmento, como una caída real).
+                        fs.Write(bytes, 0, bytes.Length / 2);
+                        fs.Flush(true);
+                        throw new AuditCrashException("durante_escritura");
+                    }
                     fs.Write(bytes, 0, bytes.Length);
+                    Crash("tras_escribir_antes_fsync");
                     var tf = System.Diagnostics.Stopwatch.StartNew();
                     fs.Flush(true);
                     AuditProfile.Write(tw.ElapsedTicks - tf.ElapsedTicks, tf.ElapsedTicks);
                     length = fs.Length;
                 }
+                Crash("tras_fsync_antes_cabeza");
                 var th = System.Diagnostics.Stopwatch.StartNew();
                 Home.WriteAtomic(HeadPath(_path), Json.Write(new Dictionary<string, object> { ["seq"] = seq, ["ultimo"] = prev, ["longitud"] = length }));
                 AuditProfile.Head(th.ElapsedTicks);
+                Crash("tras_cabeza");
                 _knownLength = length;
                 _lastOffset = offset + lastLineStart;
                 _knownWrite = File.GetLastWriteTimeUtc(_path);
@@ -448,11 +578,27 @@ namespace PDI.RevitMcp.Engine
                     CheckLine(raw, ref prev, ref seq, errors);
                 }
                 if (errors.Count == 0) { _prev = prev; _seq = seq; _knownLength = len; _lastOffset = lastOff; _knownWrite = File.GetLastWriteTimeUtc(_path); return; }
+                // AUD-01: una cola cortada por la caída de otro escritor se aparta (con evidencia) si no toca registros confirmados.
+                if (TryRepairTail(out _)) return;
                 Quarantine(errors);
                 return;
             }
             var v = Verify(_path);
-            if (v.Ok) { _prev = v.LastHash ?? ""; _seq = v.Lines; _knownLength = len; _lastOffset = v.LastOffset; _knownWrite = File.Exists(_path) ? File.GetLastWriteTimeUtc(_path) : default(DateTime); return; }
+            if (v.Ok)
+            {
+                _prev = v.LastHash ?? ""; _seq = v.Lines; _knownLength = len; _lastOffset = v.LastOffset;
+                _knownWrite = File.Exists(_path) ? File.GetLastWriteTimeUtc(_path) : default(DateTime);
+                // AUD-01: lote persistido pero no confirmado (caída entre el fsync y la cabeza). Es una cadena íntegra: se sella con un registro
+                // que lo documenta, en vez de declararla corrupta.
+                if (v.HeadLag > 1)
+                    WriteLine("sistema", "recuperacion_cabeza", "lote_no_confirmado_sellado", new Dictionary<string, object>
+                    {
+                        ["registros"] = v.HeadLag, ["desde_seq"] = v.Lines - v.HeadLag + 1, ["hasta_seq"] = v.Lines,
+                        ["motivo"] = "caída entre el fsync del lote y la actualización de la cabeza; ningún escritor recibió confirmación",
+                    });
+                return;
+            }
+            if (TryRepairTail(out _)) return;
             Quarantine(v.Errors);
         }
 
@@ -544,9 +690,12 @@ namespace PDI.RevitMcp.Engine
             return text.Split('\n').Where(l => l.Length > 0);
         }
 
-        private static void CheckLine(string raw, ref string prev, ref long n, List<string> errors)
+        private static void CheckLine(string raw, ref string prev, ref long n, List<string> errors) => CheckLine(raw, ref prev, ref n, errors, out _);
+
+        private static void CheckLine(string raw, ref string prev, ref long n, List<string> errors, out string lote)
         {
             n++;
+            lote = null;
             Dictionary<string, object> o;
             try { o = Json.ParseObject(raw); }
             catch (FormatException) { errors.Add("línea " + n + " ilegible"); prev = Home.Sha256Hex(raw); return; }
@@ -556,24 +705,48 @@ namespace PDI.RevitMcp.Engine
             try { seq = Convert.ToInt64(o.TryGetValue("seq", out var s) ? s : 0L, CultureInfo.InvariantCulture); }
             catch (Exception) { seq = -1; }
             if (seq != n) errors.Add("línea " + n + ": seq " + seq + " fuera de orden");
+            lote = Arg.GetString(o, "lote");
             prev = Home.Sha256Hex(raw);
         }
 
-        /// <summary>Compara la cola con la cabeza. Se tolera que la cabeza vaya UN registro por detrás (caída entre escribir la línea y la
-        /// cabeza); nunca por delante ni con otro hash.</summary>
-        private static void CheckHead(string path, List<string> hashes, List<string> errors)
+        /// <summary>"i/n" → (i, n). (0, 0) si no hay marca de lote (registro individual).</summary>
+        private static void ParseLote(string lote, out int i, out int n)
+        {
+            i = 0; n = 0;
+            if (string.IsNullOrEmpty(lote)) return;
+            var k = lote.IndexOf('/');
+            if (k <= 0 || !int.TryParse(lote.Substring(0, k), NumberStyles.None, CultureInfo.InvariantCulture, out i) ||
+                !int.TryParse(lote.Substring(k + 1), NumberStyles.None, CultureInfo.InvariantCulture, out n)) { i = -1; n = -1; }
+        }
+
+        /// <summary>
+        /// AUD-01: compara la cola con la cabeza. La cabeza nunca puede ir por delante ni apuntar a otro hash. Puede ir por detrás sólo en el
+        /// estado que deja una caída entre el fsync de un lote y la actualización de la cabeza: o bien UN registro individual, o bien UN lote
+        /// COMPLETO (todas sus líneas con marca "lote" i/n, i = 1..n en orden, n = desfase). Esas líneas están persistidas pero NO confirmadas
+        /// (nadie recibió su seq), y la siguiente escritura las sella. Devuelve el desfase tolerado (0 si la cabeza está al día).
+        /// </summary>
+        private static long CheckHead(string path, List<string> hashes, List<string> lotes, List<string> errors)
         {
             var hp = HeadPath(path);
-            if (!File.Exists(hp)) return; // cadenas anteriores a rc3
+            if (!File.Exists(hp)) return 0; // cadenas anteriores a rc3
             Dictionary<string, object> h;
             try { h = Json.ParseObject(File.ReadAllText(hp)); }
-            catch (Exception) { errors.Add("cabeza ilegible"); return; }
+            catch (Exception) { errors.Add("cabeza ilegible"); return 0; }
             long seq;
             try { seq = Convert.ToInt64(h.TryGetValue("seq", out var s) ? s : 0L, CultureInfo.InvariantCulture); } catch (Exception) { seq = -1; }
             var last = Arg.GetString(h, "ultimo") ?? "";
-            if (seq > hashes.Count) { errors.Add("faltan registros al final (la cabeza indica " + seq + ", hay " + hashes.Count + ")"); return; }
-            if (seq < hashes.Count - 1 || seq < 0) { errors.Add("la cabeza va " + (hashes.Count - seq) + " registros por detrás"); return; }
-            if (seq >= 1 && hashes[(int)seq - 1] != last) errors.Add("el registro " + seq + " no coincide con la cabeza (editado)");
+            if (seq < 0) { errors.Add("cabeza ilegible"); return 0; }
+            if (seq > hashes.Count) { errors.Add("faltan registros al final (la cabeza indica " + seq + ", hay " + hashes.Count + ")"); return 0; }
+            if (seq >= 1 && hashes[(int)seq - 1] != last) { errors.Add("el registro " + seq + " no coincide con la cabeza (editado)"); return 0; }
+            var lag = hashes.Count - seq;
+            if (lag <= 1) return lag;
+            if (lag > MaxBatch) { errors.Add("la cabeza va " + lag + " registros por detrás (más que un lote)"); return 0; }
+            for (var k = 0; k < lag; k++)
+            {
+                ParseLote(lotes[(int)seq + k], out var i, out var n);
+                if (i != k + 1 || n != lag) { errors.Add("la cabeza va " + lag + " registros por detrás y la cola no es un lote completo"); return 0; }
+            }
+            return lag;
         }
 
         public sealed class VerifyResult
@@ -581,11 +754,13 @@ namespace PDI.RevitMcp.Engine
             public long Lines;
             public string LastHash;
             public long LastOffset = -1;
+            /// <summary>Registros persistidos más allá de la cabeza (lote no confirmado tras una caída). 0 = cabeza al día.</summary>
+            public long HeadLag;
             public List<string> Errors = new List<string>();
             public bool Ok => Errors.Count == 0;
         }
 
-        /// <summary>Comprueba la cadena completa. Una línea final cortada (caída a mitad) es error, no se oculta.</summary>
+        /// <summary>Comprueba la cadena completa. Una línea final cortada (caída a mitad) es error, no se oculta: la reparación es aparte.</summary>
         public static VerifyResult Verify(string path)
         {
             var r = new VerifyResult();
@@ -595,19 +770,108 @@ namespace PDI.RevitMcp.Engine
             string prev = "";
             long n = 0, off = 0;
             var hashes = new List<string>();
+            var lotes = new List<string>();
             foreach (var raw in text.Split('\n'))
             {
                 if (raw.Length == 0) { off += 1; continue; }
                 r.LastOffset = off;
                 off += Encoding.UTF8.GetByteCount(raw) + 1;
-                CheckLine(raw, ref prev, ref n, r.Errors);
+                CheckLine(raw, ref prev, ref n, r.Errors, out var lote);
                 hashes.Add(prev);
+                lotes.Add(lote);
             }
             r.Lines = n;
             r.LastHash = n == 0 ? null : prev;
-            CheckHead(path, hashes, r.Errors);
+            r.HeadLag = CheckHead(path, hashes, lotes, r.Errors);
             return r;
         }
+
+        /// <summary>
+        /// AUD-01: reparación conservadora de una cola dejada por una caída. Sólo actúa si TODO lo anterior es una cadena válida y lo que
+        /// sobra está más allá de la cabeza (persistido pero nunca confirmado): un fragmento final sin salto de línea y/o las líneas de un lote
+        /// incompleto. Lo apartado se guarda íntegro en "&lt;auditoria&gt;.fragmento-…" (evidencia), el archivo se corta en el último límite
+        /// válido, se reescribe la cabeza y se añade un registro "recuperacion_cola" que lo documenta. Nunca corta registros confirmados
+        /// (≤ cabeza); una edición, un borrado o una cadena rota siguen yendo a cuarentena.
+        /// </summary>
+        private bool TryRepairTail(out string note)
+        {
+            note = null;
+            byte[] all;
+            try { all = File.ReadAllBytes(_path); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return false; }
+            var lastNl = Array.LastIndexOf(all, (byte)'\n');
+            var completeLen = lastNl + 1;   // bytes de líneas completas
+            var text = Encoding.UTF8.GetString(all, 0, completeLen);
+            var errors = new List<string>();
+            string prev = "";
+            long n = 0, off = 0;
+            var hashes = new List<string>(); var lotes = new List<string>(); var ends = new List<long>();
+            foreach (var raw in text.Split('\n'))
+            {
+                if (raw.Length == 0) { off += 1; continue; }
+                off += Encoding.UTF8.GetByteCount(raw) + 1;
+                CheckLine(raw, ref prev, ref n, errors, out var lote);
+                hashes.Add(prev); lotes.Add(lote); ends.Add(off);
+            }
+            if (errors.Count > 0) return false;                        // la parte completa no es una cadena válida: corrupción real
+            // Lote incompleto al final: se quitan sus líneas (nunca se confirmó).
+            var keep = hashes.Count;
+            if (keep > 0)
+            {
+                ParseLote(lotes[keep - 1], out var li, out var ln);
+                if (li > 0 && ln > 0 && li < ln) keep -= li;
+            }
+            var keepBytes = keep == 0 ? 0 : ends[keep - 1];
+            if (keepBytes == all.Length) return false;                 // no hay nada que apartar: el problema es otro
+            // La cabeza debe quedar dentro de lo conservado y coincidir con su hash.
+            long headSeq = 0;
+            var hp = HeadPath(_path);
+            if (File.Exists(hp))
+            {
+                Dictionary<string, object> h;
+                try { h = Json.ParseObject(File.ReadAllText(hp)); } catch (Exception) { return false; }
+                try { headSeq = Convert.ToInt64(h.TryGetValue("seq", out var s) ? s : 0L, CultureInfo.InvariantCulture); } catch (Exception) { return false; }
+                var last = Arg.GetString(h, "ultimo") ?? "";
+                if (headSeq < 0 || headSeq > keep) return false;       // se perderían registros confirmados: cuarentena
+                if (headSeq >= 1 && hashes[(int)headSeq - 1] != last) return false;
+            }
+            var dest = _path + ".fragmento-" + DateTime.UtcNow.ToString("yyyyMMddTHHmmssfff", CultureInfo.InvariantCulture) + "-" + Guid.NewGuid().ToString("N").Substring(0, 6);
+            var dropped = new byte[all.Length - keepBytes];
+            Array.Copy(all, keepBytes, dropped, 0, dropped.Length);
+            try
+            {
+                File.WriteAllBytes(dest, dropped);
+                using (var fs = new FileStream(_path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.WriteThrough))
+                {
+                    fs.SetLength(keepBytes);
+                    fs.Flush(true);
+                }
+                var lastHash = keep == 0 ? "" : hashes[keep - 1];
+                Home.WriteAtomic(hp, Json.Write(new Dictionary<string, object> { ["seq"] = (long)keep, ["ultimo"] = lastHash, ["longitud"] = keepBytes }));
+                _prev = lastHash; _seq = keep; _knownLength = keepBytes;
+                _lastOffset = keep == 0 ? -1 : (keep == 1 ? 0 : ends[keep - 2]);
+                _knownWrite = File.GetLastWriteTimeUtc(_path);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return false; }
+            Repaired.Add(dest);
+            note = "cola incompleta apartada: " + (hashes.Count - keep) + " líneas de un lote sin terminar y " + (all.Length - completeLen) + " bytes sin salto de línea";
+            WriteLine("sistema", "recuperacion_cola", "cola_incompleta_apartada", new Dictionary<string, object>
+            {
+                ["apartado"] = Path.GetFileName(dest), ["sha256_apartado"] = Home.FileSha256(dest), ["bytes"] = (long)dropped.Length,
+                ["lineas_descartadas"] = (long)(hashes.Count - keep), ["motivo"] = "escritura interrumpida más allá de la cabeza (nunca confirmada)",
+            });
+            return true;
+        }
+
+        /// <summary>Archivos de cola incompleta apartados por esta instancia (evidencia de una reparación, no de corrupción).</summary>
+        public readonly List<string> Repaired = new List<string>();
+    }
+
+    /// <summary>Caída simulada en un punto del protocolo de auditoría (sólo pruebas). No la captura ningún manejador de E/S.</summary>
+    public sealed class AuditCrashException : Exception
+    {
+        public AuditCrashException(string point) : base("caída simulada en " + point) { Point = point; }
+        public string Point { get; }
     }
 
     /// <summary>
