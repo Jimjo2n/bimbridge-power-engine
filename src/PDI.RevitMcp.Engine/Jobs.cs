@@ -151,11 +151,16 @@ namespace PDI.RevitMcp.Engine
             if (now) SafeInvoke(handler, j);
         }
 
+        /// <summary>0.9.1 (Bloque I): observador de todos los finales (historial de operaciones). Corre después de los manejadores del trabajo.</summary>
+        public Action<Job> OnAnyFinal;
+
         private void FireFinal(Job j)
         {
             List<Action<Job>> hs;
             lock (_lock) { hs = j.FinalHandlers; j.FinalHandlers = new List<Action<Job>>(); }
             foreach (var h in hs) SafeInvoke(h, j);
+            var any = OnAnyFinal;
+            if (any != null) SafeInvoke(any, j);
         }
 
         /// <summary>Errores de los manejadores finales (p. ej. el diario no se pudo escribir); se muestran en diagnóstico.</summary>

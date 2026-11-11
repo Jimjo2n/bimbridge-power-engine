@@ -8329,6 +8329,41 @@
     "native_status": "not_tested"
   },
   {
+    "capability_id": "F35-HISTORY-001",
+    "domain": "F35",
+    "subdomain": "operaciones largas",
+    "name": "Historial de operaciones con filtros, cancelaci\u00F3n y consejo de reintento seguro",
+    "name_en": "Operation history and safe retry",
+    "operation": "QUERY",
+    "expected_postconditions": "cada trabajo terminado queda persistido con estado, duraci\u00F3n y si es reintentable o exige reconciliar; en curso con progreso",
+    "categories": [],
+    "document_kind": "any",
+    "implementation_path": "engine",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "OFFLINE_VERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Engine/OperationHistory.cs",
+      "src/PDI.RevitMcp.Engine/Jobs.cs"
+    ],
+    "test_ids": [
+      "OperationHistoryTests"
+    ],
+    "verifier": "historial y JobStore con trabajos sint\u00E9ticos",
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "consulta por check name=historial; la vista en el panel de estado (#5) queda pendiente",
+    "ui_command": [],
+    "priority": "P0",
+    "native_status": "not_tested"
+  },
+  {
     "capability_id": "F37-UI-002",
     "domain": "F37",
     "subdomain": "interfaz",

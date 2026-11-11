@@ -42,6 +42,45 @@ namespace PDI.RevitMcp.Addin.Revit
             return new Response { Id = request.Id, Rev = probe.Rev, Datos = datos };
         }
 
+        private OperationHistory _history;
+
+        /// <summary>0.9.1 (Bloque I): todo trabajo terminado queda en el historial persistente (el error al abrirlo no impide trabajar).</summary>
+        private void HookHistory()
+        {
+            try { _history = new OperationHistory(System.IO.Path.Combine(Home.Root, "historial", "operaciones.jsonl")); }
+            catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { _history = new OperationHistory(null); _history.LoadErrors.Add("historial sólo en memoria: " + ex.Message); }
+            _jobs.OnAnyFinal = j => _history.Add(j);
+        }
+
+        /// <summary>
+        /// 0.9.1 (Bloque I): check name=historial [estado=] [tipo=] [sesion=] [desde=ISO] [q=] [pagina=] [por_pagina=] — operaciones largas
+        /// terminadas con su consejo de reintento; trabajos en curso de esta sesión con su progreso (cancelables con job cancelar).
+        /// </summary>
+        private Response HistoryCheck(Session session, Request request)
+        {
+            var a = request.Args;
+            DateTime? since = null;
+            var ds = Arg.GetString(a, "desde");
+            if (ds != null)
+            {
+                if (!DateTime.TryParse(ds, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var d))
+                    return Response.Fail(request.Id, Status.Invalido, "historial desde: fecha ISO 8601");
+                since = d;
+            }
+            var (page, total) = _history.Query(Arg.GetString(a, "estado"), Arg.GetString(a, "tipo"), Arg.GetString(a, "sesion"), since, Arg.GetString(a, "q"),
+                (int)(Arg.GetLong(a, "pagina") ?? 1), (int)(Arg.GetLong(a, "por_pagina") ?? 20));
+            var datos = new Dictionary<string, object>
+            {
+                ["total"] = (long)total,
+                ["cols"] = new List<object> { "job_id", "tipo", "estado", "ms", "reintento", "fin", "error" },
+                ["rows"] = page.Select(r => (object)new List<object> { r.JobId, r.Kind, r.Estado, r.Ms, r.Retry, r.FinishedUtc.ToString("o", CultureInfo.InvariantCulture), r.Error }).ToList(),
+                ["en_curso"] = _jobs.ForSession(session.Id, Arg.GetString(a, Wire.TaskArg)).Where(j => !j.IsFinal).Select(j => (object)j.Progress()).ToList(),
+                ["reintento_significa"] = "reintentable = no se aplicó nada; reconciliar_antes = resultado incierto o parcial: compruebe el modelo antes de repetir",
+            };
+            if (_history.LoadErrors.Count > 0) datos["avisos_historial"] = _history.LoadErrors.Cast<object>().ToList();
+            return new Response { Id = request.Id, Datos = datos };
+        }
+
         private static Response CoverageCheck(Request request)
         {
             var a = request.Args;
