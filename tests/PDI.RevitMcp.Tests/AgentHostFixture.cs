@@ -62,6 +62,31 @@ namespace PDI.RevitMcp.Tests
         /// <summary>Lanza el AgentHost como PROCESO INDEPENDIENTE (dotnet …AgentHost.dll). <paramref name="fault"/>: PDI_AH_FALLO.</summary>
         public static ChildResult Run(string fault, string markFile, params string[] args) => Start(fault, markFile, args).Wait();
 
+        /// <summary>Como <see cref="Run"/> con variables de entorno adicionales (p. ej. PDI_AH_RETRASO para un retraso controlado).</summary>
+        public static ChildResult RunWithEnv(IDictionary<string, string> env, string fault, string markFile, params string[] args)
+        {
+            ExtraEnv = env;
+            try { return Start(fault, markFile, args).Wait(); }
+            finally { ExtraEnv = null; }
+        }
+
+        [ThreadStatic] private static IDictionary<string, string> ExtraEnv;
+
+        /// <summary>
+        /// AUD-04: separa la inyección de caídas de la expiración. Tras una caída, el proceso muerto no libera su lease; en vez de esperar a que
+        /// venza (lo que obliga a usar TTL muy cortos que la carga de la máquina puede agotar antes del punto de caída), se adelanta el
+        /// vencimiento en el fixture de disco. Sólo es válido con el dueño ya terminado: se comprueba que el lease no esté liberado.
+        /// </summary>
+        public static void ExpireDeadLease(string stateDir)
+        {
+            var path = Path.Combine(stateDir, "control", "plan", "lease.json");
+            if (!File.Exists(path)) return;
+            var lease = Json.ParseObject(File.ReadAllText(path));
+            if (Arg.GetBool(lease, "liberada") == true) return;
+            lease["vence"] = "2000-01-01T00:00:00Z";
+            File.WriteAllText(path, Json.Write(lease));
+        }
+
         public sealed class Child
         {
             public Process P; public StringBuilder Out = new StringBuilder(), Err = new StringBuilder();
@@ -82,6 +107,8 @@ namespace PDI.RevitMcp.Tests
             if (fault != null) psi.Environment["PDI_AH_FALLO"] = fault;
             if (markFile != null) psi.Environment["PDI_AH_FALLO_MARCA"] = markFile;
             psi.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
+            psi.Environment.Remove("PDI_AH_RETRASO");
+            if (ExtraEnv != null) foreach (var kv in ExtraEnv) psi.Environment[kv.Key] = kv.Value;
             var c = new Child { P = new Process { StartInfo = psi } };
             c.P.OutputDataReceived += (s, e) => { if (e.Data != null) lock (c.Out) c.Out.AppendLine(e.Data); };
             c.P.ErrorDataReceived += (s, e) => { if (e.Data != null) lock (c.Err) c.Err.AppendLine(e.Data); };

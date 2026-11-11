@@ -28,7 +28,35 @@ namespace PDI.RevitMcp.AgentHost
         {
             var f = new Faults();
             f.Configure(Environment.GetEnvironmentVariable("PDI_AH_FALLO"), Environment.GetEnvironmentVariable("PDI_AH_FALLO_MODO"), Environment.GetEnvironmentVariable("PDI_AH_FALLO_MARCA"));
+            f.ConfigureDelay(Environment.GetEnvironmentVariable("PDI_AH_RETRASO"));
             return f;
+        }
+
+        private string _delayPoint;
+        private int _delayMs;
+
+        /// <summary>
+        /// AUD-04: retraso controlado para pruebas (variable PDI_AH_RETRASO = "punto:ms"). Reproduce sin depender de la carga de la máquina
+        /// un periodo largo sin renovar el lease. Puntos: runner.antes_de_ejecutar.
+        /// </summary>
+        public Faults ConfigureDelay(string spec)
+        {
+            _delayPoint = null; _delayMs = 0;
+            if (string.IsNullOrWhiteSpace(spec)) return this;
+            var colon = spec.LastIndexOf(':');
+            if (colon <= 0 || !int.TryParse(spec.Substring(colon + 1), NumberStyles.None, CultureInfo.InvariantCulture, out var ms)) return this;
+            _delayPoint = spec.Substring(0, colon).Trim();
+            _delayMs = ms;
+            return this;
+        }
+
+        /// <summary>Espera el retraso configurado si este es su punto (una sola vez).</summary>
+        public void Delay(string point)
+        {
+            if (_delayPoint != point || _delayMs <= 0) return;
+            var ms = _delayMs;
+            _delayPoint = null;
+            System.Threading.Thread.Sleep(ms);
         }
 
         public Faults Configure(string spec, string mode = null, string mark = null)
