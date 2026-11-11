@@ -1,0 +1,8371 @@
+[
+  {
+    "command": "AcquireCoordinates",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F03-COORD-READ-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "ActivateControlsAndDimensions",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ActivateView",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AddInsManager",
+    "domain": "F35",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AddToSet",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AdjustAnalyticalModel",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AirTerminal",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Align",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F02-XFORM-ALIGN-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "AlignedDimension",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F25-DIM-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "AlignedMultiRebarAnnotation",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AlignedToCurrentView",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AlignedToPickedLevel",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AlignedToSamePlace",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AlignedToSelectedLevels",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AlignedToSelectedViews",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AlignmentStation",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AlignmentStationLabelTypes",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AlignmentStationSet",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AllowableBarTypes",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AnalysisDisplayStyles",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AnalyticalAutomation",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AnalyticalConsistencyChecks",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AnalyticalLink",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AnalyticalMember",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Anchors",
+    "domain": "F13",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AngularDimension",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AngularDimensionTypes",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ApplyCoping",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ApplyTemplatePropertiesToCurrentView",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F24-VIEW-SET-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "ArcLengthDimension",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ArcWire",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F20-WIRE-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "ArchitecturalColumn",
+    "domain": "F12",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ArchitecturalFloor",
+    "domain": "F06",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F06-FLOOR-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "ArchitecturalWall",
+    "domain": "F05",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F05-WALL-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "Area",
+    "domain": "F09",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AreaAndVolumeComputations",
+    "domain": "F09",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AreaBasedLoadBoundary",
+    "domain": "F09",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AreaBoundary",
+    "domain": "F09",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AreaPlan",
+    "domain": "F09",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F09-AREA-PLAN-001"
+    ],
+    "status": "MISSING"
+  },
+  {
+    "command": "AreaReinforcementSymbol",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AreaTag",
+    "domain": "F09",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Array",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F02-XFORM-ARRAY-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "Arrowheads",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AssemblyCode",
+    "domain": "F31",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AutomaticBeamSystem",
+    "domain": "F12",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "AutomaticCeiling",
+    "domain": "F06",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F06-CEIL-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "AutomationCustomization",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "BatchPrint",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Beam",
+    "domain": "F12",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F12-STR-PLACE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "BeamAnnotations",
+    "domain": "F12",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "BeamOrColumnJoins",
+    "domain": "F12",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "BeamSystemSymbol",
+    "domain": "F12",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Bolts",
+    "domain": "F13",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "BottomChord",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "BoundaryConditions",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "BoundaryConditionsSettings",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Brace",
+    "domain": "F12",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "BrowserOrganization",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "BuildingElevation",
+    "domain": "F11",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F24-VIEW-CREATE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "BuildingOperatingSchedules",
+    "domain": "F11",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "BuildingOrSpaceTypeSettings",
+    "domain": "F11",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "BuildingPad",
+    "domain": "F11",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CableTray",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F20-CONDUIT-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "CableTrayConnector",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CableTrayFitting",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Callout",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F24-VIEW-CREATE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "CalloutTags",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Camera",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CanvasTheme",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ChamferedWire",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F20-WIRE-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "CheckCircuits",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F20-CIRCUIT-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "CheckDuctSystems",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CheckMemberSupports",
+    "domain": "F32",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CheckPipeSystems",
+    "domain": "F18",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CheckSpelling",
+    "domain": "F32",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Close",
+    "domain": "F01",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CloseInactiveViews",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Collaborate",
+    "domain": "F30",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CollaborateInCloud",
+    "domain": "F30",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ColorFillLegend",
+    "domain": "F09",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ColorSchemes",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Communication",
+    "domain": "F21",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Conduit",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F20-CONDUIT-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "ConduitConnector",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ConduitFitting",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ConnectionSettings",
+    "domain": "F13",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ContourCut",
+    "domain": "F13",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Control",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ConvertToFlexDuct",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CoordinationModel",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CoordinationModelAutodeskDocs",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CoordinationModelChanges",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CoordinationModelLocal",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CoordinationReviewUseCurrentProject",
+    "domain": "F29",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F29-CR-001"
+    ],
+    "status": "UNSUPPORTED_BY_PUBLIC_API"
+  },
+  {
+    "command": "CoordinationSelectLink",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F29-CR-001"
+    ],
+    "status": "UNSUPPORTED_BY_PUBLIC_API"
+  },
+  {
+    "command": "CoordinationSettings",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Cope",
+    "domain": "F13",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CopeSkewed",
+    "domain": "F13",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Copy",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F02-XFORM-COPY-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "CopyMonitorSelectLink",
+    "domain": "F29",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F29-CM-BATCH-001"
+    ],
+    "status": "UNSUPPORTED_BY_PUBLIC_API"
+  },
+  {
+    "command": "CopyMonitorUseCurrentProject",
+    "domain": "F29",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F29-CM-BATCH-001"
+    ],
+    "status": "UNSUPPORTED_BY_PUBLIC_API"
+  },
+  {
+    "command": "CopyToClipboard",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CornerCut",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CreateAnAreaBasedLoad",
+    "domain": "F09",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CreateAnalyticalLink",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CreateAssembly",
+    "domain": "F31",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F31-ASSEMBLY-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "CreateEnergyModel",
+    "domain": "F32",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CreateFromImport",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CreateGroup",
+    "domain": "F31",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F31-GROUP-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "CreateParts",
+    "domain": "F31",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CreateSimilar",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CreateTemplateFromCurrentView",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CurtainGrid",
+    "domain": "F08",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F08-CURTAIN-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "CurtainSystemByFace",
+    "domain": "F08",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CurtainWallMullion",
+    "domain": "F08",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CutBy",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CutGeometry",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CutProfile",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CutThrough",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "CutToClipboard",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DWFMarkup",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Data",
+    "domain": "F21",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F21-LOWVOLT-001"
+    ],
+    "status": "MISSING"
+  },
+  {
+    "command": "DeactivateView",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DecalTypes",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Default3DView",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F24-VIEW-3D-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "Delete",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F02-XFORM-DELETE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "DeleteEnergyModel",
+    "domain": "F32",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DemandFactors",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Demolish",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DesignOptions",
+    "domain": "F31",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F31-OPTION-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "DetailComponent",
+    "domain": "F07",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F25-DETAILCOMP-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "DetailLevel",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DetailLine",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F25-DETAIL-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "DiameterDimension",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DiameterDimensionTypes",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DisplaceElements",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Door",
+    "domain": "F07",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F07-DOOR-WIN-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "DormerOpening",
+    "domain": "F07",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DraftingView",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F24-VIEW-DRAFT-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "DrawOnFace",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DrawOnWorkPlane",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Duct",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F17-DUCT-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "DuctAccessory",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DuctConnector",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DuctFitting",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DuctLegend",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DuctPlaceholder",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DuctPressureLossReport",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DuplicateAsDependent",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DuplicateView",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DuplicateWithDetailing",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Dynamo",
+    "domain": "F35",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DynamoPlayer",
+    "domain": "F35",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "DynamoPlayerForSteel",
+    "domain": "F13",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "EditATemplate",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "EditRebarCover",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "EditSelection",
+    "domain": "F31",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "EditingRequests",
+    "domain": "F30",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ElectricalAnalyticalLoadTypeSettings",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ElectricalConductorAndCableSettings",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ElectricalConnector",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ElectricalEquipment",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ElectricalFixture",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ElectricalSettings",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ElementKeynote",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ElevationTags",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "EnergySettings",
+    "domain": "F32",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F32-ENERGY-001"
+    ],
+    "status": "MISSING"
+  },
+  {
+    "command": "EquipmentLoad",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExitRevit",
+    "domain": "F01",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportCADFormatsACIS_SAT",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportCADFormatsDGN",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportCADFormatsDWG",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F34-EXPORT-DWG-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "ExportCADFormatsDXF",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F34-EXPORT-DWG-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "ExportCADFormatsOBJ",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportCADFormatsSTEP",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportCADFormatsSTL",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportDWFOrDWFx",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportExportTypes",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportFBX",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportGBXML",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportIFC",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F34-EXPORT-IFC-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "ExportImagesandAnimationsImage",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportImagesandAnimationsSolarStudy",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportImagesandAnimationsWalkthrough",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportODBCDatabase",
+    "domain": "F21",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportOptionsExportSetupsDGN",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportOptionsExportSetupsDWGOrDXF",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportOptionsIFCOptions",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportPDF",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F01-DOC-PDF-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "ExportReportsRoomOrAreaReport",
+    "domain": "F09",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ExportReportsSchedule",
+    "domain": "F26",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F26-SCHED-EXPORT-001"
+    ],
+    "status": "MISSING"
+  },
+  {
+    "command": "FabricReinforcementSymbol",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "FabricationPart",
+    "domain": "F22",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "FabricationSettings",
+    "domain": "F22",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "FamilyCategoryAndParameters",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "FamilyTypes",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Fascia",
+    "domain": "F06",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "FillPatterns",
+    "domain": "F04",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "FilledRegion",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F25-REGION-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "Filters",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F24-VIEW-OVERRIDE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "FindOrReplace",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "FireAlarm",
+    "domain": "F21",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F21-LOWVOLT-001"
+    ],
+    "status": "MISSING"
+  },
+  {
+    "command": "FlexDuct",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "FlexPipe",
+    "domain": "F18",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "FloorByFaceFloor",
+    "domain": "F06",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "FloorPlan",
+    "domain": "F06",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F24-VIEW-CREATE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "FormWorkPlaneView",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "FramingElevation",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Generate",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "GenerateAnalysis",
+    "domain": "F32",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "GlobalParameters",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F04-PARAM-GLOBAL-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "GradedRegion",
+    "domain": "F11",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "GraphicalColumnSchedule",
+    "domain": "F12",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "GrayInactiveWorksets",
+    "domain": "F30",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Grid",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F03-DATUM-GRID-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "GuideGrid",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Gutter",
+    "domain": "F06",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "HalftoneOrUnderlay",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "HideBoundaryOpenEnds",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "HideCategory",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F24-VIEW-HIDE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "HideElements",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F24-VIEW-HIDE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "Holes",
+    "domain": "F07",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "IdsOfSelection",
+    "domain": "F31",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ImportCAD",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F28-LINK-CAD-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "ImportGBXML",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ImportImage",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ImportPDF",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ImportTypes",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "InPlaceMass",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F10-MASS-001"
+    ],
+    "status": "MISSING"
+  },
+  {
+    "command": "Insert2DElementsFromFile",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "InsertCoupler",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "InsertViewsFromFile",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Insulation",
+    "domain": "F16",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Isolated",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "JoinGeometry",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F05-WALL-JOIN-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "JoinOrUnjoinRoof",
+    "domain": "F06",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "KeyboardShortcuts",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "KeynoteLegend",
+    "domain": "F09",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "KeynotingSettings",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Label",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LabelContours",
+    "domain": "F13",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LaunchAsApp",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LaunchInBrowser",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LaunchInDockedWindow",
+    "domain": "F07",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Legend",
+    "domain": "F09",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LegendComponent",
+    "domain": "F09",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Level",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F03-DATUM-LEVEL-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "Lighting",
+    "domain": "F33",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LightingFixture",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LinePatterns",
+    "domain": "F04",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LineStyles",
+    "domain": "F04",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LineWeights",
+    "domain": "F04",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LinearDimension",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LinearDimensionTypes",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LinearMultiRebarAnnotation",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Linework",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LinkCAD",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F28-LINK-CAD-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "LinkFormit",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LinkIFC",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LinkImage",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LinkPDF",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LinkRevit",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F28-LINK-RVT-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "LinkTopography",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LoadAsGroup",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F31-GROUP-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "LoadAsGroupIntoOpenProjects",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LoadAutodeskFamily",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LoadCases",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LoadCasesAndCombinations",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LoadCasesDisplay",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LoadClassifications",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LoadCombinations",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LoadFamilyIntoProjectAndClose",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LoadIntoProject",
+    "domain": "F01",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LoadRebarShapeIntoProjectAndClose",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LoadSelection",
+    "domain": "F31",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LoadShapes",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F23-FAM-LOAD-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "LoadedTagsAndSymbols",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Loads",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "LoadsScalingDisplay",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Location",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MEPFabricationDuctworkStiffener",
+    "domain": "F22",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MacroManager",
+    "domain": "F35",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MacroSecurity",
+    "domain": "F21",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MajorSegment",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ManageCloudModels",
+    "domain": "F30",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ManageConnectionToARevitServerAccelerator",
+    "domain": "F13",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ManageImages",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ManageLinks",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ManageTemplates",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ManageViewTemplates",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F24-VIEW-SET-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "MaskingRegion",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MatchTypeProperties",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Matchline",
+    "domain": "F27",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MaterialAssets",
+    "domain": "F33",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MaterialKeynote",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MaterialTag",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MaterialTakeoff",
+    "domain": "F26",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Materials",
+    "domain": "F33",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F04-MAT-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "MeasureAlongAnElement",
+    "domain": "F32",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MeasureBetweenTwoReferences",
+    "domain": "F32",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MechanicalControlDevice",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MechanicalEquipment",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MechanicalSettings",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MergeSurfaces",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MirrorDrawAxis",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F02-XFORM-MIRROR-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "MirrorPickAxis",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F02-XFORM-MIRROR-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "MirrorProject",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Miter",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ModelInPlace",
+    "domain": "F07",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ModelLine",
+    "domain": "F07",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ModelText",
+    "domain": "F07",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Move",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F02-XFORM-MOVE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "MultiCategoryTag",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MultiPointRouting",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Multiplanar",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MultiplePaths",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "MultipleValuesIndication",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "NavigationBar",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "NewAnnotationSymbol",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "NewConceptualMass",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "NewFamily",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "NewProject",
+    "domain": "F01",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "NewSheet",
+    "domain": "F27",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F27-SHEET-CREATE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "NewTitleBlock",
+    "domain": "F01",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "NoteBlock",
+    "domain": "F26",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "NurseCall",
+    "domain": "F21",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ObjectStyles",
+    "domain": "F04",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Offset",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F02-XFORM-OFFSET-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "OneWayIndicator",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "OpenBuildingComponent",
+    "domain": "F11",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "OpenCloudModel",
+    "domain": "F30",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "OpenFamily",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F01-DOC-OPEN-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "OpenIFC",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "OpenIFCOptions",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "OpenProject",
+    "domain": "F01",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F01-DOC-OPEN-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "OpenRevitFile",
+    "domain": "F01",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F01-DOC-OPEN-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "OpenSampleFiles",
+    "domain": "F01",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Opening",
+    "domain": "F07",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "OpeningByFace",
+    "domain": "F07",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "OperatingSchedules",
+    "domain": "F26",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2025
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Optimize",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Options",
+    "domain": "F01",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "OverrideByCategory",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "OverrideByElement",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "OverrideByFilter",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PAndIDModeler",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PAndIDSettings",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PDF",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Paint",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PanelByBoundary",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PanelByExtrusion",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PanelSchedules",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F20-PANELSCHED-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "ParallelConduits",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ParallelPipes",
+    "domain": "F18",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ParametersService",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ParkingComponent",
+    "domain": "F11",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PasteFromClipboard",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PathOfTravel",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PathReinforcementSymbol",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PeopleContent",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Phases",
+    "domain": "F31",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F31-PHASE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "PickAPlane",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PickToEdit",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Pin",
+    "domain": "F31",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Pipe",
+    "domain": "F18",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F18-PIPE-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "PipeAccessory",
+    "domain": "F18",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PipeConnector",
+    "domain": "F18",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PipeFitting",
+    "domain": "F18",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PipeLegend",
+    "domain": "F18",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PipePlaceholder",
+    "domain": "F18",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PipePressureLossReport",
+    "domain": "F18",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PlaceAComponent",
+    "domain": "F07",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F07-COMP-PLACE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "PlaceDecal",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PlaceDetailGroup",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PlaceMass",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PlaceOnStairOrRamp",
+    "domain": "F08",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PlaceView",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PlanRegion",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Plate",
+    "domain": "F13",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PlumbingEquipment",
+    "domain": "F18",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PlumbingFixture",
+    "domain": "F18",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PointCloud",
+    "domain": "F28",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Print",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PrintPreview",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PrintSetup",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ProjectBrowser",
+    "domain": "F01",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ProjectInformation",
+    "domain": "F04",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ProjectParameters",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ProjectUnits",
+    "domain": "F04",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PropertyLine",
+    "domain": "F11",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PropertyLineData",
+    "domain": "F21",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PublishCoordinates",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F03-COORD-READ-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "PublishSettings",
+    "domain": "F34",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "PurgeUnused",
+    "domain": "F04",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F01-DOC-PURGE-001"
+    ],
+    "status": "MISSING"
+  },
+  {
+    "command": "RadialDimension",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RadialDimensionTypes",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Railing",
+    "domain": "F08",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F08-RAIL-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "Ramp",
+    "domain": "F08",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ReCenterReference",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RebarBendingDetail",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RebarCoverSettings",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RebarLine",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F14-REBAR-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "ReconcileHosting",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Redo",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ReferenceLine",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ReferencePlane",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F03-DATUM-REFPLANE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "ReflectedCeilingPlan",
+    "domain": "F06",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F24-VIEW-CREATE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "ReinforcementNumbers",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ReinforcementSettings",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RelinquishAllMine",
+    "domain": "F30",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ReloadLatest",
+    "domain": "F30",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RelocateProject",
+    "domain": "F01",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RemoveCoping",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RemoveHiddenLinesByElement",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RemovePaint",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Render",
+    "domain": "F33",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RenderGallery",
+    "domain": "F33",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RenderInCloud",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RepairCentralModel",
+    "domain": "F30",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RepeatComponent",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RepeatingDetailComponent",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ReportSharedCoordinates",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ResetAnalyticalModel",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ResetSharedCoordinates",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RestoreBackup",
+    "domain": "F01",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RevealObstacles",
+    "domain": "F05",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RevealWall",
+    "domain": "F05",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ReviewWarnings",
+    "domain": "F32",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RevisionCloud",
+    "domain": "F27",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F25-REVCLOUD-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "RevisionSchedule",
+    "domain": "F26",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RoofByExtrusion",
+    "domain": "F06",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F06-ROOF-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "RoofByFace",
+    "domain": "F06",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RoofByFootprint",
+    "domain": "F06",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F06-ROOF-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "Room",
+    "domain": "F09",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F09-ROOM-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "RoomSeparator",
+    "domain": "F09",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RoomTag",
+    "domain": "F09",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Rotate",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F02-XFORM-ROTATE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "RotateProjectNorth",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RotateTrueNorth",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RunAnalyticalToPhysicalForBuildings",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RunInterferenceCheck",
+    "domain": "F32",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "RunPhysicalToAnalyticalForBuildings",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Save",
+    "domain": "F01",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F01-DOC-SAVE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "SaveAsCloudModel",
+    "domain": "F30",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SaveAsFamily",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SaveAsLibraryFamily",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SaveAsLibraryGroup",
+    "domain": "F31",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SaveAsLibraryView",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SaveAsProject",
+    "domain": "F01",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F01-DOC-SAVE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "SaveAsTemplate",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SaveSelection",
+    "domain": "F31",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SawCutFlange",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SawCutWeb",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Scale",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ScheduleOrQuantities",
+    "domain": "F26",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F26-SCHED-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "ScopeBox",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F03-DATUM-SCOPEBOX-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "Section",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F24-VIEW-CREATE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "SectionTags",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Security",
+    "domain": "F21",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SelectById",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SelectionBox",
+    "domain": "F31",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SetWorkPlane",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ShaftOpening",
+    "domain": "F08",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ShapeStatus",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SharedParameters",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F04-PARAM-SHARED-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "SharedViews",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ShearStuds",
+    "domain": "F13",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SheetIssuesOrRevisions",
+    "domain": "F27",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F27-REVISION-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "SheetList",
+    "domain": "F26",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Shorten",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ShowBoundaryOpenEnds",
+    "domain": "F01",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ShowDisconnects",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ShowHiddenLinesByElement",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ShowHistory",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ShowLastReport",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ShowMassByViewSettings",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ShowMassFormAndFloors",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ShowMassSurfaceTypes",
+    "domain": "F10",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ShowMassZonesAndShades",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ShowWarningsInViews",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ShowWorkPlane",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ShowWorksharingMakeEditableControls",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SingleFabricSheetPlacement",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SiteComponent",
+    "domain": "F11",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Slab",
+    "domain": "F12",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SlabEdgeFloor",
+    "domain": "F12",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Snaps",
+    "domain": "F04",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Soffit",
+    "domain": "F06",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SolidBlend",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SolidExtrusion",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SolidRevolve",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SolidSweep",
+    "domain": "F05",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SolidSweptBlend",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Space",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SpaceNaming",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SpaceSeparator",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SpaceTag",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SpanDirectionSymbol",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SpatialGrid",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SpecifyCoordinatesAtPoint",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SplineWire",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F20-WIRE-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "SplitElement",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F05-WALL-SPLIT-001"
+    ],
+    "status": "MISSING"
+  },
+  {
+    "command": "SplitFace",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SplitSurface",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SplitWithGap",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SpotCoordinate",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SpotCoordinateTypes",
+    "domain": "F03",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SpotElevation",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SpotElevationTypes",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SpotSlope",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SpotSlopeTypes",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Sprinkler",
+    "domain": "F19",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F19-SPRINKLER-001"
+    ],
+    "status": "MISSING"
+  },
+  {
+    "command": "Stair",
+    "domain": "F08",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F08-STAIR-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "StairPath",
+    "domain": "F08",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "StairTreadOrRiserNumber",
+    "domain": "F08",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "StartingView",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "StatusBar",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "StatusBarDesignOptions",
+    "domain": "F31",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "StatusBarWorksets",
+    "domain": "F30",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "StructuralAreaReinforcement",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "StructuralColumn",
+    "domain": "F12",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F12-STR-PLACE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "StructuralConnection",
+    "domain": "F13",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "StructuralFabricArea",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "StructuralFloor",
+    "domain": "F12",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F06-FLOOR-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "StructuralPathReinforcement",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "StructuralPlan",
+    "domain": "F12",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "StructuralRebar",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F14-REBAR-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "StructuralRebarCoupler",
+    "domain": "F14",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "StructuralSettings",
+    "domain": "F15",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "StructuralTrusses",
+    "domain": "F12",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "StructuralWall",
+    "domain": "F12",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F05-WALL-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "Subregion",
+    "domain": "F11",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SubstitutionSettings",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SunSettings",
+    "domain": "F33",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SweepWall",
+    "domain": "F05",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SwitchJoinOrder",
+    "domain": "F20",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Symbol",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SymbolicLine",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SynchronizeAndModifySettings",
+    "domain": "F30",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F01-DOC-SYNC-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "SynchronizeNow",
+    "domain": "F30",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F01-DOC-SYNC-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "SystemBrowser",
+    "domain": "F16",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SystemZone",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "SystemsAnalysis",
+    "domain": "F32",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "TabViews",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "TagAllNotTagged",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "TagByCategory",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F25-TAG-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "Telephone",
+    "domain": "F21",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "TemporaryDimensions",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Text",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F25-TEXT-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "ThinLines",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "TileViews",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "TitleBlock",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ToggleHome",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "TogglePAndIDModelerBrowser",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "TogglePropertiesPalette",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ToggleRevealHiddenElementsMode",
+    "domain": "F05",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "TopChord",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "TopographyCutVoidStability",
+    "domain": "F11",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Toposolid",
+    "domain": "F11",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F11-TOPO-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "ToposolidByFace",
+    "domain": "F11",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ToposolidSmoothShading",
+    "domain": "F11",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Toposurface",
+    "domain": "F11",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023
+    ],
+    "capabilities": [
+      "F11-TOPO-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "TransferProjectStandards",
+    "domain": "F04",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "TrimOrExtendMultipleElements",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "TrimOrExtendSingleElement",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "TrimOrExtendToCorner",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "TypeProperties",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "UncutGeometry",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Undo",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "UnjoinGeometry",
+    "domain": "F02",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F05-WALL-JOIN-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "Unpin",
+    "domain": "F31",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "UserKeynote",
+    "domain": "F25",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "VerticalOpening",
+    "domain": "F07",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ViewAnalysis",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ViewCube",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ViewList",
+    "domain": "F26",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ViewReference",
+    "domain": "F27",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "VisibilityOrGraphics",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F24-VIEW-OVERRIDE-001"
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED"
+  },
+  {
+    "command": "VoidBlend",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "VoidExtrusion",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "VoidRevolve",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "VoidSweep",
+    "domain": "F05",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "VoidSweptBlend",
+    "domain": "F23",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Walkthrough",
+    "domain": "F24",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Wall",
+    "domain": "F05",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "WallByFaceWall",
+    "domain": "F05",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "WallJoins",
+    "domain": "F05",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "WallOpening",
+    "domain": "F05",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Web",
+    "domain": "F37",
+    "classified_by_rule": false,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Welds",
+    "domain": "F13",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Window",
+    "domain": "F07",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F07-DOOR-WIN-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "Worksets",
+    "domain": "F30",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [
+      "F30-WS-CREATE-001"
+    ],
+    "status": "DYNAMIC_CSHARP_ONLY"
+  },
+  {
+    "command": "WorksharingMonitor",
+    "domain": "F29",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "Zone",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ZoneBySketch",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  },
+  {
+    "command": "ZoneBySpace",
+    "domain": "F17",
+    "classified_by_rule": true,
+    "revit_versions": [
+      2026
+    ],
+    "capabilities": [],
+    "status": "UNKNOWN"
+  }
+]
