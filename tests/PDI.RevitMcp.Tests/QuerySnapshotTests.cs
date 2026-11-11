@@ -230,5 +230,95 @@ namespace PDI.RevitMcp.Tests
             Assert.Equal(5100, total);
             Assert.True(sw.ElapsedMilliseconds < 2000, "50 páginas desde instantánea: " + sw.ElapsedMilliseconds + " ms");
         }
+
+        [Theory]
+        [InlineData("documento")]
+        [InlineData("sesion")]
+        public void Get_RevalidatesAfterLiveRev_ConcurrentDropIsNeverServed(string drop)
+        {
+            // AUD-02: LiveRev se evalúa fuera del bloqueo. Una barrera lo detiene ahí mientras otro hilo descarta la instantánea:
+            // al reanudar, Get NO puede devolver Ok con un objeto ya descartado.
+            using (var inLiveRev = new System.Threading.ManualResetEventSlim(false))
+            using (var release = new System.Threading.ManualResetEventSlim(false))
+            {
+                var store = new QuerySnapshotStore();
+                var block = true;
+                var id = Put(store, "s1", "d1", 5, Spec(10), Rows(30), () =>
+                {
+                    if (block) { inLiveRev.Set(); release.Wait(10000); }
+                    return 5;
+                });
+                SnapshotLookup result = SnapshotLookup.Ok;
+                QuerySnapshot served = null;
+                var reader = new System.Threading.Thread(() => result = store.Get(id, "s1", "d1", out served));
+                reader.Start();
+                Assert.True(inLiveRev.Wait(10000));
+                if (drop == "documento") store.DropDocument("d1"); else store.DropSession("s1");
+                release.Set();
+                Assert.True(reader.Join(10000));
+                Assert.NotEqual(SnapshotLookup.Ok, result);
+                Assert.Null(served);
+                Assert.Equal(drop == "documento" ? SnapshotLookup.Evicted : SnapshotLookup.Unknown, result);
+                block = false;
+                Assert.Equal(0, store.Count);
+                Assert.Equal(0, store.EstimatedBytes);
+            }
+        }
+
+        [Fact]
+        public void Get_ManyThreadsRacingWithDrops_NeverServesADroppedSnapshot()
+        {
+            var store = new QuerySnapshotStore(maxPerSession: 64);
+            var ids = Enumerable.Range(0, 32).Select(i => Put(store, "s1", "d" + (i % 4), 1, Spec(10), Rows(20), () => { System.Threading.Thread.SpinWait(200); return 1; })).ToList();
+            var dropped = new System.Collections.Concurrent.ConcurrentDictionary<string, bool>();
+            var violations = 0;
+            var readers = Enumerable.Range(0, 8).Select(r => new System.Threading.Thread(() =>
+            {
+                for (var k = 0; k < 400; k++)
+                {
+                    var i = (k * 7 + r) % ids.Count;
+                    var doc = "d" + (i % 4);
+                    var droppedBefore = dropped.ContainsKey(doc);   // el descarte terminó ANTES de empezar esta lectura
+                    var res = store.Get(ids[i], "s1", doc, out var snap);
+                    if (res == SnapshotLookup.Ok && droppedBefore) System.Threading.Interlocked.Increment(ref violations);
+                }
+            })).ToList();
+            readers.ForEach(t => t.Start());
+            foreach (var d in new[] { "d0", "d1", "d2", "d3" }) { System.Threading.Thread.Sleep(5); store.DropDocument(d); dropped[d] = true; }
+            readers.ForEach(t => t.Join(20000));
+            // Tras DropDocument nada de ese documento se sirve: una lectura que empieza después del descarte nunca obtiene Ok.
+            Assert.Equal(0, violations);
+            Assert.Equal(0, store.Count);
+        }
+
+        [Fact]
+        public void IncrementalProjection_StopsAsSoonAsBudgetIsExceeded_NoPartialResult()
+        {
+            // AUD-03: con 10 000 filas de textos de 2 000 caracteres (~40 MB estimados) y un límite de 1 MB, la proyección se detiene
+            // en cuanto lo supera: devuelve null (nunca filas recortadas) y no llega a construir el resto.
+            var q = Spec(100);
+            var visited = 0;
+            var rows = new CountingList(Rows(10000).Select(r => { r["fam"] = new string('y', 2000); return r; }).ToList(), () => visited++);
+            var res = QuerySnapshotStore.ProjectWithinBudget(q, rows, 1024 * 1024, out var bytes);
+            Assert.Null(res);
+            Assert.True(bytes > 1024 * 1024);
+            Assert.True(visited < 1000, "se detuvo tras " + visited + " filas");     // ~250 filas de ~4 KB cada una
+            // Si cabe, devuelve todas las filas y la misma estimación que el cálculo completo.
+            var small = Rows(500);
+            var ok = QuerySnapshotStore.ProjectWithinBudget(q, small, 64L * 1024 * 1024, out var b2);
+            Assert.Equal(500, ok.Count);
+            Assert.Equal(QuerySnapshotStore.EstimateBytes(QuerySnapshotStore.Project(q, small)), b2);
+        }
+
+        /// <summary>Lista de sólo lectura que cuenta cuántas filas se recorren.</summary>
+        private sealed class CountingList : IReadOnlyList<Dictionary<string, object>>
+        {
+            private readonly List<Dictionary<string, object>> _inner; private readonly Action _onVisit;
+            public CountingList(List<Dictionary<string, object>> inner, Action onVisit) { _inner = inner; _onVisit = onVisit; }
+            public Dictionary<string, object> this[int index] { get { _onVisit(); return _inner[index]; } }
+            public int Count => _inner.Count;
+            public IEnumerator<Dictionary<string, object>> GetEnumerator() { foreach (var r in _inner) { _onVisit(); yield return r; } }
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+        }
     }
 }

@@ -91,12 +91,47 @@ namespace PDI.RevitMcp.Engine
         public static long EstimateBytes(IReadOnlyList<Dictionary<string, object>> rows)
         {
             long total = 24 + 8L * rows.Count;                     // la lista y sus referencias
+            foreach (var r in rows) total += RowBytes(r);
+            return total;
+        }
+
+        /// <summary>Tamaño estimado de una fila: Dictionary&lt;string,object&gt; (objeto + arrays + entrada/cubo por clave) + sus valores.</summary>
+        private static long RowBytes(Dictionary<string, object> r)
+        {
+            long b = 80 + 32L * r.Count;
+            foreach (var v in r.Values) b += ValueBytes(v);
+            return b;
+        }
+
+        /// <summary>
+        /// AUD-03: proyección con presupuesto INCREMENTAL. Estima fila a fila mientras proyecta y se detiene en cuanto supera
+        /// <paramref name="limit"/>: nunca construye entera una proyección que no va a caber (antes se proyectaba todo y después se
+        /// rechazaba). Devuelve null si no cabe; en <paramref name="bytes"/> queda la estimación alcanzada. No recorta filas: o todo o nada.
+        /// </summary>
+        public static List<Dictionary<string, object>> ProjectWithinBudget(QuerySpec spec, IReadOnlyList<Dictionary<string, object>> rows, long limit, out long bytes)
+        {
+            bytes = 24 + 8L * rows.Count;
+            if (bytes > limit) return null;                         // rechazo anticipado: ni siquiera caben las referencias
+            var list = new List<Dictionary<string, object>>(rows.Count);
             foreach (var r in rows)
             {
-                total += 80 + 32L * r.Count;                         // Dictionary<string,object>: objeto + arrays + entrada/cubo por clave
-                foreach (var v in r.Values) total += ValueBytes(v);
+                var d = ProjectRow(spec, r);
+                bytes += RowBytes(d);
+                if (bytes > limit) { list.Clear(); return null; }   // se suelta lo construido en cuanto se sabe que no cabe
+                list.Add(d);
             }
-            return total;
+            return list;
+        }
+
+        private static Dictionary<string, object> ProjectRow(QuerySpec spec, Dictionary<string, object> r)
+        {
+            var d = new Dictionary<string, object>(spec.Fields.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var f in spec.Fields)
+            {
+                if (r.TryGetValue(f, out var v)) { d[f] = v; continue; }
+                foreach (var kv in r) if (string.Equals(kv.Key, f, StringComparison.OrdinalIgnoreCase)) { d[f] = kv.Value; break; }
+            }
+            return d;
         }
 
         private static long ValueBytes(object v)
@@ -114,16 +149,7 @@ namespace PDI.RevitMcp.Engine
         public static List<Dictionary<string, object>> Project(QuerySpec spec, IReadOnlyList<Dictionary<string, object>> rows)
         {
             var list = new List<Dictionary<string, object>>(rows.Count);
-            foreach (var r in rows)
-            {
-                var d = new Dictionary<string, object>(spec.Fields.Count, StringComparer.OrdinalIgnoreCase);
-                foreach (var f in spec.Fields)
-                {
-                    if (r.TryGetValue(f, out var v)) { d[f] = v; continue; }
-                    foreach (var kv in r) if (string.Equals(kv.Key, f, StringComparison.OrdinalIgnoreCase)) { d[f] = kv.Value; break; }
-                }
-                list.Add(d);
-            }
+            foreach (var r in rows) list.Add(ProjectRow(spec, r));
             return list;
         }
 
@@ -139,9 +165,9 @@ namespace PDI.RevitMcp.Engine
             if (spec == null) throw new ArgumentNullException(nameof(spec));
             if (rows == null) throw new ArgumentNullException(nameof(rows));
             if (liveRev == null) throw new ArgumentNullException(nameof(liveRev));
-            var compact = Project(spec, rows);
-            var bytes = EstimateBytes(compact);
-            if (bytes > _maxDocBytes)
+            // AUD-03: proyección incremental con rechazo anticipado; el límite es el presupuesto por documento.
+            var compact = ProjectWithinBudget(spec, rows, _maxDocBytes, out var bytes);
+            if (compact == null)
             {
                 refusal = "el resultado ocupa ~" + Mb(bytes) + " MB estimados y supera el presupuesto de instantáneas (" + Mb(_maxDocBytes) +
                           " MB por documento): no hay cursor; acote la consulta (f=, where, group_by) o pagine sin cursor";
@@ -197,6 +223,10 @@ namespace PDI.RevitMcp.Engine
             catch (Exception) { live = long.MinValue; }   // no se puede comprobar: fail-closed
             lock (_lock)
             {
+                // AUD-02: entre el primer bloqueo y éste (LiveRev corre fuera del bloqueo) otro hilo pudo descartar la instantánea
+                // (DropSession, DropDocument, presupuesto, vencimiento). Sólo vale si sigue siendo EXACTAMENTE el mismo objeto autorizado.
+                if (!_items.TryGetValue(s.Id, out var current) || !ReferenceEquals(current, s))
+                    return _evicted.TryGetValue(s.Id, out var ev) && ev.Key == sessionId ? SnapshotLookup.Evicted : SnapshotLookup.Unknown;
                 if (live != s.Rev)
                 {
                     Remove(s.Id, null);
