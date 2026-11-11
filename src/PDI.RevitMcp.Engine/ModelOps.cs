@@ -179,6 +179,16 @@ namespace PDI.RevitMcp.Engine
             throw new QueryException("schedule_create campos: lista [\"Level\",\"Type\",…]");
         }
 
+        /// <summary>
+        /// AUD-06: ¿difiere lo leído de lo pedido? Un valor no finito (parámetro ausente leído como NaN) cuenta SIEMPRE como diferencia:
+        /// Math.Abs(NaN − x) &gt; tol es false y daba por buena una verificación que no se pudo hacer.
+        /// </summary>
+        public static bool Differs(double actual, double wanted, double tol)
+        {
+            if (double.IsNaN(actual) || double.IsInfinity(actual) || double.IsNaN(wanted) || double.IsInfinity(wanted)) return true;
+            return Math.Abs(actual - wanted) > tol;
+        }
+
         /// <summary>Tramos de muro (pares de puntos) de la polilínea, ya validada.</summary>
         public static List<(double[] A, double[] B)> WallSegments(IList<double[]> pts, bool closed)
         {

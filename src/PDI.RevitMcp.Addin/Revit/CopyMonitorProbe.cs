@@ -83,7 +83,12 @@ namespace PDI.RevitMcp.Addin.Revit
             // Identidad estable sin exponer la ruta: hash SHA-256 de la ruta (string.GetHashCode cambia entre procesos en .NET 8).
             LinkIdentity = PDI.RevitMcp.Engine.Home.Sha256Hex(ldoc.PathName ?? ldoc.Title).Substring(0, 16);
             var t = li.GetTotalTransform();
-            Transform = new LinkTransform { Dx = t.Origin.X, Dy = t.Origin.Y, Dz = t.Origin.Z, RotationDeg = Math.Atan2(t.BasisX.Y, t.BasisX.X) * 180.0 / Math.PI };
+            // AUD-11: transformación completa (rotación, reflexión, traslación); el verificador rechaza la que no pueda representar.
+            Transform = new LinkTransform
+            {
+                Dx = t.Origin.X, Dy = t.Origin.Y, Dz = t.Origin.Z, RotationDeg = Math.Atan2(t.BasisX.Y, t.BasisX.X) * 180.0 / Math.PI,
+                BasisX = new[] { t.BasisX.X, t.BasisX.Y, t.BasisX.Z }, BasisY = new[] { t.BasisY.X, t.BasisY.Y, t.BasisY.Z }, BasisZ = new[] { t.BasisZ.X, t.BasisZ.Y, t.BasisZ.Z },
+            };
 
             foreach (var e in new FilteredElementCollector(ldoc).OfCategory(bic).WhereElementIsNotElementType())
             {

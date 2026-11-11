@@ -142,7 +142,7 @@ namespace PDI.RevitMcp.Engine
               "tubería recta de inicio [x,y,z] a fin [x,y,z]; sistema = nombre del tipo de sistema de tuberías; diámetro opcional.",
               "{\"op\":\"pipe_create\",\"inicio\":[0,0,9],\"fin\":[20,0,9],\"nivel\":\"LEVEL 01\",\"sistema\":\"Domestic Cold Water\",\"diametro\":\"1 in\"}"),
             I("circuit_create", "Crear circuito eléctrico", true, true, new string[0], new[] { "panel" },
-              "circuito de fuerza con los ids (dispositivos con conector eléctrico libre y del mismo tipo de sistema). panel: nombre o id del cuadro que lo alimenta. Verifica miembros, panel, tensión y polos.",
+              "circuito de fuerza con los ids (dispositivos con conector eléctrico libre y del mismo tipo de sistema). panel: nombre o id del cuadro que lo alimenta. Verifica miembros y cuadro (BaseEquipment); NO verifica tensión, polos ni fases: si Revit los rechaza, el plan se revierte.",
               "{\"op\":\"circuit_create\",\"ids\":\"$receptaculos_101\",\"panel\":\"LP-1\"}"),
             I("schedule_create", "Crear tabla", false, true, new[] { "categoria", "campos" }, new[] { "nombre" },
               "tabla de planificación de la categoría (p. ej. LightingFixtures) con los campos en orden (nombres tal como los muestra Revit). Si un campo no existe en la categoría, la tabla no se crea (el plan se revierte) y se listan los campos posibles.",

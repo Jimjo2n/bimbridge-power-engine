@@ -190,7 +190,8 @@ namespace PDI.RevitMcp.Engine.Workflows
     {
         public static readonly HashSet<WorkflowState> Terminal = new HashSet<WorkflowState>
         {
-            WorkflowState.save_confirmed, WorkflowState.verification_failed, WorkflowState.manual_handoff, WorkflowState.cancelled,
+            // manual_handoff y verification_failed NO son terminales (AUD-08): la verificación continúa tras el traspaso o una corrección.
+            WorkflowState.save_confirmed, WorkflowState.cancelled,
         };
 
         private static readonly Dictionary<(WorkflowState, string), WorkflowState> Edges = new Dictionary<(WorkflowState, string), WorkflowState>
@@ -208,6 +209,25 @@ namespace PDI.RevitMcp.Engine.Workflows
             [(WorkflowState.finished, EvidenceKind.VerificationPassed)] = WorkflowState.verification_passed,
             [(WorkflowState.finished, EvidenceKind.VerificationFailed)] = WorkflowState.verification_failed,
             [(WorkflowState.verification_passed, EvidenceKind.SaveConfirmed)] = WorkflowState.save_confirmed,
+            // AUD-07/08: el preflight observado no cambia de estado; tras un traspaso manual la verificación continúa
+            // (el usuario hizo la copia y Finalizar en Revit; aquí sólo se puede verificar el resultado, no observar los pasos).
+            [(WorkflowState.preflight, EvidenceKind.PreflightPassed)] = WorkflowState.preflight,
+            [(WorkflowState.manual_handoff, EvidenceKind.VerificationPassed)] = WorkflowState.verification_passed,
+            [(WorkflowState.manual_handoff, EvidenceKind.VerificationFailed)] = WorkflowState.verification_failed,
+            // Re-verificar tras corregir: un fallo no es definitivo, pero nunca salta a guardado.
+            [(WorkflowState.verification_failed, EvidenceKind.VerificationPassed)] = WorkflowState.verification_passed,
+            [(WorkflowState.verification_failed, EvidenceKind.VerificationFailed)] = WorkflowState.verification_failed,
+        };
+
+        /// <summary>AUD-07: evidencias privilegiadas que sólo pueden aportar componentes autorizados (verificador o add-in), nunca el cliente.</summary>
+        public static readonly Dictionary<string, string[]> PrivilegedSources = new Dictionary<string, string[]>
+        {
+            [EvidenceKind.VerificationPassed] = new[] { "verifier" },
+            [EvidenceKind.VerificationFailed] = new[] { "verifier" },
+            [EvidenceKind.SaveConfirmed] = new[] { "verifier", "addin" },
+            [EvidenceKind.CopyObserved] = new[] { "verifier", "addin", "ui_executor" },
+            [EvidenceKind.FinishObserved] = new[] { "addin", "ui_executor" },
+            [EvidenceKind.CommandActive] = new[] { "addin", "ui_executor" },
         };
 
         /// <summary>Evidencias que exigen un nivel mínimo de prueba (no basta con "inferido").</summary>
@@ -227,6 +247,8 @@ namespace PDI.RevitMcp.Engine.Workflows
             if (r.IsTerminal) { refusal = "el intento ya terminó en " + r.State; return null; }
             if (e == null || Array.IndexOf(EvidenceKind.All, e.Kind) < 0) { refusal = "evidencia desconocida"; return null; }
             if (MinLevel.TryGetValue(e.Kind, out var min) && e.Level < min) { refusal = e.Kind + " exige nivel " + min + " (llegó " + e.Level + ")"; return null; }
+            if (PrivilegedSources.TryGetValue(e.Kind, out var allowed) && Array.IndexOf(allowed, e.Source ?? "") < 0)
+            { refusal = e.Kind + " sólo lo puede aportar " + string.Join(" o ", allowed) + " (llegó de '" + e.Source + "')"; return null; }
             if (e.Kind == EvidenceKind.Uncertain) return WorkflowState.reconciliation_required;
             if (e.Kind == EvidenceKind.Cancelled)
             {
@@ -296,39 +318,62 @@ namespace PDI.RevitMcp.Engine.Workflows
             return File.Exists(p) ? WorkflowReceipt.FromJson(Json.ParseObject(File.ReadAllText(p, Encoding.UTF8))) : null;
         }
 
+        /// <summary>Espera máxima por el bloqueo de un intento (otro proceso escribiendo el mismo recibo).</summary>
+        public TimeSpan LockWait = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// AUD-07: exclusión entre procesos por intento (archivo &lt;clave&gt;.lock abierto sin compartir). Leer-aplicar-guardar ocurre
+        /// entero bajo el bloqueo, así dos procesos no pueden pisar transiciones. Si no se obtiene a tiempo, falla cerrado.
+        /// </summary>
+        private T WithKeyLock<T>(string key, Func<T> body)
+        {
+            var lockPath = PathFor(key) + ".lock";
+            var deadline = DateTime.UtcNow + LockWait;
+            lock (_gate)
+            {
+                while (true)
+                {
+                    FileStream fs = null;
+                    try { fs = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
+                    catch (IOException) when (DateTime.UtcNow < deadline) { System.Threading.Thread.Sleep(15); continue; }
+                    catch (IOException ex) { throw new TimeoutException("el recibo " + key + " está bloqueado por otro proceso: " + ex.Message); }
+                    using (fs) return body();
+                }
+            }
+        }
+
         /// <summary>Abre (o recupera) el intento. <paramref name="created"/> = false si ya existía.</summary>
         public WorkflowReceipt Begin(string workflow, string key, WorkflowCorrelation corr, out bool created)
         {
-            lock (_gate)
+            var isNew = false;
+            var res = WithKeyLock(key, () =>
             {
                 var existing = Load(key);
                 if (existing != null)
                 {
-                    created = false;
                     if (existing.Workflow != workflow) throw new InvalidOperationException("la clave de intento pertenece a otro flujo (" + existing.Workflow + ")");
                     if (!string.Equals(existing.Correlation.DocumentIdentity, corr?.DocumentIdentity, StringComparison.Ordinal))
                         throw new InvalidOperationException("la clave de intento pertenece a otro documento: cambio de destino rechazado");
                     return existing;
                 }
-                created = true;
+                isNew = true;
                 var r = new WorkflowReceipt { Workflow = workflow, AttemptKey = key, Correlation = corr ?? new WorkflowCorrelation(), CreatedUtc = DateTime.UtcNow };
                 Save(r);
                 return r;
-            }
+            });
+            created = isNew;
+            return res;
         }
 
-        public WorkflowReceipt Record(string key, Evidence e)
+        public WorkflowReceipt Record(string key, Evidence e) => WithKeyLock(key, () =>
         {
-            lock (_gate)
-            {
-                var r = Load(key) ?? throw new InvalidOperationException("no existe el intento " + key);
-                WorkflowMachine.Apply(r, e);
-                Save(r);
-                return r;
-            }
-        }
+            var r = Load(key) ?? throw new InvalidOperationException("no existe el intento " + key);
+            WorkflowMachine.Apply(r, e);
+            Save(r);
+            return r;
+        });
 
-        public void Save(WorkflowReceipt r)
+        private void Save(WorkflowReceipt r)
         {
             var p = PathFor(r.AttemptKey);
             var tmp = p + ".tmp";

@@ -840,12 +840,25 @@ namespace PDI.RevitMcp.Engine
             Array.Copy(all, keepBytes, dropped, 0, dropped.Length);
             try
             {
-                File.WriteAllBytes(dest, dropped);
+                // AUD-10: el fragmento debe ser durable y legible ANTES de truncar el diario. Se escribe con WriteThrough + fsync en un
+                // temporal, se relee y compara byte a byte, y sólo entonces se renombra. Si algo falla, no se trunca nada.
+                var tmp = dest + ".tmp";
+                using (var fw = new FileStream(tmp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+                {
+                    fw.Write(dropped, 0, dropped.Length);
+                    fw.Flush(true);
+                }
+                Crash("reparacion_tras_fragmento_tmp");
+                var back = File.ReadAllBytes(tmp);
+                if (back.Length != dropped.Length || !back.SequenceEqual(dropped)) { File.Delete(tmp); return false; }
+                File.Move(tmp, dest);
+                Crash("reparacion_antes_truncar");
                 using (var fs = new FileStream(_path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.WriteThrough))
                 {
                     fs.SetLength(keepBytes);
                     fs.Flush(true);
                 }
+                Crash("reparacion_tras_truncar");
                 var lastHash = keep == 0 ? "" : hashes[keep - 1];
                 Home.WriteAtomic(hp, Json.Write(new Dictionary<string, object> { ["seq"] = (long)keep, ["ultimo"] = lastHash, ["longitud"] = keepBytes }));
                 _prev = lastHash; _seq = keep; _knownLength = keepBytes;

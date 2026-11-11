@@ -32,16 +32,60 @@ namespace PDI.RevitMcp.Engine.Workflows
         public List<long> MonitoredLinkInstances = new List<long>();
     }
 
-    /// <summary>Transformación del vínculo en planta (rotación alrededor de Z + traslación), como la da RevitLinkInstance.GetTotalTransform().</summary>
+    /// <summary>
+    /// AUD-11: transformación completa del vínculo (RevitLinkInstance.GetTotalTransform(): BasisX/Y/Z + Origin). Admite rotación,
+    /// traslación y reflexión. Si no se dan las bases se derivan de <see cref="RotationDeg"/> (rotación en planta).
+    /// Sólo se representan transformaciones ortonormales con BasisZ = ±Z (vínculo no inclinado): el resto se RECHAZA, porque la
+    /// orientación en planta de un aparato no tiene un equivalente único.
+    /// </summary>
     public sealed class LinkTransform
     {
         public double Dx, Dy, Dz, RotationDeg;
+        public double[] BasisX, BasisY, BasisZ;
         public static LinkTransform Identity => new LinkTransform();
+
+        private double[] Bx => BasisX ?? new[] { Math.Cos(RotationDeg * Math.PI / 180.0), Math.Sin(RotationDeg * Math.PI / 180.0), 0.0 };
+        private double[] By => BasisY ?? new[] { -Math.Sin(RotationDeg * Math.PI / 180.0), Math.Cos(RotationDeg * Math.PI / 180.0), 0.0 };
+        private double[] Bz => BasisZ ?? new[] { 0.0, 0.0, 1.0 };
 
         public (double X, double Y, double Z) Apply(double x, double y, double z)
         {
-            var r = RotationDeg * Math.PI / 180.0;
-            return (x * Math.Cos(r) - y * Math.Sin(r) + Dx, x * Math.Sin(r) + y * Math.Cos(r) + Dy, z + Dz);
+            double[] a = Bx, b = By, c = Bz;
+            return (a[0] * x + b[0] * y + c[0] * z + Dx, a[1] * x + b[1] * y + c[1] * z + Dy, a[2] * x + b[2] * y + c[2] * z + Dz);
+        }
+
+        /// <summary>Determinante &lt; 0: el vínculo está reflejado (espejo).</summary>
+        public bool Mirrored
+        {
+            get
+            {
+                double[] a = Bx, b = By, c = Bz;
+                return a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]) < 0;
+            }
+        }
+
+        /// <summary>null si se puede representar; si no, el motivo.</summary>
+        public string Unsupported()
+        {
+            double[] a = Bx, b = By, c = Bz;
+            foreach (var v in new[] { a, b, c, new[] { Dx, Dy, Dz } })
+                if (v == null || v.Length != 3 || v.Any(d => double.IsNaN(d) || double.IsInfinity(d))) return "transformación con valores no finitos";
+            double Dot(double[] u, double[] w) => u[0] * w[0] + u[1] * w[1] + u[2] * w[2];
+            const double eps = 1e-6;
+            if (Math.Abs(Dot(a, a) - 1) > eps || Math.Abs(Dot(b, b) - 1) > eps || Math.Abs(Dot(c, c) - 1) > eps) return "transformación con escala (no ortonormal)";
+            if (Math.Abs(Dot(a, b)) > eps || Math.Abs(Dot(a, c)) > eps || Math.Abs(Dot(b, c)) > eps) return "transformación con cizalla (no ortogonal)";
+            if (Math.Abs(Math.Abs(c[2]) - 1) > eps) return "vínculo inclinado (BasisZ no vertical): la orientación en planta no se puede comparar";
+            return null;
+        }
+
+        /// <summary>Ángulo en planta (grados) que tendrá en el anfitrión un elemento girado <paramref name="deg"/> en el vínculo.</summary>
+        public double RotateAngle(double deg)
+        {
+            var r = deg * Math.PI / 180.0;
+            double[] a = Bx, b = By;
+            var hx = a[0] * Math.Cos(r) + b[0] * Math.Sin(r);
+            var hy = a[1] * Math.Cos(r) + b[1] * Math.Sin(r);
+            return Math.Atan2(hy, hx) * 180.0 / Math.PI;
         }
     }
 
@@ -70,6 +114,9 @@ namespace PDI.RevitMcp.Engine.Workflows
                                                         double tol = DefaultTolerance, double angTol = DefaultAngleTolerance)
         {
             tf = tf ?? LinkTransform.Identity;
+            var unsupported = tf.Unsupported();
+            if (unsupported != null)
+                return new Dictionary<string, object> { ["resultado"] = "no_verificable", ["motivo"] = unsupported, ["origen"] = (long)(source?.Count ?? 0) };
             var maps = (mappings ?? new List<TypeMapping>()).ToDictionary(m => m.Source, StringComparer.OrdinalIgnoreCase);
             var before = new HashSet<long>((hostBefore ?? new List<HostFixture>()).Select(h => h.Id));
             var created = (hostAfter ?? new List<HostFixture>()).Where(h => !before.Contains(h.Id)).ToList();
@@ -91,7 +138,7 @@ namespace PDI.RevitMcp.Engine.Workflows
                 expected++;
                 var want = map?.Target ?? sk;
                 var p = tf.Apply(s.X, s.Y, s.Z);
-                var wantRot = Norm(s.RotationDeg + tf.RotationDeg);
+                var wantRot = Norm(tf.RotateAngle(s.RotationDeg));
                 double D(HostFixture h) => Math.Sqrt((h.X - p.X) * (h.X - p.X) + (h.Y - p.Y) * (h.Y - p.Y) + (h.Z - p.Z) * (h.Z - p.Z));
 
                 var near = free.Where(h => D(h) <= tol).OrderBy(D).ToList();
@@ -129,6 +176,17 @@ namespace PDI.RevitMcp.Engine.Workflows
             {
                 ["resultado"] = passed ? "verificado" : "fallido",
                 ["nivel_prueba_correspondencia"] = "inferred",   // emparejado por tipo y posición, no por id de origen
+                // AUD-08: cada dimensión por separado. Este verificador NO observa el comando, el final del workflow ni el guardado.
+                ["dimensiones"] = new Dictionary<string, object>
+                {
+                    ["consistencia_geometrica"] = (long)(matched.Count + unmonitored.Count),
+                    ["supervision_al_vinculo"] = (long)matched.Count,
+                    ["correspondencia_individual_origen"] = "no_demostrada: inferida por tipo y posición",
+                    ["comando_iniciado"] = "fuera_del_verificador (recibo del flujo)",
+                    ["workflow_finalizado"] = "fuera_del_verificador (recibo del flujo)",
+                    ["guardado_confirmado"] = "fuera_del_verificador (recibo del flujo)",
+                },
+                ["vinculo_reflejado"] = tf.Mirrored,
                 ["origen"] = (long)source.Count, ["esperados"] = (long)expected, ["creados"] = (long)created.Count,
                 ["origen_por_tipo"] = bySource, ["creados_por_tipo"] = byHost,
                 ["correctos"] = Bucket(matched), ["ausentes"] = Bucket(missing), ["tipo_incorrecto"] = Bucket(wrongType),

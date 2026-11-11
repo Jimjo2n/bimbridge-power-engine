@@ -254,6 +254,33 @@ namespace PDI.RevitMcp.Tests
             Assert.Single(b.Quarantined);                                                    // la detección de manipulación se conserva
         }
 
+        [Theory]
+        [InlineData("reparacion_tras_fragmento_tmp")]
+        [InlineData("reparacion_antes_truncar")]
+        [InlineData("reparacion_tras_truncar")]
+        public void TailRepair_CrashAtAnyStep_NeverLosesTheFragmentOrConfirmedRecords(string point)
+        {
+            // AUD-10: el fragmento apartado es durable antes de truncar; una caída en cualquier paso deja el diario recuperable.
+            var p = NewAudit();
+            var a = new AuditLog(p);
+            for (var i = 0; i < 3; i++) a.Append("s", "op" + i, "ok");
+            var b = new AuditLog(p) { CrashPoint = x => x == point };
+            var torn = System.Text.Encoding.UTF8.GetBytes("{\"seq\":4,\"cortado");
+            using (var f = new FileStream(p, FileMode.Append)) f.Write(torn, 0, torn.Length);
+            Assert.Throws<AuditCrashException>(() => b.Append("s", "op3", "ok"));
+            var frags = Directory.GetFiles(Path.GetDirectoryName(p), Path.GetFileName(p) + ".fragmento-*").Where(f => !f.EndsWith(".tmp", StringComparison.Ordinal)).ToList();
+            if (point != "reparacion_tras_fragmento_tmp")
+                Assert.Contains(frags, f => File.ReadAllBytes(f).SequenceEqual(torn));   // el fragmento existe y es íntegro
+            if (point != "reparacion_tras_truncar")
+                Assert.EndsWith("cortado", File.ReadAllText(p));                     // sin fragmento confirmado no se trunca nada
+            var c = new AuditLog(p);                                                   // reapertura: repara y sigue
+            c.Append("s", "op3", "ok");
+            Assert.Empty(c.Quarantined);
+            var v = AuditLog.Verify(p);
+            Assert.True(v.Ok, string.Join("; ", v.Errors));
+            Assert.Contains("\"op2\"", File.ReadAllText(p));                           // los confirmados siguen ahí
+        }
+
         [Fact]
         public void EditedConfirmedRecord_IsStillQuarantined()
         {

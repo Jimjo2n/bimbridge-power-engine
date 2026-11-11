@@ -44,6 +44,20 @@ namespace PDI.RevitMcp.Addin.Revit
             if (probe.Error != null) return Response.Fail(request.Id, Status.Invalido, probe.Error);
 
             var setName = "cm_antes_" + probe.LinkInstanceId.ToString(CultureInfo.InvariantCulture);
+
+            // AUD-07: recibo persistente del intento (idempotente por documento + vínculo + clave del cliente), compartido entre procesos.
+            var store = new ReceiptStore(System.IO.Path.Combine(Home.Root, "flujos"));
+            var attemptKey = WorkflowReceipt.KeyFor(NativeCapabilities.CopyMonitorFixtures, probe.DocumentIdentity, probe.LinkIdentity, Arg.GetString(request.Args, "clave") ?? "predeterminada");
+            var c = Correlation.Current;
+            var corr = new WorkflowCorrelation
+            {
+                AgentId = c?.AgentId, SessionId = c?.SessionId ?? session.Id, RequestId = c?.RequestId, TraceId = c?.TraceId, JobId = c?.JobId,
+                DocumentIdentity = probe.DocumentIdentity, LinkIdentity = probe.LinkIdentity, RevitVersion = probe.RevitVersion, ProductBuild = _addinVersion,
+            };
+            Evidence Ev(string kind, ProofLevel lvl, string source, string detail) => new Evidence { Kind = kind, Level = lvl, Source = source, Detail = detail, AtUtc = DateTime.UtcNow };
+            WorkflowReceipt receipt;
+            try { receipt = phase == "preflight" ? store.Begin(NativeCapabilities.CopyMonitorFixtures, attemptKey, corr, out _) : store.Load(attemptKey); }
+            catch (Exception ex) when (ex is InvalidOperationException || ex is TimeoutException) { return Response.Fail(request.Id, Status.Conflicto, "copy_monitor: " + ex.Message); }
             var datos = new Dictionary<string, object>
             {
                 ["vinculo"] = probe.LinkName, ["vinculo_id"] = probe.LinkInstanceId,
@@ -71,7 +85,14 @@ namespace PDI.RevitMcp.Addin.Revit
                 }
                 datos["pasos_manuales"] = NativeCapabilities.CopyMonitorManualSteps(probe.LinkName,
                     maps.Where(x => !x.Excluded).Select(x => x.Source + " → " + x.Target).Concat(maps.Where(x => x.Excluded).Select(x => x.Source + " → no copiar")), false).Cast<object>().ToList();
-                datos["siguiente"] = "tras Finalizar en Revit: check name=copy_monitor vinculo=" + probe.LinkInstanceId + " fase=verificar (mismo mapeo/excluir)";
+                datos["siguiente"] = "tras Finalizar en Revit: check name=copy_monitor vinculo=" + probe.LinkInstanceId + " fase=verificar (mismo mapeo/excluir y clave)";
+                if (receipt.State == WorkflowState.preflight)
+                {
+                    receipt = store.Record(attemptKey, Ev(EvidenceKind.PreflightPassed, ProofLevel.observed, "addin", probe.Source.Count + " aparatos de origen"));
+                    // Este add-in no tiene ejecutor de UI: el camino veraz es el traspaso manual (nunca re-PostCommand).
+                    receipt = store.Record(attemptKey, Ev(EvidenceKind.NoUiExecutor, ProofLevel.observed, "addin", "sin ejecutor de UI autorizado"));
+                }
+                else datos["aviso_intento"] = "el intento ya existe en " + receipt.State + ": no se repite; continúe con fase=verificar o use otra clave";
             }
             else
             {
@@ -81,8 +102,25 @@ namespace PDI.RevitMcp.Addin.Revit
                 var hostBefore = probe.Host.Where(h => beforeSet.Contains(h.Id)).ToList();
                 var report = CopyMonitorVerifier.Verify(probe.Source, hostBefore, probe.Host, probe.Transform, maps, probe.LinkInstanceId);
                 foreach (var kv in report) datos[kv.Key] = kv.Value;
+                if (receipt == null) datos["aviso_intento"] = "no hay recibo de este intento (preflight en otro equipo o con otra clave): verificación sin registrar";
+                else
+                {
+                    var res = Arg.GetString(report, "resultado");
+                    if (res == "verificado" || res == "fallido")
+                    {
+                        var kind = res == "verificado" ? EvidenceKind.VerificationPassed : EvidenceKind.VerificationFailed;
+                        try
+                        {
+                            if (WorkflowMachine.Next(receipt, Ev(kind, ProofLevel.verified, "verifier", res), out var why) != null)
+                                receipt = store.Record(attemptKey, Ev(kind, ProofLevel.verified, "verifier", res));
+                            else datos["aviso_intento"] = why;
+                        }
+                        catch (Exception ex) when (ex is InvalidOperationException || ex is TimeoutException) { datos["aviso_intento"] = ex.Message; }
+                    }
+                }
                 datos["nota"] = "relación origen→copia inferida por tipo y posición: GetMonitoredLinkElementIds devuelve instancias de vínculo, no aparatos de origen";
             }
+            if (receipt != null) datos["recibo"] = new Dictionary<string, object> { ["clave_intento"] = attemptKey, ["estado"] = receipt.State.ToString(), ["prueba"] = receipt.Proof.ToString() };
             datos["ms"] = sw.ElapsedMilliseconds;
             return new Response { Id = request.Id, Rev = probe.Rev, Datos = datos };
         }

@@ -17,8 +17,12 @@ namespace PDI.RevitMcp.Tests
         private readonly string _dir = Path.Combine(Path.GetTempPath(), "bb_wf_" + Guid.NewGuid().ToString("N"));
         public void Dispose() { try { Directory.Delete(_dir, true); } catch (IOException) { } }
 
-        private static Evidence Ev(string kind, ProofLevel lvl = ProofLevel.observed, string detail = null) =>
-            new Evidence { Kind = kind, Level = lvl, Source = "test", Detail = detail, AtUtc = DateTime.UtcNow };
+        private static Evidence Ev(string kind, ProofLevel lvl = ProofLevel.observed, string detail = null, string source = null) =>
+            new Evidence
+            {
+                Kind = kind, Level = lvl, Detail = detail, AtUtc = DateTime.UtcNow,
+                Source = source ?? (WorkflowMachine.PrivilegedSources.TryGetValue(kind, out var s) ? s[0] : "client"),
+            };
 
         private static WorkflowCorrelation Corr(string doc = "doc-A") => new WorkflowCorrelation { AgentId = "a1", SessionId = "s1", RequestId = "r1", TraceId = "t1", JobId = "j1", DocumentIdentity = doc, LinkIdentity = "link-1", RevitVersion = "2026" };
 
@@ -139,11 +143,49 @@ namespace PDI.RevitMcp.Tests
             st.Begin("copy_monitor_fixtures", k2, Corr(), out _);
             File.WriteAllText(Path.Combine(_dir, "roto.json"), "{no es json");
             var open = st.Open(out var unreadable);
-            Assert.Equal(new[] { k2 }, open.Select(r => r.AttemptKey).ToArray());
+            // AUD-08: el traspaso manual queda abierto, pendiente de la verificación posterior.
+            Assert.Equal(new[] { k1, k2 }.OrderBy(x => x), open.Select(r => r.AttemptKey).OrderBy(x => x));
             Assert.Single(unreadable);
             var steps = NativeCapabilities.CopyMonitorManualSteps("MEP-LINK", new[] { "WC-A → WC-B" }, saveAuthorized: false);
             Assert.Contains(steps, s => s.Contains("Copia por lotes"));
             Assert.Contains(steps, s => s.Contains("No guarde"));
+        }
+
+        [Fact]
+        public void PrivilegedEvidence_OnlyFromAuthorizedComponents_AndVerificationContinuesAfterManualHandoff()
+        {
+            var st = Store();
+            var key = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "priv");
+            st.Begin("copy_monitor_fixtures", key, Corr(), out _);
+            st.Record(key, Ev(EvidenceKind.PreflightPassed));
+            st.Record(key, Ev(EvidenceKind.NoUiExecutor));
+            // Un cliente no puede declarar la verificación ni el guardado.
+            Assert.Throws<InvalidOperationException>(() => st.Record(key, Ev(EvidenceKind.VerificationPassed, ProofLevel.verified, source: "client")));
+            Assert.Throws<InvalidOperationException>(() => st.Record(key, Ev(EvidenceKind.SaveConfirmed, ProofLevel.verified, source: "client")));
+            // Tras el traspaso manual (y una reconexión: otra instancia del almacén), el verificador continúa.
+            var again = new ReceiptStore(_dir);
+            Assert.Equal(WorkflowState.verification_failed, again.Record(key, Ev(EvidenceKind.VerificationFailed, ProofLevel.verified)).State);
+            Assert.Equal(WorkflowState.verification_passed, again.Record(key, Ev(EvidenceKind.VerificationPassed, ProofLevel.verified)).State);
+            Assert.Equal(WorkflowState.save_confirmed, again.Record(key, Ev(EvidenceKind.SaveConfirmed, ProofLevel.verified)).State);
+        }
+
+        [Fact]
+        public void ConcurrentWriters_DoNotLoseTransitions_AndAHeldLockFailsClosed()
+        {
+            var key = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "conc");
+            Store().Begin("copy_monitor_fixtures", key, Corr(), out _);
+            // Dos "procesos" (almacenes independientes) aportan preflights a la vez: ninguna transición se pierde.
+            var tasks = Enumerable.Range(0, 2).Select(_ => System.Threading.Tasks.Task.Run(() =>
+            {
+                var s = new ReceiptStore(_dir);
+                for (var i = 0; i < 20; i++) s.Record(key, Ev(EvidenceKind.PreflightPassed));
+            })).ToArray();
+            System.Threading.Tasks.Task.WaitAll(tasks);
+            Assert.Equal(40, Store().Load(key).History.Count);
+
+            var held = new ReceiptStore(_dir) { LockWait = TimeSpan.FromMilliseconds(200) };
+            using (new FileStream(Path.Combine(_dir, key + ".json.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+                Assert.Throws<TimeoutException>(() => held.Record(key, Ev(EvidenceKind.PreflightPassed)));
         }
 
         // ------------------------------------------------------------------ #23 matriz de capacidades
@@ -247,7 +289,7 @@ namespace PDI.RevitMcp.Tests
                 var p = tf.Apply(s.X, s.Y, s.Z);
                 var k = type?.Invoke(s) ?? (s.Family + ": " + s.Type);
                 var parts = k.Split(new[] { ": " }, StringSplitOptions.None);
-                return new HostFixture { Id = id++, Category = s.Category, Family = parts[0], Type = parts[1], Level = s.Level, X = p.X, Y = p.Y, Z = p.Z, RotationDeg = s.RotationDeg + tf.RotationDeg, Monitoring = true, MonitoredLinkInstances = new List<long> { link } };
+                return new HostFixture { Id = id++, Category = s.Category, Family = parts[0], Type = parts[1], Level = s.Level, X = p.X, Y = p.Y, Z = p.Z, RotationDeg = tf.RotateAngle(s.RotationDeg), Monitoring = true, MonitoredLinkInstances = new List<long> { link } };
             }).ToList();
         }
 
@@ -263,6 +305,38 @@ namespace PDI.RevitMcp.Tests
                 Assert.Equal(88L, ((Dictionary<string, object>)r["correctos"])["n"]);
                 Assert.Equal("inferred", r["nivel_prueba_correspondencia"]);
             }
+        }
+
+        [Fact]
+        public void MirroredLink_IsHandled_AndUnrepresentableTransformsAreRejected()
+        {
+            // AUD-11: reflexión X → −X con traslación.
+            var src = Synthetic88();
+            var mirror = new LinkTransform { Dx = 10, Dy = 5, BasisX = new[] { -1.0, 0, 0 }, BasisY = new[] { 0.0, 1, 0 }, BasisZ = new[] { 0.0, 0, 1 } };
+            Assert.True(mirror.Mirrored);
+            var r = CopyMonitorVerifier.Verify(src, null, PerfectCopy(src, mirror, 77), mirror, null, 77);
+            Assert.Equal("verificado", r["resultado"]);
+            Assert.Equal(true, r["vinculo_reflejado"]);
+            // Copiado como si no hubiera reflexión: posiciones mal.
+            var naive = PerfectCopy(src, new LinkTransform { Dx = 10, Dy = 5 }, 77);
+            Assert.Equal("fallido", CopyMonitorVerifier.Verify(src, null, naive, mirror, null, 77)["resultado"]);
+
+            var tilted = new LinkTransform { BasisX = new[] { 1.0, 0, 0 }, BasisY = new[] { 0.0, Math.Cos(0.3), Math.Sin(0.3) }, BasisZ = new[] { 0.0, -Math.Sin(0.3), Math.Cos(0.3) } };
+            Assert.Equal("no_verificable", CopyMonitorVerifier.Verify(src, null, new List<HostFixture>(), tilted, null, 77)["resultado"]);
+            var scaled = new LinkTransform { BasisX = new[] { 2.0, 0, 0 }, BasisY = new[] { 0.0, 1, 0 }, BasisZ = new[] { 0.0, 0, 1 } };
+            Assert.Contains("escala", (string)CopyMonitorVerifier.Verify(src, null, new List<HostFixture>(), scaled, null, 77)["motivo"]);
+        }
+
+        [Fact]
+        public void Report_SeparatesGeometryMonitoringAndIndividualCorrespondence()
+        {
+            var src = Synthetic88();
+            var host = PerfectCopy(src, LinkTransform.Identity, 77);
+            host[0].Monitoring = false;
+            var d = (Dictionary<string, object>)CopyMonitorVerifier.Verify(src, null, host, null, null, 77)["dimensiones"];
+            Assert.Equal(88L, d["consistencia_geometrica"]);
+            Assert.Equal(87L, d["supervision_al_vinculo"]);
+            Assert.StartsWith("no_demostrada", (string)d["correspondencia_individual_origen"]);
         }
 
         [Fact]

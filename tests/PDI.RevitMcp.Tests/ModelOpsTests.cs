@@ -119,6 +119,18 @@ namespace PDI.RevitMcp.Tests
         }
 
         [Fact]
+        public void Differs_TreatsNonFiniteValuesAsAMismatch()
+        {
+            // AUD-06: un parámetro ausente leído como NaN no puede pasar la verificación.
+            Assert.True(ModelOps.Differs(double.NaN, 10, 1e-5));
+            Assert.True(ModelOps.Differs(10, double.NaN, 1e-5));
+            Assert.True(ModelOps.Differs(double.PositiveInfinity, 10, 1e-5));
+            Assert.True(ModelOps.Differs(10.001, 10, 1e-5));
+            Assert.False(ModelOps.Differs(10.000001, 10, 1e-5));
+            Assert.DoesNotContain("tensión y polos.", OpCatalog.ByKind["circuit_create"].Help);
+        }
+
+        [Fact]
         public void WallSegments_OpenAndClosed()
         {
             var pts = new List<double[]> { new[] { 0.0, 0 }, new[] { 10.0, 0 }, new[] { 10.0, 5 } };

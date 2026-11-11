@@ -227,7 +227,7 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 case "level_create":
                 {
                     var l = (Level)e;
-                    if (Math.Abs(l.Elevation - WriteKit.D(t, "elev")) > Tol) return "elevación " + l.Elevation + " ft, se pidió " + WriteKit.D(t, "elev");
+                    if (ModelOps.Differs(l.Elevation, WriteKit.D(t, "elev"), Tol)) return "elevación " + l.Elevation + " ft, se pidió " + WriteKit.D(t, "elev");
                     var n = WriteKit.S(t, "nombre");
                     return n != null && l.Name != n ? "nombre '" + l.Name + "'" : null;
                 }
@@ -249,18 +249,23 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                     if (!SameLine(flat, p[0], p[1])) return "los extremos no coinciden";
                     if (t.ContainsKey("nivel_superior"))
                         return w.get_Parameter(BuiltInParameter.WALL_HEIGHT_TYPE)?.AsElementId() == Ids.ToId(WriteKit.L(t, "nivel_superior")) ? null : "no quedó restringido al nivel superior";
-                    var h = w.get_Parameter(BuiltInParameter.WALL_USER_HEIGHT_PARAM)?.AsDouble() ?? double.NaN;
-                    return Math.Abs(h - WriteKit.D(t, "altura")) > Tol ? "altura " + h + " ft" : null;
+                    var hp = w.get_Parameter(BuiltInParameter.WALL_USER_HEIGHT_PARAM);
+                    if (hp == null || !hp.HasValue) return "no se pudo leer la altura (parámetro ausente)";
+                    var h = hp.AsDouble();
+                    return ModelOps.Differs(h, WriteKit.D(t, "altura"), Tol) ? "altura " + h + " ft" : null;
                 }
                 case "floor_create":
                 case "ceiling_create":
                 {
                     if (e.LevelId != Ids.ToId(WriteKit.L(t, "nivel"))) return "nivel distinto";
                     var bip = m.Kind == "floor_create" ? BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM : BuiltInParameter.CEILING_HEIGHTABOVELEVEL_PARAM;
-                    var off = e.get_Parameter(bip)?.AsDouble();
-                    if (off.HasValue && Math.Abs(off.Value - WriteKit.D(t, "desfase", 0)) > Tol) return "altura sobre el nivel " + off.Value + " ft";
-                    var area = e.get_Parameter(BuiltInParameter.HOST_AREA_COMPUTED)?.AsDouble() ?? 0;
-                    return area > 0 ? null : "sin área";
+                    var op = e.get_Parameter(bip);
+                    if (op == null || !op.HasValue) return "no se pudo leer la altura sobre el nivel (parámetro ausente)";
+                    if (ModelOps.Differs(op.AsDouble(), WriteKit.D(t, "desfase", 0), Tol)) return "altura sobre el nivel " + op.AsDouble() + " ft";
+                    var ap = e.get_Parameter(BuiltInParameter.HOST_AREA_COMPUTED);
+                    if (ap == null || !ap.HasValue) return "no se pudo leer el área (parámetro ausente)";
+                    var area = ap.AsDouble();
+                    return !double.IsNaN(area) && !double.IsInfinity(area) && area > 0 ? null : "sin área";
                 }
                 case "room_create":
                 {
@@ -276,8 +281,10 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                     foreach (var (k, bip) in SizeParams(m.Kind))
                     {
                         if (!t.ContainsKey(k)) continue;
-                        var v = e.get_Parameter(bip)?.AsDouble() ?? double.NaN;
-                        if (Math.Abs(v - WriteKit.D(t, k)) > Tol) return k + " " + v + " ft (Revit lo ajustó a un tamaño del tipo)";
+                        var sp = e.get_Parameter(bip);
+                        if (sp == null || !sp.HasValue) return "no se pudo leer " + k + " (parámetro ausente)";
+                        var v = sp.AsDouble();
+                        if (ModelOps.Differs(v, WriteKit.D(t, k), Tol)) return k + " " + v + " ft (Revit lo ajustó a un tamaño del tipo)";
                     }
                     return null;
                 }

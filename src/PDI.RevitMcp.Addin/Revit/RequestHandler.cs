@@ -973,7 +973,20 @@ namespace PDI.RevitMcp.Addin.Revit
                 datos["marca_cambios_sin_guardar_perdida"] = true;
                 advice = "ATENCIÓN: el documento tenía cambios sin guardar y, al revertir, Revit dejó de marcarlo como modificado; esos cambios siguen sin guardar. " + advice;
             }
-            return new Response { Id = request.Id, Estado = MapStatus(plan.Status), Rev = rev, Datos = datos, Aviso = advice };
+            var estado = MapStatus(plan.Status);
+            if (plan.Status == PlanStatus.Aplicado)
+            {
+                // AUD-09: commit confirmado ≠ postcondiciones cumplidas.
+                var post = PlanVerification.Postconditions(plan.Verification);
+                datos["commit"] = "confirmado";
+                datos["postcondiciones"] = post;
+                if (post != PlanVerification.Met)
+                {
+                    estado = Status.ConDiferencias;
+                    advice = "Se aplicó (commit confirmado), pero la relectura no coincide con lo pedido o no se pudo verificar: revise 'verificacion'. " + advice;
+                }
+            }
+            return new Response { Id = request.Id, Estado = estado, Rev = rev, Datos = datos, Aviso = advice };
         }
 
         /// <summary>Cierra la intención de auditoría. Si falla, la intención queda pendiente y PendingIntents la reporta para reconciliar.</summary>

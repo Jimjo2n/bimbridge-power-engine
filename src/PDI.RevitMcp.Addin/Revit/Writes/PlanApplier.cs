@@ -432,7 +432,7 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 result["ops_sin_creacion_esperada"] = missingCreations;
                 result["borrados_que_persisten"] = missingDeletes;
                 result["ok"] = TrialGuard.FunctionalSuccess((int)(Arg.GetLong(result, "releidos") ?? 0),
-                    result.ContainsKey("distintos") || missingDeletes.Count > 0, _skipped.Count > 0,
+                    PlanVerification.Postconditions(result) != PlanVerification.Met || missingDeletes.Count > 0, _skipped.Count > 0,
                     expectedCreations, verifiedCreations, missingCreations.Count > 0 || verifiedCreations != surviving.Count);
                 return result;
             }
