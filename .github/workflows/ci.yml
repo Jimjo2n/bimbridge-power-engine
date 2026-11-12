@@ -1,12 +1,15 @@
 name: Windows distribution
 on:
+  # Saves CI minutes: work branches are validated by pull_request; push runs only on main (avoids two runs per SHA).
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: windows-build-${{ github.ref }}
+  # A new push to the same PR cancels the obsolete run.
+  group: windows-build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
   windows-build:
