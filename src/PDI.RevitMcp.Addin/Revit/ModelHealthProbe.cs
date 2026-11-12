@@ -22,6 +22,15 @@ namespace PDI.RevitMcp.Addin.Revit
         private int _phase;
         private List<ElementId> _ids;
         private int _next;
+        private IList<FailureMessage> _rawWarnings;
+        private int _nextWarning, _nextSheet, _nextView;
+        private List<ElementId> _sheetIds, _viewIds;
+        private readonly HashSet<long> _onSheet = new HashSet<long>();
+
+        /// <summary>Límites para modelos grandes: lo que excede se informa como truncado, nunca se omite en silencio.</summary>
+        public const int MaxWarnings = 20000, MaxElements = 150000, MaxSheets = 5000, MaxViews = 20000;
+        public int WarningsTotal, ElementsTotal, SheetsTotal, ViewsTotal;
+        public int Slices;
 
         public readonly List<ModelHealth.Warning> Warnings = new List<ModelHealth.Warning>();
         public readonly List<ModelHealth.Element> Elements = new List<ModelHealth.Element>();
@@ -58,15 +67,36 @@ namespace PDI.RevitMcp.Addin.Revit
             if (doc == null) { Error = docError; return true; }
             if (doc.IsFamilyDocument) { Error = Status.NoSoportado + ": model_health revisa proyectos"; return true; }
             var deadline = sw.ElapsedMilliseconds + budgetMs;
+            // AUD-17: ninguna fase hace un trabajo proporcional al modelo sin mirar el presupuesto. Las llamadas indivisibles de Revit
+            // (GetWarnings, un colector de ids) van solas en su tramo y se cede el hilo después; lo demás se trocea y se limita.
             if (_phase == 0)
             {
                 Rev = tracker.For(doc)?.Rev ?? 0;
-                foreach (var w in doc.GetWarnings())
-                    Warnings.Add(new ModelHealth.Warning { Description = w.GetDescriptionText(), Severity = w.GetSeverity().ToString(), Ids = w.GetFailingElements().Select(Ids.ToLong).ToList() });
+                _rawWarnings = doc.GetWarnings();          // una llamada de Revit; no se puede trocear
+                WarningsTotal = _rawWarnings.Count;
+                _phase = -1;
+                return false;                              // ceder el hilo antes de procesarlos
+            }
+            if (_phase == -1)
+            {
+                for (; _nextWarning < _rawWarnings.Count && _nextWarning < MaxWarnings; _nextWarning++)
+                {
+                    if ((_nextWarning & 31) == 0 && sw.ElapsedMilliseconds >= deadline) return false;
+                    var w = _rawWarnings[_nextWarning];
+                    Warnings.Add(new ModelHealth.Warning { Description = w.GetDescriptionText(), Severity = w.GetSeverity().ToString(), Ids = w.GetFailingElements().Take(50).Select(Ids.ToLong).ToList() });
+                }
+                _rawWarnings = null;
+                _phase = -2;
+                return false;
+            }
+            if (_phase == -2)
+            {
                 var filter = new ElementMulticategoryFilter(_cats.ToList());
-                _ids = new FilteredElementCollector(doc).WherePasses(filter).WhereElementIsNotElementType().ToElementIds().ToList();
+                _ids = new FilteredElementCollector(doc).WherePasses(filter).WhereElementIsNotElementType().ToElementIds().ToList();   // sólo ids: no expande elementos
+                ElementsTotal = _ids.Count;
+                if (_ids.Count > MaxElements) _ids.RemoveRange(MaxElements, _ids.Count - MaxElements);
                 _phase = 1;
-                if (sw.ElapsedMilliseconds >= deadline) return false;
+                return false;
             }
             if (_phase == 1)
             {
@@ -103,27 +133,62 @@ namespace PDI.RevitMcp.Addin.Revit
             }
             if (_phase == 2)
             {
-                var onSheet = new HashSet<long>();
-                foreach (var s in new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>())
+                // Ids de láminas y vistas y tablas por lámina en UNA pasada (antes: un colector por lámina).
+                _sheetIds = new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).ToElementIds().ToList();
+                _viewIds = new FilteredElementCollector(doc).OfClass(typeof(View)).ToElementIds().ToList();
+                SheetsTotal = _sheetIds.Count; ViewsTotal = _viewIds.Count;
+                if (_sheetIds.Count > MaxSheets) _sheetIds.RemoveRange(MaxSheets, _sheetIds.Count - MaxSheets);
+                if (_viewIds.Count > MaxViews) _viewIds.RemoveRange(MaxViews, _viewIds.Count - MaxViews);
+                foreach (var id in new FilteredElementCollector(doc).OfClass(typeof(ScheduleSheetInstance)).ToElementIds())
                 {
-                    if (s.IsTemplate) continue;
-                    var vps = s.GetAllPlacedViews();
-                    foreach (var v in vps) onSheet.Add(Ids.ToLong(v));
-                    var sched = new FilteredElementCollector(doc, s.Id).OfClass(typeof(ScheduleSheetInstance)).GetElementCount();
-                    Sheets.Add(new ModelHealth.Sheet { Id = Ids.ToLong(s.Id), Number = s.SheetNumber, Name = s.Name, Viewports = vps.Count, Schedules = sched });
+                    var owner = Ids.ToLong(doc.GetElement(id).OwnerViewId);
+                    _schedulesBySheet[owner] = (_schedulesBySheet.TryGetValue(owner, out var n) ? n : 0) + 1;
                 }
-                foreach (var v in new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>())
+                _phase = 3;
+                return false;
+            }
+            if (_phase == 3)
+            {
+                for (; _nextSheet < _sheetIds.Count; _nextSheet++)
                 {
-                    if (v is ViewSheet) continue;
+                    if ((_nextSheet & 15) == 0 && sw.ElapsedMilliseconds >= deadline) return false;
+                    var s = doc.GetElement(_sheetIds[_nextSheet]) as ViewSheet;
+                    if (s == null || s.IsTemplate) continue;
+                    var vps = s.GetAllPlacedViews();
+                    foreach (var v in vps) _onSheet.Add(Ids.ToLong(v));
+                    var sid = Ids.ToLong(s.Id);
+                    Sheets.Add(new ModelHealth.Sheet { Id = sid, Number = s.SheetNumber, Name = s.Name, Viewports = vps.Count, Schedules = _schedulesBySheet.TryGetValue(sid, out var sc) ? sc : 0 });
+                }
+                _phase = 4;
+                if (sw.ElapsedMilliseconds >= deadline) return false;
+            }
+            if (_phase == 4)
+            {
+                for (; _nextView < _viewIds.Count; _nextView++)
+                {
+                    if ((_nextView & 63) == 0 && sw.ElapsedMilliseconds >= deadline) return false;
+                    var v = doc.GetElement(_viewIds[_nextView]) as View;
+                    if (v == null || v is ViewSheet) continue;
                     Views.Add(new ModelHealth.View
                     {
-                        Id = Ids.ToLong(v.Id), Name = v.Name, Kind = v.ViewType.ToString(), OnSheet = onSheet.Contains(Ids.ToLong(v.Id)), IsTemplate = v.IsTemplate,
+                        Id = Ids.ToLong(v.Id), Name = v.Name, Kind = v.ViewType.ToString(), OnSheet = _onSheet.Contains(Ids.ToLong(v.Id)), IsTemplate = v.IsTemplate,
                         IsDependent = v.GetPrimaryViewId() != ElementId.InvalidElementId,
                     });
                 }
-                _phase = 3;
+                _phase = 5;
             }
             return true;
+        }
+
+        private readonly Dictionary<long, int> _schedulesBySheet = new Dictionary<long, int>();
+
+        /// <summary>Lo que quedó fuera por los límites (vacío si se revisó todo).</summary>
+        public Dictionary<string, object> Truncation()
+        {
+            var d = new Dictionary<string, object>();
+            void T(string k, int total, int max) { if (total > max) d[k] = "revisados " + max + " de " + total; }
+            T("avisos", WarningsTotal, MaxWarnings); T("elementos", ElementsTotal, MaxElements); T("laminas", SheetsTotal, MaxSheets); T("vistas", ViewsTotal, MaxViews);
+            return d;
         }
     }
 }

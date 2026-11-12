@@ -5,10 +5,22 @@ No mide Revit. Tokens = bytes/4 (estimación). Tiempos: mediana de 5 construccio
 
 | Catálogo | Construcción ms | Retenido KB | Asignado KB | Por id µs | Por dominio µs | Texto µs | Versión+contexto µs | Página 20 filas bytes | Tokens est. | Catálogo completo bytes | Tokens est. completo |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| real (123) | 1.69 | 87 | 777 | 0.050 | 0.9 | 2.0 | 8.3 | 646 | 161 | 113536 | 28384 |
-| 500 | 3.25 | 239 | 2973 | 0.054 | 1.9 | 10.6 | 37.5 | 1161 | 290 | 313778 | 78444 |
-| 1000 | 7.91 | 404 | 5839 | 0.039 | 2.9 | 40.2 | 143.6 | 1728 | 432 | 627810 | 156952 |
-| 5000 | 27.81 | 1514 | 28868 | 0.049 | 7.1 | 71.7 | 115.8 | 1729 | 432 | 3157045 | 789261 |
-| 10000 | 40.65 | 2226 | 57739 | 0.052 | 15.9 | 177.8 | 289.0 | 1729 | 432 | 6319230 | 1579807 |
+| real (222) | 5.19 | 166 | 1621 | 0.088 | 1.9 | 3.6 | 22.7 | 875 | 218 | 209919 | 52479 |
+| 500 | 7.50 | 239 | 2911 | 0.062 | 3.4 | 14.0 | 77.8 | 1161 | 290 | 313778 | 78444 |
+| 1000 | 14.26 | 404 | 5715 | 0.070 | 2.7 | 22.8 | 66.7 | 1728 | 432 | 627810 | 156952 |
+| 5000 | 37.07 | 1514 | 28236 | 0.066 | 12.0 | 113.7 | 274.8 | 1729 | 432 | 3157045 | 789261 |
+| 10000 | 72.66 | 2226 | 56473 | 0.094 | 23.4 | 323.7 | 663.6 | 1729 | 432 | 6319230 | 1579807 |
+
+## Huella, serialización y memoria del proceso
+
+| Catálogo | Huella canónica (construir + SHA-256) ms | Serializar página µs | Serializar un contrato µs | Contrato bytes | Tokens est. | Montón del proceso KB (pico observado tras la serie) |
+|---|---|---|---|---|---|---|
+| real (222) | 45.44 | 16.7 | 12.9 | 945 | 236 | 14551 |
+| 500 | 30.34 | 41.7 | 18.7 | 654 | 163 | 16121 |
+| 1000 | 22.54 | 9.3 | 3.7 | 649 | 162 | 18772 |
+| 5000 | 90.50 | 8.1 | 4.3 | 665 | 166 | 36475 |
+| 10000 | 184.31 | 7.3 | 2.3 | 659 | 164 | 59712 |
+
+La fila «real» es el catálogo del producto en este commit. La huella es perezosa: no entra en la construcción ni en la carga del add-in; se calcula la primera vez que se pide `catalogo`.
 
 Lectura: el descubrimiento devuelve una página compacta de tamaño casi constante; serializar el catálogo completo crece linealmente y por eso nunca se envía entero (contrato completo sólo con `check name=cobertura id=`).

@@ -373,6 +373,90 @@ namespace PDI.RevitMcp.Engine.Workflows
             return r;
         });
 
+        // ------------------------------------------------------------------ AUD-12: inventario inicial por intento
+
+        /// <summary>Inventario inicial (ids del anfitrión antes de copiar) de un intento. Es evidencia: se escribe una vez y no se sobrescribe.</summary>
+        public sealed class Baseline
+        {
+            public const string Schema = "bimbridge.workflow_baseline/1";
+            public string AttemptKey, DocumentIdentity, LinkIdentity, Sha256;
+            public List<long> Ids = new List<long>();
+            public DateTime CreatedUtc;
+
+            public static string Hash(string key, string doc, string link, IEnumerable<long> ids) =>
+                Home.Sha256Hex(key + "\n" + doc + "\n" + link + "\n" + string.Join(",", ids.Select(i => i.ToString(CultureInfo.InvariantCulture))));
+        }
+
+        private string BaselinePath(string key) => Path.ChangeExtension(PathFor(key), ".inv");
+
+        /// <summary>
+        /// Guarda el inventario inicial del intento SOLO si no existe. Un preflight repetido, otra sesión u otro proceso reciben el
+        /// inventario original (<paramref name="created"/> = false): la evidencia inicial nunca se pisa. Si la clave pertenece a otro
+        /// documento o vínculo, se rechaza.
+        /// </summary>
+        public Baseline SaveBaselineOnce(string key, string documentIdentity, string linkIdentity, IEnumerable<long> ids, out bool created)
+        {
+            var isNew = false;
+            var res = WithKeyLock(key, () =>
+            {
+                var existing = LoadBaselineUnlocked(key);
+                if (existing != null)
+                {
+                    if (!string.Equals(existing.DocumentIdentity, documentIdentity, StringComparison.Ordinal) || !string.Equals(existing.LinkIdentity, linkIdentity, StringComparison.Ordinal))
+                        throw new InvalidOperationException("el inventario inicial de este intento pertenece a otro documento o vínculo: cambio de destino rechazado");
+                    return existing;
+                }
+                var list = ids.Distinct().OrderBy(x => x).ToList();
+                var b = new Baseline { AttemptKey = key, DocumentIdentity = documentIdentity, LinkIdentity = linkIdentity, Ids = list, CreatedUtc = DateTime.UtcNow };
+                b.Sha256 = Baseline.Hash(key, documentIdentity, linkIdentity, list);
+                var json = Json.Write(new Dictionary<string, object>
+                {
+                    ["esquema"] = Baseline.Schema, ["clave_intento"] = key, ["documento"] = documentIdentity, ["vinculo"] = linkIdentity,
+                    ["ids"] = list.Cast<object>().ToList(), ["sha256"] = b.Sha256, ["creado"] = b.CreatedUtc.ToString("o", CultureInfo.InvariantCulture),
+                });
+                var p = BaselinePath(key);
+                var tmp = p + ".tmp";
+                using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+                {
+                    var bytes = new UTF8Encoding(false).GetBytes(json);
+                    fs.Write(bytes, 0, bytes.Length);
+                    fs.Flush(true);
+                }
+                File.Move(tmp, p);   // falla si ya existe: nunca sobrescribe
+                isNew = true;
+                return b;
+            });
+            created = isNew;
+            return res;
+        }
+
+        /// <summary>Inventario inicial del intento, o null si no hay. Un archivo alterado o ilegible lanza InvalidDataException (no se usa).</summary>
+        public Baseline LoadBaseline(string key) => WithKeyLock(key, () => LoadBaselineUnlocked(key));
+
+        private Baseline LoadBaselineUnlocked(string key)
+        {
+            var p = BaselinePath(key);
+            if (!File.Exists(p)) return null;
+            try
+            {
+                var d = Json.ParseObject(File.ReadAllText(p, Encoding.UTF8));
+                if (Arg.GetString(d, "esquema") != Baseline.Schema) throw new InvalidDataException("inventario inicial con esquema desconocido");
+                var b = new Baseline
+                {
+                    AttemptKey = Arg.GetString(d, "clave_intento"), DocumentIdentity = Arg.GetString(d, "documento"), LinkIdentity = Arg.GetString(d, "vinculo"),
+                    Sha256 = Arg.GetString(d, "sha256"), Ids = ((List<object>)d["ids"]).Select(x => Convert.ToInt64(x, CultureInfo.InvariantCulture)).ToList(),
+                    CreatedUtc = DateTime.Parse(Arg.GetString(d, "creado"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                };
+                if (b.AttemptKey != key || b.Sha256 != Baseline.Hash(key, b.DocumentIdentity, b.LinkIdentity, b.Ids))
+                    throw new InvalidDataException("el inventario inicial del intento " + key + " no coincide con su huella (alterado o dañado)");
+                return b;
+            }
+            catch (Exception ex) when (ex is FormatException || ex is InvalidCastException || ex is KeyNotFoundException || ex is ArgumentException || ex is OverflowException)
+            {
+                throw new InvalidDataException("el inventario inicial del intento " + key + " es ilegible: " + ex.GetType().Name);
+            }
+        }
+
         private void Save(WorkflowReceipt r)
         {
             var p = PathFor(r.AttemptKey);

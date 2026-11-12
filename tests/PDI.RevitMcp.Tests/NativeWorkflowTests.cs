@@ -188,6 +188,84 @@ namespace PDI.RevitMcp.Tests
                 Assert.Throws<TimeoutException>(() => held.Record(key, Ev(EvidenceKind.PreflightPassed)));
         }
 
+        // ------------------------------------------------------------------ AUD-12 inventario inicial por intento
+
+        [Fact]
+        public void Baseline_IsWrittenOncePerAttempt_RepeatedPreflightNeverOverwritesIt()
+        {
+            var key = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "b1");
+            var first = Store().SaveBaselineOnce(key, "doc-A", "link-1", new long[] { 3, 1, 2, 2 }, out var created);
+            Assert.True(created);
+            Assert.Equal(new long[] { 1, 2, 3 }, first.Ids);
+            // El usuario copia en Revit (aparecen 10 y 11) y alguien repite el preflight: se conserva el inventario original.
+            var second = Store().SaveBaselineOnce(key, "doc-A", "link-1", new long[] { 1, 2, 3, 10, 11 }, out created);
+            Assert.False(created);
+            Assert.Equal(new long[] { 1, 2, 3 }, second.Ids);
+            Assert.Equal(first.Sha256, second.Sha256);
+            Assert.Equal(first.CreatedUtc, second.CreatedUtc);
+            // Reconexión / reinicio: otra instancia del almacén (otra sesión) lee lo mismo; no depende de conjuntos de sesión.
+            var afterReconnect = new ReceiptStore(_dir).LoadBaseline(key);
+            Assert.Equal(new long[] { 1, 2, 3 }, afterReconnect.Ids);
+            // El inventario no se confunde con un recibo ilegible.
+            Store().Begin("copy_monitor_fixtures", key, Corr(), out _);
+            Store().Open(out var unreadable);
+            Assert.Empty(unreadable);
+            Assert.Null(Store().LoadBaseline(WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "otra-clave")));
+        }
+
+        [Fact]
+        public void Baseline_ConcurrentPreflights_ExactlyOneWins_AndEveryoneSeesTheSameEvidence()
+        {
+            var key = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "b2");
+            const int n = 8;
+            var results = new ReceiptStore.Baseline[n];
+            var createdFlags = new bool[n];
+            using (var start = new System.Threading.ManualResetEventSlim())
+            {
+                var threads = Enumerable.Range(0, n).Select(i => new System.Threading.Thread(() =>
+                {
+                    var store = new ReceiptStore(_dir);   // cada «sesión/proceso» con su propio almacén
+                    start.Wait();
+                    results[i] = store.SaveBaselineOnce(key, "doc-A", "link-1", new long[] { 100 + i, 200 + i }, out createdFlags[i]);
+                })).ToList();
+                threads.ForEach(t => t.Start());
+                start.Set();
+                threads.ForEach(t => t.Join());
+            }
+            Assert.Equal(1, createdFlags.Count(c => c));
+            var winner = Array.IndexOf(createdFlags, true);
+            Assert.Equal(new long[] { 100 + winner, 200 + winner }, results[winner].Ids);
+            Assert.All(results, r => Assert.Equal(results[winner].Sha256, r.Sha256));
+            Assert.Equal(results[winner].Ids, new ReceiptStore(_dir).LoadBaseline(key).Ids);
+            Assert.Empty(Directory.GetFiles(_dir, "*.tmp"));
+        }
+
+        [Fact]
+        public void Baseline_IsBoundToDocumentAndLink_AndTamperingIsDetected()
+        {
+            // Cambio de documento: la clave de intento ya es distinta por documento, así que cada documento tiene su inventario…
+            var keyA = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "b3");
+            var keyB = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-B", "link-1", "b3");
+            Assert.NotEqual(keyA, keyB);
+            Store().SaveBaselineOnce(keyA, "doc-A", "link-1", new long[] { 1, 2 }, out _);
+            Store().SaveBaselineOnce(keyB, "doc-B", "link-1", new long[] { 7 }, out var createdB);
+            Assert.True(createdB);
+            Assert.Equal(new long[] { 1, 2 }, Store().LoadBaseline(keyA).Ids);
+            Assert.Equal(new long[] { 7 }, Store().LoadBaseline(keyB).Ids);
+            // …y si alguien presenta la clave de A con otro documento u otro vínculo, se rechaza (no se reutiliza ni se pisa).
+            Assert.Throws<InvalidOperationException>(() => Store().SaveBaselineOnce(keyA, "doc-B", "link-1", new long[] { 9 }, out _));
+            Assert.Throws<InvalidOperationException>(() => Store().SaveBaselineOnce(keyA, "doc-A", "link-2", new long[] { 9 }, out _));
+            Assert.Equal(new long[] { 1, 2 }, Store().LoadBaseline(keyA).Ids);
+
+            // Manipular el archivo (añadir un id para «esconder» una copia) invalida la huella: no se usa.
+            var file = Path.Combine(_dir, keyA + ".inv");
+            File.WriteAllText(file, File.ReadAllText(file).Replace("[1,2]", "[1,2,55]"));
+            Assert.Throws<InvalidDataException>(() => Store().LoadBaseline(keyA));
+            Assert.Throws<InvalidDataException>(() => Store().SaveBaselineOnce(keyA, "doc-A", "link-1", new long[] { 1, 2 }, out _));
+            File.WriteAllText(file, "{no es json");
+            Assert.Throws<InvalidDataException>(() => Store().LoadBaseline(keyA));
+        }
+
         // ------------------------------------------------------------------ #23 matriz de capacidades
 
         [Theory]

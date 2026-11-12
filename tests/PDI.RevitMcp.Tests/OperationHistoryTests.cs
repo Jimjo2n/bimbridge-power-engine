@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using PDI.RevitMcp.Engine;
 using PDI.RevitMcp.Protocol;
@@ -8,10 +11,23 @@ using Xunit;
 
 namespace PDI.RevitMcp.Tests
 {
-    /// <summary>0.9.1 (Bloque I): historial persistente de operaciones, filtros, paginación y consejo de reintento seguro.</summary>
+    /// <summary>
+    /// 0.9.1 (Bloque I): historial persistente de operaciones, filtros, paginación y consejo de reintento seguro.
+    /// AUD-13: aislamiento entre sesiones y agentes (lo ajeno sólo con autorización explícita). AUD-14: con_diferencias exige revisión.
+    /// </summary>
     public class OperationHistoryTests
     {
         private static string NewPath() => Path.Combine(Path.GetTempPath(), "bb_hist_" + Guid.NewGuid().ToString("N"), "operaciones.jsonl");
+        private static readonly OperationHistory.Scope All = new OperationHistory.Scope { SeeAll = true };
+        private static OperationHistory.Scope Me(string session, string agent = null) => new OperationHistory.Scope { SessionId = session, AgentId = agent };
+
+        private static Job Done(JobStore jobs, string session, string agent, string kind, string failStatus = null, string error = null)
+        {
+            var j = jobs.Create(session, kind);
+            j.AgentId = agent;
+            if (failStatus == null) jobs.Complete(j, new Dictionary<string, object>()); else jobs.Fail(j, failStatus, error);
+            return j;
+        }
 
         [Fact]
         public void EveryFinishedJob_IsRecorded_Persisted_AndFilterable()
@@ -20,28 +36,123 @@ namespace PDI.RevitMcp.Tests
             var jobs = new JobStore();
             var h = new OperationHistory(p);
             jobs.OnAnyFinal = j => h.Add(j);
-            var a = jobs.Create("S1", "doc pdf"); jobs.Complete(a, new System.Collections.Generic.Dictionary<string, object>());
-            var b = jobs.Create("S1", "commit"); jobs.Fail(b, Status.Conflicto, "cambió el modelo");
-            var c = jobs.Create("S2", "commit"); jobs.Fail(c, Status.Desconocido, "se cortó");
-            var d = jobs.Create("S2", "check"); jobs.Fail(d, JobStatus.Cancelado, "cancelado");
+            Done(jobs, "S1", null, "doc pdf");
+            Done(jobs, "S1", null, "commit", Status.Conflicto, "cambió el modelo");
+            var c = Done(jobs, "S2", null, "commit", Status.Desconocido, "se cortó");
+            Done(jobs, "S2", null, "check", JobStatus.Cancelado, "cancelado");
             Assert.Equal(4, h.Count);
-            var (commits, n) = h.Query(null, "commit", null, null, null);
+            var (commits, n) = h.Query(All, null, "commit", null, null, null);
             Assert.Equal(2, n);
             Assert.Equal(c.Id, commits[0].JobId);                           // más reciente primero
             Assert.Equal("reconciliar_antes", commits[0].Retry);           // incierto: nunca reintentar a ciegas
             Assert.Equal("reintentable", commits[1].Retry);                // conflicto: no se aplicó nada
-            Assert.Equal("reconciliar_antes", h.Query(Status.Cancelado, null, null, null, null).Page[0].Retry);
-            Assert.Equal(2, h.Query(null, null, "S2", null, null).Total);
-            Assert.Equal(1, h.Query(null, null, null, null, "cortó").Total);
+            Assert.Equal("reconciliar_antes", h.Query(All, Status.Cancelado, null, null, null, null).Page[0].Retry);
+            Assert.Equal(2, h.Query(All, null, null, "S2", null, null).Total);
+            Assert.Equal(1, h.Query(All, null, null, null, null, "cortó").Total);
 
             // Reinicio: se recarga desde el archivo; una línea rota se informa, no se descarta en silencio.
             File.AppendAllText(p, "{roto\n");
             var again = new OperationHistory(p);
             Assert.Equal(4, again.Count);
             Assert.Single(again.LoadErrors);
-            var (p1, total) = again.Query(null, null, null, null, null, page: 2, pageSize: 3);
+            var (p1, total) = again.Query(All, null, null, null, null, null, page: 2, pageSize: 3);
             Assert.Equal(4, total);
             Assert.Single(p1);
+        }
+
+        [Fact]
+        public void ConDiferencias_RequiresReview_NotSuccessWithoutPendingActions()
+        {
+            // AUD-14
+            Assert.Equal("revisar_diferencias", OperationHistory.RetryAdvice(Status.ConDiferencias));
+            Assert.Equal("no_necesario", OperationHistory.RetryAdvice(Status.Ok));
+            Assert.Equal("reconciliar_antes", OperationHistory.RetryAdvice("un_estado_nuevo_desconocido"));
+        }
+
+        [Fact]
+        public void Sessions_OnlySeeTheirOwnOperations_UnlessExplicitlyAuthorized()
+        {
+            // AUD-13: dos agentes con sesiones concurrentes.
+            var jobs = new JobStore();
+            var h = new OperationHistory(null);
+            jobs.OnAnyFinal = j => h.Add(j);
+            Done(jobs, "S-ana-1", "A-ana", "commit");
+            Done(jobs, "S-ana-1", "A-ana", "doc pdf");
+            Done(jobs, "S-bob-1", "A-bob", "commit", Status.Desconocido, "secreto de bob");
+            Done(jobs, "S-anon-1", null, "check");
+
+            var ana = h.Query(Me("S-ana-1", "A-ana"), null, null, null, null, null);
+            Assert.Equal(2, ana.Total);
+            Assert.All(ana.Page, r => Assert.Equal("A-ana", r.Agent));
+            // Los filtros no amplían el ámbito: pedir la sesión o el texto de otro no lo muestra.
+            Assert.Equal(0, h.Query(Me("S-ana-1", "A-ana"), null, null, "S-bob-1", null, null).Total);
+            Assert.Equal(0, h.Query(Me("S-ana-1", "A-ana"), null, null, null, null, "secreto").Total);
+            Assert.Equal(1, h.Query(Me("S-bob-1", "A-bob"), null, null, null, null, null).Total);
+            // Una sesión anónima sólo ve su propia sesión; otra sesión anónima no ve la primera (null no es identidad compartida).
+            Assert.Equal(1, h.Query(Me("S-anon-1"), null, null, null, null, null).Total);
+            Assert.Equal(0, h.Query(Me("S-anon-2"), null, null, null, null, null).Total);
+            // Sin identidad alguna no se ve nada; el ámbito es obligatorio.
+            Assert.Equal(0, h.Query(new OperationHistory.Scope(), null, null, null, null, null).Total);
+            Assert.Throws<ArgumentNullException>(() => h.Query(null, null, null, null, null, null));
+            // Pedir «todos» sin autorización del usuario se rechaza (no se concede por pedirlo ni se degrada en silencio).
+            Assert.Null(OperationHistory.ScopeFor("S-ana-1", "A-ana", wantAll: true, sharedAuthorized: false, out var refusal));
+            Assert.Contains("historial_compartido", refusal);
+            Assert.False(new EngineConfig().SharedHistory);                 // por defecto, no autorizado
+            Assert.Equal(2, h.Query(OperationHistory.ScopeFor("S-ana-1", "A-ana", false, false, out _), null, null, null, null, null).Total);
+            Assert.Equal(2, h.Query(OperationHistory.ScopeFor("S-ana-1", "A-ana", false, true, out _), null, null, null, null, null).Total);   // autorizado pero no pedido: lo propio
+            // Con la autorización explícita (historial_compartido) y pidiéndolo, se ve todo.
+            Assert.Equal(4, h.Query(OperationHistory.ScopeFor("S-ana-1", "A-ana", true, true, out _), null, null, null, null, null).Total);
+            // En curso: mismo criterio.
+            var running = jobs.Create("S-bob-1", "geo"); running.AgentId = "A-bob";
+            Assert.Empty(jobs.ForOwner("S-ana-1", "A-ana").Where(j => !j.IsFinal));
+            Assert.Single(jobs.ForOwner("S-bob-2", "A-bob").Where(j => !j.IsFinal));
+            Assert.Empty(jobs.ForOwner("S-anon-2", null).Where(j => !j.IsFinal));
+        }
+
+        [Fact]
+        public void Reconnection_SameNamedAgentKeepsItsHistory_AcrossSessionsAndRestart()
+        {
+            // AUD-13: al reconectar la sesión es otra (ids únicos por instancia); el agente con nombre conserva lo suyo, también tras reiniciar.
+            var p = NewPath();
+            var jobs = new JobStore();
+            var h = new OperationHistory(p);
+            jobs.OnAnyFinal = j => h.Add(j);
+            Done(jobs, "S-ana-1", "A-ana", "commit");
+            Done(jobs, "S-bob-1", "A-bob", "commit");
+            Assert.Equal(1, h.Query(Me("S-ana-2", "A-ana"), null, null, null, null, null).Total);
+            var restarted = new OperationHistory(p);
+            Assert.Equal(1, restarted.Query(Me("S-ana-3", "A-ana"), null, null, null, null, null).Total);
+            Assert.Equal("S-ana-1", restarted.Query(Me("S-ana-3", "A-ana"), null, null, null, null, null).Page[0].Session);
+            Assert.Equal(0, restarted.Query(Me("S-eve-1", "A-eve"), null, null, null, null, null).Total);
+        }
+
+        [Fact]
+        public void ConcurrentSessions_WritingAndReading_StayIsolatedAndComplete()
+        {
+            var jobs = new JobStore();
+            var h = new OperationHistory(NewPath());
+            jobs.OnAnyFinal = j => h.Add(j);
+            const int perAgent = 60;
+            var leaks = 0;
+            using (var start = new ManualResetEventSlim())
+            {
+                var writers = new[] { "ana", "bob", "eve" }.Select(name => Task.Run(() =>
+                {
+                    start.Wait();
+                    for (var i = 0; i < perAgent; i++)
+                    {
+                        Done(jobs, "S-" + name, "A-" + name, "commit " + name);
+                        var mine = h.Query(Me("S-" + name, "A-" + name), null, null, null, null, null, pageSize: 100);
+                        if (mine.Page.Any(r => r.Agent != "A-" + name)) Interlocked.Increment(ref leaks);
+                    }
+                })).ToArray();
+                start.Set();
+                Task.WaitAll(writers);
+            }
+            Assert.Equal(0, leaks);
+            foreach (var name in new[] { "ana", "bob", "eve" })
+                Assert.Equal(perAgent, h.Query(Me("S-" + name, "A-" + name), null, null, null, null, null).Total);
+            Assert.Equal(3 * perAgent, h.Query(All, null, null, null, null, null).Total);
         }
 
         [Fact]

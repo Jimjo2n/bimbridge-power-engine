@@ -59,6 +59,21 @@ namespace PDI.RevitMcp.Tests
             var e = CapabilityCatalog.All[0];
             Assert.Throws<ArgumentException>(() => new CapabilityIndex(new[] { e, e }));
             Assert.Equal(new CapabilityIndex(CapabilityCatalog.All).Version, Idx.Version);
+            // AUD-16: cambiar CUALQUIER campo del contrato (no sólo id/estado/estrategia) cambia la huella; el orden de entrada no.
+            CapabilityEntry Clone(CapabilityEntry c) => (CapabilityEntry)typeof(object).GetMethod("MemberwiseClone", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(c, null);
+            var baseSet = CapabilityCatalog.All.Take(5).Select(Clone).ToList();
+            var v0 = new CapabilityIndex(baseSet).Version;
+            Assert.Equal(v0, new CapabilityIndex(Enumerable.Reverse(baseSet)).Version);
+            foreach (var mutate in new Action<CapabilityEntry>[]
+            {
+                c => c.Limitations += " x", c => c.Name += " x", c => c.Verifier += " x", c => c.Expected += " x", c => c.MaxVersion = 2025,
+                c => c.Tests = c.Tests.Concat(new[] { "T" }).ToArray(), c => c.PostableCommands = c.PostableCommands.Concat(new[] { "Cmd" }).ToArray(), c => c.Priority = "P9",
+            })
+            {
+                var changed = baseSet.Select(Clone).ToList();
+                mutate(changed[2]);
+                Assert.NotEqual(v0, new CapabilityIndex(changed).Version);
+            }
         }
     }
 }

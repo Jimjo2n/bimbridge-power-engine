@@ -21,6 +21,14 @@ AUD-06 NaN/parámetros ausentes; AUD-07 recibos con bloqueo entre procesos, evid
 AUD-08 dimensiones separadas y continuidad tras traspaso manual; AUD-09 commit ≠ postcondiciones (`con_diferencias`);
 AUD-10 fragmento durable antes de truncar con inyección de fallos; AUD-11 transformación completa (rotación, reflexión, traslación; rechaza escala, cizalla, inclinación).
 
+## Tercera ronda de auditoría (AUD-12 … AUD-17)
+- **AUD-12**: el inventario inicial de Copy/Monitor se guarda por clave de intento (`<clave>.inv`, escritura única con fsync y huella SHA-256), bajo el mismo bloqueo entre procesos del recibo. Preflights repetidos o simultáneos reciben el original; otro documento o vínculo se rechaza; un archivo alterado no se usa. La verificación ya no depende de `session.Sets`. Pruebas: `NativeWorkflowTests.Baseline_*` (repetición, reconexión, 8 concurrentes, cambio de documento, manipulación).
+- **AUD-13**: el historial sólo muestra lo de la misma sesión o del mismo agente con nombre; el nombre de tarea no da visibilidad; `todos=si` exige `historial_compartido=true` en la configuración del usuario y sin ella se rechaza. Pruebas: `OperationHistoryTests` (aislamiento, reconexión y reinicio, tres sesiones concurrentes).
+- **AUD-14**: `con_diferencias` → `revisar_diferencias` (revisar o reconciliar; no repetir).
+- **AUD-15**: benchmarks regenerados con el catálogo real de 222 capacidades, con huella, serialización y memoria (`docs/0.9.1/benchmarks/inventory-bench.md`). Medidos en un equipo de 4 CPU con otra carga: son orientativos.
+- **AUD-16**: huella = SHA-256 del contrato canónico completo de cada capacidad en orden de id, perezosa. Prueba de mutación de cada campo.
+- **AUD-17**: `model_health` cede el hilo tras cada llamada indivisible (GetWarnings, colectores de ids), trocea avisos, elementos, láminas y vistas con el presupuesto, cuenta tablas por lámina en una pasada y limita modelos enormes informando `truncado`. Sin medición en Revit: pendiente de la campaña nativa.
+
 ## Bloques
 | Bloque | Commits | Contenido |
 |---|---|---|

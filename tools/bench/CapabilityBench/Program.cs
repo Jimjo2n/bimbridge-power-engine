@@ -81,6 +81,7 @@ internal static class Program
         sb.AppendLine();
         sb.AppendLine("| Catálogo | Construcción ms | Retenido KB | Asignado KB | Por id µs | Por dominio µs | Texto µs | Versión+contexto µs | Página 20 filas bytes | Tokens est. | Catálogo completo bytes | Tokens est. completo |");
         sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|");
+        var extra = new StringBuilder();
         var sets = new List<(string Name, List<CapabilityEntry> Entries)> { ("real (" + CapabilityCatalog.All.Count + ")", CapabilityCatalog.All.ToList()) };
         foreach (var n in new[] { 500, 1000, 5000, 10000 }) sets.Add((n.ToString(CultureInfo.InvariantCulture), Synthetic(n)));
         foreach (var (name, entries) in sets)
@@ -114,8 +115,26 @@ internal static class Program
             sb.AppendLine("| " + name + " | " + Median(builds).ToString("0.00", CultureInfo.InvariantCulture) + " | " + (retained / 1024) + " | " + (allocated / 1024) + " | " +
                           byId.ToString("0.000", CultureInfo.InvariantCulture) + " | " + byDomain.ToString("0.0", CultureInfo.InvariantCulture) + " | " + byText.ToString("0.0", CultureInfo.InvariantCulture) + " | " +
                           byCtx.ToString("0.0", CultureInfo.InvariantCulture) + " | " + pageBytes + " | " + (pageBytes / 4) + " | " + fullBytes + " | " + (fullBytes / 4) + " |");
+            // AUD-15/16: huella canónica (perezosa, una vez), serialización de la página y del contrato, y primera consulta en frío.
+            var swv = Stopwatch.StartNew(); var ver = new CapabilityIndex(entries).Version; var verMs = swv.Elapsed.TotalMilliseconds;
+            var pg = Page(idx, new CapabilityQuery { Domain = "F20" });
+            var serPage = TimeUs(() => Bytes(pg), 2000);
+            var one = CapabilityIndex.Contract(entries[entries.Count / 2]);
+            var serOne = TimeUs(() => Bytes(one), 2000);
+            var oneBytes = Bytes(one);
+            extra.AppendLine("| " + name + " | " + verMs.ToString("0.00", CultureInfo.InvariantCulture) + " | " + serPage.ToString("0.0", CultureInfo.InvariantCulture) + " | " +
+                             serOne.ToString("0.0", CultureInfo.InvariantCulture) + " | " + oneBytes + " | " + (oneBytes / 4) + " | " + GC.GetGCMemoryInfo().HeapSizeBytes / 1024 + " |");
+            GC.KeepAlive(ver);
             Console.WriteLine(name + " ok");
         }
+        sb.AppendLine();
+        sb.AppendLine("## Huella, serialización y memoria del proceso");
+        sb.AppendLine();
+        sb.AppendLine("| Catálogo | Huella canónica (construir + SHA-256) ms | Serializar página µs | Serializar un contrato µs | Contrato bytes | Tokens est. | Montón del proceso KB (pico observado tras la serie) |");
+        sb.AppendLine("|---|---|---|---|---|---|---|");
+        sb.Append(extra);
+        sb.AppendLine();
+        sb.AppendLine("La fila «real» es el catálogo del producto en este commit. La huella es perezosa: no entra en la construcción ni en la carga del add-in; se calcula la primera vez que se pide `catalogo`.");
         sb.AppendLine();
         sb.AppendLine("Lectura: el descubrimiento devuelve una página compacta de tamaño casi constante; serializar el catálogo completo crece linealmente y por eso nunca se envía entero (contrato completo sólo con `check name=cobertura id=`).");
         var outPath = args.Length > 0 ? args[0] : "inventory-bench.md";

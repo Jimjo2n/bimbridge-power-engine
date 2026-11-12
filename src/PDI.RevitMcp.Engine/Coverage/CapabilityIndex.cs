@@ -39,7 +39,8 @@ namespace PDI.RevitMcp.Engine.Coverage
         private readonly Dictionary<string, int[]> _byDomain, _byStatus, _byStrategy, _byCategory, _byDocKind, _byPriority;
         private readonly Dictionary<string, int[]> _byToken;
         private readonly string[] _tokenKeys;
-        public readonly string Version;
+        private readonly Lazy<string> _version;
+        public string Version => _version.Value;
 
         public int Count => _all.Length;
 
@@ -59,12 +60,28 @@ namespace PDI.RevitMcp.Engine.Coverage
             _byPriority = Group(c => new[] { c.Priority ?? "P2" });
             _byToken = Group(c => Tokens(c.Id + " " + c.Name + " " + c.NameEn + " " + c.Subdomain + " " + c.Operation + " " + string.Join(" ", c.PostableCommands ?? new string[0])));
             _tokenKeys = _byToken.Keys.OrderBy(k => k, StringComparer.Ordinal).ToArray();
-            // Huella del contenido: invalida cachés externas sólo cuando cambia el catálogo.
-            unchecked
+            _version = new Lazy<string>(ComputeVersion);
+        }
+
+        /// <summary>
+        /// AUD-16: huella del contenido canónico COMPLETO (SHA-256 del contrato íntegro de cada capacidad, en orden de id): cualquier
+        /// cambio de nombre, límites, verificador, pruebas, comandos, versiones… cambia la huella. Perezosa: no cuesta en la carga.
+        /// </summary>
+        private string ComputeVersion()
+        {
+            using (var sha = System.Security.Cryptography.SHA256.Create())
             {
-                long h = 1469598103934665603;
-                foreach (var c in _all) foreach (var ch in c.Id + c.Status + c.Strategy) h = (h ^ ch) * 1099511628211;
-                Version = h.ToString("x16", CultureInfo.InvariantCulture);
+                foreach (var c in _all.OrderBy(x => x.Id, StringComparer.Ordinal))
+                {
+                    var contract = Contract(c);
+                    var canon = string.Join("\u001f", contract.OrderBy(kv => kv.Key, StringComparer.Ordinal)
+                        .Select(kv => kv.Key + "=" + (kv.Value is List<object> l ? string.Join("\u001e", l) : Convert.ToString(kv.Value, CultureInfo.InvariantCulture))));
+                    canon += "\u001fmin=" + c.MinVersion + "\u001fmax=" + c.MaxVersion + "\u001d";
+                    var b = Encoding.UTF8.GetBytes(canon);
+                    sha.TransformBlock(b, 0, b.Length, null, 0);
+                }
+                sha.TransformFinalBlock(new byte[0], 0, 0);
+                return BitConverter.ToString(sha.Hash).Replace("-", "").ToLowerInvariant().Substring(0, 32);
             }
         }
 

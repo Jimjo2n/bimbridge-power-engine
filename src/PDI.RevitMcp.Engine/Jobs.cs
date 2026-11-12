@@ -17,6 +17,8 @@ namespace PDI.RevitMcp.Engine
     {
         public string Id;
         public string SessionId;
+        /// <summary>Agente con nombre que lanzó el trabajo (huella de principal + alias); null si la sesión era anónima.</summary>
+        public string AgentId;
         /// <summary>Tarea autorizada (tarea=…). Un trabajo con tarea sigue aunque se corte la conexión y otra conexión de la misma tarea puede consultarlo.</summary>
         public string Task;
         public string Kind;
@@ -94,6 +96,7 @@ namespace PDI.RevitMcp.Engine
                 {
                     Id = "G-" + _now().ToString("HHmmss", CultureInfo.InvariantCulture) + "-" + _counter.ToString("D3", CultureInfo.InvariantCulture),
                     SessionId = sessionId,
+                    AgentId = Correlation.Current?.AgentId,   // AUD-13: dueño nominal (sobrevive a la reconexión; la sesión no)
                     Kind = kind,
                     CreatedUtc = _now(),
                     Cts = new CancellationTokenSource(),
@@ -219,6 +222,12 @@ namespace PDI.RevitMcp.Engine
         public List<Job> ForSession(string sessionId, string task = null)
         {
             lock (_lock) return _jobs.Values.Where(j => j.SessionId == sessionId || (task != null && j.Task == task)).OrderByDescending(j => j.CreatedUtc).ToList();
+        }
+
+        /// <summary>AUD-13: trabajos de la misma sesión o del mismo agente con nombre (para el historial; el nombre de tarea no cuenta).</summary>
+        public List<Job> ForOwner(string sessionId, string agentId)
+        {
+            lock (_lock) return _jobs.Values.Where(j => j.SessionId == sessionId || (!string.IsNullOrEmpty(agentId) && j.AgentId == agentId)).OrderByDescending(j => j.CreatedUtc).ToList();
         }
 
         /// <summary>¿Puede esta conexión ver el trabajo? La misma sesión, o la misma tarea autorizada.</summary>

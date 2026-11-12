@@ -38,6 +38,8 @@ namespace PDI.RevitMcp.Addin.Revit
             if (!result.Ok) return FromWork(request.Id, result);
             if (probe.Error != null) return Response.Fail(request.Id, Status.Invalido, probe.Error);
             var datos = Engine.Qa.ModelHealth.Report(probe.Warnings, probe.Elements, probe.Connectors, probe.Sheets, probe.Views, Arg.GetStringList(request.Args, "requeridos"));
+            var trunc = probe.Truncation();
+            if (trunc.Count > 0) datos["truncado"] = trunc;   // modelo muy grande: se dice qué quedó sin revisar
             datos["ms"] = sw.ElapsedMilliseconds;
             return new Response { Id = request.Id, Rev = probe.Rev, Datos = datos };
         }
@@ -67,15 +69,23 @@ namespace PDI.RevitMcp.Addin.Revit
                     return Response.Fail(request.Id, Status.Invalido, "historial desde: fecha ISO 8601");
                 since = d;
             }
-            var (page, total) = _history.Query(Arg.GetString(a, "estado"), Arg.GetString(a, "tipo"), Arg.GetString(a, "sesion"), since, Arg.GetString(a, "q"),
+            // AUD-13: por defecto sólo lo propio (misma sesión o mismo agente con nombre). todos=si exige la autorización explícita del
+            // usuario en la configuración (historial_compartido); pedirlo sin ella se rechaza, no se degrada en silencio.
+            var agentId = Correlation.AgentIdOf(session.Principal, session.AgentName);
+            var wantAll = Arg.GetBool(a, "todos") ?? false;
+            var scope = OperationHistory.ScopeFor(session.Id, agentId, wantAll, _config.SharedHistory, out var refusal);
+            if (scope == null) return Response.Fail(request.Id, Status.Rechazado, "historial todos=si: " + refusal);
+            var (page, total) = _history.Query(scope, Arg.GetString(a, "estado"), Arg.GetString(a, "tipo"), Arg.GetString(a, "sesion"), since, Arg.GetString(a, "q"),
                 (int)(Arg.GetLong(a, "pagina") ?? 1), (int)(Arg.GetLong(a, "por_pagina") ?? 20));
             var datos = new Dictionary<string, object>
             {
                 ["total"] = (long)total,
+                ["ambito"] = wantAll ? "todas las sesiones (autorizado por el usuario)" : "propio (esta sesión y este agente)",
                 ["cols"] = new List<object> { "job_id", "tipo", "estado", "ms", "reintento", "fin", "error" },
                 ["rows"] = page.Select(r => (object)new List<object> { r.JobId, r.Kind, r.Estado, r.Ms, r.Retry, r.FinishedUtc.ToString("o", CultureInfo.InvariantCulture), r.Error }).ToList(),
-                ["en_curso"] = _jobs.ForSession(session.Id, Arg.GetString(a, Wire.TaskArg)).Where(j => !j.IsFinal).Select(j => (object)j.Progress()).ToList(),
-                ["reintento_significa"] = "reintentable = no se aplicó nada; reconciliar_antes = resultado incierto o parcial: compruebe el modelo antes de repetir",
+                ["en_curso"] = _jobs.ForOwner(session.Id, agentId).Where(j => !j.IsFinal).Select(j => (object)j.Progress()).ToList(),
+                ["reintento_significa"] = "reintentable = no se aplicó nada; reconciliar_antes = resultado incierto o parcial: compruebe el modelo antes de repetir; " +
+                                          "revisar_diferencias = se aplicó pero no coincide con lo pedido: revise o reconcilie, no repita",
             };
             if (_history.LoadErrors.Count > 0) datos["avisos_historial"] = _history.LoadErrors.Cast<object>().ToList();
             return new Response { Id = request.Id, Datos = datos };
@@ -163,7 +173,23 @@ namespace PDI.RevitMcp.Addin.Revit
 
             if (phase == "preflight")
             {
-                session.Sets.Save(setName, probe.Host.Select(h => h.Id), TargetId, TargetTitle);
+                // AUD-12: el inventario inicial se persiste por clave de intento y sólo la primera vez. Un preflight repetido, otra
+                // sesión o un intento simultáneo reciben el original; nunca se sobrescribe (después de copiar, lo ya copiado pasaría por «previo»).
+                ReceiptStore.Baseline baseline;
+                bool baselineCreated;
+                try { baseline = store.SaveBaselineOnce(attemptKey, probe.DocumentIdentity, probe.LinkIdentity, probe.Host.Select(h => h.Id), out baselineCreated); }
+                catch (Exception ex) when (ex is InvalidOperationException || ex is TimeoutException || ex is System.IO.InvalidDataException || ex is System.IO.IOException)
+                { return Response.Fail(request.Id, Status.Conflicto, "copy_monitor: " + ex.Message); }
+                var baseSet = new HashSet<long>(baseline.Ids);
+                var nuevos = probe.Host.Count(h => !baseSet.Contains(h.Id));
+                datos["inventario_inicial"] = new Dictionary<string, object>
+                {
+                    ["elementos"] = (long)baseline.Ids.Count, ["creado"] = baseline.CreatedUtc.ToString("o", CultureInfo.InvariantCulture), ["sha256"] = baseline.Sha256,
+                    ["conservado"] = !baselineCreated, ["elementos_nuevos_desde_entonces"] = (long)nuevos,
+                };
+                if (!baselineCreated) datos["aviso_inventario"] = "se conserva el inventario inicial de este intento (no se sobrescribe); para empezar de cero use otra clave=";
+                // Comodidad de la sesión (no es la evidencia): los ids previos como conjunto con nombre.
+                session.Sets.Save(setName, baseline.Ids, TargetId, TargetTitle);
                 datos["conjunto_antes"] = "$" + setName;
                 var year = int.TryParse(probe.RevitVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out var y) ? y : 0;
                 if (year >= 2022 && year <= 2026)
@@ -185,9 +211,17 @@ namespace PDI.RevitMcp.Addin.Revit
             }
             else
             {
-                if (!session.Sets.TryGet(setName, TargetId, out var before, out var setError))
-                    return Response.Fail(request.Id, Status.Invalido, "copy_monitor verificar: no hay inventario previo $" + setName + " (" + (setError ?? "ejecute fase=preflight antes de copiar") + ")");
-                var beforeSet = new HashSet<long>(before);
+                // AUD-12: el inventario previo sale del almacén persistente del intento (sobrevive a reconexiones y reinicios), no de la sesión.
+                ReceiptStore.Baseline baseline;
+                try { baseline = store.LoadBaseline(attemptKey); }
+                catch (Exception ex) when (ex is System.IO.InvalidDataException || ex is TimeoutException || ex is System.IO.IOException)
+                { return Response.Fail(request.Id, Status.Conflicto, "copy_monitor verificar: " + ex.Message); }
+                if (baseline == null)
+                    return Response.Fail(request.Id, Status.Invalido, "copy_monitor verificar: no hay inventario inicial de este intento (documento, vínculo y clave): ejecute fase=preflight antes de copiar");
+                if (baseline.DocumentIdentity != probe.DocumentIdentity || baseline.LinkIdentity != probe.LinkIdentity)
+                    return Response.Fail(request.Id, Status.Conflicto, "copy_monitor verificar: el inventario inicial pertenece a otro documento o vínculo");
+                datos["inventario_inicial"] = new Dictionary<string, object> { ["elementos"] = (long)baseline.Ids.Count, ["creado"] = baseline.CreatedUtc.ToString("o", CultureInfo.InvariantCulture), ["sha256"] = baseline.Sha256 };
+                var beforeSet = new HashSet<long>(baseline.Ids);
                 var hostBefore = probe.Host.Where(h => beforeSet.Contains(h.Id)).ToList();
                 var report = CopyMonitorVerifier.Verify(probe.Source, hostBefore, probe.Host, probe.Transform, maps, probe.LinkInstanceId);
                 foreach (var kv in report) datos[kv.Key] = kv.Value;
