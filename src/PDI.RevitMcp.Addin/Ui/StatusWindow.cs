@@ -30,7 +30,13 @@ namespace PDI.RevitMcp.Addin.Ui
         private readonly TextBlock _subtitle, _pillText;
         private readonly Border _pill;
         private readonly StackPanel _summary = new StackPanel(), _agents = new StackPanel(), _activity = new StackPanel(),
-            _safety = new StackPanel(), _perf = new StackPanel(), _engine = new StackPanel();
+            _safety = new StackPanel(), _perf = new StackPanel(), _engine = new StackPanel(), _ops = new StackPanel();
+        /// <summary>#5 (0.9.1): filtro del historial de operaciones largas (null = todas).</summary>
+        private string _opsFilter;
+        private static readonly (string Label, string Estado)[] OpsFilters =
+        {
+            ("Todas", null), ("Con diferencias", Status.ConDiferencias), ("Inciertas", Status.Desconocido), ("Errores", Status.Error), ("Canceladas", Status.Cancelado), ("Conflictos", Status.Conflicto),
+        };
         private readonly Button _pause;
         private readonly DispatcherTimer _timer;
         private string _lastSignature;
@@ -82,6 +88,7 @@ namespace PDI.RevitMcp.Addin.Ui
             var body = new StackPanel();
             body.Children.Add(Section("Resumen", _summary));
             body.Children.Add(Section("Agentes", _agents));
+            body.Children.Add(Section("Operaciones largas", _ops));
             body.Children.Add(Section("Seguridad y recuperación", _safety));
             body.Children.Add(Section("Motor C#", _engine));
             body.Children.Add(Section("Rendimiento (últimas 200 solicitudes)", _perf));
@@ -121,7 +128,11 @@ namespace PDI.RevitMcp.Addin.Ui
                 try { _lastBlock = key == null ? null : Runtime.Plans.CheckWritable(key); }
                 catch (Exception ex) { _lastBlock = new DocWriteBlock { DocKey = key }; _lastBlock.Errors.Add(ex.Message); }
             }
-            var sig = string.Join("|", sessions.Select(x => x.Id + x.Requests + x.Active + x.AgentName + AgentIdentity.Presence(x, now))) + "#" + closed.Count + "#" + paused + "#" +
+            (List<Job> Running, List<OperationHistory.Record> Recent, Dictionary<string, object> Scheduler) ops = (new List<Job>(), new List<OperationHistory.Record>(), null);
+            string opsError = null;
+            try { if (Runtime.Operations != null) ops = Runtime.Operations(_opsFilter, null); } catch (Exception ex) { opsError = ex.Message; }
+            var opsSig = string.Join(",", ops.Running.Select(j => j.Id + j.Done + j.Phase)) + "/" + (ops.Recent.FirstOrDefault()?.JobId) + ops.Recent.Count + _opsFilter + opsError;
+            var sig = opsSig + "§" + string.Join("|", sessions.Select(x => x.Id + x.Requests + x.Active + x.AgentName + AgentIdentity.Presence(x, now))) + "#" + closed.Count + "#" + paused + "#" +
                       activity.Count + (activity.LastOrDefault()?["t"]) + "#" + Runtime.ActiveDocTitle + "#" + Runtime.HeldCount + "#" + Runtime.BlockDynamicCode + "#" +
                       (_lastBlock?.Blocked ?? false) + "#" + (now - StartedUtc).TotalMinutes.ToString("0", CultureInfo.InvariantCulture);
             if (!force && sig == _lastSignature) return;
@@ -136,6 +147,7 @@ namespace PDI.RevitMcp.Addin.Ui
 
             FillSummary(sessions, activity, now);
             FillAgents(sessions, closed, now);
+            FillOps(ops.Running, ops.Recent, ops.Scheduler, opsError);
             FillSafety();
             FillEngine();
             FillPerf(activity);
@@ -204,6 +216,67 @@ namespace PDI.RevitMcp.Addin.Ui
                                " " + Theme.Ago(c.ClosedUtc) + " · " + c.Requests + " solicitudes, " + c.Errors + " errores",
                         FontSize = 12, Foreground = Theme.B(Theme.Muted), Margin = new Thickness(2, 2, 0, 0),
                     });
+            }
+        }
+
+        /// <summary>
+        /// #5 (0.9.1): operaciones largas en curso (con Cancelar) e historial reciente con filtro por estado y consejo de reintento.
+        /// Es el panel de la persona en su Revit: muestra todas las sesiones. Cancelar pide confirmación y sólo señala el token del
+        /// trabajo; si ya había cambios aplicados, el trabajo termina como cancelado y el historial aconseja reconciliar.
+        /// </summary>
+        private void FillOps(List<Job> running, List<OperationHistory.Record> recent, Dictionary<string, object> scheduler, string error)
+        {
+            _ops.Children.Clear();
+            if (error != null) { Kv("Estado", "no disponible: " + error, _ops); return; }
+            if (scheduler != null)
+                Kv("Planificador", "en curso " + scheduler["en_curso"] + " de " + scheduler["max_en_curso"] + " · en cola " + scheduler["en_cola"] + " · máximo por agente " + scheduler["max_por_agente"] +
+                                   " · rechazadas por cola llena " + scheduler["rechazadas_por_cola_llena"], _ops);
+            if (running.Count == 0) Kv("En curso", "ninguna", _ops);
+            foreach (var j in running)
+            {
+                var g = new Grid { Margin = new Thickness(0, 3, 0, 3) };
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                g.Children.Add(new TextBlock
+                {
+                    Text = j.Id + " · " + j.Kind + (j.Total > 0 ? " · " + j.Done + "/" + j.Total : "") + (string.IsNullOrEmpty(j.Phase) ? "" : " · " + j.Phase) + " · " + Theme.Ago(j.CreatedUtc),
+                    TextWrapping = TextWrapping.Wrap, FontSize = 12, Foreground = Theme.B(Theme.Ink), VerticalAlignment = VerticalAlignment.Center,
+                });
+                var cancel = Theme.Button("Cancelar", Theme.Kind.Quiet);
+                var id = j.Id; var kind = j.Kind;
+                cancel.Click += (s, e) =>
+                {
+                    if (MessageBox.Show("¿Cancelar " + id + " (" + kind + ")?\n\nSi ya aplicó cambios, quedarán como estén y habrá que comprobar el modelo.", Brand.Product, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+                    bool ok = false;
+                    try { ok = Runtime.CancelOperation != null && Runtime.CancelOperation(id); } catch (Exception ex) { MessageBox.Show("No se pudo cancelar: " + ex.Message, Brand.Product); }
+                    if (!ok) MessageBox.Show("El trabajo ya había terminado.", Brand.Product);
+                    Refresh(true);
+                };
+                Grid.SetColumn(cancel, 1);
+                g.Children.Add(cancel);
+                _ops.Children.Add(g);
+            }
+            var filters = new WrapPanel { Margin = new Thickness(0, 8, 0, 4) };
+            foreach (var (label, estado) in OpsFilters)
+            {
+                var b = Theme.Button(label, _opsFilter == estado ? Theme.Kind.Primary : Theme.Kind.Quiet);
+                var est = estado;
+                b.Click += (s, e) => { _opsFilter = est; Refresh(true); };
+                filters.Children.Add(b);
+            }
+            _ops.Children.Add(filters);
+            if (recent.Count == 0) _ops.Children.Add(Theme.Label("Sin operaciones terminadas con este filtro.", 13, false, Theme.Muted));
+            foreach (var r in recent)
+            {
+                var bad = r.Retry == "reconciliar_antes" || r.Retry == "revisar_diferencias";
+                var advice = r.Retry == "no_necesario" ? "" : r.Retry == "reintentable" ? " · se puede repetir (no se aplicó nada)"
+                           : r.Retry == "revisar_diferencias" ? " · REVISAR: se aplicó pero no coincide con lo pedido" : " · COMPROBAR el modelo antes de repetir";
+                _ops.Children.Add(new TextBlock
+                {
+                    Text = r.FinishedUtc.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture) + " · " + r.JobId + " · " + r.Kind + " · " + r.Estado + " · " + FormatMs(r.Ms) + advice +
+                           (string.IsNullOrEmpty(r.Error) ? "" : " · " + r.Error),
+                    TextWrapping = TextWrapping.Wrap, FontSize = 12, Foreground = Theme.B(bad ? Theme.Darken(Theme.Amber, 0.75) : Theme.Ink), Margin = new Thickness(2, 1, 0, 1),
+                });
             }
         }
 

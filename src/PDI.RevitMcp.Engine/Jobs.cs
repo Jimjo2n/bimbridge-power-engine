@@ -224,6 +224,12 @@ namespace PDI.RevitMcp.Engine
             lock (_lock) return _jobs.Values.Where(j => j.SessionId == sessionId || (task != null && j.Task == task)).OrderByDescending(j => j.CreatedUtc).ToList();
         }
 
+        /// <summary>Todos los trabajos en curso. Sólo para la persona en el panel de Revit (los agentes usan <see cref="ForOwner"/>).</summary>
+        public List<Job> AllRunning()
+        {
+            lock (_lock) return _jobs.Values.Where(j => !j.IsFinal).OrderBy(j => j.CreatedUtc).ToList();
+        }
+
         /// <summary>AUD-13: trabajos de la misma sesión o del mismo agente con nombre (para el historial; el nombre de tarea no cuenta).</summary>
         public List<Job> ForOwner(string sessionId, string agentId)
         {

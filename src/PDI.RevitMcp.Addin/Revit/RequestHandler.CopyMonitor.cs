@@ -44,6 +44,20 @@ namespace PDI.RevitMcp.Addin.Revit
             return new Response { Id = request.Id, Rev = probe.Rev, Datos = datos };
         }
 
+        /// <summary>0.9.1 (Bloque I): reparto justo de operaciones largas entre agentes (guardar, sincronizar, exportar).</summary>
+        private readonly OperationScheduler _scheduler = new OperationScheduler();
+
+        /// <summary>Panel de estado (#5): lo ve la PERSONA en su Revit, por eso incluye todas las sesiones. Sólo memoria; nunca la API de Revit.</summary>
+        public (List<Job> Running, List<OperationHistory.Record> Recent, Dictionary<string, object> Scheduler) OperationsForPanel(string estado, string texto)
+        {
+            var recent = _history == null ? new List<OperationHistory.Record>()
+                : _history.Query(new OperationHistory.Scope { SeeAll = true }, estado, null, null, null, texto, 1, 25).Page;
+            return (_jobs.AllRunning(), recent, _scheduler.Stats());
+        }
+
+        /// <summary>Cancelación pedida por la persona desde el panel. Devuelve false si el trabajo ya terminó o no existe.</summary>
+        public bool CancelFromPanel(string jobId) => _jobs.Cancel(_jobs.Get(jobId));
+
         private OperationHistory _history;
 
         /// <summary>0.9.1 (Bloque I): todo trabajo terminado queda en el historial persistente (el error al abrirlo no impide trabajar).</summary>

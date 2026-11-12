@@ -6,7 +6,7 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 
 ## Capacidades por estado
 
-- `OFFLINE_VERIFIED`: 12
+- `OFFLINE_VERIFIED`: 13
 - `IMPLEMENTED_UNVERIFIED`: 72
 - `DYNAMIC_CSHARP_ONLY`: 92
 - `MISSING`: 7
@@ -62,7 +62,7 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 | F32 | 4 | IMPLEMENTED_UNVERIFIED 1, DYNAMIC_CSHARP_ONLY 2, MISSING 1 | 13 |
 | F33 | 2 | DYNAMIC_CSHARP_ONLY 1, UNKNOWN 1 | 6 |
 | F34 | 6 | IMPLEMENTED_UNVERIFIED 1, DYNAMIC_CSHARP_ONLY 4, UNKNOWN 1 | 20 |
-| F35 | 8 | OFFLINE_VERIFIED 6, IMPLEMENTED_UNVERIFIED 1, NOT_APPLICABLE 1 | 9 |
+| F35 | 9 | OFFLINE_VERIFIED 7, IMPLEMENTED_UNVERIFIED 1, NOT_APPLICABLE 1 | 9 |
 | F36 | 3 | OFFLINE_VERIFIED 1, IMPLEMENTED_UNVERIFIED 2 | 7 |
 | F37 | 6 | OFFLINE_VERIFIED 4, UNKNOWN 1, NOT_APPLICABLE 1 | 25 |
 
@@ -278,11 +278,12 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 | F35-AGENTHOST-001 | Planes IR durables con recuperación entre procesos | `OFFLINE_VERIFIED` | engine | verificado contra el backend simulado; contra Revit, pendiente de campaña |
 | F35-AUDIT-001 | Auditoría durable con group commit y recuperación | `OFFLINE_VERIFIED` | engine |  |
 | F35-EXEC-001 | Ejecutar C# dinámico (consulta, ensayo, ejecutar) | `IMPLEMENTED_UNVERIFIED` | exec | no es un sandbox; efectos externos sin rollback |
-| F35-HISTORY-001 | Historial de operaciones con filtros, cancelación y consejo de reintento seguro | `OFFLINE_VERIFIED` | engine | consulta por check name=historial; la vista en el panel de estado (#5) queda pendiente |
+| F35-HISTORY-001 | Historial de operaciones con filtros, cancelación y consejo de reintento seguro | `OFFLINE_VERIFIED` | engine | consulta por check name=historial (ámbito propio; lo ajeno sólo con historial_compartido) y sección «Operaciones largas» del panel de estado con filtro y Cancelar; la ventana WPF no tiene prueba automática |
 | F35-IDENTITY-001 | Identidad nominal y correlación de solicitudes | `OFFLINE_VERIFIED` | engine |  |
 | F35-OTHER-TOOLS-001 | Dynamo, macros, gestor de complementos y personalización | `NOT_APPLICABLE` | none | otras herramientas de automatización o personalización de la interfaz; BIMBRIDGE tiene su propio motor (exec, tareas, planes) |
 | F35-QUERY-SNAP-001 | Lectura paginada desde una instantánea ligada a revisión | `OFFLINE_VERIFIED` | engine |  |
 | F35-RECIPE-001 | Tareas por recetas con concesión de capacidades | `OFFLINE_VERIFIED` | engine |  |
+| F35-SCHED-001 | Planificador de operaciones largas entre agentes | `OFFLINE_VERIFIED` | engine | gobierna las operaciones de documento (guardar, sync, exportar); commit y exec siguen con la cola propia del hilo de Revit |
 | F36-HEALTH-001 | Salud del modelo: avisos, duplicados, parámetros vacíos y conectores MEP desconectados | `IMPLEMENTED_UNVERIFIED` | query:check model_health | sólo lectura; las comprobaciones estructurales de Revit (apoyos, consistencia analítica) no se reproducen. Lectura en Revit pendiente de la campaña nativa |
 | F36-QC-INDEP-001 | Verificación independiente contra fuente declarada | `OFFLINE_VERIFIED` | engine |  |
 | F36-QC-MANIFEST-001 | QC uno a uno contra manifiesto | `IMPLEMENTED_UNVERIFIED` | exec |  |

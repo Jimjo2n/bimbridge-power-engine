@@ -949,7 +949,7 @@ namespace PDI.RevitMcp.Addin.Revit
             var sw = Stopwatch.StartNew();
             var job = _jobs.Create(session.Id, "doc " + verb);
             job.Task = Arg.GetString(a, Wire.TaskArg);
-            _jobs.Run(job, async () =>
+            async Task Body()
             {
                 job.Phase = "esperando a Revit";
                 var r = await RunMain((app, watch, budget) =>
@@ -985,6 +985,18 @@ namespace PDI.RevitMcp.Addin.Revit
                 if (diffs.Count > 0) datos["diferencias"] = diffs.Cast<object>().ToList();
                 datos["ms"] = sw.ElapsedMilliseconds;
                 _jobs.Complete(job, datos);
+            }
+            // 0.9.1 (Bloque I): las operaciones de documento pasan por el planificador: reparto justo entre agentes y una sola a la vez
+            // por documento. En cola no se ha tocado nada: cola llena o cancelación en cola terminan como rechazo (reintentable).
+            var owner = Correlation.Current?.AgentId ?? session.Id;
+            var exclusive = "doc:" + (TargetId ?? "activo");
+            _jobs.Run(job, async () =>
+            {
+                var started = false;
+                job.Phase = "en cola del planificador";
+                try { await _scheduler.Run(owner, exclusive, async () => { started = true; await Body().ConfigureAwait(false); return true; }, job.Cts.Token).ConfigureAwait(false); }
+                catch (SchedulerBusyException ex) { _jobs.Fail(job, Status.Rechazado, ex.Message + ". No se aplicó nada."); }
+                catch (OperationCanceledException) when (!started) { _jobs.Fail(job, Status.Rechazado, "cancelado en la cola del planificador antes de empezar: no se aplicó nada"); }
             });
             var resp = await AwaitJob(request, job, ct).ConfigureAwait(false);
             if (resp.Estado == Status.Ok && diffs.Count > 0)

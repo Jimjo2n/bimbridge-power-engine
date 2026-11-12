@@ -8358,7 +8358,41 @@
     "verifier": "historial y JobStore con trabajos sint\u00E9ticos",
     "idempotency": null,
     "recovery": null,
-    "limitations": "consulta por check name=historial; la vista en el panel de estado (#5) queda pendiente",
+    "limitations": "consulta por check name=historial (\u00E1mbito propio; lo ajeno s\u00F3lo con historial_compartido) y secci\u00F3n \u00ABOperaciones largas\u00BB del panel de estado con filtro y Cancelar; la ventana WPF no tiene prueba autom\u00E1tica",
+    "ui_command": [],
+    "priority": "P0",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F35-SCHED-001",
+    "domain": "F35",
+    "subdomain": "operaciones largas",
+    "name": "Planificador de operaciones largas entre agentes",
+    "name_en": "Long-operation scheduler",
+    "operation": "UPDATE",
+    "expected_postconditions": "l\u00EDmite global y por agente, una operaci\u00F3n a la vez por documento, reparto justo, cola acotada con rechazo y cancelaci\u00F3n en cola sin efectos",
+    "categories": [],
+    "document_kind": "any",
+    "implementation_path": "engine",
+    "api_surface": [],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "OFFLINE_VERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Engine/OperationScheduler.cs"
+    ],
+    "test_ids": [
+      "OperationSchedulerTests"
+    ],
+    "verifier": "pruebas deterministas de orden, l\u00EDmites, exclusi\u00F3n, cancelaci\u00F3n y fallo",
+    "idempotency": null,
+    "recovery": null,
+    "limitations": "gobierna las operaciones de documento (guardar, sync, exportar); commit y exec siguen con la cola propia del hilo de Revit",
     "ui_command": [],
     "priority": "P0",
     "native_status": "not_tested"

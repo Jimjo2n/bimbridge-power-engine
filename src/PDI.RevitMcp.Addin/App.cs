@@ -99,6 +99,8 @@ namespace PDI.RevitMcp.Addin
 
                 var handler = new RequestHandler(_main, _tracker, config, revitVersion, addinVersion, plans, hold, pause);
                 Runtime.EngineDiagnostics = handler.Diagnostics;
+                Runtime.Operations = handler.OperationsForPanel;
+                Runtime.CancelOperation = handler.CancelFromPanel;
                 _host = new PipeHost(pipeName, CreateSecurePipe, sessions, handler, config, _journal, Log);
                 _host.Start();
 
