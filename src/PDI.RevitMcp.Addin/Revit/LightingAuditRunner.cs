@@ -31,6 +31,10 @@ namespace PDI.RevitMcp.Addin.Revit
         public List<string> Levels => _levels;
         public long Rev;
         public string Error;
+        /// <summary>0.9.1: caché de nombres de la auditoría (aciertos y fallos observados para las métricas).</summary>
+        public readonly ElementFields.NameCache Names = new ElementFields.NameCache();
+        /// <summary>Luminarias y etiquetas abiertas (observado).</summary>
+        public long ElementsRead;
 
         /// <param name="levels">Filtrar luminarias por nivel (vacío = todas).</param>
         /// <param name="views">null = sin conteo por vista; "rcp" = planos de techo con tags de luminarias; "rcp_todos" = todos los
@@ -55,17 +59,22 @@ namespace PDI.RevitMcp.Addin.Revit
             {
                 Rev = tracker.For(doc)?.Rev ?? 0;
                 var ws = doc.IsWorkshared ? doc.GetWorksetTable() : null;
+                // 0.9.1: una sola lista de campos y cachés por auditoría (nivel por id de nivel, workset por id): miles de luminarias
+                // comparten unas pocas decenas de niveles y worksets.
+                var lvlField = new List<string> { "lvl" };
+                var wsNames = new Dictionary<int, string>();
                 foreach (var e in new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_LightingFixtures).WhereElementIsNotElementType())
                 {
                     AllFixtureIds.Add(Ids.ToLong(e.Id));
-                    var lvl = ElementFields.Read(doc, e, new List<string> { "lvl" })["lvl"] as string;
+                    ElementsRead++;
+                    var lvl = ElementFields.Read(doc, e, lvlField, Names)["lvl"] as string;
                     if (_levels.Count > 0 && !_levels.Any(l => string.Equals(l, lvl, StringComparison.OrdinalIgnoreCase))) continue;
                     var fi = e as FamilyInstance;
                     Fixtures.Add(new LightingAudit.Fixture
                     {
                         Id = Ids.ToLong(e.Id),
                         Level = lvl,
-                        Workset = ws?.GetWorkset(e.WorksetId)?.Name,
+                        Workset = ws == null ? null : (wsNames.TryGetValue(e.WorksetId.IntegerValue, out var wn) ? wn : wsNames[e.WorksetId.IntegerValue] = ws.GetWorkset(e.WorksetId)?.Name),
                         Type = fi?.Symbol != null ? fi.Symbol.FamilyName + ": " + fi.Symbol.Name : e.Name,
                     });
                 }
@@ -75,16 +84,26 @@ namespace PDI.RevitMcp.Addin.Revit
 
             if (_phase == 1)
             {
+                // 0.9.1: nombre y nivel de la vista una vez por vista, no por etiqueta (cientos de etiquetas por vista).
+                var viewInfo = new Dictionary<long, (string Name, string Level)>();
                 foreach (var e in new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_LightingFixtureTags).WhereElementIsNotElementType())
                 {
                     if (!(e is IndependentTag tag)) continue;
-                    var view = doc.GetElement(tag.OwnerViewId) as View;
+                    ElementsRead++;
+                    var vid = Ids.ToLong(tag.OwnerViewId);
+                    if (!viewInfo.TryGetValue(vid, out var vi))
+                    {
+                        Names.Misses++;
+                        var view = doc.GetElement(tag.OwnerViewId) as View;
+                        viewInfo[vid] = vi = (view?.Name, (view as ViewPlan)?.GenLevel?.Name);
+                    }
+                    else Names.Hits++;
                     Tags.Add(new LightingAudit.Tag
                     {
                         Id = Ids.ToLong(tag.Id),
-                        ViewId = Ids.ToLong(tag.OwnerViewId),
-                        ViewName = view?.Name,
-                        ViewLevel = (view as ViewPlan)?.GenLevel?.Name,
+                        ViewId = vid,
+                        ViewName = vi.Name,
+                        ViewLevel = vi.Level,
                         Tagged = TaggedIds(tag),
                     });
                 }

@@ -3644,7 +3644,7 @@
     "test_ids": [
       "NativeWorkflowTests"
     ],
-    "verifier": "CopyMonitorVerifier (correspondencia inferida por tipo y posici\u00F3n; supervisi\u00F3n por IsMonitoringLinkElement)",
+    "verifier": "CopyMonitorVerifier contra expectativas CONGELADAS en el preflight (anfitri\u00F3n, v\u00EDnculo y revisi\u00F3n, origen, transformaci\u00F3n, mapeo, exclusiones, categor\u00EDa); un cambio del objetivo es conflicto. Correspondencia inferida por tipo y posici\u00F3n; supervisi\u00F3n por IsMonitoringLinkElement",
     "idempotency": null,
     "recovery": null,
     "limitations": "s\u00F3lo lectura: la copia la hace el usuario con los pasos devueltos (no hay ejecutor de UI). Lectura en Revit pendiente de la campa\u00F1a nativa",
@@ -4437,7 +4437,7 @@
     "verifier": "escenarios sint\u00E9ticos con expectativas conocidas",
     "idempotency": null,
     "recovery": null,
-    "limitations": "valida el documento y el plan; la ejecuci\u00F3n en Revit queda pendiente de campa\u00F1a",
+    "limitations": "valida el documento y el plan y lo convierte en planes tipados con testigo de origen; el commit aplica la clave derivada del contenido (idempotente sin que el agente la propague, sobre el diario de operaciones). La aplicaci\u00F3n en Revit queda pendiente de campa\u00F1a",
     "ui_command": [],
     "priority": "P0",
     "native_status": "not_tested"

@@ -41,6 +41,11 @@ namespace PDI.RevitMcp.Addin.Revit
             var trunc = probe.Truncation();
             if (trunc.Count > 0) datos["truncado"] = trunc;   // modelo muy grande: se dice qué quedó sin revisar
             datos["ms"] = sw.ElapsedMilliseconds;
+            // 0.9.1: métricas para el benchmark (observadas: hilo de Revit, elementos leídos, aciertos de caché de tipos y niveles).
+            if (Arg.GetBool(request.Args, "metricas") == true)
+            datos["metricas"] = WorkflowMetrics.FromMainThread(sw.ElapsedMilliseconds, result.WaitMs, result.BusyMs, result.Slices, result.MaxSliceMs)
+                .Observe("elements_read", probe.Elements.Count).Observe("elements_written", 0).Observe("transactions", 0)
+                .Observe("cache_hits", probe.CacheHits).Observe("cache_misses", probe.CacheMisses).ToJson();
             return new Response { Id = request.Id, Rev = probe.Rev, Datos = datos };
         }
 

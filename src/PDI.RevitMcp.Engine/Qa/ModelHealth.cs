@@ -40,7 +40,10 @@ namespace PDI.RevitMcp.Engine.Qa
         public static List<List<long>> Duplicates(IEnumerable<Element> elements, double tol = DuplicateTolerance)
         {
             var groups = new List<List<long>>();
-            foreach (var g in elements.Where(e => e.HasLocation && !double.IsNaN(e.X)).GroupBy(e => (e.Category ?? "") + "|" + e.Family + "|" + e.Type + "|" + e.Level, StringComparer.Ordinal))
+            // 0.9.1: coordenadas no finitas o fuera de rango de cuantización se excluyen (Math.Floor(x/tol) desbordaría long).
+            const double MaxQuant = 1e9;
+            bool Finite(double v) => !double.IsNaN(v) && !double.IsInfinity(v) && Math.Abs(v) < MaxQuant;
+            foreach (var g in elements.Where(e => e.HasLocation && Finite(e.X) && Finite(e.Y) && Finite(e.Z) && Finite(e.RotationDeg)).GroupBy(e => (e.Category ?? "") + "|" + e.Family + "|" + e.Type + "|" + e.Level, StringComparer.Ordinal))
             {
                 // Rejilla espacial: cada celda de tamaño tol; se comparan vecinos de las celdas adyacentes (O(n) esperado, no O(n²)).
                 var cell = new Dictionary<(long, long, long), List<Element>>();
@@ -52,15 +55,16 @@ namespace PDI.RevitMcp.Engine.Qa
                     if (seen.Contains(e.Id)) continue;
                     var (cx, cy, cz) = Key(e);
                     var grp = new List<long> { e.Id };
+                    var inGrp = new HashSet<long> { e.Id };   // pertenencia O(1): en grupos muy densos List.Contains era cuadrático
                     for (var dx = -1; dx <= 1; dx++) for (var dy = -1; dy <= 1; dy++) for (var dz = -1; dz <= 1; dz++)
                     {
                         if (!cell.TryGetValue((cx + dx, cy + dy, cz + dz), out var near)) continue;
                         foreach (var o in near)
                         {
-                            if (o.Id == e.Id || seen.Contains(o.Id) || grp.Contains(o.Id)) continue;
+                            if (o.Id == e.Id || seen.Contains(o.Id) || inGrp.Contains(o.Id)) continue;
                             var dist = Math.Sqrt((o.X - e.X) * (o.X - e.X) + (o.Y - e.Y) * (o.Y - e.Y) + (o.Z - e.Z) * (o.Z - e.Z));
                             var dr = Math.Abs(((o.RotationDeg - e.RotationDeg) % 360 + 540) % 360 - 180);
-                            if (dist <= tol && dr <= 0.5) grp.Add(o.Id);
+                            if (dist <= tol && dr <= 0.5) { grp.Add(o.Id); inGrp.Add(o.Id); }
                         }
                     }
                     if (grp.Count > 1) { foreach (var id in grp) seen.Add(id); groups.Add(grp.OrderBy(x => x).ToList()); }

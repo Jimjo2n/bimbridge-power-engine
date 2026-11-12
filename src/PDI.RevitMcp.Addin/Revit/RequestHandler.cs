@@ -459,6 +459,11 @@ namespace PDI.RevitMcp.Addin.Revit
                 };
             }
             datos["ms"] = sw.ElapsedMilliseconds;
+            // 0.9.1: métricas del benchmark sólo si se piden (no engordan cada respuesta).
+            if (Arg.GetBool(request.Args, "metricas") == true || Arg.GetBool(request.Args, "timing") == true)
+                datos["metricas"] = WorkflowMetrics.FromMainThread(sw.ElapsedMilliseconds, result.WaitMs, result.BusyMs, result.Slices, result.MaxSliceMs)
+                    .Observe("elements_read", runner.ElementsRead).Observe("elements_written", 0).Observe("transactions", 0)
+                    .Observe("cache_hits", runner.Names.Hits).Observe("cache_misses", runner.Names.Misses).ToJson();
             return new Response { Id = request.Id, Rev = runner.Rev, Datos = datos };
         }
 
@@ -526,6 +531,11 @@ namespace PDI.RevitMcp.Addin.Revit
                 datos["conjuntos_guardados"] = new List<object>(sets.Keys);
             }
             datos["ms"] = sw.ElapsedMilliseconds;
+            // 0.9.1: métricas del benchmark sólo si se piden (no engordan cada respuesta).
+            if (Arg.GetBool(request.Args, "metricas") == true || Arg.GetBool(request.Args, "timing") == true)
+                datos["metricas"] = WorkflowMetrics.FromMainThread(sw.ElapsedMilliseconds, result.WaitMs, result.BusyMs, result.Slices, result.MaxSliceMs)
+                    .Observe("elements_read", runner.ElementsRead).Observe("elements_written", 0).Observe("transactions", 0)
+                    .Observe("cache_hits", runner.Names.Hits).Observe("cache_misses", runner.Names.Misses).ToJson();
             return new Response { Id = request.Id, Rev = runner.Rev, Datos = datos };
         }
 

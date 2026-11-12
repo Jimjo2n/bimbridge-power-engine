@@ -260,7 +260,7 @@ namespace PDI.RevitMcp.Engine.Coverage
                     Strategy = "query:check copy_monitor", Status = CoverageStatus.IMPLEMENTED_UNVERIFIED,
                     Implementation = new[] { "src/PDI.RevitMcp.Addin/Revit/CopyMonitorProbe.cs", "src/PDI.RevitMcp.Addin/Revit/RequestHandler.CopyMonitor.cs", "src/PDI.RevitMcp.Engine/Workflows/CopyMonitorVerifier.cs", "src/PDI.RevitMcp.Engine/Workflows/NativeCapabilities.cs" },
                     Tests = new[] { "NativeWorkflowTests" }, PostableCommands = new[] { "CopyMonitorSelectLink" },
-                    Verifier = "CopyMonitorVerifier (correspondencia inferida por tipo y posición; supervisión por IsMonitoringLinkElement)",
+                    Verifier = "CopyMonitorVerifier contra expectativas CONGELADAS en el preflight (anfitrión, vínculo y revisión, origen, transformación, mapeo, exclusiones, categoría); un cambio del objetivo es conflicto. Correspondencia inferida por tipo y posición; supervisión por IsMonitoringLinkElement",
                     Limitations = "sólo lectura: la copia la hace el usuario con los pasos devueltos (no hay ejecutor de UI). Lectura en Revit pendiente de la campaña nativa", Priority = "P0" },
                 NoApi("F29-CR-001", "F29", "coordination review", "Coordination Review: revisar y resolver avisos de monitorización", "Coordination Review", "VERIFY",
                     "avisos de monitorización revisados con acción registrada", new string[0], new[] { "CoordinationReviewUseCurrentProject", "CoordinationSelectLink" },
@@ -305,7 +305,7 @@ namespace PDI.RevitMcp.Engine.Coverage
                     "clasificación con observaciones sintéticas", "las observaciones de registro por cliente se miden fuera del motor (instalador / Bridge)"),
                 Engine("F37-PDF-PLAN-001", "F37", "PDF→Revit", "Plan de colocación desde PDF (documento → plan)", "PDF to placement plan", "CREATE",
                     "plan de colocación con trazabilidad e incertidumbre explícita", new[] { "src/PDI.RevitMcp.Engine/PowerEngine/Workflows/PdfToPlan.cs" }, new[] { "PdfToModelWorkflowTests", "AgentHostDocumentTests" },
-                    "escenarios sintéticos con expectativas conocidas", "valida el documento y el plan; la ejecución en Revit queda pendiente de campaña"),
+                    "escenarios sintéticos con expectativas conocidas", "valida el documento y el plan y lo convierte en planes tipados con testigo de origen; el commit aplica la clave derivada del contenido (idempotente sin que el agente la propague, sobre el diario de operaciones). La aplicación en Revit queda pendiente de campaña"),
 
                 // ---------------- Garantías del motor (transversales) ----------------
                 Engine("F35-AUDIT-001", "F35", "garantías", "Auditoría durable con group commit y recuperación", "Durable audit journal", "VERIFY",

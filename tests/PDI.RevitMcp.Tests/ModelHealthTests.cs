@@ -28,6 +28,24 @@ namespace PDI.RevitMcp.Tests
         }
 
         [Fact]
+        public void Duplicates_DenseClusters_AreLinearish_AndNonFiniteOrHugeCoordsAreIgnored()
+        {
+            // Un grupo muy denso (20.000 elementos en el mismo punto) y 20.000 dispersos: debe terminar rápido y dar un solo grupo.
+            var els = new List<ModelHealth.Element>();
+            for (var i = 0; i < 20000; i++) els.Add(E(i + 1, 5, 5));
+            for (var i = 0; i < 20000; i++) els.Add(E(100000 + i, 1000 + i * 3.0, 2000));
+            els.Add(E(900001, double.NaN, 0)); els.Add(E(900002, double.PositiveInfinity, 0)); els.Add(E(900003, 1e15, 0));
+            els.Add(new ModelHealth.Element { Id = 900004, Category = "Lighting Fixtures", Family = "F", Type = "A", Level = "L1", X = 0, Y = 0, Z = double.NaN });
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var g = ModelHealth.Duplicates(els);
+            sw.Stop();
+            Assert.Single(g);
+            Assert.Equal(20000, g[0].Count);
+            Assert.DoesNotContain(g[0], id => id >= 900001);
+            Assert.True(sw.ElapsedMilliseconds < 5000, "tardó " + sw.ElapsedMilliseconds + " ms");
+        }
+
+        [Fact]
         public void Report_GroupsWarnings_FlagsMissingParams_DisconnectedConnectors_AndDocumentation()
         {
             var warnings = new List<ModelHealth.Warning>

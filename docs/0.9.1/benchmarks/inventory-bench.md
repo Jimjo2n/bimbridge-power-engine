@@ -5,21 +5,21 @@ No mide Revit. Tokens = bytes/4 (estimación). Tiempos: mediana de 5 construccio
 
 | Catálogo | Construcción ms | Retenido KB | Asignado KB | Por id µs | Por dominio µs | Texto µs | Versión+contexto µs | Página 20 filas bytes | Tokens est. | Catálogo completo bytes | Tokens est. completo |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| real (222) | 5.19 | 166 | 1621 | 0.088 | 1.9 | 3.6 | 22.7 | 875 | 218 | 209919 | 52479 |
-| 500 | 7.50 | 239 | 2911 | 0.062 | 3.4 | 14.0 | 77.8 | 1161 | 290 | 313778 | 78444 |
-| 1000 | 14.26 | 404 | 5715 | 0.070 | 2.7 | 22.8 | 66.7 | 1728 | 432 | 627810 | 156952 |
-| 5000 | 37.07 | 1514 | 28236 | 0.066 | 12.0 | 113.7 | 274.8 | 1729 | 432 | 3157045 | 789261 |
-| 10000 | 72.66 | 2226 | 56473 | 0.094 | 23.4 | 323.7 | 663.6 | 1729 | 432 | 6319230 | 1579807 |
+| real (223) | 2.79 | 166 | 1627 | 0.051 | 1.8 | 3.1 | 20.7 | 875 | 218 | 211355 | 52838 |
+| 500 | 3.19 | 239 | 2911 | 0.093 | 2.6 | 12.3 | 40.5 | 1161 | 290 | 313778 | 78444 |
+| 1000 | 5.98 | 404 | 5715 | 0.045 | 1.4 | 13.3 | 26.0 | 1728 | 432 | 627810 | 156952 |
+| 5000 | 22.67 | 1514 | 28236 | 0.039 | 7.6 | 70.5 | 126.2 | 1729 | 432 | 3157045 | 789261 |
+| 10000 | 40.76 | 2226 | 56473 | 0.045 | 15.3 | 182.3 | 468.7 | 1729 | 432 | 6319230 | 1579807 |
 
 ## Huella, serialización y memoria del proceso
 
 | Catálogo | Huella canónica (construir + SHA-256) ms | Serializar página µs | Serializar un contrato µs | Contrato bytes | Tokens est. | Montón del proceso KB (pico observado tras la serie) |
 |---|---|---|---|---|---|---|
-| real (222) | 45.44 | 16.7 | 12.9 | 945 | 236 | 14551 |
-| 500 | 30.34 | 41.7 | 18.7 | 654 | 163 | 16121 |
-| 1000 | 22.54 | 9.3 | 3.7 | 649 | 162 | 18772 |
-| 5000 | 90.50 | 8.1 | 4.3 | 665 | 166 | 36475 |
-| 10000 | 184.31 | 7.3 | 2.3 | 659 | 164 | 59712 |
+| real (223) | 21.33 | 12.3 | 10.5 | 945 | 236 | 14557 |
+| 500 | 8.24 | 16.2 | 8.3 | 654 | 163 | 16124 |
+| 1000 | 14.34 | 24.5 | 8.3 | 649 | 162 | 18770 |
+| 5000 | 78.44 | 5.0 | 2.0 | 665 | 166 | 36475 |
+| 10000 | 126.58 | 4.9 | 2.0 | 659 | 164 | 56314 |
 
 La fila «real» es el catálogo del producto en este commit. La huella es perezosa: no entra en la construcción ni en la carga del add-in; se calcula la primera vez que se pide `catalogo`.
 

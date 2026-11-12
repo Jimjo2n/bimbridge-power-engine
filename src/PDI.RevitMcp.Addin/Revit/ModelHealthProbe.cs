@@ -106,18 +106,26 @@ namespace PDI.RevitMcp.Addin.Revit
                     var e = doc.GetElement(_ids[_next]);
                     if (e == null) continue;
                     var fi = e as FamilyInstance;
-                    var row = new ModelHealth.Element
-                    {
-                        Id = Ids.ToLong(e.Id), Category = e.Category?.Name, Family = fi?.Symbol?.FamilyName ?? (doc.GetElement(e.GetTypeId()) as ElementType)?.FamilyName,
-                        Type = fi?.Symbol?.Name ?? doc.GetElement(e.GetTypeId())?.Name, Level = (doc.GetElement(e.LevelId) as Level)?.Name,
-                    };
+                    // 0.9.1: metadatos de tipo y nivel UNA vez por id (antes: hasta 3 doc.GetElement(typeId) por instancia, más uno por
+                    // parámetro requerido que no fuera de instancia). La caché vive sólo esta revisión: un probe nuevo por consulta.
+                    var tm = TypeMeta(doc, e, fi);
+                    var row = new ModelHealth.Element { Id = Ids.ToLong(e.Id), Category = e.Category?.Name, Family = tm.Family, Type = tm.Name, Level = LevelName(doc, e.LevelId) };
                     if (e.Location is LocationPoint lp) { row.X = lp.Point.X; row.Y = lp.Point.Y; row.Z = lp.Point.Z; row.RotationDeg = lp.Rotation * 180 / Math.PI; }
                     else if (e.Location is LocationCurve lc && lc.Curve.IsBound) { var m = lc.Curve.Evaluate(0.5, true); row.X = m.X; row.Y = m.Y; row.Z = m.Z; }
                     else row.HasLocation = false;
                     foreach (var p in _required)
                     {
-                        var prm = e.LookupParameter(p) ?? doc.GetElement(e.GetTypeId())?.LookupParameter(p);
-                        if (prm != null) row.Params[p] = prm.HasValue ? (prm.StorageType == StorageType.String ? prm.AsString() : prm.AsValueString()) ?? "" : "";
+                        // Instancia primero; si no la tiene, el valor de tipo (ya resuelto una vez por tipo: mismo valor para todas sus instancias).
+                        var prm = e.LookupParameter(p);
+                        if (prm != null) { row.Params[p] = prm.HasValue ? (prm.StorageType == StorageType.String ? prm.AsString() : prm.AsValueString()) ?? "" : ""; continue; }
+                        if (tm.TypeParams.TryGetValue(p, out var tv)) { if (tv != null) row.Params[p] = tv; }
+                        else
+                        {
+                            var tp = tm.Element?.LookupParameter(p);
+                            var v = tp == null ? null : tp.HasValue ? (tp.StorageType == StorageType.String ? tp.AsString() : tp.AsValueString()) ?? "" : "";
+                            tm.TypeParams[p] = v;
+                            if (v != null) row.Params[p] = v;
+                        }
                     }
                     Elements.Add(row);
                     var cm = fi?.MEPModel?.ConnectorManager ?? (e as MEPCurve)?.ConnectorManager;
@@ -181,6 +189,49 @@ namespace PDI.RevitMcp.Addin.Revit
         }
 
         private readonly Dictionary<long, int> _schedulesBySheet = new Dictionary<long, int>();
+
+        /// <summary>Metadatos de un tipo, resueltos una vez por id de tipo durante este probe.</summary>
+        private sealed class TypeInfo
+        {
+            public Element Element;
+            public string Family, Name;
+            /// <summary>Valor de cada parámetro requerido en el TIPO (null = el tipo no lo tiene).</summary>
+            public readonly Dictionary<string, string> TypeParams = new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+
+        private readonly Dictionary<long, TypeInfo> _types = new Dictionary<long, TypeInfo>();
+        private readonly Dictionary<long, string> _levels = new Dictionary<long, string>();
+        /// <summary>Aciertos y fallos (observados) de las cachés de tipo y nivel.</summary>
+        public long CacheHits, CacheMisses;
+
+        private TypeInfo TypeMeta(Document doc, Element e, FamilyInstance fi)
+        {
+            var tid = e.GetTypeId();
+            var k = tid == null || tid == ElementId.InvalidElementId ? long.MinValue : Ids.ToLong(tid);
+            if (_types.TryGetValue(k, out var t)) { CacheHits++; return t; }
+            CacheMisses++;
+            var te = k == long.MinValue ? null : doc.GetElement(tid);
+            t = new TypeInfo
+            {
+                Element = te,
+                Family = fi?.Symbol?.FamilyName ?? (te as ElementType)?.FamilyName,
+                Name = fi?.Symbol?.Name ?? te?.Name,
+            };
+            // Sin tipo no se cachea por id (no hay id que compartir).
+            if (k != long.MinValue) _types[k] = t;
+            return t;
+        }
+
+        private string LevelName(Document doc, ElementId id)
+        {
+            if (id == null || id == ElementId.InvalidElementId) return null;
+            var k = Ids.ToLong(id);
+            if (_levels.TryGetValue(k, out var n)) { CacheHits++; return n; }
+            CacheMisses++;
+            n = (doc.GetElement(id) as Level)?.Name;
+            _levels[k] = n;
+            return n;
+        }
 
         /// <summary>Lo que quedó fuera por los límites (vacío si se revisó todo).</summary>
         public Dictionary<string, object> Truncation()

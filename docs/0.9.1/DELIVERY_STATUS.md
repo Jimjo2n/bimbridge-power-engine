@@ -1,59 +1,42 @@
 # BIMBRIDGE 0.9.1 — estado de entrega (rama `feat/revit-functional-coverage-0.9.1`, PR #29)
 
-Estado: **candidato para nueva auditoría, sin campaña nativa**. Nada es NATIVE_VERIFIED. La versión del producto sigue en 0.9.0+commit (#23).
+Estado: **candidato a decisión de merge, sin campaña nativa**. Nada es NATIVE_VERIFIED. La versión del producto sigue en 0.9.0+commit (#23).
+Las cifras de este documento salen de `docs/0.9.1/capabilities/coverage.md` y `docs/0.9.1/inventory/revit-symbols-summary.json`, regenerados desde el código en este commit.
 
-## Inventario
-- **Símbolos públicos de la API** (RevitAPI + RevitAPIUI, Nice3point 2022.1.80 … 2026.4.10): 31.592 / 31.924 / 32.621 / 33.118 / 33.873 por versión
-  (tipos, constructores, métodos con firma completa, propiedades, campos, eventos, enums, herencia, obsoletos).
-  Listados gzip deterministas con SHA-256 del ensamblado y del listado: `docs/0.9.1/inventory/revit-symbols-*`. Reproducible (dos ejecuciones idénticas).
-  Diferencias: 2022→23 +755/−423, 23→24 +823/−126, 24→25 +754/−257, 25→26 +867/−112. Presencia técnica: no se infiere semántica.
-- **Capacidades**: 222 (`docs/0.9.1/capabilities/coverage.md`): OFFLINE_VERIFIED 12, IMPLEMENTED_UNVERIFIED 72, DYNAMIC_CSHARP_ONLY 92, MISSING 7,
-  UNKNOWN 32, UNSUPPORTED_BY_PUBLIC_API 2, NOT_APPLICABLE 5.
-- **Comandos de la cinta**: 596, todos enlazados a una capacidad. Por estado: IMPLEMENTED_UNVERIFIED 91, DYNAMIC_CSHARP_ONLY 256, UNKNOWN 189
-  (analizados, con investigación pendiente registrada), NOT_APPLICABLE 48 (interfaz/sesión), UNSUPPORTED 4, MISSING 8.
-  DYNAMIC_CSHARP_ONLY = hay API pública verificada en el listado; no es automatización completa.
-- **Descubrimiento**: `check name=cobertura` (filas compactas paginadas; contrato completo por id). Índice inmutable, sin reflexión ni hilo de Revit.
-  Benchmarks: `docs/0.9.1/benchmarks/inventory-bench.md` (catálogo real: construcción ≈1,7 ms, 87 KB retenidos; 10.000 sintéticas: ≈41 ms, 2,2 MB;
-  página de descubrimiento ≈0,4–1,7 KB ≈100–430 tokens estimados frente a 6,3 MB del catálogo completo de 10.000).
+## Inventario (fuente: registro generado)
+- **Símbolos públicos de la API** (RevitAPI + RevitAPIUI, Nice3point 2022.1.80 … 2026.4.10): 31.592 / 31.924 / 32.621 / 33.118 / 33.873 por versión, listados gzip deterministas con SHA-256 del ensamblado y del listado (`docs/0.9.1/inventory/revit-symbols-*`). Presencia técnica, sin semántica.
+- **Capacidades: 223**. OFFLINE_VERIFIED 13, IMPLEMENTED_UNVERIFIED 72, DYNAMIC_CSHARP_ONLY 92, MISSING 7, UNKNOWN 32, UNSUPPORTED_BY_PUBLIC_API 2, NOT_APPLICABLE 5.
+- **Comandos de la cinta: 596**, todos enlazados. Por estado: DYNAMIC_CSHARP_ONLY 256, IMPLEMENTED_UNVERIFIED 91, **UNKNOWN 189** (analizados, con investigación pendiente en `commands.json`), NOT_APPLICABLE 48, UNSUPPORTED_BY_PUBLIC_API 4, MISSING 8. DYNAMIC_CSHARP_ONLY = hay API pública verificada, no automatización completa.
+- **Descubrimiento**: `check name=cobertura` (filas compactas paginadas; contrato por id). Benchmarks del índice con el catálogo real de 223: `docs/0.9.1/benchmarks/inventory-bench.md`.
 
-## Hallazgos de auditoría corregidos (d772755)
-AUD-06 NaN/parámetros ausentes; AUD-07 recibos con bloqueo entre procesos, evidencia privilegiada e integración en `check copy_monitor`;
-AUD-08 dimensiones separadas y continuidad tras traspaso manual; AUD-09 commit ≠ postcondiciones (`con_diferencias`);
-AUD-10 fragmento durable antes de truncar con inyección de fallos; AUD-11 transformación completa (rotación, reflexión, traslación; rechaza escala, cizalla, inclinación).
+## Funcionalidad de la rama (estado real)
+| Pieza | Estado |
+|---|---|
+| Operaciones tipadas de modelado (nivel, rejilla, muro, suelo, techo, habitación, conducto, tubería, circuito, tabla) con verificación de lo creado | implementadas; 44 operaciones en el catálogo; efecto en Revit pendiente de campaña |
+| Copy/Monitor: preflight, traspaso manual, verificación | implementado de sólo lectura; **expectativas congeladas** por intento (AUD-20); correspondencia origen→copia **inferida**, no identidad; sin ejecutor de UI |
+| Recibos de flujos nativos | implementados con bloqueo entre procesos y evidencia privilegiada |
+| Exportación `doc ifc`, `doc tabla_csv` | implementadas, pasan por el planificador |
+| `model_health`, `historial`, `cobertura` | implementados (sólo lectura / memoria) |
+| Planificador de operaciones largas | implementado; gobierna operaciones de documento; **no** gobierna commit/exec (ver PERFORMANCE_HARDENING §G) |
+| Panel de estado #5 | sección «Operaciones largas» con filtro y Cancelar; ventana WPF sin prueba automática |
+| PDF→Revit | plan → planes tipados con testigo de origen; **idempotencia efectiva** (AUD-19); la aplicación en Revit queda para la campaña nativa |
+| Actualización en línea (solicitada por Abel) | implementada contra Releases públicas con verificación SHA-256; **sin prueba con una Release real**: el repositorio no tiene Releases |
 
-## Tercera ronda de auditoría (AUD-12 … AUD-17)
-- **AUD-12**: el inventario inicial de Copy/Monitor se guarda por clave de intento (`<clave>.inv`, escritura única con fsync y huella SHA-256), bajo el mismo bloqueo entre procesos del recibo. Preflights repetidos o simultáneos reciben el original; otro documento o vínculo se rechaza; un archivo alterado no se usa. La verificación ya no depende de `session.Sets`. Pruebas: `NativeWorkflowTests.Baseline_*` (repetición, reconexión, 8 concurrentes, cambio de documento, manipulación).
-- **AUD-13**: el historial sólo muestra lo de la misma sesión o del mismo agente con nombre; el nombre de tarea no da visibilidad; `todos=si` exige `historial_compartido=true` en la configuración del usuario y sin ella se rechaza. Pruebas: `OperationHistoryTests` (aislamiento, reconexión y reinicio, tres sesiones concurrentes).
-- **AUD-14**: `con_diferencias` → `revisar_diferencias` (revisar o reconciliar; no repetir).
-- **AUD-15**: benchmarks regenerados con el catálogo real de 222 capacidades, con huella, serialización y memoria (`docs/0.9.1/benchmarks/inventory-bench.md`). Medidos en un equipo de 4 CPU con otra carga: son orientativos.
-- **AUD-16**: huella = SHA-256 del contrato canónico completo de cada capacidad en orden de id, perezosa. Prueba de mutación de cada campo.
-- **AUD-17**: `model_health` cede el hilo tras cada llamada indivisible (GetWarnings, colectores de ids), trocea avisos, elementos, láminas y vistas con el presupuesto, cuenta tablas por lámina en una pasada y limita modelos enormes informando `truncado`. Sin medición en Revit: pendiente de la campaña nativa.
+## Rondas de auditoría
+- **Segunda (AUD-12…AUD-17)**: ver historial del PR (inventario por intento, aislamiento del historial, huella canónica, benchmarks, `model_health` troceado).
+- **Final (AUD-18…AUD-21)**:
+  - AUD-18: `JobStore.Complete` decide `con_diferencias` antes de notificar; respuesta diferida, consulta del `job_id` e historial coinciden; consejo `revisar_diferencias`. `OperationHistoryTests.JobFinishingWithDifferences_*`.
+  - AUD-19: `SourceBinding` — cada operación de una fuente lleva un testigo de origen (SHA-256 de la fuente, revisión, registro geométrico, huella del plan, lote); el motor deriva clave y huella de contenido al planificar y las aplica en el commit sobre `OperationJournal`, aunque no se pase `clave=`; otra `clave=` se rechaza; `commit ops=` con origen se rechaza. `SourceBindingTests` (intentos idénticos, reconexión, plan_id nuevo, mismo PDF otro destino/copia, PDF modificado, commit interrumpido, resultado incierto, reconciliación).
+  - AUD-20: el preflight de Copy/Monitor congela anfitrión, vínculo y revisión, elementos de origen, transformación, mapeo, exclusiones y categoría (huella de expectativas); verificar usa lo congelado y cualquier cambio del objetivo es conflicto. `NativeWorkflowTests` (congelación, conflictos, manipulación).
+  - AUD-21: este documento, el CHANGELOG, la matriz y el registro regenerados desde la fuente (223).
+  - Rendimiento: `docs/0.9.1/PERFORMANCE_HARDENING.md` (perfil de `RunMain`, cachés, métricas, harness `tools/bench/WorkflowBench`).
 
-## Después de la tercera ronda
-- **Scheduler** (`OperationScheduler`, 492573b): límite global y por agente, exclusión por documento, reparto justo, cola acotada con rechazo, cancelación en cola sin efectos. Gobierna las operaciones de documento; commit y exec siguen con la cola del hilo de Revit.
-- **Panel #5**: sección «Operaciones largas» (en curso con Cancelar y confirmación, historial con filtro por estado y consejo, estado del planificador). La ventana WPF no tiene prueba automática.
-- **PDF→Revit ejecutable** (`PdfToPlan.Execution`, 35b01d5): planes tipados con clave de idempotencia sólo si hay registro válido y los lotes pasan la validación offline; lo ambiguo queda fuera. La aplicación en Revit sigue pendiente de la campaña nativa.
-- **Actualización en línea** (`OnlineUpdate`, `OnlineHttp`): el botón Actualizar consulta la última Release pública (sin cuenta) cuando la persona pulsa «Buscar en GitHub»; descarga con tamaño máximo y verifica SHA-256 publicado, tamaño y versión interna antes de pasar al flujo de instalación existente. Sólo HTTPS a GitHub; `actualizacion_online=no` la deshabilita. Límite: el hash protege la integridad de la descarga, no la autenticidad frente a quien controle el repositorio. **Hoy el repositorio no tiene Releases**: el botón responderá «sin versiones publicadas» hasta que se publique una. El flujo de publicación revisado (`draft-release.yml`) exige que el commit esté en `main` y un acta de aceptación.
-
-## Bloques
-| Bloque | Commits | Contenido |
-|---|---|---|
-| A | cf5acde…f70ed73 | AUD-01…05, #27, #28 |
-| B | 5143dc1, 2f64467, 463f32e, be4a880 | inventario completo, índice, cobertura F01–F37 |
-| C/D/E | 990ae2a | 10 operaciones tipadas con verificación de lo creado |
-| F | 1948fda, d772755 | recibos, capacidades nativas, Copy/Monitor, destino, diagnóstico |
-| G | 03f6d15 | `doc ifc`, `doc tabla_csv` |
-| H | be4a880 | `check name=model_health` |
-| I | 76c10b9 | historial, cancelación, consejo de reintento (`check name=historial`) |
-
-## Decisiones
-D54 operaciones de modelado; D55 flujos por evidencia; D56 Copy/Monitor sin API de copia por lotes; D57 IFC con transacción revertida;
-D58 inventario completo en gzip determinista y trazable; D59 índice inmutable y descubrimiento paginado; D60 UNKNOWN con investigación pendiente en lugar de promociones por nombre;
-D61 recibos con bloqueo por intento y evidencia privilegiada; D62 historial con consejo de reintento.
+## Decisiones (D54–D66)
+D54 operaciones de modelado con verificación de lo creado · D55 flujos nativos por evidencia · D56 Copy/Monitor sin API de copia por lotes · D57 IFC con transacción revertida · D58 inventario completo en gzip determinista · D59 índice inmutable y descubrimiento paginado · D60 UNKNOWN con investigación pendiente, sin promociones por nombre · D61 recibos con bloqueo por intento y evidencia privilegiada · D62 historial con consejo de reintento y ámbito por agente ·
+D63 **estado final del trabajo se decide en `JobStore.Complete`** (antes de notificar) · D64 **idempotencia de PDF→Revit sobre el diario de operaciones existente**, con testigo de origen en las operaciones (sin segundo sistema) · D65 **expectativas de Copy/Monitor congeladas por intento** y conflicto ante cambios del objetivo · D66 **rendimiento: reducir accesos al hilo de Revit con cachés por invocación** (no globales, no cruzan documento ni revisión) y medir offline antes de afirmar.
 
 ## Pendiente (explícito)
-- 189 comandos UNKNOWN: cada uno con su motivo en `commands.json` (`pending_research`).
-- Panel de estado (#5): mostrar historial y cancelación en la interfaz; los datos ya existen.
-- PDF→Revit: el plan desde PDF existe (F37-PDF-PLAN-001); su ejecución en Revit queda para la campaña nativa.
-- Scheduler multiagente con prioridades: no implementado (sin perfiles nativos que lo justifiquen).
-- Campaña nativa única: requiere autorización de instancia y modelo de prueba desechable.
+- 189 comandos UNKNOWN; operaciones que requieren UI (Copy/Monitor completo, Coordination Review); elementos sin verificación nativa (todos).
+- Benchmarks reales frente a pyRevit: requieren Revit (campaña nativa, tras la decisión de merge).
+- Publicación de la 0.9.1 y prueba de la actualización en línea con una Release real.
+- Campaña nativa única: requiere autorización de instancia y modelo desechable.
