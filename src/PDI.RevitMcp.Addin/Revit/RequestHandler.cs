@@ -540,9 +540,12 @@ namespace PDI.RevitMcp.Addin.Revit
 
             List<OpSpec> ops;
             var resolved = new List<List<long>>();
+            SourceBinding.Bound sourceBound;
             try
             {
                 ops = OpSpec.ParseAll(request.Args);
+                // AUD-19: si las operaciones vienen de una fuente (origen=), el plan queda vinculado a su clave y huella de contenido.
+                sourceBound = SourceBinding.Resolve(request.Args["ops"] as List<object>);
                 foreach (var op in ops)
                 {
                     var ids = new List<long>(op.Ids);
@@ -568,6 +571,7 @@ namespace PDI.RevitMcp.Addin.Revit
                 CreatedUtc = DateTime.UtcNow,
                 Summary = Arg.GetString(request.Args, "summary"),
                 Task = Arg.GetString(request.Args, Wire.TaskArg),
+                BoundToken = sourceBound?.Token, BoundKey = sourceBound?.Key, BoundHash = sourceBound?.Hash,
             };
 
             // Sin geometría: se planifica en una sola visita al hilo de Revit.

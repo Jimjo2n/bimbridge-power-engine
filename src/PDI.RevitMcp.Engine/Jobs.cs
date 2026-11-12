@@ -119,12 +119,20 @@ namespace PDI.RevitMcp.Engine
             {
                 if (j.IsFinal) return;
                 j.Result = result;
-                j.FinalEstado = estado;
+                // AUD-18: el estado final se decide AQUÍ, antes de avisar a nadie (respuesta, consulta posterior del job e historial ven
+                // lo mismo). Un resultado con diferencias de verificación nunca queda como "ok", aunque quien llama no pase estado
+                // o pase "ok" por descuido.
+                j.FinalEstado = HasDifferences(result) && (estado == null || estado == PDI.RevitMcp.Protocol.Status.Ok)
+                    ? PDI.RevitMcp.Protocol.Status.ConDiferencias : estado;
                 j.Status = JobStatus.Listo;
                 j.FinishedUtc = _now();
             }
             FireFinal(j);
         }
+
+        /// <summary>¿El resultado declara diferencias entre lo pedido y lo verificado? (clave "diferencias" con algún elemento).</summary>
+        public static bool HasDifferences(Dictionary<string, object> result) =>
+            result != null && result.TryGetValue("diferencias", out var d) && d is System.Collections.ICollection c && c.Count > 0;
 
         public void Fail(Job j, string status, string error)
         {

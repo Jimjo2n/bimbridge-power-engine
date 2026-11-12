@@ -266,6 +266,90 @@ namespace PDI.RevitMcp.Tests
             Assert.Throws<InvalidDataException>(() => Store().LoadBaseline(keyA));
         }
 
+        // ------------------------------------------------------------------ AUD-20 expectativas congeladas
+
+        private static CopyMonitorExpectations Expect(List<SourceFixture> src = null, LinkTransform tf = null, List<TypeMapping> maps = null, string category = "PlumbingFixtures",
+                                                      string host = "doc-A", string link = "link-1", string rev = "g1#3") =>
+            new CopyMonitorExpectations { HostIdentity = host, LinkIdentity = link, LinkRevision = rev, Category = category, Transform = tf ?? LinkTransform.Identity, Mappings = maps ?? new List<TypeMapping>(), Source = src ?? Synthetic88() };
+
+        [Fact]
+        public void Preflight_FreezesTheWholeObjective_AndARepeatedPreflightCannotReplaceIt()
+        {
+            var key = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "e1");
+            var maps = new List<TypeMapping> { new TypeMapping { Source = "WC: B", Target = "WC: A" }, new TypeMapping { Source = "Ducha: E", Excluded = true } };
+            var first = CopyMonitorFlow.Freeze(Store(), key, Expect(maps: maps), new long[] { 1, 2 });
+            Assert.True(first.Created); Assert.False(first.Conflict);
+            Assert.Equal(88, first.Frozen.Source.Count);
+            // Mismo objetivo otra vez (otra sesión, reconexión): se conserva, sin diferencias.
+            var again = CopyMonitorFlow.Freeze(new ReceiptStore(_dir), key, Expect(maps: maps.AsEnumerable().Reverse().ToList()), new long[] { 1, 2, 99 });
+            Assert.False(again.Created); Assert.Empty(again.Differences);
+            Assert.Equal(first.Frozen.Fingerprint, again.Frozen.Fingerprint);
+            Assert.Equal(new long[] { 1, 2 }, again.Baseline.Ids);
+            // Un preflight con OTRO objetivo no lo sustituye: devuelve lo congelado y el conflicto.
+            var other = CopyMonitorFlow.Freeze(Store(), key, Expect(), new long[] { 1, 2 });
+            Assert.True(other.Conflict);
+            Assert.Equal(first.Frozen.Fingerprint, other.Frozen.Fingerprint);
+            Assert.Contains(other.Differences, x => x.StartsWith("mapeo de tipos distinto"));
+            Assert.Contains(other.Differences, x => x.StartsWith("exclusiones distintas"));
+        }
+
+        [Fact]
+        public void Verification_UsesFrozenExpectations_AndAnyChangeToTheObjectiveIsAConflict()
+        {
+            var key = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "e2");
+            var maps = new List<TypeMapping> { new TypeMapping { Source = "WC: B", Target = "WC: A" } };
+            CopyMonitorFlow.Freeze(Store(), key, Expect(maps: maps), new long[0]);
+            // Verificar sin repetir el mapeo: se usa el congelado (no es un cambio). Tras reconectar.
+            var ok = CopyMonitorFlow.Load(new ReceiptStore(_dir), key, Expect(), mappingGiven: false);
+            Assert.False(ok.Conflict);
+            Assert.Single(ok.Frozen.Mappings);
+            // Otra revisión guardada del vínculo sin cambios en los aparatos: se informa, no bloquea.
+            var saved = CopyMonitorFlow.Load(Store(), key, Expect(maps: maps, rev: "g2#4"), true);
+            Assert.False(saved.Conflict); Assert.Single(saved.Differences);
+
+            // Cada condición que altera el objetivo → conflicto, y las expectativas originales siguen intactas.
+            var moved = Synthetic88(); moved[5].X += 2;
+            var fewer = Synthetic88(); fewer.RemoveAt(0);
+            var retyped = Synthetic88(); retyped[3].Type = "Z";
+            foreach (var changed in new[]
+            {
+                Expect(moved, maps: maps), Expect(fewer, maps: maps), Expect(retyped, maps: maps),
+                Expect(maps: maps, tf: new LinkTransform { Dx = 10 }),
+                Expect(maps: maps, tf: new LinkTransform { BasisX = new[] { -1.0, 0, 0 }, BasisY = new[] { 0.0, 1, 0 }, BasisZ = new[] { 0.0, 0, 1 } }),
+                Expect(maps: maps, category: "LightingFixtures"),
+                Expect(maps: new List<TypeMapping> { new TypeMapping { Source = "WC: B", Target = "WC: C" } }),
+                Expect(maps: maps.Concat(new[] { new TypeMapping { Source = "Ducha: E", Excluded = true } }).ToList()),
+            })
+            {
+                var r = CopyMonitorFlow.Load(Store(), key, changed, true);
+                Assert.True(r.Conflict, string.Join("; ", r.Differences));
+                Assert.Equal(ok.Frozen.Fingerprint, r.Frozen.Fingerprint);
+            }
+            Assert.Contains(CopyMonitorFlow.Load(Store(), key, Expect(fewer, maps: maps), true).Differences, x => x.Contains("+0 −1 modificados 0"));
+
+            // Sin preflight no hay nada que verificar; un intento antiguo sin expectativas no se da por bueno.
+            Assert.Null(CopyMonitorFlow.Load(Store(), WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "nada"), Expect(), true));
+            var legacy = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "viejo");
+            Store().SaveBaselineOnce(legacy, "doc-A", "link-1", new long[] { 1 }, out _);
+            Assert.Throws<InvalidDataException>(() => CopyMonitorFlow.Load(Store(), legacy, Expect(), true));
+        }
+
+        [Fact]
+        public void FrozenExpectations_AreTamperEvident_AndRoundTrip()
+        {
+            var key = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "e3");
+            var e = Expect(tf: new LinkTransform { Dx = 100, Dy = -20, RotationDeg = 30 }, maps: new List<TypeMapping> { new TypeMapping { Source = "WC: B", Target = "WC: A" } });
+            CopyMonitorFlow.Freeze(Store(), key, e, new long[] { 7 });
+            var back = CopyMonitorExpectations.FromText(e.ToText());
+            Assert.Equal(e.Fingerprint, back.Fingerprint);
+            Assert.Empty(e.Diff(back));
+            // Cambiar una expectativa en el archivo (quitar un aparato esperado) invalida la huella del inventario: no se usa.
+            var file = Path.Combine(_dir, key + ".inv");
+            File.WriteAllText(file, File.ReadAllText(file).Replace("S87", "S86x"));
+            Assert.Throws<InvalidDataException>(() => CopyMonitorFlow.Load(Store(), key, e, true));
+            Assert.Throws<InvalidDataException>(() => CopyMonitorExpectations.FromText(e.ToText().Replace("\"WC: A\"", "\"WC: C\"")));
+        }
+
         // ------------------------------------------------------------------ #23 matriz de capacidades
 
         [Theory]

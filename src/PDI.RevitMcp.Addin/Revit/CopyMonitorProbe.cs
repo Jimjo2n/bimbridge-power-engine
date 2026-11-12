@@ -26,6 +26,9 @@ namespace PDI.RevitMcp.Addin.Revit
         public long LinkInstanceId;
         public string LinkName;
         public string LinkIdentity;
+        /// <summary>AUD-20: revisión guardada del documento vinculado (GUID de versión + número de guardados), o null si no se pudo leer.</summary>
+        public string LinkRevision;
+        public string Category => _category;
         public LinkTransform Transform;
         public readonly List<SourceFixture> Source = new List<SourceFixture>();
         public readonly List<HostFixture> Host = new List<HostFixture>();
@@ -82,6 +85,8 @@ namespace PDI.RevitMcp.Addin.Revit
             LinkName = li.Name;
             // Identidad estable sin exponer la ruta: hash SHA-256 de la ruta (string.GetHashCode cambia entre procesos en .NET 8).
             LinkIdentity = PDI.RevitMcp.Engine.Home.Sha256Hex(ldoc.PathName ?? ldoc.Title).Substring(0, 16);
+            try { var dv = Document.GetDocumentVersion(ldoc); LinkRevision = dv.VersionGUID.ToString("N") + "#" + dv.NumberOfSaves.ToString(CultureInfo.InvariantCulture); }
+            catch (Autodesk.Revit.Exceptions.ApplicationException) { LinkRevision = null; }
             var t = li.GetTotalTransform();
             // AUD-11: transformación completa (rotación, reflexión, traslación); el verificador rechaza la que no pueda representar.
             Transform = new LinkTransform

@@ -27,7 +27,7 @@ namespace PDI.RevitMcp.Tests
         private static PlacementPlan Plan(params Dictionary<string, object>[] batches)
         {
             var p = new PlacementPlan { Registration = new RegistrationResult(), Fingerprint = "huella-1" };
-            p.Source["id"] = "E-201@B#p1";
+            p.Source["id"] = "E-201@B#p1"; p.Source["sha256"] = "sha-de-prueba"; p.Source["revision"] = "B";
             p.Batches.AddRange(batches);
             foreach (var b in batches)
                 foreach (var _ in (List<object>)((Dictionary<string, object>)b["operacion"])["puntos"]) p.Place.Add(new PlacementItem());
@@ -47,7 +47,7 @@ namespace PDI.RevitMcp.Tests
             Assert.Equal(new[] { "place", "place" }, parsed.Select(o => o.Kind).ToArray());
             // Misma entrada → misma clave (repetir no coloca dos veces); otro contenido u otra huella → otra clave.
             var key = (string)one[Wire.KeyArg];
-            Assert.StartsWith("pdf-", key);
+            Assert.StartsWith("src-", key);
             Assert.Equal(key, ((Dictionary<string, object>)((List<object>)PdfToPlan.Execution(Plan(Batch("F: A", new[] { 1.0, 2 }, new[] { 3.0, 4 }), Batch("F: B", new[] { 5.0, 6 })))["planes"])[0])[Wire.KeyArg]);
             var moved = (Dictionary<string, object>)((List<object>)PdfToPlan.Execution(Plan(Batch("F: A", new[] { 1.0, 2 }, new[] { 3.0, 4.5 }), Batch("F: B", new[] { 5.0, 6 })))["planes"])[0];
             Assert.NotEqual(key, moved[Wire.KeyArg]);

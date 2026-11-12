@@ -171,6 +171,13 @@ namespace PDI.RevitMcp.Addin.Revit
             WorkflowReceipt receipt;
             try { receipt = phase == "preflight" ? store.Begin(NativeCapabilities.CopyMonitorFixtures, attemptKey, corr, out _) : store.Load(attemptKey); }
             catch (Exception ex) when (ex is InvalidOperationException || ex is TimeoutException) { return Response.Fail(request.Id, Status.Conflicto, "copy_monitor: " + ex.Message); }
+            // AUD-20: lo que este intento espera, con lo que se ve AHORA. En preflight se congela; en verificar se compara con lo congelado.
+            var mappingGiven = maps.Count > 0;
+            var now = new CopyMonitorExpectations
+            {
+                HostIdentity = probe.DocumentIdentity, LinkIdentity = probe.LinkIdentity, LinkRevision = probe.LinkRevision, Category = probe.Category,
+                Transform = probe.Transform, Mappings = maps, Source = probe.Source,
+            };
             var datos = new Dictionary<string, object>
             {
                 ["vinculo"] = probe.LinkName, ["vinculo_id"] = probe.LinkInstanceId,
@@ -189,11 +196,21 @@ namespace PDI.RevitMcp.Addin.Revit
             {
                 // AUD-12: el inventario inicial se persiste por clave de intento y sólo la primera vez. Un preflight repetido, otra
                 // sesión o un intento simultáneo reciben el original; nunca se sobrescribe (después de copiar, lo ya copiado pasaría por «previo»).
-                ReceiptStore.Baseline baseline;
-                bool baselineCreated;
-                try { baseline = store.SaveBaselineOnce(attemptKey, probe.DocumentIdentity, probe.LinkIdentity, probe.Host.Select(h => h.Id), out baselineCreated); }
+                CopyMonitorFlow.Result frozenP;
+                try { frozenP = CopyMonitorFlow.Freeze(store, attemptKey, now, probe.Host.Select(h => h.Id)); }
                 catch (Exception ex) when (ex is InvalidOperationException || ex is TimeoutException || ex is System.IO.InvalidDataException || ex is System.IO.IOException)
                 { return Response.Fail(request.Id, Status.Conflicto, "copy_monitor: " + ex.Message); }
+                var baseline = frozenP.Baseline;
+                var baselineCreated = frozenP.Created;
+                datos["expectativas"] = new Dictionary<string, object> { ["huella"] = frozenP.Frozen.Fingerprint, ["huella_origen"] = frozenP.Frozen.SourceFingerprint, ["congeladas"] = baseline.CreatedUtc.ToString("o", CultureInfo.InvariantCulture) };
+                if (frozenP.Differences.Count > 0) datos["cambios_desde_el_preflight"] = frozenP.Differences.Cast<object>().ToList();
+                if (frozenP.Conflict)
+                    return new Response
+                    {
+                        Id = request.Id, Estado = Status.Conflicto, Rev = probe.Rev, Datos = datos,
+                        Aviso = "Este intento ya congeló otras expectativas y ahora las condiciones son distintas (" + string.Join("; ", frozenP.Differences) + "). No se sustituyen: " +
+                                "si quiere el objetivo original, restaure las condiciones; si el objetivo cambió, inicie un intento nuevo con otra clave=.",
+                    };
                 var baseSet = new HashSet<long>(baseline.Ids);
                 var nuevos = probe.Host.Count(h => !baseSet.Contains(h.Id));
                 datos["inventario_inicial"] = new Dictionary<string, object>
@@ -234,10 +251,24 @@ namespace PDI.RevitMcp.Addin.Revit
                     return Response.Fail(request.Id, Status.Invalido, "copy_monitor verificar: no hay inventario inicial de este intento (documento, vínculo y clave): ejecute fase=preflight antes de copiar");
                 if (baseline.DocumentIdentity != probe.DocumentIdentity || baseline.LinkIdentity != probe.LinkIdentity)
                     return Response.Fail(request.Id, Status.Conflicto, "copy_monitor verificar: el inventario inicial pertenece a otro documento o vínculo");
+                // AUD-20: se verifica contra las expectativas CONGELADAS. Si las condiciones que definen el objetivo cambiaron, conflicto.
+                CopyMonitorFlow.Result frozenV;
+                try { frozenV = CopyMonitorFlow.Load(store, attemptKey, now, mappingGiven); }
+                catch (Exception ex) when (ex is System.IO.InvalidDataException || ex is TimeoutException || ex is System.IO.IOException)
+                { return Response.Fail(request.Id, Status.Conflicto, "copy_monitor verificar: " + ex.Message); }
+                datos["expectativas"] = new Dictionary<string, object> { ["huella"] = frozenV.Frozen.Fingerprint, ["huella_origen"] = frozenV.Frozen.SourceFingerprint, ["congeladas"] = baseline.CreatedUtc.ToString("o", CultureInfo.InvariantCulture) };
+                if (frozenV.Differences.Count > 0) datos["cambios_desde_el_preflight"] = frozenV.Differences.Cast<object>().ToList();
+                if (frozenV.Conflict)
+                    return new Response
+                    {
+                        Id = request.Id, Estado = Status.Conflicto, Rev = probe.Rev, Datos = datos,
+                        Aviso = "No se verificó: las condiciones cambiaron desde el preflight (" + string.Join("; ", frozenV.Differences.Where(CopyMonitorExpectations.Blocking)) + "). " +
+                                "Las expectativas originales no se sustituyen. Reconcilie: restaure las condiciones y verifique de nuevo, o inicie un intento nuevo con otra clave=.",
+                    };
                 datos["inventario_inicial"] = new Dictionary<string, object> { ["elementos"] = (long)baseline.Ids.Count, ["creado"] = baseline.CreatedUtc.ToString("o", CultureInfo.InvariantCulture), ["sha256"] = baseline.Sha256 };
                 var beforeSet = new HashSet<long>(baseline.Ids);
                 var hostBefore = probe.Host.Where(h => beforeSet.Contains(h.Id)).ToList();
-                var report = CopyMonitorVerifier.Verify(probe.Source, hostBefore, probe.Host, probe.Transform, maps, probe.LinkInstanceId);
+                var report = CopyMonitorVerifier.Verify(frozenV.Frozen.Source, hostBefore, probe.Host, frozenV.Frozen.Transform, frozenV.Frozen.Mappings, probe.LinkInstanceId);
                 foreach (var kv in report) datos[kv.Key] = kv.Value;
                 if (receipt == null) datos["aviso_intento"] = "no hay recibo de este intento (preflight en otro equipo o con otra clave): verificación sin registrar";
                 else

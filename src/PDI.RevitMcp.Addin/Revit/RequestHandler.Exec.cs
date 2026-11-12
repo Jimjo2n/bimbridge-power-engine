@@ -124,6 +124,32 @@ namespace PDI.RevitMcp.Addin.Revit
                 return Response.Fail(request.Id, Status.Invalido, "clave= es para cambios persistentes; un ensayo se revierte y no se registra como aplicado. Quite clave= (la correlación va en summary o tarea).");
             if (kind != OpSemantics.Kind.Write || request.Op == Wire.OpTask) return await GuardDocLock(session, request, kind, run).ConfigureAwait(false);
 
+            // AUD-19: un plan que viene de una fuente (operaciones con origen=) entra SIEMPRE en el diario con la clave y la huella
+            // derivadas de su contenido, haya pasado el agente clave= o no. Olvidar la clave no permite repetir el lote.
+            string boundHash = null;
+            if (request.Op == Wire.OpCommit)
+            {
+                var pid = Arg.GetString(request.Args, "plan_id");
+                if (string.IsNullOrEmpty(pid) && request.Args.TryGetValue("ops", out var rawOps))
+                {
+                    try
+                    {
+                        if (SourceBinding.Resolve(rawOps as List<object>) != null)
+                            return Response.Fail(request.Id, Status.Invalido, "commit ops= con operaciones de una fuente (origen=): use plan y después commit plan_id=…; así el lote queda protegido contra repeticiones. No se aplicó nada.");
+                    }
+                    catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
+                }
+                var boundPlan = string.IsNullOrEmpty(pid) ? null : _plans.Get(pid);
+                var isTrial = string.Equals((Arg.GetString(request.Args, "modo") ?? "").Trim(), "ensayo", StringComparison.OrdinalIgnoreCase);
+                if (boundPlan?.BoundKey != null && !isTrial)
+                {
+                    var bound = new SourceBinding.Bound { Token = boundPlan.BoundToken, Key = boundPlan.BoundKey, Hash = boundPlan.BoundHash };
+                    if (!SourceBinding.JournalIdentity(bound, key, out key, out boundHash, out var bindError))
+                        return Response.Fail(request.Id, Status.Invalido, bindError);
+                    request.Args[Wire.KeyArg] = key;
+                }
+            }
+
             string resolved = null;
             if (request.Op == Wire.OpExec)
             {
@@ -143,7 +169,8 @@ namespace PDI.RevitMcp.Addin.Revit
             catch (ArgumentException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
             var argsForHash = new Dictionary<string, object>(request.Args);
             argsForHash.Remove(ResolvedCodeArg);
-            var hash = OperationJournal.HashArgs(request.Op, argsForHash, resolved);
+            // Plan vinculado a una fuente: la huella es la del contenido del lote, no la del plan_id (un plan nuevo con el mismo lote es la misma operación).
+            var hash = boundHash ?? OperationJournal.HashArgs(request.Op, argsForHash, resolved);
             var task = Arg.GetString(request.Args, Wire.TaskArg);
             OperationJournal.BeginResult b;
             try { b = _ops.Begin(key, docKey, request.Op, hash, task, session.Id, mode, target?.Print, target?.Generation); }

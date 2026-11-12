@@ -465,6 +465,9 @@ namespace PDI.RevitMcp.Engine
         public string Task;
         /// <summary>Clave de idempotencia del commit (clave=…).</summary>
         public string IdemKey;
+        /// <summary>AUD-19: vínculo con la fuente del lote (testigo, clave y huella derivadas del contenido). null si el plan no viene de una fuente.
+        /// El commit usa esta clave y esta huella en el diario de operaciones aunque el agente no pase clave=.</summary>
+        public string BoundToken, BoundKey, BoundHash;
         public string Summary;          // texto corto que la IA da (o se genera) para mostrar en la cola
         public DateTime CreatedUtc;
         public string Status = PlanStatus.Listo;
@@ -505,6 +508,7 @@ namespace PDI.RevitMcp.Engine
             ["created_by_op"] = CreatedByOp.ToDictionary(k => k.Key.ToString(CultureInfo.InvariantCulture), k => (object)k.Value.Cast<object>().ToList()),
             ["applied_batches"] = (long)AppliedBatches, ["total_batches"] = (long)TotalBatches,
             ["reconciliation"] = Reconciliation,
+            ["origen"] = BoundToken, ["origen_clave"] = BoundKey, ["origen_huella"] = BoundHash,
         };
 
         public static Plan FromJson(string json)
@@ -541,6 +545,7 @@ namespace PDI.RevitMcp.Engine
             p.AppliedBatches = (int)(Arg.GetLong(o, "applied_batches") ?? 0);
             p.TotalBatches = (int)(Arg.GetLong(o, "total_batches") ?? 0);
             if (o.TryGetValue("reconciliation", out var rec) && rec is Dictionary<string, object> recd) p.Reconciliation = recd;
+            p.BoundToken = Arg.GetString(o, "origen"); p.BoundKey = Arg.GetString(o, "origen_clave"); p.BoundHash = Arg.GetString(o, "origen_huella");
             return p;
         }
 
@@ -561,6 +566,7 @@ namespace PDI.RevitMcp.Engine
                     ResultTable.Trim(ShowValue(x, x.Before, true)), ResultTable.Trim(x.Show ?? ShowValue(x, x.After, false)),
                 }).ToList(),
             };
+            if (BoundKey != null) d["clave_vinculada"] = BoundKey;   // AUD-19: el commit la usa aunque no se pase clave=
             var nuevos = CreationCount;
             if (nuevos > 0) d["nuevos"] = (long)nuevos;
             if (Entries.Count > maxRows) d["filas_omitidas"] = (long)(Entries.Count - maxRows);

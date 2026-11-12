@@ -112,22 +112,34 @@ namespace BimBridge.PowerEngine.Workflows
             var plans = new List<object>();
             var max = PDI.RevitMcp.Engine.OpSpec.MaxOps;
             var source = Arg.GetString(plan.Source, "id") ?? "PDF";
+            var sha = Arg.GetString(plan.Source, "sha256");
+            var revision = Arg.GetString(plan.Source, "revision");
+            var regPrint = PDI.RevitMcp.Engine.SourceBinding.RegistrationFingerprint(plan.Registration.M);
+            if (string.IsNullOrEmpty(sha)) { d["ejecutable"] = false; d["motivos"] = new List<object> { "la fuente no tiene SHA-256: no se puede vincular el lote a su origen" }; return d; }
             for (int k = 0, n = 1; k < ops.Count; k += max, n++)
             {
-                var chunk = ops.Skip(k).Take(max).ToList();
+                // AUD-19: cada operación lleva el testigo de origen en su contenido; el motor deriva de él la clave al planificar y la
+                // aplica en el commit aunque el agente no pase clave=. La clave que se informa aquí es la misma que derivará el motor.
+                var token = PDI.RevitMcp.Engine.SourceBinding.Token("pdf", source, sha, revision, regPrint, plan.Fingerprint, n);
+                var chunk = ops.Skip(k).Take(max).Select(o => new Dictionary<string, object>(o) { [PDI.RevitMcp.Engine.SourceBinding.OpField] = token }).ToList();
                 var points = chunk.Sum(o => ((List<object>)o["puntos"]).Count);
-                var key = "pdf-" + Home.Sha256Hex(plan.Fingerprint + "\n" + n + "\n" + string.Join("\n", chunk.Select(o => Json.Write(o)))).Substring(0, 24);
+                var bound = PDI.RevitMcp.Engine.SourceBinding.Resolve(chunk.Cast<object>().ToList());
                 plans.Add(new Dictionary<string, object>
                 {
                     ["ops"] = chunk.Cast<object>().ToList(),
                     ["summary"] = "Colocación desde " + source + " (" + n + "): " + points + " elementos en " + chunk.Count + " lotes",
-                    [Wire.KeyArg] = key,
+                    [Wire.KeyArg] = bound.Key,
                     ["elementos"] = (long)points,
+                    ["origen"] = new Dictionary<string, object>
+                    {
+                        ["tipo"] = "pdf", ["fuente"] = source, ["sha256"] = sha, ["revision"] = revision, ["registro"] = regPrint,
+                        ["huella_plan"] = plan.Fingerprint, ["lote"] = (long)n, ["testigo"] = token, ["huella_operaciones"] = bound.Hash,
+                    },
                 });
             }
             d["planes"] = plans;
             d["elementos"] = (long)plan.Place.Count;
-            d["siguiente"] = "por cada entrada de planes: plan con sus ops, summary y clave; revise el diff; commit plan_id=…; después verifique con el verificador de colocación contra una fuente independiente";
+            d["siguiente"] = "por cada entrada de planes: plan con sus ops TAL CUAL (llevan origen=) y summary; revise el diff; commit plan_id=… (la clave de idempotencia la aplica el motor: repetir el mismo lote en el mismo modelo no coloca dos veces); después verifique con el verificador de colocación contra una fuente independiente";
             if (plan.Ambiguous.Count > 0) d["aviso"] = plan.Ambiguous.Count + " símbolos ambiguos NO se colocan: necesitan decisión de una persona (ver 'ambiguos')";
             return d;
         }

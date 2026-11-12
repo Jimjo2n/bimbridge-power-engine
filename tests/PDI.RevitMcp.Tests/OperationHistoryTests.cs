@@ -156,6 +156,41 @@ namespace PDI.RevitMcp.Tests
         }
 
         [Fact]
+        public async Task JobFinishingWithDifferences_AfterClientSawEnProceso_IsNeverRecordedAsOk()
+        {
+            // AUD-18: el cliente recibió en_proceso; el trabajo termina después con diferencias de verificación.
+            var jobs = new JobStore();
+            var h = new OperationHistory(NewPath());
+            jobs.OnAnyFinal = j => h.Add(j);
+            var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var job = jobs.Create("S1", "doc pdf");
+            jobs.Run(job, async () =>
+            {
+                await release.Task;
+                // Como DocOp: resultado con la lista de diferencias, sin pasar estado.
+                jobs.Complete(job, new Dictionary<string, object> { ["archivo"] = "x.pdf", ["diferencias"] = new List<object> { "el PDF tiene 3 páginas y se pidieron 4 hojas" } });
+            });
+            Assert.Equal(Status.EnProceso, job.Estado);                    // lo que vio el cliente al principio
+            Assert.Equal(0, h.Count);
+            release.SetResult(true);
+            await job.Work;
+            Assert.Equal(Status.ConDiferencias, job.Estado);               // respuesta diferida
+            Assert.Equal(Status.ConDiferencias, jobs.Get(job.Id).Estado);  // consulta posterior del job_id
+            var rec = h.Query(All, null, null, null, null, null).Page.Single();
+            Assert.Equal(Status.ConDiferencias, rec.Estado);               // historial
+            Assert.Equal("revisar_diferencias", rec.Retry);                // exige revisión, no "no_necesario"
+            Assert.Equal(0, h.Query(All, Status.Ok, null, null, null, null).Total);
+
+            // Un "ok" explícito no enmascara diferencias; otros estados explícitos se respetan; sin diferencias sigue siendo ok.
+            var a = jobs.Create("S1", "doc ifc"); jobs.Complete(a, new Dictionary<string, object> { ["diferencias"] = new List<object> { "x" } }, Status.Ok);
+            Assert.Equal(Status.ConDiferencias, a.Estado);
+            var b = jobs.Create("S1", "exec"); jobs.Complete(b, new Dictionary<string, object> { ["diferencias"] = new List<object> { "x" } }, "parcial");
+            Assert.Equal("parcial", b.Estado);
+            var c = jobs.Create("S1", "doc pdf"); jobs.Complete(c, new Dictionary<string, object> { ["diferencias"] = new List<object>() });
+            Assert.Equal(Status.Ok, c.Estado);
+        }
+
+        [Fact]
         public async Task CancelledRunningJob_EndsCancelled_AndIsRecorded()
         {
             var jobs = new JobStore();

@@ -382,9 +382,12 @@ namespace PDI.RevitMcp.Engine.Workflows
             public string AttemptKey, DocumentIdentity, LinkIdentity, Sha256;
             public List<long> Ids = new List<long>();
             public DateTime CreatedUtc;
+            /// <summary>AUD-20: expectativas congeladas del intento (texto JSON canónico; lo interpreta el flujo). Entra en la huella.</summary>
+            public string Expectations;
 
-            public static string Hash(string key, string doc, string link, IEnumerable<long> ids) =>
-                Home.Sha256Hex(key + "\n" + doc + "\n" + link + "\n" + string.Join(",", ids.Select(i => i.ToString(CultureInfo.InvariantCulture))));
+            public static string Hash(string key, string doc, string link, IEnumerable<long> ids, string expectations = null) =>
+                Home.Sha256Hex(key + "\n" + doc + "\n" + link + "\n" + string.Join(",", ids.Select(i => i.ToString(CultureInfo.InvariantCulture))) +
+                               (string.IsNullOrEmpty(expectations) ? "" : "\n" + expectations));
         }
 
         private string BaselinePath(string key) => Path.ChangeExtension(PathFor(key), ".inv");
@@ -394,7 +397,7 @@ namespace PDI.RevitMcp.Engine.Workflows
         /// inventario original (<paramref name="created"/> = false): la evidencia inicial nunca se pisa. Si la clave pertenece a otro
         /// documento o vínculo, se rechaza.
         /// </summary>
-        public Baseline SaveBaselineOnce(string key, string documentIdentity, string linkIdentity, IEnumerable<long> ids, out bool created)
+        public Baseline SaveBaselineOnce(string key, string documentIdentity, string linkIdentity, IEnumerable<long> ids, out bool created, string expectations = null)
         {
             var isNew = false;
             var res = WithKeyLock(key, () =>
@@ -407,12 +410,13 @@ namespace PDI.RevitMcp.Engine.Workflows
                     return existing;
                 }
                 var list = ids.Distinct().OrderBy(x => x).ToList();
-                var b = new Baseline { AttemptKey = key, DocumentIdentity = documentIdentity, LinkIdentity = linkIdentity, Ids = list, CreatedUtc = DateTime.UtcNow };
-                b.Sha256 = Baseline.Hash(key, documentIdentity, linkIdentity, list);
+                var b = new Baseline { AttemptKey = key, DocumentIdentity = documentIdentity, LinkIdentity = linkIdentity, Ids = list, CreatedUtc = DateTime.UtcNow, Expectations = expectations };
+                b.Sha256 = Baseline.Hash(key, documentIdentity, linkIdentity, list, expectations);
                 var json = Json.Write(new Dictionary<string, object>
                 {
                     ["esquema"] = Baseline.Schema, ["clave_intento"] = key, ["documento"] = documentIdentity, ["vinculo"] = linkIdentity,
                     ["ids"] = list.Cast<object>().ToList(), ["sha256"] = b.Sha256, ["creado"] = b.CreatedUtc.ToString("o", CultureInfo.InvariantCulture),
+                    ["expectativas"] = expectations,
                 });
                 var p = BaselinePath(key);
                 var tmp = p + ".tmp";
@@ -446,8 +450,9 @@ namespace PDI.RevitMcp.Engine.Workflows
                     AttemptKey = Arg.GetString(d, "clave_intento"), DocumentIdentity = Arg.GetString(d, "documento"), LinkIdentity = Arg.GetString(d, "vinculo"),
                     Sha256 = Arg.GetString(d, "sha256"), Ids = ((List<object>)d["ids"]).Select(x => Convert.ToInt64(x, CultureInfo.InvariantCulture)).ToList(),
                     CreatedUtc = DateTime.Parse(Arg.GetString(d, "creado"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                    Expectations = Arg.GetString(d, "expectativas"),
                 };
-                if (b.AttemptKey != key || b.Sha256 != Baseline.Hash(key, b.DocumentIdentity, b.LinkIdentity, b.Ids))
+                if (b.AttemptKey != key || b.Sha256 != Baseline.Hash(key, b.DocumentIdentity, b.LinkIdentity, b.Ids, b.Expectations))
                     throw new InvalidDataException("el inventario inicial del intento " + key + " no coincide con su huella (alterado o dañado)");
                 return b;
             }
