@@ -16,7 +16,8 @@ namespace PDI.RevitMcp.Addin.Ui
     /// Botón "Actualizar": busca instaladores nuevos (Descargas, Escritorio, carpeta de actualizaciones y las que configure IT)
     /// cada 10 minutos en un hilo de fondo, sin tocar Revit. Al pulsar Instalar ejecuta el instalador en modo /actualizar,
     /// que reemplaza los archivos aunque Revit esté abierto; la versión nueva entra al reiniciar Revit.
-    /// Nunca descarga nada de internet ni instala sin que el usuario pulse el botón.
+    /// 0.9.1: además, cuando una persona pulsa «Buscar en GitHub», consulta la última Release pública del repositorio y descarga su
+    /// instalador verificando SHA-256, tamaño y versión. Nunca se conecta por su cuenta ni instala sin que el usuario pulse el botón.
     /// </summary>
     internal static class UpdateService
     {
@@ -36,6 +37,10 @@ namespace PDI.RevitMcp.Addin.Ui
         {
             Running = Updates.Normalize(Assembly.GetExecutingAssembly().GetName().Version);
             _extraFolders = config?.UpdateFolders ?? new List<string>();
+            OnlineEnabled = (config?.OnlineUpdate ?? "manual") != "no";
+            AllowPrerelease = config?.UpdatePrerelease ?? false;
+            try { Repo = OnlineUpdate.ValidRepo(config?.UpdateRepo); }
+            catch (OnlineUpdateException ex) { Repo = OnlineUpdate.DefaultRepo; Runtime.Log("Actualización en línea: " + ex.Message + "; se usa " + Repo); }
             // Lo que quedó apartado al actualizar con Revit abierto ya no está en uso: se borra.
             try
             {
@@ -44,6 +49,67 @@ namespace PDI.RevitMcp.Addin.Ui
             }
             catch (Exception) { }
             _timer = new Timer(_ => Check(), null, TimeSpan.FromSeconds(20), TimeSpan.FromMinutes(10));
+        }
+
+        // ------------------------------------------------------------------ 0.9.1: actualización en línea (Releases públicas de GitHub)
+
+        public static volatile OnlineRelease Online;
+        /// <summary>null (sin consultar), nueva, mismo_version_otro_commit, al_dia, anterior, sin_releases o error.</summary>
+        public static volatile string OnlineState;
+        public static volatile string OnlineError;
+        public static string Repo = OnlineUpdate.DefaultRepo;
+        public static bool OnlineEnabled = true, AllowPrerelease;
+
+        /// <summary>Commit con que se compiló este add-in (de su versión informativa), o null.</summary>
+        public static string RunningCommit
+        {
+            get
+            {
+                try
+                {
+                    var info = Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(AssemblyInformationalVersionAttribute), false).OfType<AssemblyInformationalVersionAttribute>().FirstOrDefault();
+                    return OnlineUpdate.CommitOf(info?.InformationalVersion);
+                }
+                catch (Exception) { return null; }
+            }
+        }
+
+        /// <summary>Consulta la última release publicada. Sólo se llama cuando una persona pulsa el botón; en un hilo de fondo.</summary>
+        public static void CheckOnline()
+        {
+            Online = null; OnlineError = null;
+            try
+            {
+                if (!OnlineEnabled) { OnlineState = "error"; OnlineError = "la actualización en línea está deshabilitada en la configuración (actualizacion_online=no)"; return; }
+                var json = OnlineHttp.GetText(OnlineUpdate.ApiUrl(Repo), OnlineUpdate.MaxTextBytes);
+                var r = OnlineUpdate.Pick(json, Repo, AllowPrerelease, out var skipped);
+                if (r == null) { OnlineState = "sin_releases"; OnlineError = skipped.Count > 0 ? "descartadas: " + string.Join("; ", skipped.Take(5)) : null; return; }
+                Online = r;
+                OnlineState = OnlineUpdate.Compare(Running, RunningCommit, r);
+                Runtime.Journal?.Log("usuario", "actualizar_buscar_online", OnlineState, 0, new Dictionary<string, object> { ["release"] = r.Tag, ["repo"] = Repo });
+            }
+            catch (Exception ex) when (ex is OnlineUpdateException || ex is IOException)
+            {
+                OnlineState = "error";
+                OnlineError = ex.Message;
+                Runtime.Log("Actualización en línea: " + OnlineError);
+            }
+        }
+
+        /// <summary>Descarga y verifica el instalador de la release (SHA-256 publicado, tamaño y versión). Devuelve (candidato, error).</summary>
+        public static (UpdateCandidate c, string error) DownloadOnline(OnlineRelease r)
+        {
+            try
+            {
+                var c = OnlineUpdate.Download(r, Paths.CachedSetup(r.VersionText), OnlineHttp.GetText, OnlineHttp.GetFile);
+                Runtime.Journal?.Log("usuario", "actualizar_descargar_online", "ok", 0, new Dictionary<string, object> { ["release"] = r.Tag, ["repo"] = Repo, ["sha256"] = OnlineUpdate.Sha256File(c.Exe) });
+                return (c, null);
+            }
+            catch (Exception ex) when (ex is OnlineUpdateException || ex is IOException || ex is UnauthorizedAccessException)
+            {
+                Runtime.Journal?.Log("usuario", "actualizar_descargar_online", "error", 0, new Dictionary<string, object> { ["release"] = r.Tag, ["detalle"] = ex.Message });
+                return (null, ex.Message);
+            }
         }
 
         public static void Stop()

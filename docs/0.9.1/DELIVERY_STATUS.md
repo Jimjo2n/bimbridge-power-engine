@@ -29,6 +29,12 @@ AUD-10 fragmento durable antes de truncar con inyección de fallos; AUD-11 trans
 - **AUD-16**: huella = SHA-256 del contrato canónico completo de cada capacidad en orden de id, perezosa. Prueba de mutación de cada campo.
 - **AUD-17**: `model_health` cede el hilo tras cada llamada indivisible (GetWarnings, colectores de ids), trocea avisos, elementos, láminas y vistas con el presupuesto, cuenta tablas por lámina en una pasada y limita modelos enormes informando `truncado`. Sin medición en Revit: pendiente de la campaña nativa.
 
+## Después de la tercera ronda
+- **Scheduler** (`OperationScheduler`, 492573b): límite global y por agente, exclusión por documento, reparto justo, cola acotada con rechazo, cancelación en cola sin efectos. Gobierna las operaciones de documento; commit y exec siguen con la cola del hilo de Revit.
+- **Panel #5**: sección «Operaciones largas» (en curso con Cancelar y confirmación, historial con filtro por estado y consejo, estado del planificador). La ventana WPF no tiene prueba automática.
+- **PDF→Revit ejecutable** (`PdfToPlan.Execution`, 35b01d5): planes tipados con clave de idempotencia sólo si hay registro válido y los lotes pasan la validación offline; lo ambiguo queda fuera. La aplicación en Revit sigue pendiente de la campaña nativa.
+- **Actualización en línea** (`OnlineUpdate`, `OnlineHttp`): el botón Actualizar consulta la última Release pública (sin cuenta) cuando la persona pulsa «Buscar en GitHub»; descarga con tamaño máximo y verifica SHA-256 publicado, tamaño y versión interna antes de pasar al flujo de instalación existente. Sólo HTTPS a GitHub; `actualizacion_online=no` la deshabilita. Límite: el hash protege la integridad de la descarga, no la autenticidad frente a quien controle el repositorio. **Hoy el repositorio no tiene Releases**: el botón responderá «sin versiones publicadas» hasta que se publique una. El flujo de publicación revisado (`draft-release.yml`) exige que el commit esté en `main` y un acta de aceptación.
+
 ## Bloques
 | Bloque | Commits | Contenido |
 |---|---|---|

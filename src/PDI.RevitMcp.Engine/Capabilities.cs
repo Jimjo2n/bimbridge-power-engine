@@ -72,6 +72,7 @@ namespace PDI.RevitMcp.Engine
             R("Bim.* (scripts)", "grupos, montaje con soporte real (rayos, vínculos), rango de vista, por qué no se ve, manifiesto", Si, "parcial", "R/W", Compila, "la lógica de QC (manifiesto, transformaciones, visibilidad) sí tiene pruebas sin Revit"),
             R("metricas", "caracteres por llamada y cliente para medir consumo (no tokens)", Si, Si, "—", Unitaria, "local al puente"),
             R("permisos", "0.8.0: 10 clases (leer, modificar proyecto/familia, cargar archivo, guardar, sincronizar, exportar, publicar, código dinámico, interfaz)", Si, Si, "—", Unitaria, "config permisos; vacío = derivados de los niveles; publicar siempre denegado"),
+            R("Actualizar en línea (GitHub)", "0.9.1: última Release pública del repositorio, sin cuenta; verifica SHA-256 publicado, tamaño y versión antes de instalar", Si, Si, "—", Unitaria, "sólo desde la cinta y sólo al pulsar; necesita una Release publicada; actualizacion_online=no la deshabilita"),
             R("Actualizar desde ZIP", "0.8.0: manifiesto, firma RSA, hashes, compatibilidad; se aplica al cerrar Revit, con reversión", Si, Si, "—", Unitaria, "sólo desde la cinta; nunca cierra Revit"),
             R("Setup /diagnostico", "versión instalada, cargada en cada Revit, puente, hashes y reinicio pendiente", Si, Si, "—", Unitaria, "el instalador verifica manifest.json antes y después de copiar"),
         };
