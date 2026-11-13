@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
         with:
           global-json-file: global.json
-      - uses: github/codeql-action/init@b7b84b636b4f90c9b31da1bc5f72bfadd5b31410
+      - uses: github/codeql-action/init@9418214df1f2c4b8128c770156c409013b07d6b9
         with:
           languages: csharp,python
       - run: dotnet build tests/PDI.RevitMcp.Tests/PDI.RevitMcp.Tests.csproj -c Release
