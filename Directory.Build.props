@@ -5,8 +5,8 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Company>BIMBRIDGE</Company>
     <Product>BIMBRIDGE (PDI Revit MCP)</Product>
-    <Version>0.9.0</Version>
-    <InformationalVersion>0.9.0</InformationalVersion>
+    <Version>0.9.1</Version>
+    <InformationalVersion>0.9.1</InformationalVersion>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <!-- Issue #7: una tarea sin await ni supervisión pierde sus excepciones; se trata como error de compilación. -->
     <WarningsAsErrors>$(WarningsAsErrors);CS4014</WarningsAsErrors>
