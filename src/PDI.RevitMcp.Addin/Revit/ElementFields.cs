@@ -149,7 +149,8 @@ namespace PDI.RevitMcp.Addin.Revit
             var def = p.Definition;
             if (cache != null && def != null && cache.Spec.TryGetValue(def, out var s)) { cache.Hits++; return s; }
             if (cache != null) cache.Misses++;
-            s = (IsLength(p), IsYesNo(p));
+            var dataType = DataType(def);
+            s = (dataType == SpecTypeId.Length, dataType == SpecTypeId.Boolean.YesNo);
             if (cache != null && def != null) cache.Spec[def] = s;
             return s;
         }
@@ -188,16 +189,12 @@ namespace PDI.RevitMcp.Addin.Revit
             return null;
         }
 
-        public static bool IsLength(Parameter p)
-        {
-            try { return p.Definition.GetDataType() == SpecTypeId.Length; }
-            catch (Exception) { return false; }
-        }
+        public static bool IsLength(Parameter p) => DataType(p?.Definition) == SpecTypeId.Length;
 
-        private static bool IsYesNo(Parameter p)
+        private static ForgeTypeId DataType(Definition definition)
         {
-            try { return p.Definition.GetDataType() == SpecTypeId.Boolean.YesNo; }
-            catch (Exception) { return false; }
+            try { return definition?.GetDataType(); }
+            catch (Exception) { return null; }
         }
     }
 }

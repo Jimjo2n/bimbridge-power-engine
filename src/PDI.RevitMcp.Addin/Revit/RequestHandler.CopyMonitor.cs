@@ -150,9 +150,12 @@ namespace PDI.RevitMcp.Addin.Revit
             if (request.Args.TryGetValue("mapeo", out var m) && m != null)
             {
                 if (!(m is Dictionary<string, object> md)) return Response.Fail(request.Id, Status.Invalido, "copy_monitor mapeo: {\"Familia: Tipo origen\": \"Familia: Tipo destino\"}");
-                maps.AddRange(md.Select(kv => new TypeMapping { Source = kv.Key, Target = Convert.ToString(kv.Value, CultureInfo.InvariantCulture) }));
+                maps.AddRange(md.Select(kv => new TypeMapping { Source = kv.Key.Trim(), Target = Convert.ToString(kv.Value, CultureInfo.InvariantCulture)?.Trim() }));
             }
             maps.AddRange(Arg.GetStringList(request.Args, "excluir").Select(x => new TypeMapping { Source = x.Trim(), Excluded = true }));
+            var duplicate = maps.GroupBy(x => x.Source, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
+            if (duplicate != null)
+                return Response.Fail(request.Id, Status.Invalido, "copy_monitor: el tipo de origen «" + duplicate.Key + "» aparece más de una vez en mapeo/excluir");
 
             var probe = new CopyMonitorProbe(link, Arg.GetString(request.Args, "categoria"));
             var sw = Stopwatch.StartNew();
@@ -177,7 +180,7 @@ namespace PDI.RevitMcp.Addin.Revit
             try { receipt = phase == "preflight" ? store.Begin(NativeCapabilities.CopyMonitorFixtures, attemptKey, corr, out _) : store.Load(attemptKey); }
             catch (Exception ex) when (ex is InvalidOperationException || ex is TimeoutException) { return Response.Fail(request.Id, Status.Conflicto, "copy_monitor: " + ex.Message); }
             // AUD-20: lo que este intento espera, con lo que se ve AHORA. En preflight se congela; en verificar se compara con lo congelado.
-            var mappingGiven = maps.Count > 0;
+            var mappingGiven = request.Args.ContainsKey("mapeo") || request.Args.ContainsKey("excluir");
             var now = new CopyMonitorExpectations
             {
                 HostIdentity = probe.DocumentIdentity, LinkIdentity = probe.LinkIdentity, LinkRevision = probe.LinkRevision, Category = probe.Category,
