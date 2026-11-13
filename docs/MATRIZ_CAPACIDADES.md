@@ -1,4 +1,4 @@
-# Matriz de capacidades — BIMBRIDGE - Power Engine 0.9.0
+# Matriz de capacidades — BIMBRIDGE - Power Engine 0.9.1
 
 Generada desde `src/PDI.RevitMcp.Engine/Capabilities.cs` (una prueba comprueba que coincide). Columna *evidencia*: lo que de verdad se comprobó. Lo nuevo de 0.6.0 todavía no se ha ejecutado dentro de Revit: está compilado para 2022–2026 y probado sin Revit; la prueba nativa es `tools/aceptacion/PROCEDIMIENTO_0.6.0.md`.
 
