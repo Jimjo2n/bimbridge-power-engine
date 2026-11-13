@@ -25,6 +25,9 @@ namespace PDI.RevitMcp.Addin.Revit
         private readonly List<string> _fields;
         private List<ElementId> _candidates;
         private readonly ElementFields.NameCache _names = new ElementFields.NameCache();
+        /// <summary>0.9.1: caché de nombres de esta consulta (aciertos/fallos observados) y elementos abiertos.</summary>
+        public ElementFields.NameCache Names => _names;
+        public long ElementsRead;
         private int _next;
 
         public readonly List<Dictionary<string, object>> Rows = new List<Dictionary<string, object>>();
@@ -70,6 +73,7 @@ namespace PDI.RevitMcp.Addin.Revit
             {
                 var e = doc.GetElement(_candidates[_next++]);
                 if (e == null) continue;
+                ElementsRead++;
                 var row = ElementFields.Read(doc, e, _fields, _names);
                 if (PassesPostFilters(row)) Rows.Add(row);
                 // revisar el reloj cada 32 elementos: barato y suficiente

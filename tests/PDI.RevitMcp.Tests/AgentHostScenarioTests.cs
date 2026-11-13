@@ -64,8 +64,8 @@ namespace PDI.RevitMcp.Tests
             foreach (var f in faults)
             {
                 var fault = f();
-                AH.WaitLeaseExpiry(state);
-                var r = AH.Run(fault, mark, "ejecutar", processes == 0 ? pf : "-", state, "--modelo", model, "--lease-ms", "2000", "--checkpoint", "50");
+                AH.ExpireDeadLease(state);   // AUD-04: caída ≠ expiración; lease largo y vencimiento adelantado del proceso muerto
+                var r = AH.Run(fault, mark, "ejecutar", processes == 0 ? pf : "-", state, "--modelo", model, "--lease-ms", "3600000", "--checkpoint", "50");
                 processes++;
                 var st = AH.Read(state, out var vplan, out var diags);
                 Assert.NotNull(st);
@@ -76,8 +76,8 @@ namespace PDI.RevitMcp.Tests
                 Assert.Subset(verified, verifiedBefore);    // lo completado sigue completado
                 verifiedBefore = verified;
             }
-            AH.WaitLeaseExpiry(state);
-            var last = AH.Run(null, null, "ejecutar", "-", state, "--modelo", model, "--lease-ms", "2000");
+            AH.ExpireDeadLease(state);
+            var last = AH.Run(null, null, "ejecutar", "-", state, "--modelo", model, "--lease-ms", "3600000");
             processes++;
             Log("$ agenthost ejecutar - (sin fallo, proceso " + processes + ") → código " + last.Code + "\n  " + last.Out.Trim().Replace("\n", "\n  "));
             Assert.Equal(2, last.Code);   // terminó con las excepciones previstas

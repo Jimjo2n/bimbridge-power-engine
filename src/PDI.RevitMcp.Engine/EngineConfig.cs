@@ -52,6 +52,20 @@ namespace PDI.RevitMcp.Engine
         /// false sólo para integraciones antiguas que IT decida tolerar; cada operación anónima queda marcada en el diario (sin_nombre_modo_heredado).
         /// </summary>
         public bool IdentityRequired = true;
+        /// <summary>
+        /// AUD-13: autorización explícita del usuario (config "historial_compartido": true) para que un agente vea en el historial las
+        /// operaciones de OTRAS sesiones y agentes. Por defecto false: cada agente sólo ve lo suyo.
+        /// </summary>
+        public bool SharedHistory;
+        /// <summary>
+        /// 0.9.1: actualización en línea desde las Releases públicas de GitHub. "manual" (por defecto): sólo se conecta cuando una
+        /// persona pulsa «Buscar en GitHub»; "no": deshabilitada (redes corporativas que no lo permitan). Nunca hay conexión automática.
+        /// </summary>
+        public string OnlineUpdate = "manual";
+        /// <summary>Repositorio propietario/nombre del que se leen las releases (config "repositorio_actualizacion").</summary>
+        public string UpdateRepo;
+        /// <summary>Aceptar prereleases en la actualización en línea (config "actualizacion_prerelease", por defecto false).</summary>
+        public bool UpdatePrerelease;
         private HashSet<string> _perms;
         public HashSet<string> EffectivePermissions => _perms ?? (_perms = Permissions.Effective(PermissionList, Levels));
 
@@ -99,6 +113,11 @@ namespace PDI.RevitMcp.Engine
                 c.DocumentFolders = Arg.GetStringList(o, "carpetas_documentos");
                 c.BlockDynamicCode = Arg.GetBool(o, DynamicCodePolicy.ConfigKey) ?? false;
                 c.IdentityRequired = Arg.GetBool(o, "identidad_obligatoria") ?? true;
+                c.SharedHistory = Arg.GetBool(o, "historial_compartido") ?? false;
+                var online = (Arg.GetString(o, "actualizacion_online") ?? "manual").Trim().ToLowerInvariant();
+                c.OnlineUpdate = online == "no" ? "no" : "manual";
+                c.UpdateRepo = Arg.GetString(o, "repositorio_actualizacion");
+                c.UpdatePrerelease = Arg.GetBool(o, "actualizacion_prerelease") ?? false;
                 // 0.9.0: "power_engine": { "python": "C:\\…\\python.exe", "worker_python": "…\\run_worker.py", "rust_worker": "…exe", "geometria": "auto" }
                 if (o.TryGetValue("power_engine", out var po) && po is Dictionary<string, object> pe)
                 {

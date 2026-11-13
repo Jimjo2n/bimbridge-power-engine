@@ -28,6 +28,10 @@ namespace PDI.RevitMcp.Addin.Ui
         public static GrantStore Grants;
         /// <summary>#5: estadísticas del motor C# (hilo de Revit, cachés de compilación y de consultas, trabajos). Sólo memoria; nunca la API de Revit.</summary>
         public static Func<System.Collections.Generic.Dictionary<string, object>> EngineDiagnostics;
+        /// <summary>#5 (0.9.1): operaciones largas en curso, historial reciente (filtro de estado y texto) y planificador. Sólo memoria.</summary>
+        public static Func<string, string, (List<Job> Running, List<OperationHistory.Record> Recent, Dictionary<string, object> Scheduler)> Operations;
+        /// <summary>#5 (0.9.1): cancelar un trabajo desde el panel (lo pulsa una persona).</summary>
+        public static Func<string, bool> CancelOperation;
 
         /// <summary>
         /// «Bloquear inyección de código C#» (revisión consolidada). Por defecto NO bloqueado: exec corre para los agentes locales autorizados.

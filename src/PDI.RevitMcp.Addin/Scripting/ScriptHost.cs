@@ -24,6 +24,8 @@ namespace PDI.RevitMcp.Addin.Scripting
             public MethodInfo Run;
             public string Key;
             public long CompileMs;
+            /// <summary>Bytes de la imagen del ensamblado (+ PDB) cargado: base de la estimación de memoria de AUD-05.</summary>
+            public long ImageBytes;
             public bool FromCache;
             public string[] Diagnostics;
             public string Kind;
@@ -36,7 +38,8 @@ namespace PDI.RevitMcp.Addin.Scripting
         }
 
         private static readonly object Lock = new object();
-        private static readonly CompileCache<Compiled> Cache = new CompileCache<Compiled>();
+        /// <summary>AUD-05: límite de compilaciones distintas (cada una deja un ensamblado cargado hasta reiniciar Revit) y tamaño estimado de imágenes.</summary>
+        private static readonly CompileCache<Compiled> Cache = new CompileCache<Compiled>(CompileCache<Compiled>.DefaultMaxEntries, c => c.ImageBytes);
         private static MethodInfo _compile;
         private static Func<string> _roslynVersion;
         private static string[] _references;
@@ -261,12 +264,14 @@ namespace PDI.RevitMcp.Addin.Scripting
             var key = ScriptSource.CacheKey(probe.Source, revitVersion, addinVersion, _refFingerprint + extraFp);
             // Issue #9: single-flight. Dos peticiones simultáneas del mismo código compilan una sola vez.
             string compileError = null;
-            var got = Cache.GetOrCompile(key, () =>
+            // AUD-05: contabilidad por agente (o sesión) con la correlación de la petición en curso.
+            var owner = Correlation.Current?.AgentId ?? Correlation.Current?.SessionId;
+            var got = Cache.GetOrCompile(key, owner, () =>
             {
                 var c = CompileNew(code, className, refs, key, out compileError);
                 return c == null ? null : Tuple.Create(c, c.CompileMs);
-            }, out var fromCache);
-            if (got == null) { error = compileError ?? "no compila"; return null; }
+            }, out var fromCache, out var refusal);
+            if (got == null) { error = refusal ?? compileError ?? "no compila"; return null; }
             if (!fromCache) { got.ExtraRefs = extraReport.Count > 0 ? extraReport : null; return got; }
             return new Compiled
             {
@@ -319,7 +324,8 @@ namespace PDI.RevitMcp.Addin.Scripting
             }
             return new Compiled
             {
-                Run = run, Key = key, CompileMs = ms, FromCache = false, Diagnostics = diags, Kind = wrapped.Kind, RecipeType = recipe, Capabilities = caps,
+                Run = run, Key = key, CompileMs = ms, ImageBytes = image.Length + (pdb?.Length ?? 0),
+                FromCache = false, Diagnostics = diags, Kind = wrapped.Kind, RecipeType = recipe, Capabilities = caps,
             };
         }
 

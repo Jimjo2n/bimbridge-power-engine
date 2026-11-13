@@ -93,6 +93,8 @@ namespace PDI.RevitMcp.Addin.Ui
                     "No hay instaladores más nuevos que la versión " + Updates.Format(UpdateService.Running) + "."));
             }
 
+            _body.Children.Add(OnlineCard());
+
             // Cómo llega una versión nueva
             var how = new StackPanel();
             how.Children.Add(Theme.Label("Cómo recibir una versión nueva", 14, true));
@@ -121,6 +123,78 @@ namespace PDI.RevitMcp.Addin.Ui
                 back.Children.Add(btn);
                 _body.Children.Add(Theme.Card(back));
             }
+        }
+
+        /// <summary>
+        /// 0.9.1: actualización en línea. Sólo se conecta a GitHub cuando la persona pulsa «Buscar en GitHub»; descargar e instalar
+        /// es otro clic. El instalador se verifica (SHA-256 publicado, tamaño y versión) antes de ofrecer la instalación.
+        /// </summary>
+        private UIElement OnlineCard()
+        {
+            var p = new StackPanel();
+            p.Children.Add(Theme.Label("Actualización en línea (GitHub)", 14, true));
+            var state = UpdateService.OnlineState;
+            var r = UpdateService.Online;
+            string text;
+            if (!UpdateService.OnlineEnabled) text = "Deshabilitada en la configuración de este equipo (actualizacion_online=no).";
+            else if (state == null) text = "Consulta la última versión publicada en github.com/" + UpdateService.Repo + ". Sólo se conecta cuando usted pulsa el botón; no hace falta cuenta de GitHub.";
+            else if (state == "error") text = "No se pudo consultar: " + UpdateService.OnlineError;
+            else if (state == "sin_releases") text = "El repositorio todavía no tiene ninguna versión publicada que se pueda instalar." + (UpdateService.OnlineError != null ? "\n" + UpdateService.OnlineError : "");
+            else if (state == "nueva") text = "Versión publicada: " + r.Tag + (r.Commit != null ? " (commit " + r.Commit.Substring(0, 7) + ")" : "") + (r.Prerelease ? " · prerelease" : "") + ". Es más nueva que la que está usando.";
+            else if (state == "mismo_version_otro_commit") text = "La versión publicada " + r.Tag + " tiene el mismo número que la suya pero otro commit (" + r.Commit.Substring(0, 7) + "; usted usa " + (UpdateService.RunningCommit ?? "?") + "). Puede instalarla si quiere exactamente la publicada.";
+            else if (state == "anterior") text = "La última versión publicada (" + r.Tag + ") es anterior a la que está usando. No hay nada que actualizar.";
+            else text = "Está usando la última versión publicada (" + r.Tag + (r.Commit != null ? ", commit " + r.Commit.Substring(0, 7) : "") + ").";
+            var t = Theme.Label(text, 12.5, false, state == "error" ? Theme.Darken(Theme.Red, 0.8) : Theme.Muted);
+            t.Margin = new Thickness(0, 4, 0, 8);
+            p.Children.Add(t);
+            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            if (UpdateService.OnlineEnabled)
+            {
+                var check = Theme.Button(state == null ? "Buscar en GitHub" : "Buscar de nuevo en GitHub");
+                check.Margin = new Thickness(0, 0, 8, 0);
+                check.Click += async (s, e) => await CheckOnline();
+                row.Children.Add(check);
+                if (r != null && (state == "nueva" || state == "mismo_version_otro_commit") && !UpdateService.RestartPending)
+                {
+                    var get = Theme.Button("Descargar e instalar " + r.Tag, Theme.Kind.Primary);
+                    get.Margin = new Thickness(0);
+                    var sameVersion = state == "mismo_version_otro_commit";
+                    get.Click += async (s, e) => await DownloadAndInstall(r, sameVersion);
+                    row.Children.Add(get);
+                }
+            }
+            p.Children.Add(row);
+            return Theme.Card(p);
+        }
+
+        private async Task CheckOnline()
+        {
+            if (_busy) return;
+            SetBusy(true, "Consultando GitHub…");
+            await Task.Run(() => UpdateService.CheckOnline());
+            SetBusy(false, null);
+            Render();
+        }
+
+        private async Task DownloadAndInstall(OnlineRelease r, bool sameVersion)
+        {
+            if (_busy) return;
+            SetBusy(true, "Descargando " + r.Tag + " (" + (r.SetupSize / (1024 * 1024)) + " MB) y verificando su SHA-256…");
+            var d = await Task.Run(() => UpdateService.DownloadOnline(r));
+            if (d.c == null)
+            {
+                SetBusy(false, null);
+                Render();
+                Banner("No se instaló nada: " + d.error, Theme.Red);
+                return;
+            }
+            SetBusy(true, "Verificado. Instalando la versión " + d.c.VersionText + "… (unos segundos)");
+            // Misma versión con otro commit: el instalador sólo lo acepta con /permitir-anterior.
+            var res = await Task.Run(() => UpdateService.Install(d.c, sameVersion));
+            SetBusy(false, null);
+            Render();
+            if (res.ok) Banner(res.text + "\nDescargada de " + d.c.Source + " y verificada. Cierre y abra Revit para usarla.", Theme.Green);
+            else Banner("Se descargó y verificó, pero no se pudo instalar: " + res.text, Theme.Red);
         }
 
         private static Border StatusCard(Color color, string title, string text)

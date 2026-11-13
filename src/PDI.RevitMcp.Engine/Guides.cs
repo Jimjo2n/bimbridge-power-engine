@@ -74,7 +74,8 @@ namespace PDI.RevitMcp.Engine
 
         private const string DocOps =
             "DOCUMENTO (act o doc_op): guardar | guardar_como como=ruta [sobrescribir=si] | sync [comentario=] [liberar=si] | " +
-            "pdf conjunto=\"NON-UNIT LIGHTING\" o hojas=$x|10E.01.NUL,10E.02.NUL [carpeta=] [nombre=] | cerrar [guardar=si|descartar=si].\n" +
+            "pdf conjunto=\"NON-UNIT LIGHTING\" o hojas=$x|10E.01.NUL,10E.02.NUL [carpeta=] [nombre=] | " +
+            "ifc [version=ifc2x3|ifc4|ifc4dtv] [vista=] [cantidades=si] [carpeta=] [nombre=] | tabla_csv tabla=<nombre|id> [carpeta=] [nombre=] | cerrar [guardar=si|descartar=si].\n" +
             "Cada uno corre como trabajo (job_id si tarda) y se VERIFICA: archivo existe, fecha nueva, tamaño, SHA-256, páginas del PDF; sync confirma por evento. " +
             "No cierra el documento activo (Revit no lo permite por la API). Permiso D o W.";
 

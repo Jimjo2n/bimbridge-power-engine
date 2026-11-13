@@ -41,10 +41,17 @@ namespace PDI.RevitMcp.Tests
             return c;
         }
 
+        /// <summary>
+        /// AUD-04 (#28): las pruebas de inyección de caídas no prueban la expiración. Usan un lease largo (no hay carrera entre la carga de la
+        /// máquina y el TTL antes del punto de caída) y, tras una caída, adelantan el vencimiento del lease del proceso muerto en el fixture.
+        /// La expiración, el fencing y la renovación tienen sus propias pruebas (AH04_*).
+        /// </summary>
+        private const string CrashTestLeaseMs = "3600000";
+
         private AH.ChildResult Exec(Case c, string fault = null, params string[] extra)
         {
-            AH.WaitLeaseExpiry(c.State);
-            var r = AH.Run(fault, c.Mark, new[] { "ejecutar", c.PlanFile, c.State, "--modelo", c.Model, "--lease-ms", "700" }.Concat(extra).ToArray());
+            AH.ExpireDeadLease(c.State);
+            var r = AH.Run(fault, c.Mark, new[] { "ejecutar", c.PlanFile, c.State, "--modelo", c.Model, "--lease-ms", CrashTestLeaseMs }.Concat(extra).ToArray());
             _out.WriteLine("$ ejecutar" + (fault != null ? "  [PDI_AH_FALLO=" + fault + "]" : "") + "\n" + r);
             return r;
         }
@@ -155,8 +162,7 @@ namespace PDI.RevitMcp.Tests
         {
             var c = Setup();
             AssertCrashedAt(c, Exec(c, "backend.tras_commit@" + c.SetOp), "backend.tras_commit");
-            Assert.Equal(0, AH.Run(null, null, "modelo", "compactar", c.Model).Code);
-            AH.WaitLeaseExpiry(c.State);    // el detalle de la transacción desaparece
+            Assert.Equal(0, AH.Run(null, null, "modelo", "compactar", c.Model).Code);   // el detalle de la transacción desaparece
             var r2 = Exec(c);
             Assert.Equal(2, r2.Code);
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));                      // probado por el recuento compactado
@@ -212,13 +218,13 @@ namespace PDI.RevitMcp.Tests
             var mark = Path.Combine(dir, "caida.txt");
             var hash = AH.Hash(plan);
 
-            var r1 = AH.Run("runner.entre_operaciones#9", mark, "ejecutar", pf, state, "--modelo", model, "--checkpoint", "5", "--lease-ms", "700");
+            var r1 = AH.Run("runner.entre_operaciones#9", mark, "ejecutar", pf, state, "--modelo", model, "--checkpoint", "5", "--lease-ms", CrashTestLeaseMs);
             _out.WriteLine(r1.ToString());
             Assert.True(r1.Killed, r1.ToString());
             var mid = AH.Read(state, out _, out _);
             Assert.Equal(8, mid.Ops.Values.Count(o => o.State == OpState.Verificada));
             // un proceso nuevo del sistema operativo, sólo con lo que hay en disco
-            AH.WaitLeaseExpiry(state);
+            AH.ExpireDeadLease(state);
             var r2 = AH.Run(null, null, "ejecutar", "-", state, "--modelo", model);
             _out.WriteLine(r2.ToString());
             Assert.Equal(0, r2.Code);
@@ -245,6 +251,40 @@ namespace PDI.RevitMcp.Tests
         }
 
         // ---------------- AH-04 ----------------
+
+        [Fact]
+        public void AH04_LeaseExpiresBeforeFirstAction_FailsClosed_NothingWritten()
+        {
+            // AUD-04 / #28 reproducido de forma determinista: un retraso controlado de 1,5 s entre la inicialización y la primera acción con
+            // un TTL de 700 ms. Es exactamente lo que ocurrió en el runner de Windows: el lease vence antes de la primera comprobación.
+            // Comportamiento correcto: fail-closed (lease_perdido, código 4) ANTES de cualquier transición o escritura.
+            var c = Setup();
+            var r = AH.RunWithEnv(new Dictionary<string, string> { ["PDI_AH_RETRASO"] = "runner.antes_de_ejecutar:1500" }, null, null,
+                "ejecutar", c.PlanFile, c.State, "--modelo", c.Model, "--lease-ms", "700");
+            _out.WriteLine(r.ToString());
+            Assert.Equal(4, r.Code);
+            Assert.Contains("lease_perdido", r.Out);
+            foreach (var op in c.Plan.Ops) Assert.Equal(0, AH.TxCount(c.Model, c.Hash, op.Id));     // ninguna escritura
+            Assert.Equal(0, AH.Transitions(c.State, c.SetOp, OpState.EnEjecucion));                  // ni siquiera empezó
+            // Sin carrera: el siguiente proceso (lease vencido) toma el plan con fencing mayor y lo completa una sola vez.
+            var r2 = AH.Run(null, null, "ejecutar", c.PlanFile, c.State, "--modelo", c.Model, "--lease-ms", CrashTestLeaseMs);
+            Assert.Equal(0, r2.Code);
+            Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));
+            Assert.Equal(new long?[] { 1, 2 }, AH.Journal(c.State).Where(x => Arg.GetString(x, "ev") == "dueno").Select(x => Arg.GetLong(x, "f")).ToArray());
+        }
+
+        [Fact]
+        public void AH04_SlowInitializationWithinTtl_IsRenewedBeforeFirstAction_AndCompletesOnce()
+        {
+            // Mismo retraso, TTL suficiente: la renovación explícita tras la inicialización mantiene dueño y fencing; sin re-adquirir.
+            var c = Setup();
+            var r = AH.RunWithEnv(new Dictionary<string, string> { ["PDI_AH_RETRASO"] = "runner.antes_de_ejecutar:1500" }, null, null,
+                "ejecutar", c.PlanFile, c.State, "--modelo", c.Model, "--lease-ms", "6000");
+            _out.WriteLine(r.ToString());
+            Assert.Equal(0, r.Code);
+            Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));
+            Assert.Single(AH.Journal(c.State), x => Arg.GetString(x, "ev") == "dueno");             // un solo dueño, fencing 1
+        }
 
         [Fact]
         public void AH04_TwoProcessesCompete_OnlyOneExecutes_NoDuplicates()
@@ -323,10 +363,10 @@ namespace PDI.RevitMcp.Tests
             var state = Path.Combine(dir, "estado"); var mark = Path.Combine(dir, "caida.txt");
             var opId = plan.Ops[0].Id;
             var fault = point == "backend.mitad_tx" ? point + "@" + opId + ":2" : point + "@" + opId;
-            var r1 = AH.Run(fault, mark, "ejecutar", pf, state, "--modelo", model, "--lease-ms", "700");
+            var r1 = AH.Run(fault, mark, "ejecutar", pf, state, "--modelo", model, "--lease-ms", CrashTestLeaseMs);
             Assert.True(r1.Killed, r1.ToString());
-            AH.WaitLeaseExpiry(state);
-            var r2 = AH.Run(null, mark, "ejecutar", pf, state, "--modelo", model, "--lease-ms", "700");
+            AH.ExpireDeadLease(state);
+            var r2 = AH.Run(null, mark, "ejecutar", pf, state, "--modelo", model, "--lease-ms", CrashTestLeaseMs);
             Assert.True(r2.Code == 0, r2.ToString());
             Assert.Equal(1, AH.TxCount(model, AH.Hash(plan), opId));
             var st = AH.Read(state, out _, out _);

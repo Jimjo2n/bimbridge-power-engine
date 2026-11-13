@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- SPDX-License-Identifier: GPL-3.0-only -->
+  <!-- Harness offline de benchmarks de workflows (0.9.1). Mide la parte de BIMBRIDGE que corre fuera de Revit; NO mide Revit ni pyRevit. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\PDI.RevitMcp.Engine\PDI.RevitMcp.Engine.csproj" />
+  </ItemGroup>
+</Project>

@@ -124,6 +124,32 @@ namespace PDI.RevitMcp.Addin.Revit
                 return Response.Fail(request.Id, Status.Invalido, "clave= es para cambios persistentes; un ensayo se revierte y no se registra como aplicado. Quite clave= (la correlación va en summary o tarea).");
             if (kind != OpSemantics.Kind.Write || request.Op == Wire.OpTask) return await GuardDocLock(session, request, kind, run).ConfigureAwait(false);
 
+            // AUD-19: un plan que viene de una fuente (operaciones con origen=) entra SIEMPRE en el diario con la clave y la huella
+            // derivadas de su contenido, haya pasado el agente clave= o no. Olvidar la clave no permite repetir el lote.
+            string boundHash = null;
+            if (request.Op == Wire.OpCommit)
+            {
+                var pid = Arg.GetString(request.Args, "plan_id");
+                if (string.IsNullOrEmpty(pid) && request.Args.TryGetValue("ops", out var rawOps))
+                {
+                    try
+                    {
+                        if (SourceBinding.Resolve(rawOps as List<object>) != null)
+                            return Response.Fail(request.Id, Status.Invalido, "commit ops= con operaciones de una fuente (origen=): use plan y después commit plan_id=…; así el lote queda protegido contra repeticiones. No se aplicó nada.");
+                    }
+                    catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
+                }
+                var boundPlan = string.IsNullOrEmpty(pid) ? null : _plans.Get(pid);
+                var isTrial = string.Equals((Arg.GetString(request.Args, "modo") ?? "").Trim(), "ensayo", StringComparison.OrdinalIgnoreCase);
+                if (boundPlan?.BoundKey != null && !isTrial)
+                {
+                    var bound = new SourceBinding.Bound { Token = boundPlan.BoundToken, Key = boundPlan.BoundKey, Hash = boundPlan.BoundHash };
+                    if (!SourceBinding.JournalIdentity(bound, key, out key, out boundHash, out var bindError))
+                        return Response.Fail(request.Id, Status.Invalido, bindError);
+                    request.Args[Wire.KeyArg] = key;
+                }
+            }
+
             string resolved = null;
             if (request.Op == Wire.OpExec)
             {
@@ -143,7 +169,8 @@ namespace PDI.RevitMcp.Addin.Revit
             catch (ArgumentException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
             var argsForHash = new Dictionary<string, object>(request.Args);
             argsForHash.Remove(ResolvedCodeArg);
-            var hash = OperationJournal.HashArgs(request.Op, argsForHash, resolved);
+            // Plan vinculado a una fuente: la huella es la del contenido del lote, no la del plan_id (un plan nuevo con el mismo lote es la misma operación).
+            var hash = boundHash ?? OperationJournal.HashArgs(request.Op, argsForHash, resolved);
             var task = Arg.GetString(request.Args, Wire.TaskArg);
             OperationJournal.BeginResult b;
             try { b = _ops.Begin(key, docKey, request.Op, hash, task, session.Id, mode, target?.Print, target?.Generation); }
@@ -938,8 +965,8 @@ namespace PDI.RevitMcp.Addin.Revit
             var a = request.Args;
             var verb = (Arg.GetString(a, "accion") ?? "").Trim().ToLowerInvariant();
             if (verb == "guardar_como") { verb = "guardar"; if (Arg.GetString(a, "como") == null) return Response.Fail(request.Id, Status.Invalido, "guardar_como necesita como=ruta"); }
-            if (verb != "guardar" && verb != "sync" && verb != "sincronizar" && verb != "pdf" && verb != "cerrar" && verb != "verificar_disco")
-                return Response.Fail(request.Id, Status.Invalido, "doc: guardar, guardar_como, sync, pdf, cerrar o verificar_disco");
+            if (verb != "guardar" && verb != "sync" && verb != "sincronizar" && verb != "pdf" && verb != "ifc" && verb != "tabla_csv" && verb != "cerrar" && verb != "verificar_disco")
+                return Response.Fail(request.Id, Status.Invalido, "doc: guardar, guardar_como, sync, pdf, ifc, tabla_csv, cerrar o verificar_disco");
             if (!_config.AllowsDocOps)
                 return Response.Fail(request.Id, Status.Rechazado, "este Revit no tiene habilitado guardar, sincronizar ni exportar por este conector (niveles " + _config.Levels + "). Dígaselo al usuario.");
             var diffs = new List<string>();
@@ -949,7 +976,7 @@ namespace PDI.RevitMcp.Addin.Revit
             var sw = Stopwatch.StartNew();
             var job = _jobs.Create(session.Id, "doc " + verb);
             job.Task = Arg.GetString(a, Wire.TaskArg);
-            _jobs.Run(job, async () =>
+            async Task Body()
             {
                 job.Phase = "esperando a Revit";
                 var r = await RunMain((app, watch, budget) =>
@@ -964,6 +991,8 @@ namespace PDI.RevitMcp.Addin.Revit
                             case "guardar": datos = DocOps.Save(app, doc, a, pend, diffs); break;
                             case "sync": case "sincronizar": datos = DocOps.Sync(doc, a, diffs, _tracker); break;
                             case "pdf": datos = DocOps.Pdf(doc, a, session.Sets, DocRegistry.Instance.IdOf(doc), pend, diffs); break;
+                            case "ifc": datos = ExportOps.Ifc(doc, a, pend, diffs); break;
+                            case "tabla_csv": datos = ExportOps.ScheduleCsv(doc, a, pend, diffs); break;
                             case "cerrar": datos = DocOps.Close(app, doc, a); break;
                             case "verificar_disco": datos = DocOps.VerifyOnDisk(app, doc, a); break;
                         }
@@ -983,6 +1012,18 @@ namespace PDI.RevitMcp.Addin.Revit
                 if (diffs.Count > 0) datos["diferencias"] = diffs.Cast<object>().ToList();
                 datos["ms"] = sw.ElapsedMilliseconds;
                 _jobs.Complete(job, datos);
+            }
+            // 0.9.1 (Bloque I): las operaciones de documento pasan por el planificador: reparto justo entre agentes y una sola a la vez
+            // por documento. En cola no se ha tocado nada: cola llena o cancelación en cola terminan como rechazo (reintentable).
+            var owner = Correlation.Current?.AgentId ?? session.Id;
+            var exclusive = "doc:" + (TargetId ?? "activo");
+            _jobs.Run(job, async () =>
+            {
+                var started = false;
+                job.Phase = "en cola del planificador";
+                try { await _scheduler.Run(owner, exclusive, async () => { started = true; await Body().ConfigureAwait(false); return true; }, job.Cts.Token).ConfigureAwait(false); }
+                catch (SchedulerBusyException ex) { _jobs.Fail(job, Status.Rechazado, ex.Message + ". No se aplicó nada."); }
+                catch (OperationCanceledException) when (!started) { _jobs.Fail(job, Status.Rechazado, "cancelado en la cola del planificador antes de empezar: no se aplicó nada"); }
             });
             var resp = await AwaitJob(request, job, ct).ConfigureAwait(false);
             if (resp.Estado == Status.Ok && diffs.Count > 0)

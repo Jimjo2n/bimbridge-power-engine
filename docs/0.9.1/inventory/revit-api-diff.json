@@ -1,0 +1,241 @@
+[
+  {
+    "de": 2022,
+    "a": 2023,
+    "postable_command_nuevos": [
+      "PickAPlane",
+      "ParametersService",
+      "ActivateControlsAndDimensions",
+      "ShowWorksharingMakeEditableControls",
+      "CreateAnAreaBasedLoad",
+      "AreaBasedLoadBoundary",
+      "EquipmentLoad",
+      "ShowBoundaryOpenEnds",
+      "MechanicalControlDevice",
+      "PlumbingEquipment",
+      "HideBoundaryOpenEnds",
+      "CreateAnalyticalLink",
+      "BoundaryConditionsSettings",
+      "AnalyticalMember",
+      "ElectricalAnalyticalLoadTypeSettings",
+      "DynamoPlayerForSteel",
+      "PanelByBoundary",
+      "AnalyticalAutomation",
+      "PanelByExtrusion"
+    ],
+    "postable_command_retirados": [
+      "ResetAnalyticalModel",
+      "CheckMemberSupports",
+      "AnalyticalConsistencyChecks",
+      "AdjustAnalyticalModel",
+      "LinkFormit",
+      "Generate",
+      "ManageCloudModels",
+      "Optimize"
+    ],
+    "built_in_category_nuevas": [
+      "OST_BridgeArchTags",
+      "OST_BridgeGirderTags",
+      "OST_BridgeFramingCrossBracingTags",
+      "OST_BridgeFramingDiaphragmTags",
+      "OST_BridgeFramingTrussTags",
+      "OST_VibrationManagementTags",
+      "OST_ELECTRICAL_AreaBasedLoads_Boundary",
+      "OST_ELECTRICAL_AreaBasedLoads_InteriorFill",
+      "OST_ELECTRICAL_AreaBasedLoads_Reference",
+      "OST_ELECTRICAL_AreaBasedLoads_ColorFill_Obsolete",
+      "OST_ELECTRICAL_AreaBasedLoads_InteriorFill_Visibility",
+      "OST_ELECTRICAL_AreaBasedLoads_Reference_Visibility",
+      "OST_FabricationDuctworkStiffeners",
+      "OST_FabricationDuctworkStiffenerTags",
+      "OST_MEPAncillaries_Obsolete",
+      "OST_MEPAncillaryFraming",
+      "OST_MechanicalControlDevices",
+      "OST_MechanicalControlDeviceTags",
+      "OST_PlumbingEquipment",
+      "OST_PlumbingEquipmentTags",
+      "OST_MEPAncillaryFramingTags",
+      "OST_MechanicalControlDevicesHiddenLines",
+      "OST_PlumbingEquipmentHiddenLines",
+      "OST_AnalyticalPanel",
+      "OST_AnalyticalOpening",
+      "OST_AnalyticalMemberLocalCoordSys",
+      "OST_AnalyticalPanelLocalCoordSys",
+      "OST_AnalyticalPanelTags",
+      "OST_AnalyticalOpeningTags",
+      "OST_ElectricalZoneEquipment_Obsolete",
+      "OST_MEPLoadAreaTags_OBSOLETE",
+      "OST_FasciaTags",
+      "OST_ColumnTags",
+      "OST_EntourageTags",
+      "OST_GutterTags",
+      "OST_HandrailTags",
+      "OST_PadTags",
+      "OST_RampTags",
+      "OST_RoofSoffitTags",
+      "OST_SlabEdgeTags",
+      "OST_TopRailTags",
+      "OST_WallSweepTags",
+      "OST_ModelGroupTags",
+      "OST_RvtLinksTags",
+      "OST_AnalyticalMemberCrossSection",
+      "OST_FloorsSplitLines",
+      "OST_ElectricalAnalyticalTransformer",
+      "OST_ELECTRICAL_AreaBasedLoads_Tags",
+      "OST_Toposolid",
+      "OST_ToposolidHiddenLines",
+      "OST_ToposolidContours",
+      "OST_ToposolidSecondaryContours",
+      "OST_ToposolidFoldingLines",
+      "OST_ToposolidSplitLines",
+      "OST_ToposolidDefault",
+      "OST_ToposolidCutPattern",
+      "OST_ToposolidMembrane",
+      "OST_ToposolidStructure",
+      "OST_ToposolidSubstrate",
+      "OST_ToposolidFinish1",
+      "OST_ToposolidFinish2",
+      "OST_ToposolidSurfacePattern",
+      "OST_ToposolidInsulation",
+      "OST_ToposolidTags",
+      "OST_ToposolidOpening",
+      "OST_ElectricalAnalyticalFeeder",
+      "OST_ToposolidLink",
+      "OST_ElectricalLoadSet"
+    ],
+    "built_in_category_retiradas": [
+      "OST_BridgeArchTags2021_Deprecated",
+      "OST_BridgeGirderTags2021_Deprecated",
+      "OST_ElectricalZoneEquipment",
+      "OST_MEPLoadAreaTags"
+    ],
+    "superficies_aparecen": [
+      "Autodesk.Revit.DB.Electrical.ElectricalAnalyticalNode",
+      "Autodesk.Revit.DB.Structure.AnalyticalElement"
+    ],
+    "superficies_desaparecen": [
+      "Autodesk.Revit.DB.Structure.AnalyticalModel"
+    ]
+  },
+  {
+    "de": 2023,
+    "a": 2024,
+    "postable_command_nuevos": [
+      "InsertCoupler",
+      "MEPFabricationDuctworkStiffener",
+      "AnalyticalLink",
+      "LoadsScalingDisplay",
+      "Toposolid",
+      "CreateFromImport",
+      "RebarBendingDetail",
+      "CoordinationModelLocal",
+      "CoordinationModelAutodeskDocs",
+      "PropertyLineData",
+      "PDF",
+      "CanvasTheme"
+    ],
+    "postable_command_retirados": [
+      "SplitSurface",
+      "OpenBuildingComponent",
+      "CoordinationModel",
+      "BuildingPad",
+      "Toposurface",
+      "MergeSurfaces",
+      "Subregion",
+      "StructuralRebarCoupler",
+      "CreateAnalyticalLink"
+    ],
+    "built_in_category_nuevas": [
+      "OST_ElectricalLoadCase",
+      "OST_ElectricalConnector",
+      "OST_ElectricalConnectorTags",
+      "OST_ToposolidLinkTags",
+      "OST_RebarBendingDetails",
+      "OST_WallLayers",
+      "OST_FloorLayers",
+      "OST_DataExchanges"
+    ],
+    "built_in_category_retiradas": [],
+    "superficies_aparecen": [
+      "Autodesk.Revit.DB.ElementId::Value",
+      "Autodesk.Revit.DB.Toposolid::Create"
+    ],
+    "superficies_desaparecen": []
+  },
+  {
+    "de": 2024,
+    "a": 2025,
+    "postable_command_nuevos": [
+      "ExportCADFormatsSTEP",
+      "ReCenterReference",
+      "LoadCasesDisplay",
+      "LoadCasesAndCombinations",
+      "CoordinationModelChanges",
+      "ToposolidByFace",
+      "OperatingSchedules",
+      "ToposolidSmoothShading",
+      "LaunchAsApp",
+      "LaunchInBrowser",
+      "LaunchInDockedWindow",
+      "SubstitutionSettings",
+      "AddInsManager"
+    ],
+    "postable_command_retirados": [
+      "ExportOptionsIFCOptions",
+      "LoadCases",
+      "LoadCombinations",
+      "GenerateAnalysis",
+      "ViewAnalysis"
+    ],
+    "built_in_category_nuevas": [
+      "OST_RebarSpliceLines",
+      "OST_RebarSpliceType",
+      "OST_PipeFlowDirectionSymbols_Obsolete",
+      "OST_DuctFlowDirectionSymbols_Obsolete",
+      "OST_SheetCollections",
+      "OST_PipeAnalyticalSegments",
+      "OST_PipeAnalyticalSegmentTags",
+      "OST_DuctAnalyticalSegments",
+      "OST_DuctAnalyticalSegmentTags"
+    ],
+    "built_in_category_retiradas": [],
+    "superficies_aparecen": [],
+    "superficies_desaparecen": []
+  },
+  {
+    "de": 2025,
+    "a": 2026,
+    "postable_command_nuevos": [
+      "ZoneBySketch",
+      "ZoneBySpace",
+      "AutomationCustomization",
+      "BuildingOperatingSchedules",
+      "ElectricalConductorAndCableSettings",
+      "TopographyCutVoidStability",
+      "RunPhysicalToAnalyticalForBuildings",
+      "RunAnalyticalToPhysicalForBuildings"
+    ],
+    "postable_command_retirados": [
+      "Zone",
+      "SystemZone",
+      "AnalyticalAutomation",
+      "OperatingSchedules"
+    ],
+    "built_in_category_nuevas": [
+      "OST_ElectricalInternalCircuits_Obsolete",
+      "OST_RebarCrankType",
+      "OST_PanelSchedules",
+      "OST_Cable",
+      "OST_Subdivision",
+      "OST_ViewPosition",
+      "OST_MEPSystemZoneColorFill"
+    ],
+    "built_in_category_retiradas": [
+      "OST_ElectricalInternalCircuits"
+    ],
+    "superficies_aparecen": [],
+    "superficies_desaparecen": [
+      "Autodesk.Revit.DB.ElementId::IntegerValue"
+    ]
+  }
+]

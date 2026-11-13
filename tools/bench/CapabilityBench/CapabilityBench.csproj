@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- SPDX-License-Identifier: GPL-3.0-only -->
+  <!-- Benchmarks offline del índice de capacidades (0.9.1). No toca Revit: mide construcción, búsqueda, memoria y bytes serializados. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\PDI.RevitMcp.Engine\PDI.RevitMcp.Engine.csproj" />
+  </ItemGroup>
+</Project>

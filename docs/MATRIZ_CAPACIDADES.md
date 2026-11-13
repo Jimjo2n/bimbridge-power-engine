@@ -10,7 +10,11 @@ Generada desde `src/PDI.RevitMcp.Engine/Capabilities.cs` (una prueba comprueba q
 | chk lighting_audit | QC de luminarias y etiquetas por vista | sí | no | R | 2022 | probado en Revit 2024 (lectura, 0.2.x) | perfil de etiquetas por tarea: tags=uno|ninguno|ignorar |
 | geo | geometría: montaje, choques, rangos de vista, cuartos | sí | no | R | 2022 | probado en Revit 2024 (lectura, 0.2.x) | vínculos con transformación fallida se excluyen y se informan |
 | show / cap | señalar y capturar vistas | sí | sí | R | 2022 | probado en Revit 2024 (lectura, 0.2.x) | sólo sobre el documento activo (necesita la interfaz) |
-| plan / commit | 34 operaciones tipadas con diff y un Deshacer (0.8.0: dibujo 2D, cotas, componentes de detalle, conjunto de impresión) | sí | parcial | P/W | 2022 | compila 2022–2026 | en familias: set, values, move, rotate, mirror, copy, delete |
+| chk model_health | salud del modelo: avisos agrupados, duplicados, parámetros requeridos vacíos, conectores MEP libres, láminas vacías y vistas sin lámina | sí | no | R | 2022 | compila 2022–2026 | sólo lectura, por tramos; no reproduce las comprobaciones estructurales de Revit |
+| chk historial | historial de operaciones largas con filtros, progreso de las que siguen y consejo de reintento | sí | sí | R | 2022 | compila 2022–2026 | persistente en %LOCALAPPDATA%; nunca aconseja repetir lo incierto |
+| chk cobertura | descubrimiento del catálogo F01–F37 bajo demanda: filas compactas paginadas y contrato completo por id | sí | sí | R | 2022 | compila 2022–2026 | índice inmutable en memoria; no entra al hilo de Revit ni lee ensamblados |
+| chk copy_monitor | Copy/Monitor: preflight e inventario del vínculo, traspaso manual veraz y verificación posterior (sólo lectura) | sí | no | R | 2022 | compila 2022–2026 | no hay API pública de Copia por lotes: nunca declara 'copiado'; correspondencia origen→copia inferida por tipo y posición |
+| plan / commit | 44 operaciones tipadas con diff y un Deshacer (0.8.0: dibujo 2D, cotas, componentes de detalle, conjunto de impresión; 0.9.1: niveles, rejillas, muros, suelos, techos, habitaciones, conductos, tuberías, circuitos y tablas) | sí | parcial | P/W | 2022 | compila 2022–2026 | en familias: set, values, move, rotate, mirror, copy, delete; las operaciones de modelado 0.9.1 sólo en proyectos |
 | exec consulta | C# general sobre la API; todo se revierte al final | sí | sí | R | 2022 | compila + prueba sin Revit | compilador Roslyn 4.8; compilación probada contra la API de cada año sin Revit |
 | exec ejecutar | C# general con transacción automática, grupo o sin transacción | sí | sí | W | 2022 | compila + prueba sin Revit | tx=auto|grupo|ninguna; avisos clasificados por FailureDefinitionId |
 | fam info / caras | tipos, parámetros, fórmulas, GUID, conectores, caras planas | sí | sí | R | 2022 | probado en Revit 2026 (lectura, 0.5.0, una muestra) | en proyecto: por familia cargada (conectores de una instancia) |
@@ -22,6 +26,8 @@ Generada desde `src/PDI.RevitMcp.Engine/Capabilities.cs` (una prueba comprueba q
 | doc guardar / guardar_como | Save / SaveAs con verificación de archivo y hash | sí | sí | D o W | 2022 | compila 2022–2026 |  |
 | doc sync | sincronizar con central y verificar | sí | no | D o W | 2022 | compila 2022–2026 | sólo modelos con worksharing |
 | doc pdf | exportar hojas o un conjunto a PDF y verificar archivos | sí | no | D o W | 2022 | compila 2022–2026 | Document.Export(PDFExportOptions), existe desde 2022 |
+| doc ifc | exportar IFC (2x3, 4 RV, 4 DTV; modelo o vista) y verificar el archivo | sí | no | D o W | 2022 | compila 2022–2026 | la transacción que Revit exige se revierte siempre: el modelo no cambia |
+| doc tabla_csv | exportar una tabla de planificación a CSV y comparar filas | sí | no | D o W | 2022 | compila 2022–2026 | ViewSchedule.Export con coma y comillas dobles |
 | doc cerrar | cerrar un documento que no es el activo | sí | sí | D o W | 2022 | compila 2022–2026 | Revit no permite cerrar el activo por la API |
 | res | leer resultados largos guardados por handle | sí | sí | R | 2022 | compila + prueba sin Revit | 7 días en disco |
 | clave= / tarea= | idempotencia y diario de operaciones durable | sí | sí | — | 2022 | compila + prueba sin Revit | commit, exec ejecutar, fam y doc |
@@ -32,6 +38,7 @@ Generada desde `src/PDI.RevitMcp.Engine/Capabilities.cs` (una prueba comprueba q
 | Bim.* (scripts) | grupos, montaje con soporte real (rayos, vínculos), rango de vista, por qué no se ve, manifiesto | sí | parcial | R/W | 2022 | compila 2022–2026 | la lógica de QC (manifiesto, transformaciones, visibilidad) sí tiene pruebas sin Revit |
 | metricas | caracteres por llamada y cliente para medir consumo (no tokens) | sí | sí | — | 2022 | compila + prueba sin Revit | local al puente |
 | permisos | 0.8.0: 10 clases (leer, modificar proyecto/familia, cargar archivo, guardar, sincronizar, exportar, publicar, código dinámico, interfaz) | sí | sí | — | 2022 | compila + prueba sin Revit | config permisos; vacío = derivados de los niveles; publicar siempre denegado |
+| Actualizar en línea (GitHub) | 0.9.1: última Release pública del repositorio, sin cuenta; verifica SHA-256 publicado, tamaño y versión antes de instalar | sí | sí | — | 2022 | compila + prueba sin Revit | sólo desde la cinta y sólo al pulsar; necesita una Release publicada; actualizacion_online=no la deshabilita |
 | Actualizar desde ZIP | 0.8.0: manifiesto, firma RSA, hashes, compatibilidad; se aplica al cerrar Revit, con reversión | sí | sí | — | 2022 | compila + prueba sin Revit | sólo desde la cinta; nunca cierra Revit |
 | Setup /diagnostico | versión instalada, cargada en cada Revit, puente, hashes y reinicio pendiente | sí | sí | — | 2022 | compila + prueba sin Revit | el instalador verifica manifest.json antes y después de copiar |
 

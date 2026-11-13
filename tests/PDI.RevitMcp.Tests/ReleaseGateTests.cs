@@ -162,16 +162,22 @@ namespace PDI.RevitMcp.Tests
         }
 
         [Fact]
-        public void R02_TruncatedTailFromAnotherWriter_IsQuarantinedOnNextAppend()
+        public void R02_TruncatedTailFromAnotherWriter_IsSetAsideWithEvidence_NotQuarantined()
         {
+            // AUD-01: un fragmento sin salto de línea más allá de la cabeza es una escritura interrumpida (nunca confirmada), no corrupción.
             var root = TempRoot(); Directory.CreateDirectory(root);
             var p = Path.Combine(root, "a.jsonl");
             var a = new AuditLog(p);
             a.Append("s", "op", "ok");
             File.AppendAllText(p, "{\"seq\":2,\"t\":\"cort"); // otro proceso murió a mitad de línea
             a.Append("s", "op2", "ok");
-            Assert.Single(a.Quarantined);
-            Assert.True(AuditLog.Verify(p).Ok);
+            Assert.Empty(a.Quarantined);
+            Assert.Single(a.Repaired);
+            Assert.Equal("{\"seq\":2,\"t\":\"cort", File.ReadAllText(a.Repaired[0]));   // el fragmento se conserva íntegro como evidencia
+            var v = AuditLog.Verify(p);
+            Assert.True(v.Ok, string.Join("; ", v.Errors));
+            Assert.Equal(3, v.Lines);                                                     // op, recuperación documentada, op2
+            Assert.Contains("recuperacion_cola", File.ReadAllText(p));
         }
 
         [Fact]

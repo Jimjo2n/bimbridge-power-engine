@@ -549,9 +549,23 @@ namespace PDI.RevitMcp.Tests
         {
             var p = Path.Combine(TempRoot(), "a.jsonl");
             var a = new AuditLog(p);
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            for (var i = 0; i < 300; i++) a.Append("s", "op", "ok");
-            Assert.True(sw.ElapsedMilliseconds < 15000, sw.ElapsedMilliseconds + " ms");
+            // La intención es que el coste de un append NO crezca con el tamaño del diario (nada cuadrático). Un umbral absoluto en
+            // milisegundos depende del disco: en el runner de Windows de GitHub un fsync cuesta ~6 veces más que en un equipo local
+            // (19 s frente a 3 s para 300 appends) y el límite de 15 s fallaba sin que hubiera regresión. Se compara la parte final
+            // del diario con la inicial en la MISMA máquina y ejecución; el tope absoluto sólo detecta bloqueos.
+            const int chunks = 6, per = 50;
+            var ms = new double[chunks];
+            var whole = System.Diagnostics.Stopwatch.StartNew();
+            for (var c = 0; c < chunks; c++)
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                for (var i = 0; i < per; i++) a.Append("s", "op", "ok");
+                ms[c] = sw.Elapsed.TotalMilliseconds;
+            }
+            var early = ms.Take(3).OrderBy(x => x).ToArray()[1];            // mediana de los tres primeros tramos
+            var late = ms.Skip(3).Max();                                    // el peor de los tres últimos
+            Assert.True(late <= early * 4 + 500, "tramos (ms): " + string.Join(", ", ms.Select(x => x.ToString("0"))));
+            Assert.True(whole.ElapsedMilliseconds < 180000, "bloqueo: " + whole.ElapsedMilliseconds + " ms");
             Assert.True(AuditLog.Verify(p).Ok);
         }
 

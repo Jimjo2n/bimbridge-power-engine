@@ -17,6 +17,8 @@ namespace PDI.RevitMcp.Engine
     {
         public string Id;
         public string SessionId;
+        /// <summary>Agente con nombre que lanzó el trabajo (huella de principal + alias); null si la sesión era anónima.</summary>
+        public string AgentId;
         /// <summary>Tarea autorizada (tarea=…). Un trabajo con tarea sigue aunque se corte la conexión y otra conexión de la misma tarea puede consultarlo.</summary>
         public string Task;
         public string Kind;
@@ -94,6 +96,7 @@ namespace PDI.RevitMcp.Engine
                 {
                     Id = "G-" + _now().ToString("HHmmss", CultureInfo.InvariantCulture) + "-" + _counter.ToString("D3", CultureInfo.InvariantCulture),
                     SessionId = sessionId,
+                    AgentId = Correlation.Current?.AgentId,   // AUD-13: dueño nominal (sobrevive a la reconexión; la sesión no)
                     Kind = kind,
                     CreatedUtc = _now(),
                     Cts = new CancellationTokenSource(),
@@ -116,12 +119,20 @@ namespace PDI.RevitMcp.Engine
             {
                 if (j.IsFinal) return;
                 j.Result = result;
-                j.FinalEstado = estado;
+                // AUD-18: el estado final se decide AQUÍ, antes de avisar a nadie (respuesta, consulta posterior del job e historial ven
+                // lo mismo). Un resultado con diferencias de verificación nunca queda como "ok", aunque quien llama no pase estado
+                // o pase "ok" por descuido.
+                j.FinalEstado = HasDifferences(result) && (estado == null || estado == PDI.RevitMcp.Protocol.Status.Ok)
+                    ? PDI.RevitMcp.Protocol.Status.ConDiferencias : estado;
                 j.Status = JobStatus.Listo;
                 j.FinishedUtc = _now();
             }
             FireFinal(j);
         }
+
+        /// <summary>¿El resultado declara diferencias entre lo pedido y lo verificado? (clave "diferencias" con algún elemento).</summary>
+        public static bool HasDifferences(Dictionary<string, object> result) =>
+            result != null && result.TryGetValue("diferencias", out var d) && d is System.Collections.ICollection c && c.Count > 0;
 
         public void Fail(Job j, string status, string error)
         {
@@ -151,11 +162,16 @@ namespace PDI.RevitMcp.Engine
             if (now) SafeInvoke(handler, j);
         }
 
+        /// <summary>0.9.1 (Bloque I): observador de todos los finales (historial de operaciones). Corre después de los manejadores del trabajo.</summary>
+        public Action<Job> OnAnyFinal;
+
         private void FireFinal(Job j)
         {
             List<Action<Job>> hs;
             lock (_lock) { hs = j.FinalHandlers; j.FinalHandlers = new List<Action<Job>>(); }
             foreach (var h in hs) SafeInvoke(h, j);
+            var any = OnAnyFinal;
+            if (any != null) SafeInvoke(any, j);
         }
 
         /// <summary>Errores de los manejadores finales (p. ej. el diario no se pudo escribir); se muestran en diagnóstico.</summary>
@@ -214,6 +230,18 @@ namespace PDI.RevitMcp.Engine
         public List<Job> ForSession(string sessionId, string task = null)
         {
             lock (_lock) return _jobs.Values.Where(j => j.SessionId == sessionId || (task != null && j.Task == task)).OrderByDescending(j => j.CreatedUtc).ToList();
+        }
+
+        /// <summary>Todos los trabajos en curso. Sólo para la persona en el panel de Revit (los agentes usan <see cref="ForOwner"/>).</summary>
+        public List<Job> AllRunning()
+        {
+            lock (_lock) return _jobs.Values.Where(j => !j.IsFinal).OrderBy(j => j.CreatedUtc).ToList();
+        }
+
+        /// <summary>AUD-13: trabajos de la misma sesión o del mismo agente con nombre (para el historial; el nombre de tarea no cuenta).</summary>
+        public List<Job> ForOwner(string sessionId, string agentId)
+        {
+            lock (_lock) return _jobs.Values.Where(j => j.SessionId == sessionId || (!string.IsNullOrEmpty(agentId) && j.AgentId == agentId)).OrderByDescending(j => j.CreatedUtc).ToList();
         }
 
         /// <summary>¿Puede esta conexión ver el trabajo? La misma sesión, o la misma tarea autorizada.</summary>

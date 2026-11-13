@@ -166,6 +166,11 @@ namespace PDI.RevitMcp.AgentHost
             var cancelled = State.PlanState == PlanRunState.Cancelado;
             try
             {
+                // AUD-04 (#28): renovación explícita tras la inicialización (adquisición → recuperación del diario → apertura del modelo).
+                // Si esa fase tardó más que el TTL, el lease ya venció: Check lo detecta y el proceso falla cerrado (lease_perdido, código 4)
+                // ANTES de cualquier transición o escritura; nunca re-adquiere en silencio. Si no venció, lo renueva.
+                _faults.Delay("runner.antes_de_ejecutar");
+                _lease.Check();
                 foreach (var id in Plan.Order)
                 {
                     if (ct.IsCancellationRequested) break;

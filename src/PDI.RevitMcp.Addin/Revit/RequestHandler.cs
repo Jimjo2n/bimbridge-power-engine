@@ -40,6 +40,7 @@ namespace PDI.RevitMcp.Addin.Revit
             PlanStore plans, HoldSwitch hold, PauseSwitch pause)
         {
             _pause = pause;
+            HookHistory();
             _plans = plans;
             _hold = hold;
             _main = main;
@@ -458,6 +459,11 @@ namespace PDI.RevitMcp.Addin.Revit
                 };
             }
             datos["ms"] = sw.ElapsedMilliseconds;
+            // 0.9.1: métricas del benchmark sólo si se piden (no engordan cada respuesta).
+            if (Arg.GetBool(request.Args, "metricas") == true || Arg.GetBool(request.Args, "timing") == true)
+                datos["metricas"] = WorkflowMetrics.FromMainThread(sw.ElapsedMilliseconds, result.WaitMs, result.BusyMs, result.Slices, result.MaxSliceMs)
+                    .Observe("elements_read", runner.ElementsRead).Observe("elements_written", 0).Observe("transactions", 0)
+                    .Observe("cache_hits", runner.Names.Hits).Observe("cache_misses", runner.Names.Misses).ToJson();
             return new Response { Id = request.Id, Rev = runner.Rev, Datos = datos };
         }
 
@@ -500,8 +506,12 @@ namespace PDI.RevitMcp.Addin.Revit
         private async Task<Response> Check(Session session, Request request, CancellationToken ct)
         {
             var name = (Arg.GetString(request.Args, "name") ?? "").ToLowerInvariant();
+            if (name == "copy_monitor") return await CopyMonitorCheck(session, request, ct).ConfigureAwait(false);
+            if (name == "cobertura") return CoverageCheck(request);
+            if (name == "historial") return HistoryCheck(session, request);
+            if (name == "model_health") return await ModelHealthCheck(request, ct).ConfigureAwait(false);
             if (name != "lighting_audit")
-                return Response.Fail(request.Id, Status.Invalido, "check disponible en esta versión: lighting_audit");
+                return Response.Fail(request.Id, Status.Invalido, "check disponible en esta versión: lighting_audit, copy_monitor");
 
             var tagRule = Arg.GetString(request.Args, "tags") ?? "uno";
             if (tagRule != "uno" && tagRule != "ninguno" && tagRule != "ignorar")
@@ -521,6 +531,11 @@ namespace PDI.RevitMcp.Addin.Revit
                 datos["conjuntos_guardados"] = new List<object>(sets.Keys);
             }
             datos["ms"] = sw.ElapsedMilliseconds;
+            // 0.9.1: métricas del benchmark sólo si se piden (no engordan cada respuesta).
+            if (Arg.GetBool(request.Args, "metricas") == true || Arg.GetBool(request.Args, "timing") == true)
+                datos["metricas"] = WorkflowMetrics.FromMainThread(sw.ElapsedMilliseconds, result.WaitMs, result.BusyMs, result.Slices, result.MaxSliceMs)
+                    .Observe("elements_read", runner.ElementsRead).Observe("elements_written", 0).Observe("transactions", 0)
+                    .Observe("cache_hits", runner.Names.Hits).Observe("cache_misses", runner.Names.Misses).ToJson();
             return new Response { Id = request.Id, Rev = runner.Rev, Datos = datos };
         }
 
@@ -535,9 +550,12 @@ namespace PDI.RevitMcp.Addin.Revit
 
             List<OpSpec> ops;
             var resolved = new List<List<long>>();
+            SourceBinding.Bound sourceBound;
             try
             {
                 ops = OpSpec.ParseAll(request.Args);
+                // AUD-19: si las operaciones vienen de una fuente (origen=), el plan queda vinculado a su clave y huella de contenido.
+                sourceBound = SourceBinding.Resolve(request.Args["ops"] as List<object>);
                 foreach (var op in ops)
                 {
                     var ids = new List<long>(op.Ids);
@@ -563,6 +581,7 @@ namespace PDI.RevitMcp.Addin.Revit
                 CreatedUtc = DateTime.UtcNow,
                 Summary = Arg.GetString(request.Args, "summary"),
                 Task = Arg.GetString(request.Args, Wire.TaskArg),
+                BoundToken = sourceBound?.Token, BoundKey = sourceBound?.Key, BoundHash = sourceBound?.Hash,
             };
 
             // Sin geometría: se planifica en una sola visita al hilo de Revit.
@@ -972,7 +991,20 @@ namespace PDI.RevitMcp.Addin.Revit
                 datos["marca_cambios_sin_guardar_perdida"] = true;
                 advice = "ATENCIÓN: el documento tenía cambios sin guardar y, al revertir, Revit dejó de marcarlo como modificado; esos cambios siguen sin guardar. " + advice;
             }
-            return new Response { Id = request.Id, Estado = MapStatus(plan.Status), Rev = rev, Datos = datos, Aviso = advice };
+            var estado = MapStatus(plan.Status);
+            if (plan.Status == PlanStatus.Aplicado)
+            {
+                // AUD-09: commit confirmado ≠ postcondiciones cumplidas.
+                var post = PlanVerification.Postconditions(plan.Verification);
+                datos["commit"] = "confirmado";
+                datos["postcondiciones"] = post;
+                if (post != PlanVerification.Met)
+                {
+                    estado = Status.ConDiferencias;
+                    advice = "Se aplicó (commit confirmado), pero la relectura no coincide con lo pedido o no se pudo verificar: revise 'verificacion'. " + advice;
+                }
+            }
+            return new Response { Id = request.Id, Estado = estado, Rev = rev, Datos = datos, Aviso = advice };
         }
 
         /// <summary>Cierra la intención de auditoría. Si falla, la intención queda pendiente y PendingIntents la reporta para reconciliar.</summary>
