@@ -24,7 +24,7 @@ namespace PDI.RevitMcp.Setup
     /// <summary>
     /// Actualización sin reinstalar a mano (flujo de actualización): el add-in busca instaladores nuevos en
     /// Descargas, Escritorio, la carpeta de actualizaciones y las que configure IT, y el instalador en modo
-    /// /actualizar los aplica con las mismas opciones, incluso con Revit abierto (la versión nueva entra al reiniciar).
+    /// /actualizar los aplica con las mismas opciones, al cerrar todas las instancias de Revit.
     /// Sólo se aceptan ensamblados llamados PDI.RevitMcp.Setup; nunca se descarga nada de internet.
     /// </summary>
     public static class Updates

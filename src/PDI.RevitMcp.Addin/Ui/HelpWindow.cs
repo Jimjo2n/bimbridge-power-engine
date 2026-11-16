@@ -33,7 +33,7 @@ namespace PDI.RevitMcp.Addin.Ui
             body.Children.Add(Item(Icons.Queue(3, 32), "Cola",
                 "Revise cada cambio (antes y después), elija cuáles aplicar o descartar. Si algo cambió mientras esperaba, ese cambio se omite y la IA se entera. Cada plan se deshace con un Ctrl+Z."));
             body.Children.Add(Item(Icons.Update(1, 32), "Versión / Actualizar",
-                "Cuando le pasen un instalador nuevo, déjelo en Descargas o en el Escritorio (sin abrirlo). El botón se pone verde: púlselo y se instala sin cerrar Revit, " +
+                "Cuando le pasen un instalador nuevo, déjelo en Descargas o en el Escritorio (sin abrirlo). El botón se pone verde: púlselo y se prepara para instalar al cerrar Revit, " +
                 "con sus mismas opciones; entra al reiniciar Revit. Los instaladores viejos van a la papelera y puede volver a la versión anterior."));
             body.Children.Add(Theme.Card(Theme.Label(
                 "Qué puede hacer la IA, según los permisos que usted eligió al instalar: leer el modelo; proponer cambios tipados con su antes y después (plan); " +
