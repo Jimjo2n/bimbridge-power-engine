@@ -440,6 +440,45 @@ namespace PDI.RevitMcp.Engine
             Append(author, op, estado, e);
         }
 
+        public static Dictionary<string, object> FindCommitReceipt(string path, string attempt, string session, string agent, string doc, string docPrint)
+        {
+            if (string.IsNullOrEmpty(attempt) || string.IsNullOrEmpty(doc) || string.IsNullOrEmpty(docPrint) || !File.Exists(path))
+                return null;
+            Dictionary<string, object> result = null;
+            string intent = null;
+            foreach (var raw in ReadLinesShared(path))
+            {
+                if (raw.IndexOf("\"intento_id\"", StringComparison.Ordinal) < 0 && (intent == null || raw.IndexOf(intent, StringComparison.Ordinal) < 0))
+                    continue;
+                Dictionary<string, object> entry;
+                try { entry = Json.ParseObject(raw); }
+                catch (FormatException) { continue; }
+                if (Arg.GetString(entry, "op") != "commit") continue;
+                var candidate = Arg.GetString(entry, "intencion");
+                if (candidate == null) continue;
+                var state = Arg.GetString(entry, "estado");
+                if (state == "intencion" && Arg.GetString(entry, "intento_id") == attempt &&
+                    Arg.GetString(entry, "objetivo") == doc && Arg.GetString(entry, "huella_doc") == docPrint &&
+                    (Arg.GetString(entry, "autor") == session || (!string.IsNullOrEmpty(agent) && Arg.GetString(entry, "agente") == agent)))
+                {
+                    if (result != null) return null;
+                    intent = candidate;
+                    result = new Dictionary<string, object>
+                    {
+                        ["intento_id"] = attempt, ["estado"] = Status.Desconocido, ["doc"] = doc, ["huella_doc"] = docPrint,
+                        ["plan_id"] = Arg.GetString(entry, "plan_id"), ["inicio"] = Arg.GetString(entry, "t"),
+                    };
+                }
+                else if (candidate == intent && Arg.GetString(entry, "fase") == "resultado")
+                {
+                    result["estado"] = Arg.GetString(entry, "estado_recibo") ?? state ?? Status.Desconocido;
+                    result["fin"] = Arg.GetString(entry, "t");
+                    result["rev"] = Arg.GetLong(entry, "rev");
+                }
+            }
+            return result;
+        }
+
         /// <summary>Intenciones sin resultado (la escritura pudo ocurrir o no): entrada de la reconciliación.</summary>
         public static List<Dictionary<string, object>> PendingIntents(string path)
         {

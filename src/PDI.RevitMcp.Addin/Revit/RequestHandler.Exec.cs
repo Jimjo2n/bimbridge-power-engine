@@ -52,9 +52,26 @@ namespace PDI.RevitMcp.Addin.Revit
         }
 
         /// <summary>Destino de la petición: doc= (handle, ruta, clave o título) o el activo ahora. Se resuelve fuera del hilo de Revit con la copia del registro.</summary>
-        private Response ResolveTarget(Request request)
+        private Response ResolveTarget(Session session, Request request)
         {
             var requested = Arg.GetString(request.Args, Wire.DocArg);
+            var planId = request.Op == Wire.OpCommit ? Arg.GetString(request.Args, "plan_id") : null;
+            var plan = string.IsNullOrEmpty(planId) ? null : _plans.Get(planId);
+            var task = Arg.GetString(request.Args, Wire.TaskArg);
+            if (plan?.DocId != null && (plan.SessionId == session.Id || (!string.IsNullOrEmpty(task) && plan.Task == task)))
+            {
+                var planned = DocRegistry.Instance.Find(plan.DocId, out _, out _);
+                if (planned == null || planned.Key != plan.DocKey)
+                    return Response.Fail(request.Id, Status.DestinoNoDisponible, "El documento del plan ya no está disponible. Consulte el plan antes de repetir.");
+                if (!string.IsNullOrEmpty(requested))
+                {
+                    var explicitDoc = DocRegistry.Instance.Find(requested, out _, out _);
+                    if (explicitDoc?.Id != planned.Id)
+                        return Response.Fail(request.Id, Status.Conflicto, "El documento indicado no coincide con el documento del plan.");
+                }
+                DocTarget.Ambient.Value = DocTarget.From(planned, true);
+                return null;
+            }
             if (DocRegistry.Instance.Count == 0 && string.IsNullOrEmpty(requested)) { DocTarget.Ambient.Value = null; return null; }
             var info = DocRegistry.Instance.Find(requested, out var error, out var ambiguous);
             if (info == null)
@@ -173,7 +190,12 @@ namespace PDI.RevitMcp.Addin.Revit
             var hash = boundHash ?? OperationJournal.HashArgs(request.Op, argsForHash, resolved);
             var task = Arg.GetString(request.Args, Wire.TaskArg);
             OperationJournal.BeginResult b;
-            try { b = _ops.Begin(key, docKey, request.Op, hash, task, session.Id, mode, target?.Print, target?.Generation); }
+            var attempt = Guid.TryParseExact(request.AttemptId, "N", out _) ? request.AttemptId : null;
+            try
+            {
+                b = _ops.Begin(key, docKey, request.Op, hash, task, session.Id, mode, target?.Print, target?.Generation,
+                    attempt, Correlation.Current?.AgentId, Arg.GetString(request.Args, "plan_id"));
+            }
             catch (JournalUnavailableException ex)
             {
                 return Response.Fail(request.Id, Status.DiarioNoDisponible, "No se aplicó nada: " + ex.Message + ". Sin diario, clave= no puede evitar repeticiones.");
@@ -241,6 +263,7 @@ namespace PDI.RevitMcp.Addin.Revit
             {
                 try { _ops.LinkJob(key, docKey, jobId); } catch (JournalUnavailableException) { }
                 _jobs.WhenFinal(running, j => _ops.Complete(key, docKey, j.Estado, JobJournalResult(j)));
+                AddWriteReceipt(session, attempt, resp);
                 return resp;
             }
             try { _ops.Complete(key, docKey, resp.Estado, resp.Datos as Dictionary<string, object> ?? (resp.Aviso != null ? new Dictionary<string, object> { ["aviso"] = resp.Aviso } : null)); }
@@ -248,7 +271,42 @@ namespace PDI.RevitMcp.Addin.Revit
             {
                 resp.Aviso = (resp.Aviso == null ? "" : resp.Aviso + " ") + "ATENCIÓN: el diario no registró el final (" + ex.Message + "); si repite clave=" + key + " se pedirá reconciliar.";
             }
+            AddWriteReceipt(session, attempt, resp);
             return resp;
+        }
+
+        private Response ReadWriteReceipt(Session session, long requestId, string attempt)
+        {
+            var target = DocTarget.Ambient.Value;
+            Dictionary<string, object> receipt;
+            try
+            {
+                var agent = Correlation.Current?.AgentId;
+                receipt = _ops?.FindReceipt(attempt, session.Id, agent, target?.Key, target?.Print)
+                    ?? AuditLog.FindCommitReceipt(Ui.Runtime.Audit?.Path_, attempt, session.Id, agent, target?.Key, target?.Print);
+            }
+            catch (Exception ex) when (ex is JournalUnavailableException || ex is IOException || ex is UnauthorizedAccessException)
+            {
+                receipt = null;
+            }
+            if (receipt == null)
+                return Response.Fail(requestId, Status.Desconocido,
+                    "No hay evidencia consultable para este intento en el documento y la sesión indicados. Fije el documento y verifique el modelo antes de repetir.");
+            return new Response
+            {
+                Id = requestId, Estado = Arg.GetString(receipt, "estado"),
+                Datos = new Dictionary<string, object> { ["recibo"] = receipt },
+            };
+        }
+
+        private void AddWriteReceipt(Session session, string attempt, Response response)
+        {
+            if (attempt == null) return;
+            if (ReadWriteReceipt(session, response.Id, attempt).Datos is Dictionary<string, object> receipt)
+            {
+                if (response.Datos == null) response.Datos = receipt;
+                else if (response.Datos is Dictionary<string, object> data) data["recibo"] = receipt["recibo"];
+            }
         }
 
         private static Dictionary<string, object> JobJournalResult(Job j)

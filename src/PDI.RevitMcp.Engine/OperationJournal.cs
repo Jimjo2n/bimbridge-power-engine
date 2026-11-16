@@ -231,6 +231,10 @@ namespace PDI.RevitMcp.Engine
             public string Estado;
             public string JobId;
             public string Reconciled;
+            public string Correlation;
+            public string Agent;
+            public string PlanId;
+            public string DocPrint;
         }
 
         public sealed class Record
@@ -347,7 +351,12 @@ namespace PDI.RevitMcp.Engine
                         r.Estado = null;
                         r.Result = null;
                         r.JobId = null;
-                        r.Attempts.Add(new Attempt { N = r.Attempts.Count + 1, Session = r.Session, Started = r.Started });
+                        r.Attempts.Add(new Attempt
+                        {
+                            N = r.Attempts.Count + 1, Session = r.Session, Started = r.Started,
+                            Correlation = Arg.GetString(o, "intento_id"), Agent = Arg.GetString(o, "agente"),
+                            PlanId = Arg.GetString(o, "plan_id"), DocPrint = r.DocPrint,
+                        });
                         break;
                     case "job" when r != null:
                         r.JobId = Arg.GetString(o, "job_id");
@@ -408,7 +417,7 @@ namespace PDI.RevitMcp.Engine
         /// leer o escribir el diario: quien llama NO debe aplicar la operación en ese caso.
         /// </summary>
         public BeginResult Begin(string key, string doc, string op, string hash, string task, string session, ReconcileMode mode,
-            string docPrint = null, string generation = null)
+            string docPrint = null, string generation = null, string correlation = null, string agent = null, string planId = null)
         {
             if (string.IsNullOrWhiteSpace(key)) throw new ArgumentException("clave vacía");
             lock (_lock)
@@ -463,9 +472,32 @@ namespace PDI.RevitMcp.Engine
                 {
                     ["ev"] = "inicio", ["clave"] = key, ["doc"] = doc, ["op"] = op, ["hash"] = hash, ["tarea"] = task, ["sesion"] = session,
                     ["huella_doc"] = docPrint, ["generacion"] = generation,
+                    ["intento_id"] = correlation, ["agente"] = agent, ["plan_id"] = planId,
                 });
                 _running[id] = "";
                 return new BeginResult { Kind = BeginKind.New, Previous = _index.TryGetValue(id, out var now) ? now : null };
+            }
+        }
+
+        public Dictionary<string, object> FindReceipt(string correlation, string session, string agent, string doc, string docPrint)
+        {
+            if (string.IsNullOrEmpty(correlation) || string.IsNullOrEmpty(doc) || string.IsNullOrEmpty(docPrint)) return null;
+            lock (_lock)
+            {
+                Refresh();
+                var matches = _index.Values.Where(r => r.Doc == doc)
+                    .SelectMany(r => r.Attempts.Where(a => a.Correlation == correlation && a.DocPrint == docPrint &&
+                        (a.Session == session || (!string.IsNullOrEmpty(agent) && a.Agent == agent))).Select(a => (Record: r, Attempt: a)))
+                    .Take(2).ToList();
+                if (matches.Count != 1) return null;
+                var (record, attempt) = matches[0];
+                var active = ReferenceEquals(attempt, record.Attempts.Last()) && _running.ContainsKey(Id(doc, record.Key));
+                return new Dictionary<string, object>
+                {
+                    ["intento_id"] = correlation, ["estado"] = attempt.Estado ?? (active ? Status.EnProceso : Status.Desconocido),
+                    ["clave"] = record.Key, ["plan_id"] = attempt.PlanId, ["doc"] = doc, ["huella_doc"] = docPrint,
+                    ["job_id"] = attempt.JobId, ["inicio"] = attempt.Started, ["fin"] = attempt.Finished,
+                };
             }
         }
 

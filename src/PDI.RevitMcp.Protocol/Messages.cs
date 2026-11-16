@@ -14,6 +14,8 @@ namespace PDI.RevitMcp.Protocol
 
         // Operaciones
         public const string OpHello = "hello";
+        public const string WriteReceiptFeature = "recibo_escritura";
+        public const string LargeResultFeature = "resultado_fuera_de_trama";
         public const string OpPing = "ping";
         public const string OpContext = "context";
         public const string OpQuery = "query";
@@ -112,14 +114,14 @@ namespace PDI.RevitMcp.Protocol
         public Dictionary<string, object> Args = new Dictionary<string, object>(StringComparer.Ordinal);
         /// <summary>Tiempo máximo que el puente esperará; el add-in lo usa para no trabajar en vano.</summary>
         public int DeadlineMs;
+        public string AttemptId;
 
-        public object ToJson() => new Dictionary<string, object>
+        public object ToJson()
         {
-            ["id"] = Id,
-            ["op"] = Op,
-            ["args"] = Args,
-            ["deadline_ms"] = DeadlineMs,
-        };
+            var data = new Dictionary<string, object> { ["id"] = Id, ["op"] = Op, ["args"] = Args, ["deadline_ms"] = DeadlineMs };
+            if (AttemptId != null) data["intento_id"] = AttemptId;
+            return data;
+        }
 
         public static Request FromJson(string json)
         {
@@ -128,6 +130,7 @@ namespace PDI.RevitMcp.Protocol
             {
                 Id = Arg.GetLong(o, "id") ?? 0,
                 Op = Arg.GetString(o, "op"),
+                AttemptId = Arg.GetString(o, "intento_id"),
                 Args = o.TryGetValue("args", out var a) && a is Dictionary<string, object> d
                     ? d
                     : new Dictionary<string, object>(StringComparer.Ordinal),
