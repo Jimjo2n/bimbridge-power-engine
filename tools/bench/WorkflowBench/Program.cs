@@ -107,7 +107,7 @@ internal static class Program
         foreach (var n in new[] { 1000, 10000, 50000 })
         {
             var source = Elements(n, false);
-            var spec = QuerySpec.Parse(new Dictionary<string, object> { ["group_by"] = "lvl,type" });
+            var spec = QuerySpec.Parse(new Dictionary<string, object> { ["cat"] = "LightingFixtures", ["group_by"] = "lvl,type" });
             Dictionary<string, object> Project(ModelHealth.Element e) => new Dictionary<string, object>
             {
                 ["lvl"] = e.Level, ["type"] = e.Type,

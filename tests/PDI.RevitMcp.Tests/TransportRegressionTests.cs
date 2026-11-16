@@ -2,6 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Pipes;
+using System.Threading;
+using System.Threading.Tasks;
 using PDI.RevitMcp.Bridge;
 using PDI.RevitMcp.Engine;
 using PDI.RevitMcp.Protocol;
@@ -14,6 +17,51 @@ namespace PDI.RevitMcp.Tests
     {
         private static OperationJournal Journal() => new OperationJournal(Path.Combine(
             Path.GetTempPath(), "bimbridge-regression-" + Guid.NewGuid().ToString("N"), "operations.jsonl"));
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task SentWrite_RemainsUnknownAfterDisconnectOrTimeout(bool supportsReceipt, bool timeout)
+        {
+            var name = "bimbridge-receipt-" + Guid.NewGuid().ToString("N");
+            using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using var bridge = new RevitConnection { FixedTarget = (name, null) };
+            var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            async Task<Request> Peer()
+            {
+                await server.WaitForConnectionAsync(deadline.Token);
+                var hello = Request.FromJson(await Frame.ReadAsync(server, deadline.Token));
+                await Frame.WriteAsync(server, Json.Write(new Response
+                {
+                    Id = hello.Id, Datos = new Dictionary<string, object> { [Wire.WriteReceiptFeature] = supportsReceipt },
+                }), deadline.Token);
+                var request = Request.FromJson(await Frame.ReadAsync(server, deadline.Token));
+                if (timeout)
+                {
+                    await release.Task.WaitAsync(deadline.Token);
+                    await Frame.WriteAsync(server, Json.Write(new Response { Id = request.Id }), deadline.Token);
+                }
+                else server.Disconnect();
+                return request;
+            }
+            var peer = Peer();
+            var call = await bridge.CallAsync(Wire.OpCommit, new Dictionary<string, object> { ["plan_id"] = "P-1" },
+                TimeSpan.FromMilliseconds(timeout ? 250 : 3000), deadline.Token);
+            release.TrySetResult(true);
+            var sent = await peer;
+            Assert.Equal(Status.Desconocido, call.Estado);
+            if (supportsReceipt)
+            {
+                var data = Assert.IsType<Dictionary<string, object>>(call.Datos);
+                var receipt = Assert.IsType<Dictionary<string, object>>(data["recibo"]);
+                Assert.Equal(sent.AttemptId, receipt["intento_id"]);
+                Assert.True(Guid.TryParseExact(sent.AttemptId, "N", out _));
+                Assert.Equal(true, receipt["envio_confirmado"]);
+            }
+            else Assert.Null(sent.AttemptId);
+        }
 
         [Theory]
         [InlineData("escribir")]

@@ -106,6 +106,8 @@ namespace PDI.RevitMcp.Addin.Ui
             var sw = Stopwatch.StartNew();
             // Fail-closed: con operaciones sin reconciliar el plan sigue en la cola y no se toca el modelo.
             var key0 = DocumentTracker.KeyOf(doc) ?? p.DocKey;
+            if (p.ReceiptDocPrint != null && !string.Equals(DocRegistry.Instance.IdentityOf(doc)?.Print, p.ReceiptDocPrint, StringComparison.Ordinal))
+                return new PlanOps.ApplyResult { Status = PlanStatus.Retenido, Detail = "El documento activo no coincide con la huella del intento retenido." };
             try { Plans.LoadPersisted(key0); } catch (Exception ex) { Log("Cola: " + ex.Message); }
             var block0 = Plans.CheckWritable(key0);
             if (block0.Blocked) { Log("Cola: plan " + p.Id + " NO aplicado: " + block0.Message); return new PlanOps.ApplyResult { Status = PlanStatus.Retenido, Detail = block0.Message }; }
