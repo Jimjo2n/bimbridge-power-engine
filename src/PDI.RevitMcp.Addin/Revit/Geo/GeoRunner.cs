@@ -85,7 +85,8 @@ namespace PDI.RevitMcp.Addin.Revit.Geo
         private readonly List<GeoCompute.PairToCheck> _pairs = new List<GeoCompute.PairToCheck>();
         private readonly List<GeoCompute.ExactResult> _exact = new List<GeoCompute.ExactResult>();
         private int _exactNext;
-        private readonly Dictionary<string, List<Solid>> _targetSolids = new Dictionary<string, List<Solid>>(StringComparer.Ordinal);
+        private readonly Dictionary<(int Target, long Link), (List<Solid> Solids, GeoCompute.ExactIssue Issues)> _targetSolids =
+            new Dictionary<(int, long), (List<Solid>, GeoCompute.ExactIssue)>();
 
         /// <summary>
         /// place con montaje: mide familias que todavía no existen. Toma el cuerpo de una instancia existente del mismo tipo y lo mueve
@@ -749,47 +750,49 @@ namespace PDI.RevitMcp.Addin.Revit.Geo
             var r = new GeoCompute.ExactResult { Target = p.Target, Body = p.Body };
             var item = _items[p.Body];
             var mine = TargetSolids(p.Target, item.Source);
-            var other = _index.SolidsOf(item, null);
-            if (mine.Count == 0 || other.Count == 0) return r;
-            var failed = false;
-            foreach (var a in mine)
+            var other = _index.SolidsOf(item, null, out var extractionFailed);
+            r.Issues = mine.Issues;
+            if (extractionFailed) r.Issues |= GeoCompute.ExactIssue.Extraction;
+            if (mine.Solids.Count == 0 || other.Count == 0)
+            {
+                if (r.Issues == GeoCompute.ExactIssue.None) r.Issues = GeoCompute.ExactIssue.NoSolid;
+                return r;
+            }
+            foreach (var a in mine.Solids)
                 foreach (var b in other)
                 {
                     try
                     {
                         var x = BooleanOperationsUtils.ExecuteBooleanOperation(a, b, BooleanOperationsType.Intersect);
-                        if (x != null) r.Volume += x.Volume;
+                        if (x == null) r.Issues |= GeoCompute.ExactIssue.Boolean;
+                        else r.Volume += x.Volume;
                     }
-                    catch (Exception) { failed = true; }
+                    catch (Exception) { r.Issues |= GeoCompute.ExactIssue.Boolean; }
                 }
-            r.Failed = failed && r.Volume <= Spec.MinVolume;
             return r;
         }
 
         /// <summary>Sólidos del elemento revisado, llevados a las coordenadas del modelo del otro (los vínculos tienen su propio origen).</summary>
-        private List<Solid> TargetSolids(int target, GeoSource src)
+        private (List<Solid> Solids, GeoCompute.ExactIssue Issues) TargetSolids(int target, GeoSource src)
         {
-            var key = target.ToString(CultureInfo.InvariantCulture) + "|" + src.LinkId.ToString(CultureInfo.InvariantCulture);
+            var key = (target, src.LinkId);
             if (_targetSolids.TryGetValue(key, out var cached)) return cached;
-            List<Solid> list;
-            var hostKey = target.ToString(CultureInfo.InvariantCulture) + "|0";
+            var hostKey = (target, 0L);
             if (!_targetSolids.TryGetValue(hostKey, out var host))
             {
-                var e = _doc.GetElement(_targetElemIds[target]);
-                host = e != null ? _index.SolidsOf(e, Spec.ExcludeSubcategories) : new List<Solid>();
+                var solids = _index.ReadSolids(() => _doc.GetElement(_targetElemIds[target]), Spec.ExcludeSubcategories, out var failed);
+                host = (solids, failed ? GeoCompute.ExactIssue.Extraction : GeoCompute.ExactIssue.None);
                 _targetSolids[hostKey] = host;
             }
-            if (src.Identity) list = host;
-            else
+            if (src.Identity) return _targetSolids[key] = host;
+            var transformed = new List<Solid>(host.Solids.Count);
+            var issues = host.Issues;
+            foreach (var s in host.Solids)
             {
-                list = new List<Solid>(host.Count);
-                foreach (var s in host)
-                {
-                    try { list.Add(SolidUtils.CreateTransformed(s, src.ToLocal)); } catch (Exception) { }
-                }
+                try { transformed.Add(SolidUtils.CreateTransformed(s, src.ToLocal)); }
+                catch (Exception) { issues |= GeoCompute.ExactIssue.Transform; }
             }
-            _targetSolids[key] = list;
-            return list;
+            return _targetSolids[key] = (transformed, issues);
         }
 
         public void FinishClashes()

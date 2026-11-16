@@ -37,6 +37,7 @@ namespace PDI.RevitMcp.Addin.Revit.Geo
         public GeoBody Body;
         /// <summary>Sólidos de Revit (sólo para la booleana exacta de choques). Se cargan si hacen falta.</summary>
         public List<Solid> Solids;
+        public bool SolidsFailed;
     }
 
     /// <summary>Elementos de una categoría en un modelo, con su rejilla en planta.</summary>
@@ -415,25 +416,27 @@ namespace PDI.RevitMcp.Addin.Revit.Geo
         }
 
         /// <summary>Sólidos de Revit de un elemento indexado (para la booleana exacta), en coordenadas de su propio modelo.</summary>
-        public List<Solid> SolidsOf(GeoItem item, ICollection<string> skip)
+        public List<Solid> SolidsOf(GeoItem item, ICollection<string> skip, out bool failed)
         {
-            if (item.Solids != null) return item.Solids;
-            var list = new List<Solid>();
-            try
-            {
-                var e = Live(item);
-                Bodies.CollectSolids(e?.get_Geometry(_options), list, e?.Document, skip);
-            }
-            catch (Exception) { MeshFailures++; }
-            item.Solids = list;
-            return list;
+            if (item.Solids == null)
+                item.Solids = ReadSolids(() => Live(item), skip, out item.SolidsFailed);
+            failed = item.SolidsFailed;
+            return item.Solids;
         }
 
-        public List<Solid> SolidsOf(Element e, ICollection<string> skip)
+        public List<Solid> ReadSolids(Func<Element> resolve, ICollection<string> skip, out bool failed)
         {
             var list = new List<Solid>();
-            try { Bodies.CollectSolids(e?.get_Geometry(_options), list, e?.Document, skip); }
-            catch (Exception) { MeshFailures++; }
+            var incomplete = false;
+            try
+            {
+                var e = resolve();
+                if (e == null) incomplete = true;
+                else Bodies.CollectSolids(e.get_Geometry(_options), list, e.Document, skip, onFailure: () => incomplete = true);
+            }
+            catch (Exception) { incomplete = true; }
+            if (incomplete) MeshFailures++;
+            failed = incomplete;
             return list;
         }
 
