@@ -25,7 +25,7 @@ namespace PDI.RevitMcp.Tests
         [Fact]
         public void CatalogExamples_OfEveryNewOperation_ValidateOffline()
         {
-            var kinds = new[] { "level_create", "grid_create", "wall_create", "floor_create", "ceiling_create", "room_create", "duct_create", "pipe_create", "circuit_create", "schedule_create" };
+            var kinds = new[] { "level_create", "grid_create", "wall_create", "floor_create", "ceiling_create", "room_create", "duct_create", "pipe_create", "conduit_create", "conduit_route", "circuit_create", "schedule_create" };
             foreach (var k in kinds)
             {
                 var info = OpCatalog.ByKind[k];
@@ -33,6 +33,14 @@ namespace PDI.RevitMcp.Tests
                 var ops = Plan(info.Example);
                 Assert.Equal(k, ops.Single().Kind);
             }
+        }
+
+        [Fact]
+        public void ConduitRoute_RejectsCollapsedAndTwoDimensionalSegments()
+        {
+            var good = OpCatalog.ByKind["conduit_route"].Example;
+            Rejected(good.Replace("[20,10,9]", "[20,0,9]"), "coinciden");
+            Rejected(good.Replace("[20,10,9]", "[20,10]"), "[x,y,z]");
         }
 
         [Fact]

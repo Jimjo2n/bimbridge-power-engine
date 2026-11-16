@@ -11,6 +11,20 @@ namespace PDI.RevitMcp.Tests
     {
         private static CapabilityIndex Idx => CapabilityIndex.Default;
 
+        [Theory]
+        [InlineData("Lighting fixture QA", "F20-LIGHT-QA-001")]
+        [InlineData("QA de luminarias y etiquetas", "F20-LIGHT-QA-001")]
+        [InlineData("choques", "F32-GEO-CLASH-001")]
+        [InlineData("Clash / mounting analysis", "F32-GEO-CLASH-001")]
+        [InlineData("f28-link-rvt-001", "F28-LINK-RVT-001")]
+        public void Relevance_FindsBilingualTasksAndRespectsFilters(string query, string expected)
+        {
+            var (rows, _) = Idx.Search(new CapabilityQuery { Relevance = true, Text = query });
+            Assert.Contains(rows, row => row.Id == expected);
+            Assert.InRange(rows.Count, 1, 3);
+            Assert.Empty(Idx.Search(new CapabilityQuery { Relevance = true, Text = query, Domain = "F99" }).Page);
+        }
+
         [Fact]
         public void LookupById_AndContractOnDemand()
         {

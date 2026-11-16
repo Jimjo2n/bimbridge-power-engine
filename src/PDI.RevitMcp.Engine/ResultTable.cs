@@ -27,15 +27,62 @@ namespace PDI.RevitMcp.Engine
             var filtered = new List<Dictionary<string, object>>();
             foreach (var r in rows)
             {
-                if (q.Millimeters) ToMillimeters(r);
-                var ok = true;
-                foreach (var c in q.Where)
-                    if (!c.Matches(Get(r, c.Field))) { ok = false; break; }
-                if (!ok) continue;
+                if (!NormalizeAndMatch(q, r)) continue;
                 filtered.Add(r);
                 if (Get(r, "id") is long id) matchedIds.Add(id);
             }
             return filtered;
+        }
+
+        private static bool NormalizeAndMatch(QuerySpec q, Dictionary<string, object> row)
+        {
+            if (q.Millimeters) ToMillimeters(row);
+            return q.Where.All(c => c.Matches(Get(row, c.Field)));
+        }
+
+        public sealed class GroupAccumulator
+        {
+            private readonly QuerySpec _spec;
+            private readonly Dictionary<string, object[]> _groups = new Dictionary<string, object[]>(StringComparer.Ordinal);
+            private readonly List<string> _order = new List<string>();
+            private long _total;
+
+            public GroupAccumulator(QuerySpec spec) { _spec = spec; }
+
+            public void Add(Dictionary<string, object> row)
+            {
+                if (NormalizeAndMatch(_spec, row)) AddFiltered(row);
+            }
+
+            internal void AddFiltered(Dictionary<string, object> row)
+            {
+                var parts = new object[_spec.GroupBy.Count];
+                for (var i = 0; i < parts.Length; i++) parts[i] = Get(row, _spec.GroupBy[i]);
+                var key = string.Join("\u001f", Array.ConvertAll(parts, v => v == null ? "\u0000" : Convert.ToString(v, CultureInfo.InvariantCulture)));
+                if (!_groups.TryGetValue(key, out var group))
+                {
+                    group = new object[parts.Length + 1];
+                    Array.Copy(parts, group, parts.Length);
+                    group[parts.Length] = 0L;
+                    _groups.Add(key, group);
+                    _order.Add(key);
+                }
+                group[parts.Length] = (long)group[parts.Length] + 1;
+                _total++;
+            }
+
+            public Dictionary<string, object> Render(int maxGroups = 500)
+            {
+                var order = new List<string>(_order);
+                order.Sort(StringComparer.OrdinalIgnoreCase);
+                var result = new Dictionary<string, object>
+                {
+                    ["total"] = _total, ["cols"] = new List<object>(_spec.GroupBy) { "n" },
+                    ["groups"] = order.Take(maxGroups).Select(key => (object)_groups[key]).ToList(),
+                };
+                if (order.Count > maxGroups) result["aviso"] = "más de " + maxGroups + " grupos; se muestran los primeros";
+                return result;
+            }
         }
 
         /// <summary>True si la consulta devuelve filas paginables (ni digest, ni conteo, ni agrupación).</summary>
@@ -65,34 +112,9 @@ namespace PDI.RevitMcp.Engine
 
             if (q.GroupBy.Count > 0)
             {
-                var groups = new Dictionary<string, object[]>(StringComparer.Ordinal);
-                var order = new List<string>();
-                foreach (var r in filtered)
-                {
-                    var keyParts = new object[q.GroupBy.Count];
-                    for (var i = 0; i < keyParts.Length; i++) keyParts[i] = Get(r, q.GroupBy[i]);
-                    var key = string.Join("\u001f", Array.ConvertAll(keyParts, k => k == null ? "\u0000" : Convert.ToString(k, CultureInfo.InvariantCulture)));
-                    if (!groups.TryGetValue(key, out var g))
-                    {
-                        g = new object[keyParts.Length + 1];
-                        Array.Copy(keyParts, g, keyParts.Length);
-                        g[keyParts.Length] = 0L;
-                        groups[key] = g;
-                        order.Add(key);
-                    }
-                    g[keyParts.Length] = (long)g[keyParts.Length] + 1;
-                }
-                order.Sort((a, b) => string.Compare(a, b, StringComparison.OrdinalIgnoreCase));
-                var cols = new List<object>(q.GroupBy) { "n" };
-                var list = new List<object>();
-                foreach (var k in order)
-                {
-                    if (list.Count >= maxGroups) { result["aviso"] = "más de " + maxGroups + " grupos; se muestran los primeros"; break; }
-                    list.Add(groups[k]);
-                }
-                result["cols"] = cols;
-                result["groups"] = list;
-                return result;
+                var groups = new GroupAccumulator(q);
+                foreach (var r in filtered) groups.AddFiltered(r);
+                return groups.Render(maxGroups);
             }
 
             var pages = Math.Max(1, (filtered.Count + pageSize - 1) / pageSize);

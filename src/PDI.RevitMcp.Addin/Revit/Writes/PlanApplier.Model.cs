@@ -34,7 +34,7 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
 
         private static readonly HashSet<string> ModelKinds = new HashSet<string>(StringComparer.Ordinal)
         {
-            "level_create", "grid_create", "wall_create", "floor_create", "ceiling_create", "room_create", "duct_create", "pipe_create", "circuit_create", "schedule_create",
+            "level_create", "grid_create", "wall_create", "floor_create", "ceiling_create", "room_create", "duct_create", "pipe_create", "conduit_create", "conduit_route", "circuit_create", "schedule_create",
         };
 
         private string ModelGuard(string op, Dictionary<string, object> t)
@@ -158,6 +158,12 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                     var number = WriteKit.S(t, "numero"); if (number != null) room.Number = number;
                     return new[] { Track(opIndex, op, room.Id, t) };
                 }
+                case "conduit_create":
+                {
+                    var m = CreateConduit(t, Xyz(t, "a"), Xyz(t, "b"));
+                    return new[] { Track(opIndex, op, m.Id, t) };
+                }
+                case "conduit_route": return CreateConduitRoute(t);
                 case "duct_create":
                 case "pipe_create":
                 {
@@ -207,9 +213,92 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
             return null;
         }
 
+        private Conduit CreateConduit(Dictionary<string, object> t, XYZ a, XYZ b)
+        {
+            var m = Conduit.Create(_doc, Ids.ToId(WriteKit.L(t, "ctype")), a, b, Ids.ToId(WriteKit.L(t, "nivel")));
+            var diameter = m.get_Parameter(BuiltInParameter.RBS_CONDUIT_DIAMETER_PARAM);
+            if (diameter == null || diameter.IsReadOnly || !diameter.Set(WriteKit.D(t, "diametro")))
+                throw new InvalidOperationException("no se pudo fijar el diámetro del conduit");
+            SetConduitWorkset(m, t);
+            return m;
+        }
+
+        private static void SetConduitWorkset(Element e, Dictionary<string, object> t)
+        {
+            if (!t.ContainsKey("ws") || e.WorksetId.IntegerValue == WriteKit.L(t, "ws")) return;
+            var p = e.get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM);
+            if (p == null || p.IsReadOnly || !p.Set((int)WriteKit.L(t, "ws")))
+                throw new InvalidOperationException("no se pudo fijar el workset del recorrido");
+        }
+
+        private readonly List<(Dictionary<string, object> Target, List<ElementId> Segments, List<ElementId> Elbows)> _conduitRoutes =
+            new List<(Dictionary<string, object>, List<ElementId>, List<ElementId>)>();
+
+        private IEnumerable<ElementId> CreateConduitRoute(Dictionary<string, object> target)
+        {
+            var points = RoutePoints(target);
+            var segments = new List<Conduit>();
+            for (var i = 1; i < points.Count; i++) segments.Add(CreateConduit(target, points[i - 1], points[i]));
+            _doc.Regenerate();
+            var elbows = new List<ElementId>();
+            for (var i = 1; i < segments.Count; i++)
+            {
+                var before = AtEnd(segments[i - 1], points[i]);
+                var after = AtEnd(segments[i], points[i]);
+                var elbow = _doc.Create.NewElbowFitting(before, after) ?? throw new InvalidOperationException("Revit no creó el codo " + i);
+                SetConduitWorkset(elbow, target);
+                elbows.Add(elbow.Id);
+            }
+            var ids = segments.Select(s => s.Id).ToList();
+            _conduitRoutes.Add((target, ids, elbows));
+            return ids.Concat(elbows).ToArray();
+        }
+
+        private static List<XYZ> RoutePoints(Dictionary<string, object> t) =>
+            OpCatalog.Points(t["puntos"], "conduit_route puntos", 3, 100).Select(p => new XYZ(p[0], p[1], p[2])).ToList();
+
+        private static Connector AtEnd(Conduit segment, XYZ point)
+        {
+            var ends = segment.ConnectorManager.Connectors.Cast<Connector>()
+                .Where(c => c.ConnectorType == ConnectorType.End && Near(c.Origin, point)).ToList();
+            if (ends.Count != 1 || ends[0].IsConnected)
+                throw new InvalidOperationException("el extremo del conduit no está libre o no se pudo identificar");
+            return ends[0];
+        }
+
+        private string VerifyConduitRoutes()
+        {
+            foreach (var (target, segments, elbows) in _conduitRoutes)
+            {
+                var points = RoutePoints(target);
+                var live = segments.Select(id => _doc.GetElement(id) as Conduit).ToList();
+                if (live.Any(s => s == null)) return "Recorrido: falta un tramo creado";
+                bool HasEnd(Conduit s, XYZ point) => s.ConnectorManager.Connectors.Cast<Connector>()
+                    .Any(c => c.ConnectorType == ConnectorType.End && Near(c.Origin, point) && !c.IsConnected);
+                bool Connects(Conduit s, ElementId elbow) => s.ConnectorManager.Connectors.Cast<Connector>()
+                    .Any(c => c.ConnectorType == ConnectorType.End && c.IsConnected &&
+                        c.AllRefs.Cast<Connector>().Any(r => r.ConnectorType == ConnectorType.End && r.Owner.Id == elbow));
+                if (!HasEnd(live[0], points[0]) || !HasEnd(live.Last(), points.Last()))
+                    return "Recorrido: cambiaron los extremos";
+                for (var i = 0; i < elbows.Count; i++)
+                    if (_doc.GetElement(elbows[i]) == null || !Connects(live[i], elbows[i]) || !Connects(live[i + 1], elbows[i]))
+                        return "Recorrido: el codo " + (i + 1) + " no conecta sus dos tramos";
+                foreach (var s in live)
+                {
+                    var size = s.get_Parameter(BuiltInParameter.RBS_CONDUIT_DIAMETER_PARAM);
+                    if (size == null || ModelOps.Differs(size.AsDouble(), WriteKit.D(target, "diametro"), Tol) ||
+                        Ids.ToLong(s.GetTypeId()) != WriteKit.L(target, "ctype") ||
+                        Ids.ToLong(s.ReferenceLevel?.Id) != WriteKit.L(target, "nivel") ||
+                        (target.ContainsKey("ws") && s.WorksetId.IntegerValue != WriteKit.L(target, "ws")))
+                        return "Recorrido: el tipo, nivel, diámetro o workset no coincide";
+                }
+            }
+            return null;
+        }
+
         private static IEnumerable<(string, BuiltInParameter)> SizeParams(string op) => op == "duct_create"
             ? new[] { ("diametro", BuiltInParameter.RBS_CURVE_DIAMETER_PARAM), ("ancho", BuiltInParameter.RBS_CURVE_WIDTH_PARAM), ("alto", BuiltInParameter.RBS_CURVE_HEIGHT_PARAM) }
-            : new[] { ("diametro", BuiltInParameter.RBS_PIPE_DIAMETER_PARAM) };
+            : new[] { ("diametro", op == "conduit_create" ? BuiltInParameter.RBS_CONDUIT_DIAMETER_PARAM : BuiltInParameter.RBS_PIPE_DIAMETER_PARAM) };
 
         private static bool Near(XYZ a, XYZ b) => a != null && b != null && a.DistanceTo(b) < Tol;
 
@@ -275,9 +364,14 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 }
                 case "duct_create":
                 case "pipe_create":
+                case "conduit_create":
                 {
                     var lc = ((e.Location as LocationCurve)?.Curve);
                     if (!SameLine(lc, Xyz(t, "a"), Xyz(t, "b"))) return "los extremos no coinciden";
+                    if (m.Kind == "conduit_create" && (Ids.ToLong(e.GetTypeId()) != WriteKit.L(t, "ctype") ||
+                        Ids.ToLong(((Conduit)e).ReferenceLevel?.Id) != WriteKit.L(t, "nivel") ||
+                        (t.ContainsKey("ws") && e.WorksetId.IntegerValue != WriteKit.L(t, "ws"))))
+                        return "el tipo, nivel o workset del conduit no coincide";
                     foreach (var (k, bip) in SizeParams(m.Kind))
                     {
                         if (!t.ContainsKey(k)) continue;

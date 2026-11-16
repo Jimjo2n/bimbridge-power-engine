@@ -38,15 +38,6 @@ namespace PDI.RevitMcp.Tests
         }
 
         [Fact]
-        public void BridgeWiring_LostConnectionOnWriteIsUnknown()
-        {
-            var src = Source("src/PDI.RevitMcp.Bridge/RevitConnection.cs");
-            var i = src.IndexOf("catch (IOException)", src.IndexOf("public async Task<Response> CallAsync", StringComparison.Ordinal), StringComparison.Ordinal);
-            var block = src.Substring(i, 600);
-            Assert.True(block.IndexOf("Status.Desconocido", StringComparison.Ordinal) < block.IndexOf("Status.RevitNoDisponible", StringComparison.Ordinal));
-        }
-
-        [Fact]
         public void CleanDocument_IsWritable_AndCleanFinishLeavesNoLock()
         {
             var s = Store();

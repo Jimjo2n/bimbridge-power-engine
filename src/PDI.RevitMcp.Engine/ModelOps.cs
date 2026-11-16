@@ -117,13 +117,16 @@ namespace PDI.RevitMcp.Engine
                 }
                 case "duct_create":
                 case "pipe_create":
+                case "conduit_create":
                 {
                     var a = Point3(o["inicio"], kind + " inicio");
                     var b = Point3(o["fin"], kind + " fin");
                     var len = Math.Sqrt((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]) + (b[2] - a[2]) * (b[2] - a[2]));
                     if (len < Draw2D.ShortCurve) throw new QueryException(kind + ": inicio y fin coinciden (longitud " + len + " ft)");
-                    if (string.IsNullOrWhiteSpace(Arg.GetString(o, "sistema"))) throw new QueryException(kind + ": falta sistema (nombre del tipo de sistema)");
-                    Positive(o, "diametro", kind, 20);
+                    if (kind != "conduit_create" && string.IsNullOrWhiteSpace(Arg.GetString(o, "sistema")))
+                        throw new QueryException(kind + ": falta sistema (nombre del tipo de sistema)");
+                    if (!Positive(o, "diametro", kind, 20).HasValue && kind == "conduit_create")
+                        throw new QueryException("conduit_create: indique diametro");
                     if (kind == "duct_create")
                     {
                         var hasW = o.ContainsKey("ancho"); var hasH = o.ContainsKey("alto");
@@ -133,6 +136,16 @@ namespace PDI.RevitMcp.Engine
                         Positive(o, "alto", kind, 20);
                     }
                     else if (o.ContainsKey("ancho") || o.ContainsKey("alto")) throw new QueryException("pipe_create: las tuberías sólo admiten diametro");
+                    break;
+                }
+                case "conduit_route":
+                {
+                    var points = OpCatalog.Points(o["puntos"], "conduit_route puntos", 3, 100);
+                    foreach (var p in points) Point3(p.Cast<object>().ToList(), "conduit_route vértice");
+                    for (var i = 1; i < points.Count; i++)
+                        if (points[i].Zip(points[i - 1], (a, b) => (a - b) * (a - b)).Sum() < Draw2D.ShortCurve * Draw2D.ShortCurve)
+                            throw new QueryException("conduit_route: los puntos consecutivos coinciden o forman un tramo demasiado corto");
+                    if (!Positive(o, "diametro", kind, 20).HasValue) throw new QueryException("conduit_route: indique diametro");
                     break;
                 }
                 case "circuit_create":

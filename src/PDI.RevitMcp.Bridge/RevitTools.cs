@@ -288,13 +288,17 @@ namespace PDI.RevitMcp.Bridge
                      "luminarias, tags y sin_tag_en_vista, estimado por nivel y sin regenerar. exacto=true cuenta lo realmente visible pero regenera cada vista: sólo con pocas vistas (máx. 12).")]
         public Task<string> Check(
             McpServer server,
-            [Description("lighting_audit")] string name,
+            [Description("lighting_audit o cobertura")] string name,
             [Description("Niveles por nombre, separados por coma (opcional)")] string lvl = null,
             [Description("rcp (planos de techo con tags de luminarias), rcp_todos, o ids de vista separados por coma (opcional)")] string views = null,
             [Description("true = luminarias realmente visibles por vista (lento: máx. 12 vistas)")] bool? exacto = null,
+            [Description("Argumentos JSON para cobertura: q, modo=relevancia, id, dominio, estado, estrategia, categoría, documento, prioridad y versión")] string args = null,
             CancellationToken ct = default)
         {
-            var a = new Dictionary<string, object> { ["name"] = name };
+            Dictionary<string, object> a;
+            try { a = args == null ? new Dictionary<string, object>() : Json.ParseObject(args); }
+            catch (FormatException ex) { return Task.FromResult(Json.Write(Response.Fail(0, Status.Invalido, ex.Message))); }
+            a["name"] = name;
             if (exacto != null) a["exacto"] = exacto;
             if (lvl != null) a["lvl"] = lvl;
             if (views != null) a["views"] = views;
@@ -551,11 +555,13 @@ namespace PDI.RevitMcp.Bridge
             [Description("job_id devuelto por geo o plan (opcional)")] string job_id = null,
             [Description("plan_id (opcional)")] string plan_id = null,
             [Description("status (por defecto), cancel (job), drop (plan), pendientes o reconciliar")] string op = null,
+            [Description("ID de intento de escritura para consulta de sólo lectura")] string intento_id = null,
             CancellationToken ct = default)
         {
             var a = new Dictionary<string, object>();
             if (job_id != null) a["job_id"] = job_id;
             if (plan_id != null) a["plan_id"] = plan_id;
+            if (intento_id != null) a["intento_id"] = intento_id;
             if (op != null) a["op"] = op;
             return Call(server, Wire.OpJob, a, ct);
         }

@@ -125,7 +125,8 @@ namespace PDI.RevitMcp.Addin.Revit
             {
                 Text = Arg.GetString(a, "q"), Domain = Arg.GetString(a, "dominio"), Status = Arg.GetString(a, "estado"), Strategy = Arg.GetString(a, "estrategia"),
                 Category = Arg.GetString(a, "categoria"), DocumentKind = Arg.GetString(a, "documento"), Priority = Arg.GetString(a, "prioridad"),
-                Version = (int?)Arg.GetLong(a, "version"), Page = (int)(Arg.GetLong(a, "pagina") ?? 1), PageSize = (int)(Arg.GetLong(a, "por_pagina") ?? 20),
+                Version = (int?)Arg.GetLong(a, "version"), Page = (int)(Arg.GetLong(a, "pagina") ?? 1), PageSize = (int)(Arg.GetLong(a, "por_pagina") ?? 0),
+                Relevance = string.Equals(Arg.GetString(a, "modo"), "relevancia", StringComparison.OrdinalIgnoreCase),
             };
             var (page, total) = idx.Search(q);
             return new Response

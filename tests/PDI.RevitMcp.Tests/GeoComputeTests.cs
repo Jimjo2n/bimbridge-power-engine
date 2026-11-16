@@ -200,7 +200,7 @@ namespace PDI.RevitMcp.Tests
             {
                 new GeoCompute.ExactResult { Target = 0, Body = 1, Volume = 0.002 },   // 1 también toca la viga
                 new GeoCompute.ExactResult { Target = 1, Body = 1, Volume = 0.01 },    // 2 sólo por booleana
-                new GeoCompute.ExactResult { Target = 2, Body = 2, Failed = true },    // 3: Revit no pudo
+                new GeoCompute.ExactResult { Target = 2, Body = 2, Issues = GeoCompute.ExactIssue.Boolean },
             };
             var rows = GeoCompute.MergeClashes(new[] { a, b, c, d }, bodies, screened, exact, 0.0001);
             Assert.Equal(4, rows.Count);
@@ -219,6 +219,35 @@ namespace PDI.RevitMcp.Tests
             Assert.Equal(new object[] { "id", "clase", "prof_in", "vol_ft3" }, cols.ToArray());
             var first = (object[])((List<object>)dsum["rows"])[0];
             Assert.Equal(3.0, (double)first[2], 6); // 0.25 ft = 3"
+        }
+
+        [Fact]
+        public void ExactCoverage_DistinguishesMissingSolid_PartialVolume_AndLinkInstances()
+        {
+            var targets = new[] { Fixture(1, 0, 0, 0, 1), Fixture(2, 0, 0, 0, 1), Fixture(3, 0, 0, 0, 1) };
+            var bodies = new[] { new GeoBody { Id = 77, LinkId = 10 }, new GeoBody { Id = 77, LinkId = 20 } };
+            var exact = new[]
+            {
+                new GeoCompute.ExactResult { Target = 0, Body = 0, Issues = GeoCompute.ExactIssue.NoSolid },
+                new GeoCompute.ExactResult { Target = 1, Body = 0, Volume = 0.5, Issues = GeoCompute.ExactIssue.Boolean },
+                new GeoCompute.ExactResult { Target = 1, Body = 1, Issues = GeoCompute.ExactIssue.Transform | GeoCompute.ExactIssue.Extraction },
+                new GeoCompute.ExactResult { Target = 2, Body = 0 },
+            };
+            var rows = GeoCompute.MergeClashes(targets, bodies, Array.Empty<Dictionary<string, object>>(), exact, 0.0001);
+            Assert.Equal("no_evaluable", rows[0]["clase"]);
+            Assert.Equal("choque", rows[1]["clase"]);
+            Assert.Equal(true, rows[1]["vol_parcial"]);
+            Assert.Equal("libre", rows[2]["clase"]);
+            var coverage = Assert.IsType<Dictionary<string, object>>(rows[1]["cobertura"]);
+            Assert.Equal(2L, coverage["pares_exactos"]);
+            Assert.Equal(1L, coverage["sin_resolver"]);
+            Assert.Equal(1L, coverage["volumenes_parciales"]);
+            Assert.Equal(false, coverage["completa"]);
+            var sample = Assert.IsType<List<object>>(coverage["muestra"]).Cast<Dictionary<string, object>>().ToArray();
+            Assert.All(sample, x => Assert.Equal(77L, x["elemento_id"]));
+            Assert.Equal(new[] { 10L, 20L }, sample.Select(x => (long)x["vinculo_id"]));
+            var summary = GeoSummary.Build(Spec("choques"), rows, new[] { "id", "clase", "vol" }, "clase", null, out _);
+            Assert.Equal(2, Assert.IsType<List<object>>(summary["cobertura"]).Count);
         }
 
         [Fact]

@@ -22,7 +22,9 @@ namespace PDI.RevitMcp.Bridge
     {
         private readonly SemaphoreSlim _connectLock = new SemaphoreSlim(1, 1);
         private readonly SemaphoreSlim _writeLock = new SemaphoreSlim(1, 1);
-        private readonly ConcurrentDictionary<long, TaskCompletionSource<Response>> _pending = new ConcurrentDictionary<long, TaskCompletionSource<Response>>();
+        private readonly object _connectionState = new object();
+        private readonly ConcurrentDictionary<long, (Stream Pipe, TaskCompletionSource<Response> Waiter)> _pending =
+            new ConcurrentDictionary<long, (Stream, TaskCompletionSource<Response>)>();
         private NamedPipeClientStream _pipe;
         private CancellationTokenSource _connCts;
         private long _nextId;
@@ -108,38 +110,70 @@ namespace PDI.RevitMcp.Bridge
         {
             if (OpSemantics.Classify(op, args, out var invalid) == OpSemantics.Kind.Invalid)
                 return Response.Fail(0, Status.Invalido, invalid);
-            var connectError = await EnsureConnectedAsync(ct, allowRetarget: !IsWriteOp(op, args)).ConfigureAwait(false);
+            var write = IsWriteOp(op, args);
+            var receiptQuery = op == Wire.OpJob && !string.IsNullOrEmpty(Arg.GetString(args, "intento_id"));
+            var connectError = await EnsureConnectedAsync(ct, allowRetarget: !write && !receiptQuery).ConfigureAwait(false);
             if (connectError != null) return connectError;
+            bool supportsReceipt;
+            NamedPipeClientStream pipe;
+            int? pid;
+            lock (_connectionState)
+            {
+                supportsReceipt = Arg.GetBool(Hello, Wire.WriteReceiptFeature) == true;
+                pipe = _pipe;
+                pid = Instance?.Pid;
+            }
+            if (pipe == null) return Response.Fail(0, Status.RevitNoDisponible, "La petición no llegó a enviarse a Revit.");
+            if (receiptQuery && !supportsReceipt)
+                return Response.Fail(0, Status.NoSoportado, "Este add-in no admite recibos por intento. Consulte job con plan_id o revise el modelo antes de repetir.");
 
             var id = Interlocked.Increment(ref _nextId);
-            var req = new Request { Id = id, Op = op, Args = args ?? new Dictionary<string, object>(), DeadlineMs = (int)timeout.TotalMilliseconds };
+            var req = new Request
+            {
+                Id = id, Op = op, Args = args ?? new Dictionary<string, object>(), DeadlineMs = (int)timeout.TotalMilliseconds,
+                AttemptId = write && supportsReceipt ? Guid.NewGuid().ToString("N") : null,
+            };
             var tcs = new TaskCompletionSource<Response>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _pending[id] = tcs;
+            _pending[id] = (pipe, tcs);
+            var sending = false;
+            var sent = false;
+            Response Unknown()
+            {
+                var response = Response.Fail(id, Status.Desconocido,
+                    "La escritura pudo iniciarse o terminar en Revit. Consulte el intento o el plan y vuelva a leer el modelo antes de repetir.");
+                if (req.AttemptId != null)
+                    response.Datos = new Dictionary<string, object>
+                    {
+                        ["recibo"] = new Dictionary<string, object>
+                        {
+                            ["intento_id"] = req.AttemptId, ["estado"] = Status.Desconocido, ["pid"] = pid,
+                            ["doc"] = Arg.GetString(req.Args, "doc"), ["plan_id"] = Arg.GetString(req.Args, "plan_id"),
+                            ["envio_confirmado"] = sent,
+                        },
+                    };
+                return response;
+            }
             try
             {
-                await SendAsync(req, ct).ConfigureAwait(false);
-                var done = await Task.WhenAny(tcs.Task, Task.Delay(timeout, ct)).ConfigureAwait(false);
-                if (done != tcs.Task)
-                    return Response.Fail(id, IsWriteOp(op, args) ? Status.Desconocido : Status.RevitOcupado,
-                        "Revit no respondió en " + (int)timeout.TotalSeconds + " s. Eso NO significa que se revirtiera ni que se detuviera: " +
-                        (IsWriteOp(op, args)
-                            ? "la escritura puede seguir o haber terminado dentro de Revit. Consulte job (o repita con la MISMA clave=, que no la duplica) antes de hacer nada más."
-                            : "puede haber un diálogo abierto o la consulta era demasiado grande: acótela (menos niveles, vistas o ids)."));
-                return await tcs.Task.ConfigureAwait(false);
+                using var wait = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                try
+                {
+                    await SendAsync(req, ct, pipe, () => sending = true).ConfigureAwait(false);
+                    sent = true;
+                    wait.CancelAfter(timeout);
+                }
+                catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException || (sending && ex is OperationCanceledException))
+                {
+                    tcs.TrySetResult(write && sending ? Unknown() :
+                        Response.Fail(id, Status.RevitNoDisponible, sending ? "Se perdió la conexión con Revit." : "La petición no llegó a enviarse a Revit."));
+                    if (sending) Drop(pipe);
+                }
+                using var registration = wait.Token.Register(() => tcs.TrySetResult(write ? Unknown() :
+                    Response.Fail(id, Status.RevitOcupado, "Revit no respondió dentro del plazo. Revise si hay un diálogo abierto o acote la consulta.")));
+                var response = await tcs.Task.ConfigureAwait(false);
+                return write && sending && response.Estado == Status.RevitNoDisponible ? Unknown() : response;
             }
-            catch (IOException)
-            {
-                Drop();
-                // Una escritura ya enviada pudo aplicarse: nunca se presenta como "no disponible", que invita a repetirla.
-                if (IsWriteOp(op, args))
-                    return Response.Fail(id, Status.Desconocido, "Se perdió la conexión con Revit después de enviar la escritura: puede haberse aplicado o no. " +
-                                                                 "No la repita: consulte job op=pendientes y reconcilie.");
-                return Response.Fail(id, Status.RevitNoDisponible, "Se perdió la conexión con Revit. Vuelva a intentar la consulta.");
-            }
-            finally
-            {
-                _pending.TryRemove(id, out _);
-            }
+            finally { _pending.TryRemove(id, out _); }
         }
 
         private async Task<Response> EnsureConnectedAsync(CancellationToken ct, bool allowRetarget = true)
@@ -209,6 +243,7 @@ namespace PDI.RevitMcp.Bridge
                         Args = new Dictionary<string, object>
                         {
                             ["protocol"] = (long)Wire.ProtocolVersion,
+                            [Wire.LargeResultFeature] = true,
                             ["client"] = ClientName,
                             ["client_version"] = ClientVersion,
                             ["agente"] = AgentName,
@@ -235,13 +270,17 @@ namespace PDI.RevitMcp.Bridge
                     var resp = Response.FromJson(text);
                     if (resp.Estado != Status.Ok) { pipe.Dispose(); return resp; }
 
-                    _pipe = pipe;
-                    _connCts = new CancellationTokenSource();
-                    Hello = resp.Datos as Dictionary<string, object> ?? new Dictionary<string, object>();
-                    Instance = d;
-                    if (d != null) { PreferredPid = d.Pid; PinnedVersion = d.RevitVersion; }
-                    _ = Task.Run(() => ReadLoop(pipe, _connCts.Token));
-                    _heartbeat = new Timer(_ => _ = PingAsync(), null, HeartbeatInterval, HeartbeatInterval);
+                    lock (_connectionState)
+                    {
+                        _connCts = new CancellationTokenSource();
+                        var token = _connCts.Token;
+                        Hello = resp.Datos as Dictionary<string, object> ?? new Dictionary<string, object>();
+                        Instance = d;
+                        if (d != null) { PreferredPid = d.Pid; PinnedVersion = d.RevitVersion; }
+                        _pipe = pipe;
+                        _ = Task.Run(() => ReadLoop(pipe, token));
+                        _heartbeat = new Timer(_ => _ = PingAsync(pipe), null, HeartbeatInterval, HeartbeatInterval);
+                    }
                     return null;
                 }
                 return Response.Fail(0, Status.RevitNoDisponible, "No se pudo conectar con Revit (" + lastError + ").");
@@ -252,21 +291,27 @@ namespace PDI.RevitMcp.Bridge
             }
         }
 
-        private async Task PingAsync()
+        private async Task PingAsync(NamedPipeClientStream pipe)
         {
             try
             {
                 var id = Interlocked.Increment(ref _nextId);
-                await SendAsync(new Request { Id = id, Op = Wire.OpPing }, CancellationToken.None).ConfigureAwait(false);
+                await SendAsync(new Request { Id = id, Op = Wire.OpPing }, CancellationToken.None, pipe, null).ConfigureAwait(false);
             }
-            catch (Exception) { Drop(); }
+            catch (Exception) { Drop(pipe); }
         }
 
-        private async Task SendAsync(Request req, CancellationToken ct)
+        private async Task SendAsync(Request req, CancellationToken ct, NamedPipeClientStream pipe, Action starting)
         {
-            var pipe = _pipe ?? throw new IOException("sin conexión");
+            if (pipe == null) throw new IOException("sin conexión");
             await _writeLock.WaitAsync(ct).ConfigureAwait(false);
-            try { await Frame.WriteAsync(pipe, Json.Write(req), ct).ConfigureAwait(false); }
+            try
+            {
+                if (!ReferenceEquals(pipe, _pipe)) throw new IOException("la conexión cambió antes del envío");
+                var json = Json.Write(req);
+                starting?.Invoke();
+                await Frame.WriteAsync(pipe, json, ct).ConfigureAwait(false);
+            }
             finally { _writeLock.Release(); }
         }
 
@@ -280,11 +325,12 @@ namespace PDI.RevitMcp.Bridge
                     if (text == null) break;
                     Response resp;
                     try { resp = Response.FromJson(text); } catch (FormatException) { continue; }
-                    if (_pending.TryGetValue(resp.Id, out var tcs)) tcs.TrySetResult(resp);
+                    if (_pending.TryGetValue(resp.Id, out var pending) && ReferenceEquals(pending.Pipe, pipe))
+                        pending.Waiter.TrySetResult(resp);
                 }
             }
             catch (Exception) { }
-            Drop();
+            Drop(pipe);
         }
 
         private static async Task<string> ReadWithTimeout(Stream s, TimeSpan timeout, CancellationToken ct)
@@ -298,15 +344,24 @@ namespace PDI.RevitMcp.Bridge
             }
         }
 
-        private void Drop()
+        private void Drop(Stream expected = null)
         {
-            _heartbeat?.Dispose();
-            _heartbeat = null;
-            try { _connCts?.Cancel(); } catch (ObjectDisposedException) { }
-            _pipe?.Dispose();
-            _pipe = null;
+            Stream closed;
+            lock (_connectionState)
+            {
+                if (expected != null && !ReferenceEquals(expected, _pipe)) return;
+                closed = _pipe;
+                _pipe = null;
+                _heartbeat?.Dispose();
+                _heartbeat = null;
+                _connCts?.Cancel();
+                _connCts?.Dispose();
+                _connCts = null;
+                closed?.Dispose();
+            }
             foreach (var kv in _pending)
-                kv.Value.TrySetResult(Response.Fail(kv.Key, Status.RevitNoDisponible, "Se perdió la conexión con Revit."));
+                if (ReferenceEquals(kv.Value.Pipe, closed))
+                    kv.Value.Waiter.TrySetResult(Response.Fail(kv.Key, Status.RevitNoDisponible, "Se perdió la conexión con Revit."));
         }
 
         public void Dispose() => Drop();

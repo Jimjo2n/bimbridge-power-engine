@@ -147,7 +147,12 @@ namespace PDI.RevitMcp.Addin.Revit.Families
                     sheets.Add(s);
                 }
             }
-            sheets = sheets.GroupBy(s => s.Id).Select(g => g.First()).OrderBy(s => s.SheetNumber, StringComparer.OrdinalIgnoreCase).ToList();
+            var order = (Arg.GetString(a, "orden") ?? "numero").Trim().ToLowerInvariant();
+            if (order != "numero" && order != "entrada") throw new OpFail(Status.Invalido, "orden=numero o entrada");
+            if (order == "entrada" && setName != null)
+                throw new OpFail(Status.Invalido, "orden=entrada exige la lista explícita de hojas; el conjunto sólo identifica miembros");
+            sheets = sheets.GroupBy(s => s.Id).Select(g => g.First()).ToList();
+            if (order == "numero") sheets = sheets.OrderBy(s => s.SheetNumber, StringComparer.OrdinalIgnoreCase).ToList();
             if (sheets.Count == 0) throw new OpFail(Status.Invalido, "indique hojas=ids|$conjunto|números o conjunto=\"Nombre del conjunto de impresión\"");
             var notPrintable = sheets.Where(s => { try { return !s.CanBePrinted; } catch (Exception) { return false; } }).Select(s => s.SheetNumber).ToList();
             if (notPrintable.Count > 0) throw new OpFail(Status.Invalido, "hojas que Revit no puede imprimir: " + string.Join(", ", notPrintable));
@@ -166,10 +171,14 @@ namespace PDI.RevitMcp.Addin.Revit.Families
                 throw new OpFail(Status.NecesitaUsuario, "ya existe " + target + "; pase sobrescribir=si o otro nombre=");
 
             // Ajustes del encargo de Tyler (Use Sheet Size, Fit to Page, Center, Color, Vector, High; ocultar planos de referencia, scope boxes y recortes).
+            var paperName = Arg.GetString(a, "papel") ?? "Default";
+            if (!Enum.TryParse(paperName, true, out ExportPaperFormat paper) || !Enum.IsDefined(typeof(ExportPaperFormat), paper) ||
+                int.TryParse(paperName, out _))
+                throw new OpFail(Status.Invalido, "papel: indique un formato de exportación de Revit, por ejemplo Default");
             var o = new PDFExportOptions
             {
                 Combine = combine,
-                PaperFormat = ExportPaperFormat.Default,
+                PaperFormat = paper,
                 ZoomType = (Arg.GetString(a, "zoom") ?? "ajustar") == "100" ? ZoomType.Zoom : ZoomType.FitToPage,
                 PaperPlacement = PaperPlacementType.Center,
                 ColorDepth = (Arg.GetString(a, "color") ?? "color") == "gris" ? ColorDepthType.GrayScale : ColorDepthType.Color,
@@ -201,7 +210,8 @@ namespace PDI.RevitMcp.Addin.Revit.Families
                 ["n_hojas"] = (long)sheets.Count,
                 ["carpeta"] = folder,
                 ["combinado"] = combine,
-                ["ajustes"] = "tamaño de hoja, " + (o.ZoomType == ZoomType.FitToPage ? "ajustar a página" : "100 %") + ", centrado, " +
+                ["orden"] = order, ["papel"] = paper.ToString(),
+                ["ajustes"] = (paper == ExportPaperFormat.Default ? "tamaño de hoja" : paper.ToString()) + ", " + (o.ZoomType == ZoomType.FitToPage ? "ajustar a página" : "100 %") + ", centrado, " +
                               (o.ColorDepth == ColorDepthType.Color ? "color" : "gris") + ", " + (o.AlwaysUseRaster ? "ráster" : "vectorial") + ", calidad alta, sin planos de referencia/scope boxes/recortes",
             };
         }

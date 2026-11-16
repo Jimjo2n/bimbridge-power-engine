@@ -82,14 +82,22 @@ namespace PDI.RevitMcp.Engine.Geo
             var list = shown.ToList();
             var pages = Math.Max(1, (list.Count + spec.PageSize - 1) / spec.PageSize);
             var outRows = new List<object>();
+            var coverage = new List<object>();
             foreach (var r in list.Skip((spec.Page - 1) * spec.PageSize).Take(spec.PageSize))
             {
                 var arr = new object[cols.Count];
                 for (var i = 0; i < arr.Length; i++) arr[i] = Convert(r, cols[i], spec.Millimeters);
                 outRows.Add(arr);
+                if (r.TryGetValue("cobertura", out var fact))
+                    coverage.Add(new Dictionary<string, object>
+                    {
+                        ["id"] = r["id"], ["exacta"] = fact,
+                        ["vol_parcial"] = r.TryGetValue("vol_parcial", out var partial) ? partial : null,
+                    });
             }
             d["cols"] = cols.Select(c => (object)Header(c, spec.Millimeters)).ToList();
             d["rows"] = outRows;
+            if (coverage.Count > 0) d["cobertura"] = coverage;
             if (pages > 1) { d["page"] = (long)spec.Page; d["pages"] = (long)pages; }
             d["unidades"] = spec.Millimeters ? "mm" : "pies (holguras en pulgadas)";
             if (sets.Count > 0) d["conjuntos_guardados"] = sets.Keys.Cast<object>().ToList();

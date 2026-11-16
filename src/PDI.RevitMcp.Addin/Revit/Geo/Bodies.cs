@@ -30,9 +30,10 @@ namespace PDI.RevitMcp.Addin.Revit.Geo
         /// Junta los sólidos con volumen de un GeometryElement. Las instancias de familia ya vienen en coordenadas del modelo
         /// (GetInstanceGeometry). <paramref name="skipStyles"/>: subcategorías a excluir (p. ej. "Light Source").
         /// </summary>
-        public static void CollectSolids(GeometryElement ge, List<Solid> into, Document doc, ICollection<string> skipStyles, ISet<string> parts = null, int depth = 0)
+        public static void CollectSolids(GeometryElement ge, List<Solid> into, Document doc, ICollection<string> skipStyles, ISet<string> parts = null, int depth = 0, Action onFailure = null)
         {
-            if (ge == null || depth > 8) return;
+            if (ge == null) return;
+            if (depth > 8) { onFailure?.Invoke(); return; }
             foreach (var obj in ge)
             {
                 switch (obj)
@@ -40,7 +41,7 @@ namespace PDI.RevitMcp.Addin.Revit.Geo
                     case Solid s:
                         if (s.Faces.Size == 0) break;
                         double vol;
-                        try { vol = s.Volume; } catch (Exception) { vol = 0; }
+                        try { vol = s.Volume; } catch (Exception) { onFailure?.Invoke(); break; }
                         if (vol < MinSolidVolume) break;
                         string style = null;
                         if ((parts != null || (skipStyles != null && skipStyles.Count > 0)) && doc != null) style = StyleName(doc, s.GraphicsStyleId);
@@ -50,11 +51,11 @@ namespace PDI.RevitMcp.Addin.Revit.Geo
                         break;
                     case GeometryInstance gi:
                         GeometryElement inner;
-                        try { inner = gi.GetInstanceGeometry(); } catch (Exception) { inner = null; }
-                        CollectSolids(inner, into, doc, skipStyles, parts, depth + 1);
+                        try { inner = gi.GetInstanceGeometry(); } catch (Exception) { onFailure?.Invoke(); break; }
+                        CollectSolids(inner, into, doc, skipStyles, parts, depth + 1, onFailure);
                         break;
                     case GeometryElement nested:
-                        CollectSolids(nested, into, doc, skipStyles, parts, depth + 1);
+                        CollectSolids(nested, into, doc, skipStyles, parts, depth + 1, onFailure);
                         break;
                 }
             }

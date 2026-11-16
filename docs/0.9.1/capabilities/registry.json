@@ -2309,15 +2309,99 @@
     "capability_id": "F20-CONDUIT-001",
     "domain": "F20",
     "subdomain": "canalizaciones",
-    "name": "Crear conduit o bandeja",
-    "name_en": "Create conduit / cable tray",
+    "name": "Crear tramo de conduit",
+    "name_en": "Create conduit segment",
+    "operation": "CREATE",
+    "expected_postconditions": "tramo recto con tipo, nivel, di\u00E1metro y workset opcional",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "typed:conduit_create",
+    "api_surface": [
+      "Autodesk.Revit.DB.Electrical.Conduit::Create"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
+      "src/PDI.RevitMcp.Engine/ModelOps.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
+    ],
+    "test_ids": [
+      "ModelOpsTests"
+    ],
+    "verifier": "relectura de cada elemento creado frente a lo pedido (verificacion_creacion)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "colocaci\u00F3n entre puntos; pendiente de verificaci\u00F3n nativa",
+    "ui_command": [
+      "Conduit"
+    ],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F20-CONDUIT-ROUTE-001",
+    "domain": "F20",
+    "subdomain": "canalizaciones",
+    "name": "Crear recorrido de conduit con codos",
+    "name_en": "Create conduit route with elbows",
+    "operation": "CREATE",
+    "expected_postconditions": "tramos conectados por codos, con extremos libres",
+    "categories": [],
+    "document_kind": "project",
+    "implementation_path": "typed:conduit_route",
+    "api_surface": [
+      "Autodesk.Revit.DB.Electrical.Conduit::Create",
+      "Autodesk.Revit.Creation.Document::NewElbowFitting"
+    ],
+    "revit_versions": [
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "status": "IMPLEMENTED_UNVERIFIED",
+    "source_files": [
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
+      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
+      "src/PDI.RevitMcp.Engine/ModelOps.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
+    ],
+    "test_ids": [
+      "ModelOpsTests"
+    ],
+    "verifier": "relectura de cada elemento creado frente a lo pedido (verificacion_creacion)",
+    "idempotency": "clave= por commit; plan_id \u00FAnico",
+    "recovery": "TransactionGroup \u002B intenci\u00F3n durable; reconciliaci\u00F3n por plan_id",
+    "limitations": "crea un recorrido nuevo; pendiente de verificaci\u00F3n nativa",
+    "ui_command": [],
+    "priority": "P1",
+    "native_status": "not_tested"
+  },
+  {
+    "capability_id": "F20-TRAY-001",
+    "domain": "F20",
+    "subdomain": "canalizaciones",
+    "name": "Crear bandeja",
+    "name_en": "Create cable tray",
     "operation": "CREATE",
     "expected_postconditions": "recorrido con tipo y nivel",
     "categories": [],
     "document_kind": "project",
     "implementation_path": "exec",
     "api_surface": [
-      "Autodesk.Revit.DB.Electrical.Conduit::Create",
       "Autodesk.Revit.DB.Electrical.CableTray::Create"
     ],
     "revit_versions": [
@@ -2337,7 +2421,6 @@
     "recovery": "intenci\u00F3n durable \u002B auditor\u00EDa; sin rollback de efectos externos",
     "limitations": "accesible s\u00F3lo con C# din\u00E1mico: falta operaci\u00F3n tipada, verificador y pruebas",
     "ui_command": [
-      "Conduit",
       "CableTray"
     ],
     "priority": "P2",

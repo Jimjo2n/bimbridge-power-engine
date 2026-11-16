@@ -130,6 +130,8 @@ namespace PDI.RevitMcp.Engine
                             : Arg.GetString(hello.Args, "agente_fuente") == AgentIdentity.SourceRegister ? AgentIdentity.SourceRegister : AgentIdentity.SourceHello,
                         Environment.UserName);
                     var info = SafeHelloInfo();
+                    var largeResults = Arg.GetBool(hello.Args, Wire.LargeResultFeature) == true;
+                    info[Wire.LargeResultFeature] = largeResults;
                     info["protocol"] = (long)Wire.ProtocolVersion;
                     info["sesion"] = session.Id;
                     info["agente"] = session.AgentName;
@@ -228,7 +230,7 @@ namespace PDI.RevitMcp.Engine
                             if (anonymous && !IdentityPolicy.IsRegistration(req)) extra["identidad"] = _config.IdentityRequired ? "sin_nombre" : "sin_nombre_modo_heredado";
                             if (reqDoc != null) extra["doc"] = reqDoc;
                             _journal?.Log(s.Id, ToolName(req), resp.Estado, ms, extra);
-                            try { await Send(stream, writeLock, resp, connCts.Token).ConfigureAwait(false); }
+                            try { await Send(stream, writeLock, resp, connCts.Token, largeResults).ConfigureAwait(false); }
                             catch (Exception) { /* conexión cerrada mientras se trabajaba */ }
                         });
                     }
@@ -293,11 +295,56 @@ namespace PDI.RevitMcp.Engine
             return await read.ConfigureAwait(false);
         }
 
-        private static async Task Send(Stream stream, SemaphoreSlim writeLock, Response resp, CancellationToken ct)
+        private static async Task Send(Stream stream, SemaphoreSlim writeLock, Response resp, CancellationToken ct, bool largeResults = false)
         {
+            var json = FitResponse(resp, largeResults, text => ResultStore.Save(text, "a"));
             await writeLock.WaitAsync(ct).ConfigureAwait(false);
-            try { await Frame.WriteAsync(stream, Json.Write(resp), ct).ConfigureAwait(false); }
+            try { await Frame.WriteAsync(stream, json, ct).ConfigureAwait(false); }
             finally { writeLock.Release(); }
+        }
+
+        public static string FitResponse(Response response, bool largeResults, Func<string, string> save)
+        {
+            var json = Json.Write(response);
+            var bytes = System.Text.Encoding.UTF8.GetByteCount(json);
+            var budget = largeResults ? 1024 * 1024 : Frame.MaxBytes;
+            if (bytes <= budget) return json;
+
+            var summary = new Dictionary<string, object> { ["bytes_respuesta"] = (long)bytes };
+            if (response.Datos is Dictionary<string, object> data)
+                foreach (var key in new[] { "total", "page", "pages", "cursor", "rev_instantanea", "recibo", "job_id", "plan_id" })
+                    if (data.TryGetValue(key, out var field)) summary[key] = field;
+            if (largeResults)
+            {
+                try
+                {
+                    var chunks = new System.Text.StringBuilder();
+                    for (var start = 0; start < json.Length;)
+                    {
+                        var length = Math.Min(4000, json.Length - start);
+                        if (start + length < json.Length && char.IsHighSurrogate(json[start + length - 1])) length--;
+                        chunks.Append(json, start, length).Append('\n');
+                        start += length;
+                    }
+                    summary["res"] = save(chunks.ToString());
+                    summary["formato_res"] = "json_fragmentos: concatene las líneas sin separador";
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    summary["aviso_resultado"] = "No se pudo guardar el detalle: " + ex.Message;
+                }
+            }
+            else summary["aviso_resultado"] = "La respuesta excede el límite del puente. Acote la lectura o reinicie la conversación con el puente actualizado.";
+            var result = new Response { Id = response.Id, Estado = response.Estado, Rev = response.Rev, Aviso = response.Aviso, Datos = summary };
+            var fitted = Json.Write(result);
+            if (System.Text.Encoding.UTF8.GetByteCount(fitted) <= budget) return fitted;
+            result.Aviso = ResultTable.Trim(result.Aviso, 2000);
+            fitted = Json.Write(result);
+            if (System.Text.Encoding.UTF8.GetByteCount(fitted) <= budget) return fitted;
+            foreach (var key in new[] { "cursor", "recibo", "job_id", "plan_id" })
+                if (summary.TryGetValue(key, out var field) && System.Text.Encoding.UTF8.GetByteCount(Json.Write(field)) > 16384)
+                    summary.Remove(key);
+            return Json.Write(result);
         }
 
         public void Dispose()

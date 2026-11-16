@@ -61,6 +61,7 @@ namespace PDI.RevitMcp.Addin.Revit
             ["niveles"] = _config.Levels,
             ["retener"] = _hold?.On ?? false,
             ["pausado"] = _pause?.On ?? false,
+            [Wire.WriteReceiptFeature] = true,
         };
 
         public async Task<Response> HandleAsync(Session session, Request request, CancellationToken ct)
@@ -68,7 +69,7 @@ namespace PDI.RevitMcp.Addin.Revit
             if (_pause != null && _pause.On)
                 return Response.Fail(request.Id, Status.Rechazado,
                     "El usuario pausó la IA desde Revit (botón Pausar IA). Deténgase y dígaselo; mientras siga en pausa no haga cambios en Revit por ningún medio. Continúe cuando la reanude.");
-            var targetError = ResolveTarget(request);
+            var targetError = ResolveTarget(session, request);
             if (targetError != null) return targetError;
             // 0.8.0: permiso por clase de operación (además de los niveles R/P/W/D).
             var permission = Permissions.Of(request.Op, request.Args, string.Equals(DocTarget.Ambient.Value?.Kind, "familia", StringComparison.OrdinalIgnoreCase));
@@ -414,7 +415,7 @@ namespace PDI.RevitMcp.Addin.Revit
                 {
                     if (q.Since.HasValue && sinceIds == null)
                     {
-                        var reg = _tracker.For(app.ActiveUIDocument?.Document);
+                        var reg = _tracker.For(DocTarget.Resolve(app));
                         sinceIds = reg != null ? reg.ChangedSince(q.Since.Value, out _) : new HashSet<long>();
                         runner = new QueryRunner(q, explicitIds, sinceIds);
                     }
@@ -424,12 +425,19 @@ namespace PDI.RevitMcp.Addin.Revit
             }, highPriority: true, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
 
             if (!result.Ok) return FromWork(request.Id, result);
-            if (runner.Error != null) return Response.Fail(request.Id, Status.Invalido, runner.Error);
+            if (runner.Error != null) return Response.Fail(request.Id, runner.RevisionChanged ? Status.Conflicto : Status.Invalido, runner.Error);
 
             var dispatchMs = sw.Elapsed.TotalMilliseconds;
             // Filtrar, agrupar, paginar y formatear: fuera del hilo de Revit.
-            var filtered = ResultTable.Filter(q, runner.Rows, out var matched);
-            var datos = (Dictionary<string, object>)ResultTable.Render(q, filtered, q.Page, q.PageSize);
+            List<Dictionary<string, object>> filtered = null;
+            List<long> matched = null;
+            Dictionary<string, object> datos;
+            if (runner.Groups != null) datos = runner.Groups.Render();
+            else
+            {
+                filtered = ResultTable.Filter(q, runner.Rows, out matched);
+                datos = (Dictionary<string, object>)ResultTable.Render(q, filtered, q.Page, q.PageSize);
+            }
             if (runner.FastCount.HasValue) datos["total"] = runner.FastCount.Value;
             // Issue #2: si hay más de una página, las siguientes se sirven desde esta lectura (cursor), sin volver al hilo de Revit.
             // La lectura puede ocupar varias visitas al hilo de Revit: sólo hay cursor si la revisión no cambió durante ella.
@@ -846,11 +854,20 @@ namespace PDI.RevitMcp.Addin.Revit
             // Cola: el usuario la aplica cuando quiera desde la cinta. Si ya hay cola, también se retiene para respetar el orden.
             if (!trial && WillHold(plan.DocKey))
             {
+                if (Guid.TryParseExact(request.AttemptId, "N", out _))
+                {
+                    plan.ReceiptAttempt = request.AttemptId;
+                    plan.ReceiptSession = session.Id;
+                    plan.ReceiptAgent = Correlation.Current?.AgentId;
+                    plan.ReceiptDocPrint = DocTarget.Ambient.Value?.Print;
+                }
                 _plans.Hold(plan);
                 Ui.Runtime.MarkDirty();
                 var pos = _plans.Held(plan.DocKey).FindIndex(p => p.Id == plan.Id) + 1;
                 var d = plan.Describe(0);
                 d["posicion_en_cola"] = (long)pos;
+                if (plan.ReceiptAttempt != null)
+                    d["recibo"] = HeldReceipt(plan);
                 return new Response
                 {
                     Id = request.Id, Estado = Status.Retenido, Datos = d,
@@ -862,6 +879,7 @@ namespace PDI.RevitMcp.Addin.Revit
             // 0.8.0 (pendiente H2 de rc1): un commit persistente deja intención y resultado en la auditoría encadenada.
             // Sin auditoría no se escribe (fail-closed, igual que exec): una escritura sin registro no se puede reconciliar.
             string auditIntent = null;
+            var originalTarget = DocTarget.Ambient.Value;
             if (!trial)
             {
                 if (Ui.Runtime.Audit == null)
@@ -874,6 +892,9 @@ namespace PDI.RevitMcp.Addin.Revit
                     auditIntent = Ui.Runtime.Audit.Intent(session.Id, "commit", plan.DocKey ?? "", new Dictionary<string, object>
                     {
                         ["plan_id"] = plan.Id, ["clave"] = Arg.GetString(request.Args, "clave") ?? "", ["documento"] = plan.DocTitle ?? "",
+                        ["intento_id"] = Guid.TryParseExact(request.AttemptId, "N", out _) ? request.AttemptId : null,
+                        ["huella_doc"] = originalTarget?.Key == plan.DocKey ? originalTarget?.Print : null,
+                        ["agente"] = Correlation.Current?.AgentId,
                     });
                 }
                 catch (Exception aex) when (aex is IOException || aex is UnauthorizedAccessException || aex is InvalidOperationException)
@@ -977,7 +998,6 @@ namespace PDI.RevitMcp.Addin.Revit
                 };
             }
             _plans.Finish(plan, r.Status, r.Detail);
-            AuditOutcome(session, auditIntent, plan.Status, rev);
             var datos = plan.Describe(0);
             var saved = SaveCreated(session, plan);
             if (saved.Count > 0) datos["conjuntos_guardados"] = saved.Cast<object>().ToList();
@@ -1004,15 +1024,30 @@ namespace PDI.RevitMcp.Addin.Revit
                     advice = "Se aplicó (commit confirmado), pero la relectura no coincide con lo pedido o no se pudo verificar: revise 'verificacion'. " + advice;
                 }
             }
+            var auditSaved = AuditOutcome(session, auditIntent, plan.Status, rev, estado);
+            if (Guid.TryParseExact(request.AttemptId, "N", out _))
+                datos["recibo"] = new Dictionary<string, object>
+                {
+                    ["intento_id"] = request.AttemptId, ["plan_id"] = plan.Id, ["doc"] = plan.DocKey,
+                    ["estado"] = auditSaved ? estado : Status.Desconocido,
+                };
             return new Response { Id = request.Id, Estado = estado, Rev = rev, Datos = datos, Aviso = advice };
         }
 
-        /// <summary>Cierra la intención de auditoría. Si falla, la intención queda pendiente y PendingIntents la reporta para reconciliar.</summary>
-        private static void AuditOutcome(Session session, string intent, string estado, long rev)
+        private static Dictionary<string, object> HeldReceipt(Plan plan) => new Dictionary<string, object>
         {
-            if (intent == null) return;
-            try { Ui.Runtime.Audit?.Outcome(session.Id, "commit", intent, estado, new Dictionary<string, object> { ["rev"] = rev }); }
-            catch (Exception) { /* queda como intención pendiente: visible en PendingIntents */ }
+            ["intento_id"] = plan.ReceiptAttempt, ["plan_id"] = plan.Id, ["doc"] = plan.DocKey, ["estado"] = Status.Retenido,
+        };
+
+        /// <summary>Cierra la intención de auditoría. Si falla, la intención queda pendiente y PendingIntents la reporta para reconciliar.</summary>
+        private static bool AuditOutcome(Session session, string intent, string estado, long rev, string receiptState = null)
+        {
+            var audit = Ui.Runtime.Audit;
+            if (intent == null || audit == null) return false;
+            var extra = new Dictionary<string, object> { ["rev"] = rev };
+            if (receiptState != null) extra["estado_recibo"] = receiptState;
+            try { audit.Outcome(session.Id, "commit", intent, estado, extra); return true; }
+            catch (Exception) { return false; } // La intención queda visible en PendingIntents.
         }
 
         private static Response BlockedResponse(long id, DocWriteBlock block)
@@ -1080,6 +1115,14 @@ namespace PDI.RevitMcp.Addin.Revit
 
         private async Task<Response> Job(Session session, Request request, CancellationToken ct)
         {
+            var attempt = Arg.GetString(request.Args, "intento_id");
+            if (attempt != null)
+            {
+                if (!Guid.TryParseExact(attempt, "N", out _) || request.Args.ContainsKey("plan_id") || request.Args.ContainsKey("job_id")
+                    || !string.Equals(Arg.GetString(request.Args, "op") ?? "status", "status", StringComparison.OrdinalIgnoreCase))
+                    return Response.Fail(request.Id, Status.Invalido, "job intento_id sólo admite una consulta de estado.");
+                return ReadWriteReceipt(session, request.Id, attempt);
+            }
             var jop = (Arg.GetString(request.Args, "op") ?? "status").Trim().ToLowerInvariant();
             if (jop == "pendientes" || jop == "reconciliar") return await ReconcileJob(session, request, jop, ct).ConfigureAwait(false);
             var jobId = Arg.GetString(request.Args, "job_id");

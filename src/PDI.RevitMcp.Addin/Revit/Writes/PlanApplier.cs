@@ -309,6 +309,8 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                         try { Ui.Runtime.Plans?.Checkpoint(_plan); }
                         catch (PlanStoreException ex) { return AbortGroup(group, ex.Message); }
                     }
+                    var verificationError = VerifySourcePlacements() ?? VerifyConduitRoutes();
+                    if (verificationError != null) return AbortGroup(group, verificationError);
                     if (Trial) return FinishTrial(group);
                     if (group.Assimilate() != TransactionStatus.Committed)
                         return AbortGroup(group, "Revit no confirmó la asimilación del grupo");
@@ -612,8 +614,41 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
         private void ApplyEntry(PlanEntry entry)
         {
             if (entry.Ref > 0) { ApplyTemplate(entry); return; }
-            if (entry.Key == "nuevo") { Record(entry.OpIndex, Create(entry.Op, WriteKit.Dict(entry.Target), 0, entry.OpIndex)); return; }
+            if (entry.Key == "nuevo")
+            {
+                var target = WriteKit.Dict(entry.Target);
+                var ids = Create(entry.Op, target, 0, entry.OpIndex);
+                if (entry.Op == "place" && target.ContainsKey("z_verificar"))
+                {
+                    var made = ids.Single();
+                    _sourcePlacements.Add((entry, made));
+                    Record(entry.OpIndex, new[] { made });
+                }
+                else Record(entry.OpIndex, ids);
+                return;
+            }
             ApplyExisting(entry, entry.Id, entry.Target, false);
+        }
+
+        private readonly List<(PlanEntry Entry, ElementId Id)> _sourcePlacements = new List<(PlanEntry, ElementId)>();
+
+        private string VerifySourcePlacements()
+        {
+            var expected = _plan.Entries.Count(e => e.Op == "place" && e.Key == "nuevo" && WriteKit.Dict(e.Target).ContainsKey("z_verificar"));
+            if (expected != _sourcePlacements.Count) return "Colocación: faltan elementos por verificar";
+            const double oneMillimeter = 1.0 / 304.8;
+            foreach (var (entry, id) in _sourcePlacements)
+            {
+                var t = WriteKit.Dict(entry.Target);
+                var f = _doc.GetElement(id) as FamilyInstance;
+                var point = (f?.Location as LocationPoint)?.Point;
+                var wanted = new XYZ(WriteKit.D(t, "x"), WriteKit.D(t, "y"), WriteKit.D(t, "z_verificar"));
+                if (point == null || Ids.ToLong(f.GetTypeId()) != WriteKit.L(t, "sym") ||
+                    Ids.ToLong(f.LevelId) != WriteKit.L(t, "lvl") || point.DistanceTo(wanted) > oneMillimeter ||
+                    (t.ContainsKey("ws") && f.WorksetId.IntegerValue != WriteKit.L(t, "ws")))
+                    return "Colocación: " + (WriteKit.S(t, "item_fuente") ?? Where(entry)) + " (id " + Ids.ToLong(id) + ") no coincide en tipo, nivel, posición o workset";
+            }
+            return null;
         }
 
         /// <summary>Entrada plantilla (ids=@n): se aplica a cada elemento que creó la operación n.</summary>
@@ -1219,7 +1254,15 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
         {
             var view = ViewOf(t) ?? throw new InvalidOperationException("la vista ya no existe");
             var note = TextNote.Create(_doc, view.Id, ViewPoint(view, WriteKit.D(t, "x"), WriteKit.D(t, "y")), WriteKit.S(t, "texto") ?? "", Ids.ToId(WriteKit.L(t, "ttype")));
-            return note?.Id ?? throw new InvalidOperationException("Revit no creó la nota");
+            if (note == null) throw new InvalidOperationException("Revit no creó la nota");
+            if (t.ContainsKey("negrita") || t.ContainsKey("subrayado"))
+            {
+                var text = note.GetFormattedText();
+                if (t.ContainsKey("negrita")) text.SetBoldStatus(WriteKit.B(t, "negrita"));
+                if (t.ContainsKey("subrayado")) text.SetUnderlineStatus(WriteKit.B(t, "subrayado"));
+                note.SetFormattedText(text);
+            }
+            return note.Id;
         }
 
         private ElementId FilledRegionCreate(Dictionary<string, object> t)

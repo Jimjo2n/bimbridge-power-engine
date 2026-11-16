@@ -19,7 +19,8 @@ namespace PDI.RevitMcp.Engine.Coverage
         public string DocumentKind;  // project | family | any
         public string Priority;      // P0..P3
         public int Page = 1;
-        public int PageSize = 20;
+        public int PageSize;
+        public bool Relevance;
     }
 
     /// <summary>
@@ -137,7 +138,7 @@ namespace PDI.RevitMcp.Engine.Coverage
             if (!string.IsNullOrWhiteSpace(q.Category)) And(Lookup(_byCategory, q.Category));
             if (!string.IsNullOrWhiteSpace(q.DocumentKind)) And(Lookup(_byDocKind, q.DocumentKind).Concat(Lookup(_byDocKind, "any")).OrderBy(x => x).ToArray());
             if (!string.IsNullOrWhiteSpace(q.Priority)) And(Lookup(_byPriority, q.Priority));
-            if (!string.IsNullOrWhiteSpace(q.Text))
+            if (!q.Relevance && !string.IsNullOrWhiteSpace(q.Text))
                 foreach (var t in Tokens(q.Text).Distinct())
                 {
                     // prefijo: "circ" encuentra "circuito"; se acota a las claves del índice de palabras (no al catálogo).
@@ -151,10 +152,49 @@ namespace PDI.RevitMcp.Engine.Coverage
                 }
             var ids = (set ?? Enumerable.Range(0, _all.Length));
             if (q.Version.HasValue) ids = ids.Where(i => _all[i].MinVersion <= q.Version && _all[i].MaxVersion >= q.Version);
-            var list = ids.Distinct().OrderBy(i => _all[i].Id, StringComparer.Ordinal).ToList();
-            var size = Math.Max(1, Math.Min(MaxPageSize, q.PageSize));
+            var list = q.Relevance && !string.IsNullOrWhiteSpace(q.Text)
+                ? Rank(ids.Distinct(), q.Text).ToList()
+                : ids.Distinct().OrderBy(i => _all[i].Id, StringComparer.Ordinal).ToList();
+            var size = Math.Max(1, Math.Min(MaxPageSize, q.PageSize == 0 ? (q.Relevance ? 3 : 20) : q.PageSize));
             var page = Math.Max(1, q.Page);
-            return (list.Skip((page - 1) * size).Take(size).Select(i => _all[i]).ToList(), list.Count);
+            var offset = Math.Min(list.Count, ((long)page - 1) * size);
+            return (list.Skip((int)offset).Take(size).Select(i => _all[i]).ToList(), list.Count);
+        }
+
+        private static readonly string[][] VdcAliases =
+        {
+            new[] { "luminaria", "luminarias", "fixture", "fixtures", "lighting" },
+            new[] { "vinculo", "vinculos", "link", "links", "linked" },
+            new[] { "choque", "choques", "clash", "clashes", "interferencia", "interference" },
+            new[] { "tuberia", "tuberias", "pipe", "pipes", "piping" },
+            new[] { "lamina", "laminas", "sheet", "sheets" },
+            new[] { "etiqueta", "etiquetas", "tag", "tags" },
+            new[] { "cota", "cotas", "dimension", "dimensions" },
+        };
+
+        private IEnumerable<int> Rank(IEnumerable<int> ids, string text)
+        {
+            var terms = Tokens(text).Distinct().ToArray();
+            var phrase = string.Join(" ", Tokens(text));
+            var scores = new Dictionary<int, int>();
+            foreach (var term in terms)
+            {
+                if (_byToken.TryGetValue(term, out var hits))
+                    foreach (var id in hits) scores[id] = (scores.TryGetValue(id, out var old) ? old : 0) + 10;
+                var aliases = VdcAliases.FirstOrDefault(group => group.Contains(term));
+                if (aliases == null) continue;
+                var related = new HashSet<int>();
+                foreach (var alias in aliases.Where(a => a != term))
+                    if (_byToken.TryGetValue(alias, out var other)) related.UnionWith(other);
+                foreach (var id in related)
+                    if (hits == null || Array.BinarySearch(hits, id) < 0)
+                        scores[id] = (scores.TryGetValue(id, out var old) ? old : 0) + 3;
+            }
+            if (_byId.TryGetValue(text.Trim(), out var exact)) scores[exact] = 10000;
+            return ids.Where(scores.ContainsKey)
+                .Select(i => (Index: i, Score: scores[i] + (phrase.Length > 0 &&
+                    (string.Join(" ", Tokens(_all[i].Name)) == phrase || string.Join(" ", Tokens(_all[i].NameEn)) == phrase) ? 1000 : 0)))
+                .OrderByDescending(x => x.Score).ThenBy(x => _all[x.Index].Id, StringComparer.Ordinal).Select(x => x.Index);
         }
 
         /// <summary>Fila compacta para descubrimiento (lo mínimo para decidir; el contrato completo va aparte).</summary>

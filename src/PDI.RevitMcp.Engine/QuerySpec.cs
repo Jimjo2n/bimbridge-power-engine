@@ -102,6 +102,7 @@ namespace PDI.RevitMcp.Engine
         /// </summary>
         public bool CanFastCount => CountOnly && GroupBy.Count == 0 && Levels.Count == 0 && Types.Count == 0 && Worksets.Count == 0 &&
                                     Where.Count == 0 && Ids.Count == 0 && FromSet == null && Since == null && SaveAs == null && !Digest;
+        public bool CanAggregateDuringRead => GroupBy.Count > 0 && SaveAs == null && !Digest;
 
         /// <summary>Todos los campos que hay que leer de cada elemento (salida + filtros + agrupación).</summary>
         public List<string> FieldsToRead()

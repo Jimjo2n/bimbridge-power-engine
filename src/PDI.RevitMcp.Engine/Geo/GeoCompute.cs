@@ -409,13 +409,16 @@ namespace PDI.RevitMcp.Engine.Geo
             return rows;
         }
 
-        /// <summary>Resultado de la booleana exacta de Revit para un par que la criba no decidió.</summary>
+        [Flags]
+        public enum ExactIssue { None = 0, NoSolid = 1, Extraction = 2, Transform = 4, Boolean = 8 }
+
+        /// <summary>Volumen observado y condiciones que impiden darlo por completo.</summary>
         public struct ExactResult
         {
             public int Target;
             public int Body;
             public double Volume;
-            public bool Failed;
+            public ExactIssue Issues;
         }
 
         /// <summary>
@@ -432,43 +435,74 @@ namespace PDI.RevitMcp.Engine.Geo
                 l.Add(r);
             }
             foreach (var r in screened) Add((long)r["id"], r);
-            if (exact != null)
-                foreach (var e in exact)
+            var exactByTarget = (exact ?? Enumerable.Empty<ExactResult>()).ToLookup(e => e.Target);
+            foreach (var group in exactByTarget)
+                foreach (var e in group)
                 {
                     var t = targets[e.Target];
                     var label = e.Body >= 0 && e.Body < bodies.Count ? bodies[e.Body].Label : null;
-                    if (e.Failed)
-                        Add(t.Id, new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level, ["clase"] = "no_evaluable", ["contra"] = label });
-                    else if (e.Volume > minVolume)
+                    if (e.Volume > minVolume)
                         Add(t.Id, new Dictionary<string, object>
                         {
                             ["id"] = t.Id, ["lvl"] = t.Level, ["clase"] = "choque", ["contra"] = label, ["vol"] = e.Volume, ["metodo"] = "booleana",
+                            ["vol_parcial"] = e.Issues != ExactIssue.None,
                         });
+                    else if (e.Issues != ExactIssue.None)
+                        Add(t.Id, new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level, ["clase"] = "no_evaluable", ["contra"] = label });
                 }
             var rows = new List<Dictionary<string, object>>(targets.Count);
-            foreach (var t in targets)
+            for (var i = 0; i < targets.Count; i++)
             {
-                if (!byId.TryGetValue(t.Id, out var list))
-                {
-                    rows.Add(new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level, ["clase"] = "libre" });
-                    continue;
-                }
-                var clashes = list.Where(r => (string)r["clase"] == "choque").ToList();
+                var t = targets[i];
+                byId.TryGetValue(t.Id, out var list);
+                var clashes = list?.Where(r => (string)r["clase"] == "choque").ToList() ?? new List<Dictionary<string, object>>();
+                Dictionary<string, object> row;
                 if (clashes.Count > 0)
                 {
                     var best = clashes.OrderByDescending(r => r.TryGetValue("prof", out var p) ? (double)p : 0)
                                       .ThenByDescending(r => r.TryGetValue("vol", out var v) ? (double)v : 0).First();
-                    var row = new Dictionary<string, object>(best);
+                    row = new Dictionary<string, object>(best);
                     if (clashes.Count > 1) row["n"] = (long)clashes.Count;
-                    rows.Add(row);
                 }
                 else
                 {
-                    var bad = list.FirstOrDefault(r => (string)r["clase"] == "no_evaluable");
-                    rows.Add(bad ?? new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level, ["clase"] = "libre" });
+                    var bad = list?.FirstOrDefault(r => (string)r["clase"] == "no_evaluable");
+                    row = bad ?? new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level, ["clase"] = "libre" };
                 }
+                var observed = exactByTarget[i];
+                if (observed.Any()) row["cobertura"] = ClashCoverage(observed, bodies, minVolume);
+                rows.Add(row);
             }
             return rows;
+        }
+
+        private static Dictionary<string, object> ClashCoverage(IEnumerable<ExactResult> observed, IList<GeoBody> bodies, double minVolume)
+        {
+            var samples = new List<object>();
+            long total = 0, unresolved = 0, partial = 0;
+            foreach (var e in observed)
+            {
+                total++;
+                if (e.Issues != ExactIssue.None)
+                {
+                    if (e.Volume > minVolume) partial++;
+                    else unresolved++;
+                }
+                if (samples.Count >= 8) continue;
+                var body = bodies[e.Body];
+                var states = new List<object>();
+                if (e.Issues.HasFlag(ExactIssue.NoSolid)) states.Add("sin_solido");
+                if (e.Issues.HasFlag(ExactIssue.Extraction)) states.Add("extraccion_fallida");
+                if (e.Issues.HasFlag(ExactIssue.Transform)) states.Add("transformacion_fallida");
+                if (e.Issues.HasFlag(ExactIssue.Boolean)) states.Add("booleana_fallida");
+                if (states.Count == 0) states.Add("booleana_completa");
+                samples.Add(new Dictionary<string, object> { ["elemento_id"] = body.Id, ["vinculo_id"] = body.LinkId, ["estados"] = states });
+            }
+            return new Dictionary<string, object>
+            {
+                ["pares_exactos"] = total, ["sin_resolver"] = unresolved, ["volumenes_parciales"] = partial,
+                ["completa"] = unresolved + partial == 0, ["muestra"] = samples,
+            };
         }
 
         public static string Fmt(double v) => v.ToString("0.####", CultureInfo.InvariantCulture);

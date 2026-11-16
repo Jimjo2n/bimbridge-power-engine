@@ -171,7 +171,14 @@ namespace PDI.RevitMcp.Engine
                     }
                     break;
                 case "place":
-                    OpCatalog.Points(o["puntos"], "place puntos", 1, 5000);
+                    var placePoints = OpCatalog.Points(o["puntos"], "place puntos", 1, 5000);
+                    if (o.TryGetValue("items_fuente", out var rawItems))
+                    {
+                        if (!(rawItems is List<object> items) || items.Count != placePoints.Count ||
+                            items.Any(item => !(item is string text) || string.IsNullOrWhiteSpace(text)) ||
+                            items.Distinct().Count() != items.Count)
+                            throw new QueryException("place: items_fuente exige un identificador único por punto");
+                    }
                     OpCatalog.Length(o, "elev", "place");
                     OpCatalog.Length(o, "holgura", "place");
                     OpCatalog.Number(o, "rot", "place");
@@ -236,6 +243,9 @@ namespace PDI.RevitMcp.Engine
                     break;
                 case "text_note":
                     OpCatalog.Point(o["punto"], "text_note punto", false);
+                    foreach (var key in new[] { "negrita", "subrayado" })
+                        if (o.ContainsKey(key) && !Arg.GetBool(o, key).HasValue)
+                            throw new QueryException("text_note " + key + ": indique true o false");
                     break;
                 case "level_create":
                 case "grid_create":
@@ -245,6 +255,8 @@ namespace PDI.RevitMcp.Engine
                 case "room_create":
                 case "duct_create":
                 case "pipe_create":
+                case "conduit_create":
+                case "conduit_route":
                 case "circuit_create":
                 case "schedule_create":
                     ModelOps.Validate(s.Kind, o, s);
@@ -468,6 +480,7 @@ namespace PDI.RevitMcp.Engine
         /// <summary>AUD-19: vínculo con la fuente del lote (testigo, clave y huella derivadas del contenido). null si el plan no viene de una fuente.
         /// El commit usa esta clave y esta huella en el diario de operaciones aunque el agente no pase clave=.</summary>
         public string BoundToken, BoundKey, BoundHash;
+        public string ReceiptAttempt, ReceiptSession, ReceiptAgent, ReceiptDocPrint;
         public string Summary;          // texto corto que la IA da (o se genera) para mostrar en la cola
         public DateTime CreatedUtc;
         public string Status = PlanStatus.Listo;
@@ -509,6 +522,7 @@ namespace PDI.RevitMcp.Engine
             ["applied_batches"] = (long)AppliedBatches, ["total_batches"] = (long)TotalBatches,
             ["reconciliation"] = Reconciliation,
             ["origen"] = BoundToken, ["origen_clave"] = BoundKey, ["origen_huella"] = BoundHash,
+            ["intento_id"] = ReceiptAttempt, ["intento_sesion"] = ReceiptSession, ["intento_agente"] = ReceiptAgent, ["intento_doc"] = ReceiptDocPrint,
         };
 
         public static Plan FromJson(string json)
@@ -546,6 +560,8 @@ namespace PDI.RevitMcp.Engine
             p.TotalBatches = (int)(Arg.GetLong(o, "total_batches") ?? 0);
             if (o.TryGetValue("reconciliation", out var rec) && rec is Dictionary<string, object> recd) p.Reconciliation = recd;
             p.BoundToken = Arg.GetString(o, "origen"); p.BoundKey = Arg.GetString(o, "origen_clave"); p.BoundHash = Arg.GetString(o, "origen_huella");
+            p.ReceiptAttempt = Arg.GetString(o, "intento_id"); p.ReceiptSession = Arg.GetString(o, "intento_sesion");
+            p.ReceiptAgent = Arg.GetString(o, "intento_agente"); p.ReceiptDocPrint = Arg.GetString(o, "intento_doc");
             return p;
         }
 
