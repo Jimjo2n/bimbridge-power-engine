@@ -15,7 +15,7 @@ namespace PDI.RevitMcp.Addin.Ui
     /// <summary>
     /// Botón "Actualizar": busca instaladores nuevos (Descargas, Escritorio, carpeta de actualizaciones y las que configure IT)
     /// cada 10 minutos en un hilo de fondo, sin tocar Revit. Al pulsar Instalar ejecuta el instalador en modo /actualizar,
-    /// que reemplaza los archivos aunque Revit esté abierto; la versión nueva entra al reiniciar Revit.
+    /// que espera el cierre de Revit antes de reemplazar los archivos.
     /// 0.9.1: además, cuando una persona pulsa «Buscar en GitHub», consulta la última Release pública del repositorio y descarga su
     /// instalador verificando SHA-256, tamaño y versión. Nunca se conecta por su cuenta ni instala sin que el usuario pulse el botón.
     /// </summary>
@@ -174,6 +174,8 @@ namespace PDI.RevitMcp.Addin.Ui
         {
             try
             {
+                var pending = PendingInstallation();
+                if (pending != null) return (true, pending);
                 Directory.CreateDirectory(Paths.UpdatesDir);
                 var exe = Paths.CachedSetup(c.VersionText);
                 if (!string.Equals(Path.GetFullPath(c.Exe), Path.GetFullPath(exe), StringComparison.OrdinalIgnoreCase))
@@ -189,7 +191,14 @@ namespace PDI.RevitMcp.Addin.Ui
                 };
                 using (var p = Process.Start(psi))
                 {
-                    if (!p.WaitForExit(180000)) return (false, "El instalador no terminó en 3 minutos. Revise " + report + ".");
+                    var deadline = Stopwatch.StartNew();
+                    while (!p.WaitForExit(250))
+                    {
+                        var waiting = PendingInstallation();
+                        if (waiting != null) return (true, waiting);
+                        if (deadline.Elapsed >= TimeSpan.FromMinutes(3))
+                            return (false, "El instalador no terminó en 3 minutos. Revise " + report + ".");
+                    }
                     var text = File.Exists(report) ? File.ReadAllLines(report).Skip(2).FirstOrDefault() : null;
                     Runtime.Journal?.Log("usuario", "actualizar", p.ExitCode == 0 ? "ok" : "error", 0,
                         new Dictionary<string, object> { ["version"] = c.VersionText, ["codigo"] = (long)p.ExitCode, ["detalle"] = text });
@@ -204,6 +213,26 @@ namespace PDI.RevitMcp.Addin.Ui
             finally
             {
                 Check();
+            }
+        }
+
+        public static string PendingInstallation()
+        {
+            try
+            {
+                using (File.Open(Path.Combine(Paths.Home, "instalador.lock"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) { }
+                return null;
+            }
+            catch (FileNotFoundException) { return null; }
+            catch (DirectoryNotFoundException) { return null; }
+            catch (IOException)
+            {
+                try
+                {
+                    var lines = File.ReadAllLines(Path.Combine(Paths.UpdatesDir, "ultima.txt"));
+                    return lines.Length >= 3 && lines[0] == "6" ? lines[2] : null;
+                }
+                catch (IOException) { return null; }
             }
         }
 
@@ -222,7 +251,7 @@ namespace PDI.RevitMcp.Addin.Ui
             Button.ToolTip = state == 2
                 ? "La versión " + InstalledVersion + " ya está instalada: cierre y abra Revit para usarla."
                 : state == 1
-                    ? "Hay una versión nueva (" + a.VersionText + "). Pulse para instalarla sin cerrar Revit."
+                    ? "Hay una versión nueva (" + a.VersionText + "). Pulse para preparar la instalación al cerrar Revit."
                     : "Está al día. Pulse para buscar de nuevo o volver a la versión anterior.";
         }
     }

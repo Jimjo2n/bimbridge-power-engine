@@ -27,6 +27,25 @@ namespace PDI.RevitMcp.Setup
 
         public static bool RevitRunning() => !SetupPaths.IsSandbox && Process.GetProcessesByName("Revit").Length > 0;
 
+        public const int WaitingForRevit = 6;
+
+        public static bool WaitForRevitExit()
+        {
+            var elapsed = Stopwatch.StartNew();
+            while (RevitRunning())
+            {
+                if (elapsed.Elapsed >= TimeSpan.FromHours(24)) return false;
+                System.Threading.Thread.Sleep(1000);
+            }
+            return true;
+        }
+
+        public static FileStream LockInstallation(SetupPaths paths)
+        {
+            Directory.CreateDirectory(paths.Home);
+            return new FileStream(Path.Combine(paths.Home, "instalador.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        }
+
         // ---------------- Claude Code ----------------
 
         /// <summary>Busca la CLI de Claude Code en los lugares habituales.</summary>
@@ -229,12 +248,11 @@ namespace PDI.RevitMcp.Setup
                     Platform.DeleteSetupCopyLater(paths);
                     return 0;
                 }
+                using var installation = Platform.LockInstallation(paths);
                 var before = core.ReadInstalled();
                 // 0.6.0: sin revit=/niveles= se conservan la elección y los permisos de la instalación anterior (p. ej. RPW).
                 var versions = c.Versions ?? (before != null && before.Versions.Count > 0 ? before.Versions.ToArray() : core.DetectRevit().Where(r => r.Installed).Select(r => r.Version).ToArray());
                 if (versions.Length == 0) { Console.Error.WriteLine("No se encontró Revit 2022-2026."); return 1; }
-                // Sin hot reload: los binarios sólo cambian con Revit cerrado.
-                if (Platform.RevitRunning()) { Console.Error.WriteLine("Revit está abierto: ciérrelo antes de instalar. No se cambió nada."); return 2; }
                 // Nunca sobre una instalación existente sin pedirlo; podría ser la de trabajo.
                 var conflicts = core.DetectConflicts(Platform.ProductVersion);
                 if (conflicts.Count > 0 && !c.Replace)
@@ -242,8 +260,13 @@ namespace PDI.RevitMcp.Setup
                     Console.Error.WriteLine("No se instaló nada: " + string.Join("; ", conflicts) + ". Si este perfil es de laboratorio y quiere reemplazarla, repita con /reemplazar (se crea un respaldo).");
                     return 5;
                 }
+                if (Platform.RevitRunning())
+                {
+                    Report(paths, Platform.WaitingForRevit, "Instalación pendiente. Cierre todas las ventanas de Revit para aplicarla.");
+                    if (!Platform.WaitForRevitExit()) return Report(paths, 2, "La espera terminó con Revit abierto.");
+                }
                 using (var zip = new System.IO.Compression.ZipArchive(Platform.OpenPayload()))
-                    core.Install(zip, new InstallOptions { Versions = versions.ToList(), Levels = c.Levels ?? before?.Levels ?? "R", Codex = c.Codex || (before?.Codex ?? false), AllowInUse = false, RequireManifest = true }, Platform.ProductVersion);
+                    core.Install(zip, new InstallOptions { Versions = versions.ToList(), Levels = c.Levels ?? before?.Levels ?? "R", Codex = c.Codex || (before?.Codex ?? false), AllowInUse = true, RequireManifest = true }, Platform.ProductVersion);
                 if (c.Claude)
                 {
                     var claude = Platform.FindClaude();
@@ -252,12 +275,11 @@ namespace PDI.RevitMcp.Setup
                 Platform.AfterInstall(core, paths, before);
                 if (Platform.LastWarning != null) Console.Error.WriteLine("Aviso: " + Platform.LastWarning);
                 if (core.ReplacedInUse > 0) Console.WriteLine("Revit o una conversación de la IA estaba abierta: lo nuevo entra al reiniciarlos.");
-                return 0;
+                return Report(paths, 0, "Instalada la versión " + Platform.ProductVersion + ".");
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine(ex.Message);
-                return 1;
+                return Report(paths, 1, ex.Message);
             }
         }
 
@@ -275,21 +297,26 @@ namespace PDI.RevitMcp.Setup
 
         /// <summary>
         /// /actualizar: lo lanza el botón Actualizar de la cinta. Usa las mismas opciones de la instalación anterior
-        /// (versiones de Revit, permisos, Codex; Claude ya apunta al mismo puente) y funciona con Revit abierto.
+        /// (versiones de Revit, permisos, Codex) y espera al cierre de Revit cuando está abierto.
         /// Códigos: 0 bien, 1 error, 3 no hay instalación previa, 4 ya hay una versión igual o más nueva.
         /// El resultado queda en actualizaciones\ultima.txt para que la cinta lo muestre.
         /// </summary>
         private static int Update(CommandLine c, SetupPaths paths, SetupCore core)
         {
+            using var installation = Platform.LockInstallation(paths);
+            if (Platform.RevitRunning())
+            {
+                Report(paths, Platform.WaitingForRevit, "Actualización pendiente. Cierre todas las ventanas de Revit para aplicarla. Abra Revit después de que termine la instalación.");
+                if (!Platform.WaitForRevitExit()) return Report(paths, 2, "La espera terminó con Revit abierto.");
+            }
             var before = core.ReadInstalled();
             if (before == null || before.Versions.Count == 0) return Report(paths, 3, "No hay una instalación previa: use el instalador normal.");
-            if (Platform.RevitRunning()) return Report(paths, 2, "Revit está abierto: ciérrelo antes de actualizar. No se cambió nada.");
             var mine = Updates.Parse(Platform.ProductVersion);
             var installed = Updates.Parse(before.ProductVersion);
             if (installed != null && mine <= installed && !c.AllowOlder)
                 return Report(paths, 4, "Ya está instalada la versión " + before.ProductVersion + ".");
             using (var zip = new System.IO.Compression.ZipArchive(Platform.OpenPayload()))
-                core.Install(zip, new InstallOptions { Versions = before.Versions, Levels = before.Levels ?? "R", Codex = before.Codex, AllowInUse = false, RequireManifest = true }, Platform.ProductVersion);
+                core.Install(zip, new InstallOptions { Versions = before.Versions, Levels = before.Levels ?? "R", Codex = before.Codex, AllowInUse = true, RequireManifest = true }, Platform.ProductVersion);
             var recycled = Platform.AfterInstall(core, paths, before);
             var msg = "Instalada la versión " + Platform.ProductVersion + " (antes " + before.ProductVersion + ")." +
                       (core.ReplacedInUse > 0 ? " " + core.ReplacedInUse + " archivo(s) estaban en uso: la versión nueva se carga al reiniciar Revit y la conversación de la IA; hasta entonces sigue la anterior." : "") +

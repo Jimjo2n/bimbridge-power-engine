@@ -89,7 +89,7 @@ namespace PDI.RevitMcp.Addin.Ui
         }
     }
 
-    /// <summary>Actualizar: instala una versión nueva encontrada en Descargas/Escritorio sin cerrar Revit, o vuelve a la anterior.</summary>
+    /// <summary>Actualizar: instala una versión nueva encontrada en Descargas/Escritorio al cerrar Revit, o vuelve a la anterior.</summary>
     [Transaction(TransactionMode.ReadOnly)]
     public sealed class UpdateCommand : IExternalCommand
     {

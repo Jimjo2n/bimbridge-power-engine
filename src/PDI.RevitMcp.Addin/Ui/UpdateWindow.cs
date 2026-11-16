@@ -13,7 +13,7 @@ using Visibility = System.Windows.Visibility;
 namespace PDI.RevitMcp.Addin.Ui
 {
     /// <summary>
-    /// Ventana del botón Actualizar: versión en uso, versión nueva encontrada (y dónde), instalar sin cerrar Revit,
+    /// Ventana del botón Actualizar: versión en uso, versión nueva encontrada (y dónde), programar la instalación al cerrar Revit,
     /// volver a la versión anterior. Todo el trabajo pesado lo hace el instalador en modo /actualizar.
     /// </summary>
     internal sealed class UpdateWindow
@@ -68,6 +68,12 @@ namespace PDI.RevitMcp.Addin.Ui
             _subtitle.Text = "Versión en uso: " + Updates.Format(UpdateService.Running);
             _body.Children.Clear();
             var a = UpdateService.Available;
+            var pending = UpdateService.PendingInstallation();
+            if (pending != null)
+            {
+                _body.Children.Add(StatusCard(Theme.Amber, "Instalación pendiente", pending));
+                return;
+            }
 
             if (UpdateService.RestartPending)
             {
@@ -77,12 +83,12 @@ namespace PDI.RevitMcp.Addin.Ui
             }
             else if (a != null)
             {
-                var install = Theme.Button("Instalar " + a.VersionText, Theme.Kind.Primary);
+                var install = Theme.Button("Instalar al cerrar Revit (" + a.VersionText + ")", Theme.Kind.Primary);
                 install.Margin = new Thickness(0, 12, 0, 0);
                 install.HorizontalAlignment = HorizontalAlignment.Left;
                 install.Click += async (s, e) => await Install(a, false);
                 var card = StatusCard(Theme.Green, "Hay una versión nueva: " + a.VersionText,
-                    "Encontrada en " + a.Source + "\n\nSe instala sin cerrar Revit y con sus mismas opciones (versiones de Revit, permisos de la IA). " +
+                    "Encontrada en " + a.Source + "\n\nSe instala al cerrar todas las ventanas de Revit y conserva sus opciones (versiones de Revit, permisos de la IA). " +
                     "La cola de cambios y los registros se conservan. Entra en uso la próxima vez que abra Revit.");
                 ((StackPanel)((Grid)card.Child).Children[1]).Children.Add(install);
                 _body.Children.Add(card);
@@ -193,7 +199,7 @@ namespace PDI.RevitMcp.Addin.Ui
             var res = await Task.Run(() => UpdateService.Install(d.c, sameVersion));
             SetBusy(false, null);
             Render();
-            if (res.ok) Banner(res.text + "\nDescargada de " + d.c.Source + " y verificada. Cierre y abra Revit para usarla.", Theme.Green);
+            if (res.ok) Banner(res.text + "\nDescargada de " + d.c.Source + " y verificada.", Theme.Green);
             else Banner("Se descargó y verificó, pero no se pudo instalar: " + res.text, Theme.Red);
         }
 
@@ -230,7 +236,7 @@ namespace PDI.RevitMcp.Addin.Ui
             var r = await Task.Run(() => UpdateService.Install(c, allowOlder));
             SetBusy(false, null);
             Render();
-            if (r.ok) Banner(r.text + "\nCierre y abra Revit para usarla.", Theme.Green);
+            if (r.ok) Banner(r.text, Theme.Green);
             else Banner("No se pudo instalar: " + r.text, Theme.Red);
         }
 

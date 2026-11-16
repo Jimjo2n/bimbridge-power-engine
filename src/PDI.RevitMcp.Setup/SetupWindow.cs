@@ -157,13 +157,12 @@ namespace PDI.RevitMcp.Setup
             var versions = _versionChecks.Where(c => c.IsChecked == true).Select(c => (string)c.Tag).ToList();
             if (versions.Count == 0) { ShowBanner("Elija al menos una versión de Revit.", Theme.Amber); return; }
             var revitOpen = Platform.RevitRunning();
-            if (revitOpen) { ShowBanner("Revit está abierto. Ciérrelo y pulse otra vez: los binarios sólo cambian con Revit cerrado.", Theme.Amber); return; }
 
             var levels = _r.IsChecked == true ? "R" : _rp.IsChecked == true ? "RP" : "RPW";
-            var options = new InstallOptions { Versions = versions, Levels = levels, Codex = _codex.IsChecked == true, AllowInUse = false, RequireManifest = true };
+            var options = new InstallOptions { Versions = versions, Levels = levels, Codex = _codex.IsChecked == true, AllowInUse = true, RequireManifest = true };
             var before = _core.ReadInstalled();
             var wantClaude = _claude.IsChecked == true;
-            ShowBusy("Instalando…");
+            ShowBusy(revitOpen ? "Instalación pendiente. Guarde su trabajo y cierre todas las ventanas de Revit. Deje abierto este instalador." : "Instalando…");
 
             string error = null;
             string claudeResult = null;
@@ -171,6 +170,8 @@ namespace PDI.RevitMcp.Setup
             {
                 try
                 {
+                    using var installation = Platform.LockInstallation(_paths);
+                    if (!Platform.WaitForRevitExit()) throw new InvalidOperationException("La espera terminó con Revit abierto. Puede volver a intentar la instalación.");
                     using (var zip = new ZipArchive(Platform.OpenPayload()))
                         _core.Install(zip, options, Platform.ProductVersion);
                     if (wantClaude)
@@ -182,7 +183,7 @@ namespace PDI.RevitMcp.Setup
                     var recycled = Platform.AfterInstall(_core, _paths, before);
                     if (Platform.LastWarning != null) _log.Add("Aviso: " + Platform.LastWarning);
                     if (recycled.Count > 0) _log.Add("Instaladores viejos enviados a la papelera: " + recycled.Count);
-                    if (_core.ReplacedInUse > 0 || revitOpen) _log.Add("Revit estaba abierto: cierre y abra Revit para usar esta versión");
+                    if (_core.ReplacedInUse > 0) _log.Add("Reinicie las conversaciones que usaban BIMBRIDGE para cargar el puente nuevo.");
                 }
                 catch (Exception ex) { error = ex.Message; }
             });

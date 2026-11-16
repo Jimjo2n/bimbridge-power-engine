@@ -18,7 +18,7 @@ namespace PDI.RevitMcp.Setup
     ///   /quiet /uninstall [/borrardatos]
     ///   /restaurar[=carpeta]      vuelve al último respaldo de instalación (o al indicado). Exige Revit cerrado. Código 2 si está abierto.
     ///   /actualizar [/permitir-anterior]   lo usa el botón Actualizar de la cinta: mismas opciones que la
-    ///                             instalación anterior, sin ventana, con Revit abierto (entra al reiniciar)
+    ///                             instalación anterior, sin ventana, al cerrar todas las instancias de Revit
     ///   /aplicar-pendiente        0.8.0 "Actualizar desde ZIP": espera a que el USUARIO cierre Revit (nunca lo cierra),
     ///                             instala la actualización preparada, la verifica y, si falla, vuelve a la anterior
     ///   /reemplazar               /quiet sobre una instalación existente (crea respaldo). Sin él, código 5.
