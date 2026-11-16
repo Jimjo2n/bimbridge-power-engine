@@ -89,6 +89,7 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 case "floor_create": case "ceiling_create": SlabCreateOp(ctx, op, c); break;
                 case "room_create": RoomCreateOp(ctx, op, c); break;
                 case "duct_create": case "pipe_create": MepCurveCreateOp(ctx, op, c); break;
+                case "conduit_create": case "conduit_route": ConduitCreateOp(ctx, op, c); break;
                 case "circuit_create": CircuitCreateOp(ctx, op, ids, c); break;
                 case "schedule_create": ScheduleCreateOp(ctx, op, c); break;
                 default: throw new QueryException("operación no implementada: " + op.Kind);
@@ -514,12 +515,19 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
 
         private static void Place(BuildContext ctx, OpSpec op, Collector c)
         {
+            var host = Arg.GetString(op.Args, "anfitrion");
+            if (!string.IsNullOrWhiteSpace(host))
+                throw new QueryException("place: se exige anfitrión físico '" + host + "'. Esta operación sólo coloca por nivel; indique una familia y regla compatibles.");
+            var sourceBound = !string.IsNullOrEmpty(Arg.GetString(op.Args, SourceBinding.OpField));
             var sym = ctx.Model.FindType(Arg.GetString(op.Args, "type"), "place", t => t is FamilySymbol, "familias cargadas") as FamilySymbol;
             var pt = sym.Family?.FamilyPlacementType ?? FamilyPlacementType.Invalid;
+            if (sourceBound && pt != FamilyPlacementType.OneLevelBased)
+                throw new QueryException("place de fuente registrada: la familia " + sym.FamilyName + " es " + pt + "; sólo se admite OneLevelBased.");
             if (pt != FamilyPlacementType.OneLevelBased && pt != FamilyPlacementType.WorkPlaneBased)
                 throw new QueryException("place: " + sym.FamilyName + " es una familia " + pt + " (necesita un anfitrión: muro, cara o techo). Copie una instancia existente con copy");
             var lvl = ctx.Model.FindLevel(Arg.GetString(op.Args, "level"), "place");
             var points = OpCatalog.Points(op.Args["puntos"], "place puntos", 1, 5000);
+            var sourceItems = op.Args.TryGetValue("items_fuente", out var rawItems) ? rawItems as List<object> : null;
             var elev = OpCatalog.Length(op.Args, "elev", "place");
             var montaje = Arg.GetString(op.Args, "montaje");
             var clearance = OpCatalog.Length(op.Args, "holgura", "place") ?? 0.0;
@@ -562,6 +570,7 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 {
                     if (!geo.TryGetValue(i, out var row) || !(row.TryGetValue("mover", out var mv) && mv is double mover) || double.IsNaN(mover))
                     {
+                        if (sourceBound) throw new QueryException("place de fuente registrada: no hay soporte medible en el punto " + (i + 1));
                         c.Skip("no hay " + (up ? "losa encima" : "piso debajo") + " medible en ese punto (no se inventa la altura)", i + 1);
                         continue;
                     }
@@ -573,6 +582,8 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                     ["sym"] = Ids.ToLong(sym.Id), ["lvl"] = Ids.ToLong(lvl.Id), ["x"] = p[0], ["y"] = p[1],
                 };
                 if (offset.HasValue) t["elev"] = offset.Value;
+                if (sourceBound) t["z_verificar"] = lvl.ProjectElevation + (offset ?? 0);
+                if (sourceItems != null) t["item_fuente"] = sourceItems[i];
                 if (rot.HasValue && Math.Abs(rot.Value) > 1e-9) t["rot"] = rot.Value;
                 if (ws != null) t["ws"] = (long)ws.Id.IntegerValue;
                 if (converted.Count > 0) t["params"] = converted;
@@ -1278,6 +1289,8 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
             ElementId typeId = tn != null ? ctx.Model.FindType(tn, "text_note", x => x is TextNoteType, "tipos de texto").Id : ctx.Doc.GetDefaultElementTypeId(ElementTypeGroup.TextNoteType);
             if (typeId == null || typeId == ElementId.InvalidElementId) throw new QueryException("text_note: no hay tipo de texto por defecto; dé tipo");
             var t = new Dictionary<string, object> { ["x"] = p[0], ["y"] = p[1], ["texto"] = text, ["ttype"] = Ids.ToLong(typeId) };
+            foreach (var key in new[] { "negrita", "subrayado" })
+                if (Arg.GetBool(op.Args, key) is bool value) t[key] = value;
             if (view != null) t["view"] = Ids.ToLong(view.Id); else t["view_ref"] = (long)viewRef;
             var show = "nota '" + (text.Length > 40 ? text.Substring(0, 40) + "…" : text) + "' en " + (view?.Name ?? "@" + viewRef);
             c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });

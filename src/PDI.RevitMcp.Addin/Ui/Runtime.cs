@@ -111,6 +111,14 @@ namespace PDI.RevitMcp.Addin.Ui
             if (block0.Blocked) { Log("Cola: plan " + p.Id + " NO aplicado: " + block0.Message); return new PlanOps.ApplyResult { Status = PlanStatus.Retenido, Detail = block0.Message }; }
             // R01: intención durable ANTES de tocar el modelo (AuditGate); sin ella no se aplica nada. Resultado después.
             var ex0 = new Dictionary<string, object> { ["plan"] = p.Id, ["cambios"] = (long)p.Entries.Count };
+            if (p.ReceiptAttempt != null)
+            {
+                ex0["plan_id"] = p.Id;
+                ex0["intento_id"] = p.ReceiptAttempt;
+                ex0["sesion_intento"] = p.ReceiptSession;
+                ex0["agente"] = p.ReceiptAgent;
+                ex0["huella_doc"] = p.ReceiptDocPrint;
+            }
             return AuditGate.Apply(Audit, p.SessionId, "aplicar_cola", DocumentTracker.KeyOf(doc) ?? "", ex0, () =>
             {
                 try { Plans.BeginWrite(p); }
@@ -138,6 +146,8 @@ namespace PDI.RevitMcp.Addin.Ui
                 }
                 catch (Exception ex) { Log("Cola: no se pudieron guardar los creados: " + ex.Message); }
                 ex0["detalle"] = r.Detail;
+                if (r.Status == PlanStatus.Aplicado && PlanVerification.Postconditions(p.Verification) != PlanVerification.Met)
+                    ex0["estado_recibo"] = PDI.RevitMcp.Protocol.Status.ConDiferencias;
                 Journal?.Log(p.SessionId, "aplicar_cola", r.Status, sw.ElapsedMilliseconds, ex0);
                 MarkDirty();
                 return r;

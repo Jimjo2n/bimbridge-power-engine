@@ -453,20 +453,23 @@ namespace PDI.RevitMcp.Engine
                 Dictionary<string, object> entry;
                 try { entry = Json.ParseObject(raw); }
                 catch (FormatException) { continue; }
-                if (Arg.GetString(entry, "op") != "commit") continue;
+                var op = Arg.GetString(entry, "op");
+                if (op != "commit" && op != "aplicar_cola") continue;
                 var candidate = Arg.GetString(entry, "intencion");
                 if (candidate == null) continue;
                 var state = Arg.GetString(entry, "estado");
                 if (state == "intencion" && Arg.GetString(entry, "intento_id") == attempt &&
                     Arg.GetString(entry, "objetivo") == doc && Arg.GetString(entry, "huella_doc") == docPrint &&
-                    (Arg.GetString(entry, "autor") == session || (!string.IsNullOrEmpty(agent) && Arg.GetString(entry, "agente") == agent)))
+                    ((Arg.GetString(entry, "sesion_intento") ?? Arg.GetString(entry, "autor")) == session ||
+                        (!string.IsNullOrEmpty(agent) && Arg.GetString(entry, "agente") == agent)))
                 {
-                    if (result != null) return null;
+                    var planId = Arg.GetString(entry, "plan_id");
+                    if (result != null && Arg.GetString(result, "plan_id") != planId) return null;
                     intent = candidate;
                     result = new Dictionary<string, object>
                     {
                         ["intento_id"] = attempt, ["estado"] = Status.Desconocido, ["doc"] = doc, ["huella_doc"] = docPrint,
-                        ["plan_id"] = Arg.GetString(entry, "plan_id"), ["inicio"] = Arg.GetString(entry, "t"),
+                        ["plan_id"] = planId, ["inicio"] = Arg.GetString(entry, "t"),
                     };
                 }
                 else if (candidate == intent && Arg.GetString(entry, "fase") == "resultado")

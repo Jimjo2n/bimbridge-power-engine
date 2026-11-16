@@ -134,6 +134,31 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
             c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show.Replace("  ", " "), Show = show.Replace("  ", " "), Target = t });
         }
 
+        private static void ConduitCreateOp(BuildContext ctx, OpSpec op, Collector c)
+        {
+            var level = ctx.Model.FindLevel(Arg.GetString(op.Args, "nivel"), op.Kind);
+            var type = ctx.Model.FindType(Arg.GetString(op.Args, "tipo"), op.Kind, x => x is ConduitType, "tipos de conduit");
+            var settings = new Dictionary<string, object>
+            {
+                ["nivel"] = Ids.ToLong(level.Id), ["ctype"] = Ids.ToLong(type.Id),
+                ["diametro"] = OpCatalog.Length(op.Args, "diametro", op.Kind).Value,
+            };
+            if (op.Kind == "conduit_route")
+                settings["puntos"] = OpCatalog.Points(op.Args["puntos"], op.Kind + " puntos", 3, 100)
+                    .Select(p => (object)WriteKit.List(p[0], p[1], p[2])).ToList();
+            else
+            {
+                var a = OpCatalog.Point(op.Args["inicio"], op.Kind + " inicio", true);
+                var b = OpCatalog.Point(op.Args["fin"], op.Kind + " fin", true);
+                settings["a"] = WriteKit.List(a[0], a[1], a[2]); settings["b"] = WriteKit.List(b[0], b[1], b[2]);
+            }
+            var ws = Arg.GetString(op.Args, "ws");
+            if (ws != null) settings["ws"] = (long)ctx.Model.FindWorkset(ws, op.Kind).Id.IntegerValue;
+            var show = (op.Kind == "conduit_route" ? "recorrido de conduit " : "conduit ") +
+                type.Name + " Ø" + Ft((double)settings["diametro"]) + " en " + level.Name;
+            c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = settings });
+        }
+
         private static void MepCurveCreateOp(BuildContext ctx, OpSpec op, Collector c)
         {
             var duct = op.Kind == "duct_create";

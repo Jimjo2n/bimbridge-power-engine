@@ -182,7 +182,8 @@ namespace BimBridge.PowerEngine.Workflows
             plan.AlreadyThere = items.Where(i => i.Estado == "ya_existe").ToList();
 
             // 4) lotes "place": mismos tipo, nivel, montaje/elev, giro y workset; ≤ BatchMax puntos; orden estable
-            foreach (var g in plan.Place.GroupBy(i => (i.FamilyType, i.Level, i.Montaje, Elev: i.ElevFt.HasValue ? Math.Round(i.ElevFt.Value, 6) : (double?)null, Rot: Math.Round(i.RotDeg, 3), i.Workset))
+            foreach (var g in plan.Place.GroupBy(i => (i.FamilyType, i.Level, i.Montaje, Elev: i.ElevFt.HasValue ? Math.Round(i.ElevFt.Value, 6) : (double?)null, Rot: Math.Round(i.RotDeg, 3), i.Workset, i.Host,
+                                            Parameters: OpSemantics.Canonical(byCode[i.Code][0].Params)))
                                         .OrderBy(g => g.Key.FamilyType, StringComparer.Ordinal).ThenBy(g => g.Key.Rot))
             {
                 var all = g.OrderBy(i => i.Id, StringComparer.Ordinal).ToList();
@@ -194,10 +195,12 @@ namespace BimBridge.PowerEngine.Workflows
                     {
                         ["op"] = "place", ["type"] = g.Key.FamilyType, ["level"] = g.Key.Level,
                         ["puntos"] = chunk.Select(i => (object)new List<object> { Math.Round(i.X, 6), Math.Round(i.Y, 6) }).ToList(),
+                        ["items_fuente"] = chunk.Select(i => (object)i.Id).ToList(),
                     };
                     if (g.Key.Elev.HasValue) op["elev"] = g.Key.Elev.Value; else op["montaje"] = g.Key.Montaje;
                     if (Math.Abs(g.Key.Rot) > 0) op["rot"] = g.Key.Rot;
                     if (g.Key.Workset != null) op["ws"] = g.Key.Workset;
+                    if (!string.IsNullOrWhiteSpace(g.Key.Host)) op["anfitrion"] = g.Key.Host;
                     if (rule.Params.Count > 0) op["params"] = rule.Params;
                     plan.Batches.Add(new Dictionary<string, object> { ["operacion"] = op, ["items"] = chunk.Select(i => (object)i.Id).ToList() });
                 }

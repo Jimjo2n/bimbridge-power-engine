@@ -1222,7 +1222,7 @@
       2026
     ],
     "capabilities": [
-      "F20-CONDUIT-001"
+      "F20-TRAY-001"
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "analysis": "enlazado",
@@ -1618,9 +1618,9 @@
     "capabilities": [
       "F20-CONDUIT-001"
     ],
-    "status": "DYNAMIC_CSHARP_ONLY",
+    "status": "IMPLEMENTED_UNVERIFIED",
     "analysis": "enlazado",
-    "executor": "DYNAMIC_CSHARP",
+    "executor": "DIRECT_REVIT_API",
     "pending_research": null
   },
   {

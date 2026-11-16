@@ -34,6 +34,36 @@ namespace PDI.RevitMcp.Tests
             return p;
         }
 
+        [Theory]
+        [InlineData(10)]
+        [InlineData(50)]
+        [InlineData(200)]
+        public void HostAndItemExpectationsSurvivePdfExecution(int size)
+        {
+            var reg = new RegistrationResult { M = new[] { 1.0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 1.0, 0 } };
+            var symbols = Enumerable.Range(0, size).Select(i => new SymbolCandidate
+            {
+                Px = i * 2.0, Py = 1, Code = i % 2 == 0 ? "A" : "B", Confidence = 1,
+            }).ToList();
+            var rules = new List<TypeRule>
+            {
+                new TypeRule { Code = "A", FamilyType = "F: T", ElevFt = 9, Host = "losa" },
+                new TypeRule { Code = "B", FamilyType = "F: T", ElevFt = 9 },
+            };
+            var plan = PlacementPlanner.Plan(symbols, reg, rules, new PlacementOptions
+            {
+                Level = "L1", SourceId = "E-101", SourceSha256 = "sha-prueba",
+            });
+            Assert.Equal(size, plan.Place.Count);
+            var execution = PdfToPlan.Execution(plan);
+            var ops = ((List<object>)execution["planes"]).Cast<Dictionary<string, object>>()
+                .SelectMany(p => (List<object>)p["ops"]).Cast<Dictionary<string, object>>().ToList();
+            Assert.Equal(2, ops.Count);
+            Assert.Single(ops.Where(o => Arg.GetString(o, "anfitrion") == "losa"));
+            Assert.Equal(size, ops.SelectMany(o => (List<object>)o["items_fuente"]).Distinct().Count());
+            Assert.All(ops, o => Assert.StartsWith(SourceBinding.TokenPrefix, Arg.GetString(o, SourceBinding.OpField)));
+        }
+
         [Fact]
         public void ReadyPlan_BecomesTypedPlansWithStableIdempotencyKeys()
         {

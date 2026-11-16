@@ -7,7 +7,7 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 ## Capacidades por estado
 
 - `OFFLINE_VERIFIED`: 13
-- `IMPLEMENTED_UNVERIFIED`: 72
+- `IMPLEMENTED_UNVERIFIED`: 74
 - `DYNAMIC_CSHARP_ONLY`: 92
 - `MISSING`: 7
 - `UNKNOWN`: 32
@@ -19,8 +19,8 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 - Total distintos: 596
 - Con capacidad enlazada: 596
 - Estado `UNKNOWN`: 189 (sin analizar: 0; analizados sin evidencia suficiente, con investigación pendiente registrada: 189)
-- Por estado: `DYNAMIC_CSHARP_ONLY` 256, `IMPLEMENTED_UNVERIFIED` 91, `MISSING` 8, `NOT_APPLICABLE` 48, `UNKNOWN` 189, `UNSUPPORTED_BY_PUBLIC_API` 4
-- Por ejecutor: `DIRECT_REVIT_API` 91, `DYNAMIC_CSHARP` 256, `MANUAL_HANDOFF` 4, `UNAVAILABLE` 245
+- Por estado: `DYNAMIC_CSHARP_ONLY` 255, `IMPLEMENTED_UNVERIFIED` 92, `MISSING` 8, `NOT_APPLICABLE` 48, `UNKNOWN` 189, `UNSUPPORTED_BY_PUBLIC_API` 4
+- Por ejecutor: `DIRECT_REVIT_API` 92, `DYNAMIC_CSHARP` 255, `MANUAL_HANDOFF` 4, `UNAVAILABLE` 245
 - Un comando enlazado a una capacidad DYNAMIC_CSHARP_ONLY sólo tiene API pública identificada; no es automatización completa.
 - Dominio: el de la capacidad enlazada (596); la regla por nombre (`domain_by_name`) sólo es referencia y difiere en 246 comandos.
 
@@ -47,7 +47,7 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 | F17 | 7 | IMPLEMENTED_UNVERIFIED 1, DYNAMIC_CSHARP_ONLY 4, UNKNOWN 2 | 32 |
 | F18 | 3 | IMPLEMENTED_UNVERIFIED 1, DYNAMIC_CSHARP_ONLY 2 | 2 |
 | F19 | 1 | MISSING 1 | 1 |
-| F20 | 8 | IMPLEMENTED_UNVERIFIED 3, DYNAMIC_CSHARP_ONLY 4, UNKNOWN 1 | 15 |
+| F20 | 10 | IMPLEMENTED_UNVERIFIED 5, DYNAMIC_CSHARP_ONLY 4, UNKNOWN 1 | 15 |
 | F21 | 1 | MISSING 1 | 2 |
 | F22 | 3 | DYNAMIC_CSHARP_ONLY 2, UNKNOWN 1 | 5 |
 | F23 | 7 | IMPLEMENTED_UNVERIFIED 3, DYNAMIC_CSHARP_ONLY 3, UNKNOWN 1 | 24 |
@@ -185,10 +185,12 @@ Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña n
 | F20-ANALYTICAL-001 | Cargas de equipo y cargas por área (análisis eléctrico) | `UNKNOWN` | none | investigación pendiente: API de cargas analíticas eléctricas introducida en versiones recientes; verificar por versión |
 | F20-CIRCUIT-CREATE-001 | Crear circuito eléctrico de fuerza | `IMPLEMENTED_UNVERIFIED` | typed:circuit_create | verifica miembros y cuadro; la compatibilidad de tensión y polos la decide Revit (si la rechaza, el plan se revierte). Efecto en Revit pendiente de la campaña nativa |
 | F20-CIRCUIT-PANEL-001 | Asignar panel al crear el circuito | `IMPLEMENTED_UNVERIFIED` | typed:circuit_create | sólo al crear; reasignar el cuadro de un circuito existente sigue por C# dinámico. Efecto en Revit pendiente de la campaña nativa |
-| F20-CONDUIT-001 | Crear conduit o bandeja | `DYNAMIC_CSHARP_ONLY` | exec | accesible sólo con C# dinámico: falta operación tipada, verificador y pruebas |
+| F20-CONDUIT-001 | Crear tramo de conduit | `IMPLEMENTED_UNVERIFIED` | typed:conduit_create | colocación entre puntos; pendiente de verificación nativa |
+| F20-CONDUIT-ROUTE-001 | Crear recorrido de conduit con codos | `IMPLEMENTED_UNVERIFIED` | typed:conduit_route | crea un recorrido nuevo; pendiente de verificación nativa |
 | F20-LIGHT-QA-001 | QA de luminarias y etiquetas | `IMPLEMENTED_UNVERIFIED` | query:check |  |
 | F20-PANELSCHED-001 | Crear tabla de cuadro eléctrico | `DYNAMIC_CSHARP_ONLY` | exec | accesible sólo con C# dinámico: falta operación tipada, verificador y pruebas |
 | F20-SETTINGS-001 | Ajustes eléctricos, factores de demanda, clasificaciones de carga y cables | `DYNAMIC_CSHARP_ONLY` | exec | accesible sólo con C# dinámico: falta operación tipada, verificador y pruebas |
+| F20-TRAY-001 | Crear bandeja | `DYNAMIC_CSHARP_ONLY` | exec | accesible sólo con C# dinámico: falta operación tipada, verificador y pruebas |
 | F20-WIRE-CREATE-001 | Crear cableado | `DYNAMIC_CSHARP_ONLY` | exec | accesible sólo con C# dinámico: falta operación tipada, verificador y pruebas |
 | F21-LOWVOLT-001 | Dispositivos y circuitos de datos, alarma y seguridad | `MISSING` | none | sin implementación en BIMBRIDGE |
 | F22-FAB-001 | Colocar o leer partes de fabricación MEP | `DYNAMIC_CSHARP_ONLY` | exec | depende de la configuración de fabricación cargada |

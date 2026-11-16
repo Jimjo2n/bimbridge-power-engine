@@ -282,10 +282,18 @@ namespace PDI.RevitMcp.Addin.Revit
             try
             {
                 var agent = Correlation.Current?.AgentId;
-                receipt = _ops?.FindReceipt(attempt, session.Id, agent, target?.Key, target?.Print)
-                    ?? AuditLog.FindCommitReceipt(Ui.Runtime.Audit?.Path_, attempt, session.Id, agent, target?.Key, target?.Print);
+                receipt = _ops?.FindReceipt(attempt, session.Id, agent, target?.Key, target?.Print);
+                if (receipt == null || Arg.GetString(receipt, "estado") == Status.Retenido)
+                    receipt = AuditLog.FindCommitReceipt(Ui.Runtime.Audit?.Path_, attempt, session.Id, agent, target?.Key, target?.Print) ?? receipt;
+                if (receipt == null && target?.Print != null)
+                {
+                    _plans.LoadPersisted(target.Key);
+                    var held = _plans.Held(target.Key).FirstOrDefault(p => p.ReceiptAttempt == attempt && p.ReceiptDocPrint == target.Print &&
+                        (p.ReceiptSession == session.Id || (!string.IsNullOrEmpty(agent) && p.ReceiptAgent == agent)));
+                    if (held != null) receipt = HeldReceipt(held);
+                }
             }
-            catch (Exception ex) when (ex is JournalUnavailableException || ex is IOException || ex is UnauthorizedAccessException)
+            catch (Exception ex) when (ex is JournalUnavailableException || ex is PlanStoreException || ex is IOException || ex is UnauthorizedAccessException)
             {
                 receipt = null;
             }

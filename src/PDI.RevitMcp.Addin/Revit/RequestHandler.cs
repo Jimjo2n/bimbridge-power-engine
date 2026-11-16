@@ -415,7 +415,7 @@ namespace PDI.RevitMcp.Addin.Revit
                 {
                     if (q.Since.HasValue && sinceIds == null)
                     {
-                        var reg = _tracker.For(app.ActiveUIDocument?.Document);
+                        var reg = _tracker.For(DocTarget.Resolve(app));
                         sinceIds = reg != null ? reg.ChangedSince(q.Since.Value, out _) : new HashSet<long>();
                         runner = new QueryRunner(q, explicitIds, sinceIds);
                     }
@@ -425,12 +425,19 @@ namespace PDI.RevitMcp.Addin.Revit
             }, highPriority: true, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
 
             if (!result.Ok) return FromWork(request.Id, result);
-            if (runner.Error != null) return Response.Fail(request.Id, Status.Invalido, runner.Error);
+            if (runner.Error != null) return Response.Fail(request.Id, runner.RevisionChanged ? Status.Conflicto : Status.Invalido, runner.Error);
 
             var dispatchMs = sw.Elapsed.TotalMilliseconds;
             // Filtrar, agrupar, paginar y formatear: fuera del hilo de Revit.
-            var filtered = ResultTable.Filter(q, runner.Rows, out var matched);
-            var datos = (Dictionary<string, object>)ResultTable.Render(q, filtered, q.Page, q.PageSize);
+            List<Dictionary<string, object>> filtered = null;
+            List<long> matched = null;
+            Dictionary<string, object> datos;
+            if (runner.Groups != null) datos = runner.Groups.Render();
+            else
+            {
+                filtered = ResultTable.Filter(q, runner.Rows, out matched);
+                datos = (Dictionary<string, object>)ResultTable.Render(q, filtered, q.Page, q.PageSize);
+            }
             if (runner.FastCount.HasValue) datos["total"] = runner.FastCount.Value;
             // Issue #2: si hay más de una página, las siguientes se sirven desde esta lectura (cursor), sin volver al hilo de Revit.
             // La lectura puede ocupar varias visitas al hilo de Revit: sólo hay cursor si la revisión no cambió durante ella.
@@ -847,11 +854,20 @@ namespace PDI.RevitMcp.Addin.Revit
             // Cola: el usuario la aplica cuando quiera desde la cinta. Si ya hay cola, también se retiene para respetar el orden.
             if (!trial && WillHold(plan.DocKey))
             {
+                if (Guid.TryParseExact(request.AttemptId, "N", out _))
+                {
+                    plan.ReceiptAttempt = request.AttemptId;
+                    plan.ReceiptSession = session.Id;
+                    plan.ReceiptAgent = Correlation.Current?.AgentId;
+                    plan.ReceiptDocPrint = DocTarget.Ambient.Value?.Print;
+                }
                 _plans.Hold(plan);
                 Ui.Runtime.MarkDirty();
                 var pos = _plans.Held(plan.DocKey).FindIndex(p => p.Id == plan.Id) + 1;
                 var d = plan.Describe(0);
                 d["posicion_en_cola"] = (long)pos;
+                if (plan.ReceiptAttempt != null)
+                    d["recibo"] = HeldReceipt(plan);
                 return new Response
                 {
                     Id = request.Id, Estado = Status.Retenido, Datos = d,
@@ -1017,6 +1033,11 @@ namespace PDI.RevitMcp.Addin.Revit
                 };
             return new Response { Id = request.Id, Estado = estado, Rev = rev, Datos = datos, Aviso = advice };
         }
+
+        private static Dictionary<string, object> HeldReceipt(Plan plan) => new Dictionary<string, object>
+        {
+            ["intento_id"] = plan.ReceiptAttempt, ["plan_id"] = plan.Id, ["doc"] = plan.DocKey, ["estado"] = Status.Retenido,
+        };
 
         /// <summary>Cierra la intención de auditoría. Si falla, la intención queda pendiente y PendingIntents la reporta para reconciliar.</summary>
         private static bool AuditOutcome(Session session, string intent, string estado, long rev, string receiptState = null)

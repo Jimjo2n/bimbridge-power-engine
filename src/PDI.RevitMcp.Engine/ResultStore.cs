@@ -48,12 +48,15 @@ namespace PDI.RevitMcp.Engine
             if (!IsValidId(id)) return null;
             var path = Path.Combine(Folder, id + ".txt");
             if (!File.Exists(path)) return null;
-            var lines = File.ReadAllLines(path);
-            total = lines.Length;
             if (from < 0) from = 0;
             if (count <= 0) count = 200;
             var sb = new StringBuilder();
-            for (var i = from; i < Math.Min(lines.Length, from + count); i++) sb.Append(lines[i]).Append('\n');
+            var end = (long)from + count;
+            foreach (var line in File.ReadLines(path))
+            {
+                if (total >= from && total < end) sb.Append(line).Append('\n');
+                total++;
+            }
             return sb.ToString().TrimEnd('\n');
         }
 

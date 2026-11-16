@@ -31,11 +31,13 @@ namespace PDI.RevitMcp.Addin.Revit
         private int _next;
 
         public readonly List<Dictionary<string, object>> Rows = new List<Dictionary<string, object>>();
+        public readonly ResultTable.GroupAccumulator Groups;
         public long Rev;
         /// <summary>Registro de revisiones y handle (dN) del documento leído: ligan el cursor de la instantánea (issue #2).</summary>
         public VersionRegistry Registry;
         public string DocId;
         public string Error;
+        public bool RevisionChanged;
         public string DocumentTitle;
         /// <summary>Total obtenido con GetElementCount (conteo rápido); null si se leyeron los elementos.</summary>
         public long? FastCount;
@@ -46,6 +48,10 @@ namespace PDI.RevitMcp.Addin.Revit
             _explicitIds = explicitIds;
             _sinceIds = sinceIds;
             _fields = q.FieldsToRead();
+            if (q.CanAggregateDuringRead && !q.GroupBy.Contains("id", StringComparer.OrdinalIgnoreCase) &&
+                !q.Where.Any(c => string.Equals(c.Field, "id", StringComparison.OrdinalIgnoreCase)))
+                _fields.Remove("id");
+            if (q.CanAggregateDuringRead) Groups = new ResultTable.GroupAccumulator(q);
             // Los filtros por nivel, tipo y workset se aplican sobre los campos leídos.
             if (q.Levels.Count > 0 && !_fields.Contains("lvl")) _fields.Add("lvl");
             if (q.Types.Count > 0) { if (!_fields.Contains("fam")) _fields.Add("fam"); if (!_fields.Contains("type")) _fields.Add("type"); }
@@ -67,15 +73,28 @@ namespace PDI.RevitMcp.Addin.Revit
                 _candidates = Collect(doc);
                 if (Error != null) return true;
             }
+            else if (!ReferenceEquals(tracker.For(doc), Registry) || Registry?.Rev != Rev ||
+                     DocRegistry.Instance.IdOf(doc) != DocId)
+            {
+                RevisionChanged = true;
+                Error = "El documento o su revisión cambió durante la lectura. Repita la consulta.";
+                return true;
+            }
 
             var deadline = sw.ElapsedMilliseconds + budgetMs;
             while (_next < _candidates.Count)
             {
                 var e = doc.GetElement(_candidates[_next++]);
-                if (e == null) continue;
-                ElementsRead++;
-                var row = ElementFields.Read(doc, e, _fields, _names);
-                if (PassesPostFilters(row)) Rows.Add(row);
+                if (e != null)
+                {
+                    ElementsRead++;
+                    var row = ElementFields.Read(doc, e, _fields, _names);
+                    if (PassesPostFilters(row))
+                    {
+                        if (Groups != null) Groups.Add(row);
+                        else Rows.Add(row);
+                    }
+                }
                 // revisar el reloj cada 32 elementos: barato y suficiente
                 if ((_next & 31) == 0 && sw.ElapsedMilliseconds >= deadline) return false;
             }

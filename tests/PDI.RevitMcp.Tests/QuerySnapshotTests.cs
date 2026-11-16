@@ -29,6 +29,22 @@ namespace PDI.RevitMcp.Tests
             ((List<object>)((Dictionary<string, object>)rendered)["rows"]).Select(r => Json.Write(r)).ToList();
 
         [Fact]
+        public void IncrementalGrouping_MatchesLegacyWithNulls_Units_FiltersAndLimit()
+        {
+            var spec = Spec(20, "mm", "elev>100");
+            spec.GroupBy.AddRange(new[] { "lvl", "elev" });
+            var rows = Rows(25);
+            rows[2]["lvl"] = null;
+            var accumulator = new ResultTable.GroupAccumulator(spec);
+            foreach (var row in rows) accumulator.Add(new Dictionary<string, object>(row));
+            var expected = ResultTable.Build(spec, rows, out _, maxGroups: 5);
+            Assert.Equal(Json.Write(expected), Json.Write(accumulator.Render(5)));
+            Assert.True(spec.CanAggregateDuringRead);
+            spec.SaveAs = "$lote";
+            Assert.False(spec.CanAggregateDuringRead);
+        }
+
+        [Fact]
         public void PagedFromSnapshot_EqualsLegacyPerPageReads_IncludingUnitsAndWhere()
         {
             // Lectura clásica: cada página vuelve a leer y filtrar (lo que hacía el add-in en cada llamada).

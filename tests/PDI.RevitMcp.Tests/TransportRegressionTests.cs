@@ -109,5 +109,34 @@ namespace PDI.RevitMcp.Tests
             Assert.Null(AuditLog.FindCommitReceipt(path, attempt, "session2", null, "document", "model"));
             Assert.Null(AuditLog.FindCommitReceipt(path, attempt, "session1", null, "document", "replaced"));
         }
+
+        [Fact]
+        public void FrameBudget_PreservesReceiptAndCursor_AndStoresCompleteMultibyteRow()
+        {
+            var response = new Response
+            {
+                Id = 7, Rev = 12, Estado = Status.ConDiferencias, Aviso = "Se aplicó con diferencias",
+                Datos = new Dictionary<string, object>
+                {
+                    ["rows"] = new List<object> { new string('é', 600000) + "🚧" },
+                    ["cursor"] = "cursor-1", ["recibo"] = new Dictionary<string, object> { ["plan_id"] = "P-1" },
+                },
+            };
+            var expected = Json.Write(response);
+            string detail = null;
+            var summary = Response.FromJson(PipeHost.FitResponse(response, true, text => { detail = text; return "r123"; }));
+            Assert.Equal(response.Estado, summary.Estado);
+            Assert.Equal(response.Rev, summary.Rev);
+            Assert.Equal(response.Aviso, summary.Aviso);
+            var data = Assert.IsType<Dictionary<string, object>>(summary.Datos);
+            Assert.Equal("cursor-1", data["cursor"]);
+            Assert.True(data.ContainsKey("recibo"));
+            Assert.Equal("r123", data["res"]);
+            Assert.Equal(expected, detail.Replace("\n", ""));
+            var failed = Response.FromJson(PipeHost.FitResponse(response, true, _ => throw new IOException("sin espacio")));
+            Assert.Equal(response.Estado, failed.Estado);
+            Assert.Contains("sin espacio", (string)Assert.IsType<Dictionary<string, object>>(failed.Datos)["aviso_resultado"]);
+            Assert.Equal(expected, PipeHost.FitResponse(response, false, _ => throw new InvalidOperationException()));
+        }
     }
 }

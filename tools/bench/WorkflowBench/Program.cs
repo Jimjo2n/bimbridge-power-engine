@@ -104,6 +104,28 @@ internal static class Program
     {
         var reps = args.Length > 2 ? int.Parse(args[2], CultureInfo.InvariantCulture) : 7;
 
+        foreach (var n in new[] { 1000, 10000, 50000 })
+        {
+            var source = Elements(n, false);
+            var spec = QuerySpec.Parse(new Dictionary<string, object> { ["group_by"] = "lvl,type" });
+            Dictionary<string, object> Project(ModelHealth.Element e) => new Dictionary<string, object>
+            {
+                ["lvl"] = e.Level, ["type"] = e.Type,
+            };
+            object Legacy() => ResultTable.Build(spec, source.Select(Project), out _);
+            object Streaming()
+            {
+                var groups = new ResultTable.GroupAccumulator(spec);
+                foreach (var e in source) groups.Add(Project(e));
+                return groups.Render();
+            }
+            var check = Json.Write(Legacy());
+            if (check != Json.Write(Streaming())) throw new InvalidOperationException("BM-01: las agrupaciones difieren");
+            var note = "mismo conteo, orden y grupos; SHA-256 " + Home.Sha256Hex(check) + "; sólo proyección y agregación offline";
+            Measure("BM-01", "Inventario agrupado", "materializado", n, Math.Max(30, reps), Legacy, note);
+            Measure("BM-01", "Inventario agrupado", "incremental", n, Math.Max(30, reps), Streaming, note);
+        }
+
         // BM-03 Model Health (análisis fuera de Revit) en tamaños distintos, y duplicados denso antes/después.
         foreach (var n in new[] { 1000, 10000, 50000 })
         {
