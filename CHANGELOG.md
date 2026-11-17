@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.3 experimental
+
+- Added Revit 2027 build and installer support with .NET 10.
+- Closed the 39 parity checks under the offline validation criteria.
+- Improved lighting placement, linked geometry, annotations, view and connector checks, print sets, and PDF and workbook handling.
+- Added the illustrated bilingual repository landing and documented the Windows installer and update ZIP.
+
 ## Unreleased — 0.9.1 functional coverage candidate (0.9.0+commit)
 Branch `feat/revit-functional-coverage-0.9.1`. Status and decisions D54–D66 in [DELIVERY_STATUS](docs/0.9.1/DELIVERY_STATUS.md). No native campaign yet: nothing is NATIVE_VERIFIED.
 - fix(audit) AUD-01/01B: batch-aware head recovery, durable claims, tail repair into fragments; crash-point tests for batches of 1–64.

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="280" viewBox="0 0 760 280" role="img">
+<title>Build, test + Windows distribution</title>
+<rect x="1" y="1" width="758" height="278" rx="16" fill="#0e0d0f" stroke="#493438"/>
+<rect x="28" y="27" width="6" height="30" rx="2" fill="#ff203c"/>
+<text x="48" y="51" fill="#f7f2f3" font-size="25" font-family="Consolas, monospace">Build, test + Windows distribution</text>
+<text x="684" y="50" fill="#ff203c" font-size="19" font-family="Consolas, monospace">11</text>
+<path d="M31 73h698" stroke="#4c3439" stroke-width="1" fill="none" />
+<rect x="31" y="90" width="334" height="143" rx="8" fill="#191719" stroke="#4c3439"/>
+<rect x="392" y="90" width="337" height="143" rx="8" fill="#191719" stroke="#4c3439"/>
+<text x="50" y="120" fill="#ffb7c0" font-size="15" font-family="Consolas, monospace">REVIT BUILD TARGETS</text>
+<text x="411" y="120" fill="#ffb7c0" font-size="15" font-family="Consolas, monospace">PACKAGE VERIFICATION</text>
+<g font-family="Consolas, monospace" text-anchor="middle">
+  <rect x="49" y="140" width="100" height="45" rx="5" fill="#282024" stroke="#4c3439"/>
+  <rect x="158" y="140" width="100" height="45" rx="5" fill="#5e101d" stroke="#4c3439"/>
+  <rect x="267" y="140" width="80" height="45" rx="5" fill="#5e101d" stroke="#ff203c"/>
+  <text x="99" y="168" fill="#f7f2f3" font-size="14">2022–2024</text>
+  <text x="208" y="168" fill="#f7f2f3" font-size="14">2025–2026</text>
+  <text x="307" y="168" fill="#f7f2f3" font-size="14">2027</text>
+  <text x="99" y="214" fill="#c3b7ba" font-size="13">.NET FW 4.8</text>
+  <text x="208" y="214" fill="#c3b7ba" font-size="13">.NET 8</text>
+  <text x="307" y="214" fill="#c3b7ba" font-size="13">.NET 10</text>
+</g>
+<path d="M420 145l5 5 10-11" stroke="#ff203c" stroke-width="2" fill="none" />
+<text x="449" y="149" fill="#f7f2f3" font-size="15" font-family="Consolas, monospace">manifest.json</text>
+<path d="M420 173l5 5 10-11" stroke="#ff203c" stroke-width="2" fill="none" />
+<text x="449" y="177" fill="#f7f2f3" font-size="15" font-family="Consolas, monospace">SHA-256</text>
+<path d="M420 201l5 5 10-11" stroke="#ff203c" stroke-width="2" fill="none" />
+<text x="449" y="205" fill="#f7f2f3" font-size="15" font-family="Consolas, monospace">install / rollback</text>
+<text x="32" y="260" fill="#c3b7ba" font-size="14" font-family="Consolas, monospace">CI / manifest / hashes / rollback</text>
+</svg>

@@ -4,15 +4,15 @@ This guide describes the source-inspected installation interface. No installer i
 
 ## Build versus installation
 
-The .NET 8 SDK provides the CLI/MSBuild used by build.ps1. The projects reference Microsoft.NETFramework.ReferenceAssemblies for net48 targets. Visual Studio is optional for editing/debugging; a successful CLI build does not require claiming a particular Visual Studio installation.
+The SDK pinned in `global.json` supplies the build tools. The add-in targets .NET Framework 4.8 for Revit 2022–2024, .NET 8 for Revit 2025–2026 and .NET 10 for Revit 2027. See [development setup](../DEVELOPMENT.md) for build dependencies.
 
 Revit reference packages are selected per target year in the add-in project. They are compile-time inputs and excluded from runtime distribution. A local Revit API path can instead be supplied through the existing build options. Offline rebuilding requires all required NuGet and Rust packages already cached; the checked-in Python wheels are hash-pinned.
 
 ## Reviewed package
 
-Obtain a package tied to a reviewed commit, verify its published SHA-256 and inspect signing/acceptance status. The incoming audit installer is not an approved release and is not attached to this repository.
+Download the Windows installer or update ZIP from [GitHub Releases](https://github.com/Jimjo2n/bimbridge-power-engine/releases). The release notes identify the source commit, validation scope and signing status. Verify the published SHA-256 before installing.
 
-Close Revit before installation or replacement. Launch the reviewed Windows installer, choose the supported target versions and configure supported MCP clients. Existing installations require the explicit replacement flow. Silent installation is not a way around the closed-Revit or replacement checks.
+Launch the Windows installer and choose the target versions and MCP clients. If Revit is open, the installer waits for you to close every Revit window before copying files. You can cancel during the wait. For online prereleases, enable experimental versions in BIMBRIDGE. For an update ZIP, use the ribbon's ZIP update action and review the signature status shown by the updater.
 
 The product is named BIMBRIDGE – Power Engine. Assembly names, add-in GUIDs and PDI.RevitMcp storage/configuration identifiers remain for compatibility.
 

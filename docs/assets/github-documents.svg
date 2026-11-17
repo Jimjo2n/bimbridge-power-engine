@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="280" viewBox="0 0 760 280" role="img">
+<title>Families + document operations</title>
+<rect x="1" y="1" width="758" height="278" rx="16" fill="#0e0d0f" stroke="#493438"/>
+<rect x="28" y="27" width="6" height="30" rx="2" fill="#ff203c"/>
+<text x="48" y="51" fill="#f7f2f3" font-size="25" font-family="Consolas, monospace">Families + document operations</text>
+<text x="684" y="50" fill="#ff203c" font-size="19" font-family="Consolas, monospace">09</text>
+<path d="M31 73h698" stroke="#4c3439" stroke-width="1" fill="none" />
+<rect x="31" y="90" width="334" height="143" rx="8" fill="#191719" stroke="#4c3439"/>
+<rect x="392" y="90" width="337" height="143" rx="8" fill="#191719" stroke="#4c3439"/>
+<text x="50" y="120" fill="#ffb7c0" font-size="15" font-family="Consolas, monospace">RFA FAMILY LIFECYCLE</text>
+<text x="411" y="120" fill="#ffb7c0" font-size="15" font-family="Consolas, monospace">VERIFIED EXPORTS</text>
+<rect x="54" y="148" width="85" height="32" rx="6" fill="#6a0e1c" stroke="#ff203c"/>
+<text x="64" y="169" fill="#f7f2f3" font-size="14" font-family="Consolas, monospace">RFA</text>
+<path d="M147 164H194m-7-5 7 5-7 5" stroke="#ff203c" stroke-width="2" fill="none" />
+<rect x="204" y="148" width="86" height="32" rx="6" fill="#212023" stroke="#4c3439"/>
+<text x="214" y="169" fill="#f7f2f3" font-size="14" font-family="Consolas, monospace">RVT</text>
+<text x="54" y="210" fill="#c3b7ba" font-size="15" font-family="Consolas, monospace">EditFamily → reload</text>
+<rect x="421" y="137" width="76" height="80" rx="8" fill="#2b191f" stroke="#4c3439"/>
+<text x="435" y="166" fill="#f7f2f3" font-size="16" font-family="Consolas, monospace">PDF</text>
+<path d="M436 194l5 5 10-11" stroke="#ff203c" stroke-width="2" fill="none" />
+<rect x="518" y="137" width="76" height="80" rx="8" fill="#2b191f" stroke="#4c3439"/>
+<text x="532" y="166" fill="#f7f2f3" font-size="16" font-family="Consolas, monospace">IFC</text>
+<path d="M533 194l5 5 10-11" stroke="#ff203c" stroke-width="2" fill="none" />
+<rect x="615" y="137" width="76" height="80" rx="8" fill="#2b191f" stroke="#4c3439"/>
+<text x="629" y="166" fill="#f7f2f3" font-size="16" font-family="Consolas, monospace">CSV</text>
+<path d="M630 194l5 5 10-11" stroke="#ff203c" stroke-width="2" fill="none" />
+<text x="32" y="260" fill="#c3b7ba" font-size="14" font-family="Consolas, monospace">EditFamily / IFamilyLoadOptions</text>
+</svg>

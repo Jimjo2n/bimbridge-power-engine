@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="280" viewBox="0 0 760 280" role="img">
+<title>PDF-to-model registration</title>
+<rect x="1" y="1" width="758" height="278" rx="16" fill="#0e0d0f" stroke="#493438"/>
+<rect x="28" y="27" width="6" height="30" rx="2" fill="#ff203c"/>
+<text x="48" y="51" fill="#f7f2f3" font-size="25" font-family="Consolas, monospace">PDF-to-model registration</text>
+<text x="684" y="50" fill="#ff203c" font-size="19" font-family="Consolas, monospace">07</text>
+<path d="M31 73h698" stroke="#4c3439" stroke-width="1" fill="none" />
+<rect x="31" y="90" width="334" height="143" rx="8" fill="#191719" stroke="#4c3439"/>
+<rect x="392" y="90" width="337" height="143" rx="8" fill="#191719" stroke="#4c3439"/>
+<text x="50" y="120" fill="#ffb7c0" font-size="15" font-family="Consolas, monospace">PDF PAGE SPACE</text>
+<text x="411" y="120" fill="#ffb7c0" font-size="15" font-family="Consolas, monospace">REVIT MODEL SPACE</text>
+<path d="M56 150h240m-240 25h240m-240 25h240m-190-62v75m70-75v75m70-75v75" stroke="#4c3439" stroke-width="1" fill="none" />
+<path d="M423 143h240m-240 25h240m-240 25h240m-190-62v75m70-75v75m70-75v75" stroke="#4c3439" stroke-width="1" fill="none" />
+<path d="M106 150L473 143" stroke="#b42f45" stroke-width="1" fill="none" stroke-dasharray="5 6"/>
+<circle cx="106" cy="150" r="10" fill="#560c19"/>
+<circle cx="106" cy="150" r="4" fill="#ff203c"/>
+<circle cx="473" cy="143" r="10" fill="#560c19"/>
+<circle cx="473" cy="143" r="4" fill="#ff203c"/>
+<text x="116" y="142" fill="#f7f2f3" font-size="13" font-family="Consolas, monospace">A/1</text>
+<text x="483" y="135" fill="#f7f2f3" font-size="13" font-family="Consolas, monospace">A/1</text>
+<path d="M176 175L543 168" stroke="#b42f45" stroke-width="1" fill="none" stroke-dasharray="5 6"/>
+<circle cx="176" cy="175" r="10" fill="#560c19"/>
+<circle cx="176" cy="175" r="4" fill="#ff203c"/>
+<circle cx="543" cy="168" r="10" fill="#560c19"/>
+<circle cx="543" cy="168" r="4" fill="#ff203c"/>
+<text x="186" y="167" fill="#f7f2f3" font-size="13" font-family="Consolas, monospace">B/2</text>
+<text x="553" y="160" fill="#f7f2f3" font-size="13" font-family="Consolas, monospace">B/2</text>
+<path d="M246 200L613 193" stroke="#b42f45" stroke-width="1" fill="none" stroke-dasharray="5 6"/>
+<circle cx="246" cy="200" r="10" fill="#560c19"/>
+<circle cx="246" cy="200" r="4" fill="#ff203c"/>
+<circle cx="613" cy="193" r="10" fill="#560c19"/>
+<circle cx="613" cy="193" r="4" fill="#ff203c"/>
+<text x="256" y="192" fill="#f7f2f3" font-size="13" font-family="Consolas, monospace">C/3</text>
+<text x="623" y="185" fill="#f7f2f3" font-size="13" font-family="Consolas, monospace">C/3</text>
+<text x="32" y="260" fill="#c3b7ba" font-size="14" font-family="Consolas, monospace">named anchors / fit / residuals / scale</text>
+</svg>
