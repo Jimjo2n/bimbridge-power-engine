@@ -171,7 +171,7 @@ namespace PDI.RevitMcp.Engine.Geo
         /// <summary>Holgura con signo: positiva = espacio libre; negativa = penetración. NaN = sin superficie en el rango.</summary>
         public double Gap;
         public int Item;
-        public double X, Y;
+        public double X, Y, SurfaceZ;
         public bool Found => !double.IsNaN(Gap);
     }
 
@@ -192,6 +192,7 @@ namespace PDI.RevitMcp.Engine.Geo
         public double GapMin = double.NaN;
         public double GapMax = double.NaN;
         public int Item = -1;
+        public double SurfaceX, SurfaceY, SurfaceZ;
         public int PointsTotal;
         public int PointsWithSurface;
         /// <summary>La superficie no es paralela al cuerpo (rampa, escalera): la holgura varía más que la tolerancia.</summary>
@@ -229,6 +230,7 @@ namespace PDI.RevitMcp.Engine.Geo
             var gap = bestIn - zTop;
             if (gap > maxUp) { best.Item = -1; return best; }
             best.Gap = gap;
+            best.SurfaceZ = bestIn;
             return best;
         }
 
@@ -247,6 +249,7 @@ namespace PDI.RevitMcp.Engine.Geo
             var gap = zBot - bestOut;
             if (gap > maxDown) { best.Item = -1; return best; }
             best.Gap = gap;
+            best.SurfaceZ = bestOut;
             return best;
         }
 
@@ -258,7 +261,14 @@ namespace PDI.RevitMcp.Engine.Geo
             {
                 if (!h.Found) continue;
                 r.PointsWithSurface++;
-                if (double.IsNaN(r.GapMin) || h.Gap < r.GapMin) { r.GapMin = h.Gap; r.Item = h.Item; }
+                if (double.IsNaN(r.GapMin) || h.Gap < r.GapMin)
+                {
+                    r.GapMin = h.Gap;
+                    r.Item = h.Item;
+                    r.SurfaceX = h.X;
+                    r.SurfaceY = h.Y;
+                    r.SurfaceZ = h.SurfaceZ;
+                }
                 if (double.IsNaN(r.GapMax) || h.Gap > r.GapMax) r.GapMax = h.Gap;
             }
             if (r.PointsWithSurface == 0) { r.Class = MountClass.NoSurface; return r; }

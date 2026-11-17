@@ -18,7 +18,7 @@ Cada comprobación tiene uno de dos estados. `IMPLEMENTADO` indica que el criter
 | Descubrimiento por relevancia en español e inglés | IMPLEMENTADO | Reutiliza `check name=cobertura` y aplica filtros antes de ordenar. Predeterminado de tres resultados con relevancia. Caso de prueba por ID, nombres, alias y filtro. |
 | Piloto PDF: transportar requisitos de anfitrión y expectativas por elemento | IMPLEMENTADO | Lotes por contrato y parámetros; identidad de ítem opcional. El piloto admite familias por nivel y rechaza requisitos de anfitrión físico en la planificación. |
 | Piloto PDF: releer antes de consolidar, asociar entradas e IDs, revertir diferencias | IMPLEMENTADO | Verificación compartida de aplicación y ensayo antes de `Assimilate`. Conserva verificación independiente separada. Equiparación entre lo planificado, lo creado y el resultado nativo se debe ejecutar en la campaña. |
-| Espera del instalador, reapertura, cierre manual y convivencia de procesos | NO IMPLEMENTADO | El EXE y la actualización desde ZIP exigen dos comprobaciones consecutivas con todas las instancias cerradas. La prueba simulada comprueba que reabrir Revit entre ambas reinicia la espera. Falta la comprobación con dos procesos de Revit y el cierre manual del instalador. |
+| Espera del instalador, reapertura, cierre manual y convivencia de procesos | NO IMPLEMENTADO | El EXE y la actualización desde ZIP exigen dos comprobaciones consecutivas con todas las instancias cerradas. El EXE permite cancelar la espera y bloquea el cierre de su ventana mientras escribe los archivos. Las pruebas simuladas cubren la reapertura y la cancelación con una de dos instancias todavía abierta. Falta comprobar el flujo completo en Windows con los procesos reales. |
 
 ## Plan de trabajo diario
 
@@ -26,11 +26,11 @@ Cada comprobación tiene uno de dos estados. `IMPLEMENTADO` indica que el criter
 |---|---|---|---|
 | PY-01 | Fijar sesión, instancia y documento | NO IMPLEMENTADO | Repetir con dos modelos homónimos y corte de conexión. |
 | PY-02 | Consultar y guardar un conjunto filtrado | IMPLEMENTADO | La ruta existente se conserva. El caso de relectura tras edición se prueba en Revit. |
-| PY-03 | Inventario de 33 vistas y siete campos | NO IMPLEMENTADO | Repetir el control histórico con la compilación candidata. |
-| PY-04 | Referencias geométricas de vínculos | NO IMPLEMENTADO | Id por instancia del vínculo en choques. Falta comprobar la cara transformada en el caso de dos instancias. |
+| PY-03 | Inventario de 33 vistas y siete campos | NO IMPLEMENTADO | Se comprobó offline que la evidencia histórica contiene las 33 filas y los siete campos. Falta obtener la lectura del modelo con la compilación candidata y compararla por ID. |
+| PY-04 | Referencias geométricas de vínculos | NO IMPLEMENTADO | `geo montaje` y `geo holgura` con `referencias=true` devuelven el elemento, la instancia vinculada y las coordenadas de la cara que controla en el anfitrión. Una prueba sintética distingue dos copias con el mismo ID local y verifica el punto elegido. Falta ejecutar el caso con dos vínculos de Revit. |
 | PY-05 | Inventario PDF con notas, leyendas, inclusión y exclusión | NO IMPLEMENTADO | El inventario conserva ID, página, posición, forma, rótulo, leyenda y evidencia de revisión. Las decisiones se vinculan al PDF y gobiernan la colocación. Falta repetir la comparación de una zona de E-1.3.03 contra la selección manual. |
 | PY-06 | Resolución de familias y sustitución dentro de grupos | NO IMPLEMENTADO | `group_variant` aplica el mapa explícito de tipos dentro de la variante y verifica categoría, montaje, anfitrión, coordenadas y orientación de miembros. Falta comprobar el grupo con downlights redondos, cuadrados y apliques wall-hosted en Revit. |
-| PY-07 | Colocación idempotente | NO IMPLEMENTADO | Piloto con expectativas verificadas. Falta probar reintento con preexistencias en el cuadrante. |
+| PY-07 | Colocación idempotente | NO IMPLEMENTADO | La prueba offline comprueba que el plan excluye preexistencias de otro nivel, señala coincidencias compartidas y genera cero lotes al repetir con las dos luces presentes. Falta probar el cuadrante real. |
 | PY-08 | Medición y ajuste en losa, rampa y cielo | NO IMPLEMENTADO | Se usa el ajuste existente y se verifica el nivel y posición del piloto. Falta el caso de los tres montajes y la etiqueta. |
 | PY-09 | Mantenimiento de llamadas estáticas de luminarias | NO IMPLEMENTADO | `text_note` vincula la llamada a una luminaria por UID en el RVT. `llamadas_audit` detecta cambios y `text_note_refresh` regenera sólo las llamadas seleccionadas. Falta verificar en el RCP DIM el cambio de tipo, altura, posición y la separación de anotaciones. |
 | PY-10 | QC independiente de inventario, vistas y tags | IMPLEMENTADO | `lighting_audit` acepta un inventario independiente en `manifiesto`. `ManifestInventory_DetectsMissingAndPhysicalDuplicates_WithoutCountingCrossViewReferencesTwice` demuestra faltantes, duplicados físicos y una referencia legítima visible y etiquetada en dos vistas con datos simulados. |
@@ -43,7 +43,7 @@ Cada comprobación tiene uno de dos estados. `IMPLEMENTADO` indica que el criter
 | PY-17 | QC integral por ruta | NO IMPLEMENTADO | `ruta_audit` contrasta conectividad, volumen fuera de losas, stubs autorizados y choques sólidos por ruta. Los casos sin evidencia sólida se informan como no evaluables. Falta ejecutar el deck sembrado para comprobar los cuatro hallazgos esperados. |
 | PY-18 | Diagnóstico de plantillas, filtros, vínculos y regiones | NO IMPLEMENTADO | `vista_audit` aporta evidencia simultánea de varias vistas, filtros activos, overrides RGB, vínculo, regiones y candidatos del colector. Falta validar la plantilla derivada y la visibilidad y el color efectivos del caso Power DN. |
 | PY-19 | Callouts, cortes, 3D y láminas de QC | NO IMPLEMENTADO | Las operaciones existen. Falta revisar composición y legibilidad. |
-| PY-20 | Grafo de riser a partir de PDF y Excel | NO IMPLEMENTADO | `power riser` lee el XLSX con procedencia por celda, coteja evidencia textual de las aristas PDF indicadas, reconcilia con precedencia explícita y genera operaciones de dibujo. `riser_geometria` relee tramos y rótulos. `power riser_audit` coteja esa lectura con las fuentes. Falta reproducir el sector real y validar legibilidad de símbolos y bandas a escala. |
+| PY-20 | Grafo de riser a partir de PDF y Excel | NO IMPLEMENTADO | `power riser` lee el XLSX con procedencia por celda, coteja evidencia textual de las aristas PDF indicadas, reconcilia con precedencia explícita y genera operaciones de dibujo. `riser_geometria` exige los símbolos esperados y detecta rótulos repetidos. `power riser_audit` relee las fuentes. Los resultados largos se recuperan con `res` en fragmentos. Falta reproducir el sector real y validar legibilidad a escala. |
 | PY-21 | Orden, preset y configuración persistente del set | NO IMPLEMENTADO | `sheet_set` guarda el orden y el objeto opcional `preset_pdf`. `doc pdf` los relee, detecta cambios de miembros y comprueba viewports y títulos contra el papel de la lámina. Falta guardar, reabrir y comprobar el set y el PDF de 26 láminas en el laboratorio. |
 | PY-22 | Verificación del PDF de entrega | NO IMPLEMENTADO | `power pdf verify` compara orden, textos visibles, sello extraíble, dimensiones, RGB vectorial y SHA-256 contra el manifiesto y el PDF anterior. La prueba sintética distingue revisiones. Falta cotejar apariencia, recorte y alimentadores en la emisión real del riser. |
 | PY-23 | Guardado, sincronización y recuperación interrumpida | NO IMPLEMENTADO | Recibos y destino de plan fijado. Falta el escenario completo con confirmación perdida y reanudación. |
@@ -54,6 +54,8 @@ Cada comprobación tiene uno de dos estados. `IMPLEMENTADO` indica que el criter
 | PY-28 | Índices, filtros de tablas y cantidades | IMPLEMENTADO | `check tabla_audit` compara IDs, cantidad, filtros y texto de celdas. `ScheduleAuditTests` verifica coincidencias, diferencias, índices inválidos, población no evaluable y el comando compacto. La lectura de la API de Revit queda para la validación nativa. |
 
 **Revit 2027: pendiente de comenzar.** El alcance funcional continúa abierto.
+
+La comprobación local compiló el add-in para Revit 2022–2026 y el proyecto del instalador. Pasaron 808 pruebas .NET en la suite sin benchmarks, y después pasaron las 30 pruebas del instalador y de actualización ZIP con el caso de cancelación añadido. Rust pasó 13 pruebas y Python 32, con dos omitidas. La aceptación en Revit sigue aplazada.
 
 Ejemplo en el perfil compacto:
 
@@ -95,6 +97,8 @@ chk ruta_audit ruta=R-01 nivel=L15 ids=201,202,203 inicio=[0,0,9] fin=[20,10,9] 
 Para reconciliar un grupo reconstruido, conserve `instantanea_miembros` del primer `grupos_audit` y pásela como `anterior` cuando compruebe el grupo nuevo. Para reparar una cota, lea los destinos geométricos y pase su lista completa ordenada en `refs_estables`. Repare primero las anotaciones cuando dependen del recorrido anterior y se ha creado el nuevo como operación independiente.
 
 `power riser` devuelve `esperado_dibujo` con las aristas y sus rótulos. Pase ese valor a `chk riser_geometria vista=… estilo=… esperado_dibujo=[…]`. Use el resultado `observado` en `power riser_audit` junto con el mismo PDF, XLSX y criterio de precedencia.
+
+Cuando `power` devuelve `formato_res=json_fragmentos`, ejecute la orden que indica `lectura` y siga el cursor hasta la última página. Concatene sólo las líneas de datos, sin saltos añadidos, para recuperar el JSON original.
 
 ## Evidencia histórica offline BM-01
 

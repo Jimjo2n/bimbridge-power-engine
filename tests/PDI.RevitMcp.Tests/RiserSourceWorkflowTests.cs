@@ -41,6 +41,11 @@ namespace PDI.RevitMcp.Tests
             Assert.Equal(3, ops.Count(o => Equals(o["op"], "detail_component")));
             Assert.Equal(3, ops.Count(o => Equals(o["op"], "detail_line")));
             Assert.Equal(3, ops.Count(o => Equals(o["op"], "text_note")));
+            var edges = ((List<object>)result["esperado_dibujo"]).Cast<Dictionary<string, object>>()
+                .ToDictionary(edge => (string)edge["id"]);
+            Assert.Equal("Equipos: Meter", edges["F-1"]["tipo_destino"]);
+            Assert.Equal("Equipos: Meter", edges["F-2"]["tipo_origen"]);
+            Assert.Null(edges["F-2"]["tipo_destino"]);
         }
 
         [Fact]

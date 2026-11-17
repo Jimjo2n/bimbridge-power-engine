@@ -40,6 +40,14 @@ namespace PDI.RevitMcp.Addin.Revit
                     .Select(c => c.GeometryCurve).OfType<Line>()
                     .Select(c => RiserLegKey(c.GetEndPoint(0), c.GetEndPoint(1))).ToHashSet();
                 var notes = LightingCallout.InView(doc, view.Id).ToLookup(n => n.Text, StringComparer.OrdinalIgnoreCase);
+                using var symbolCollector = new FilteredElementCollector(doc);
+                var symbols = symbolCollector.OfClass(typeof(FamilyInstance)).OwnedByView(view.Id).Cast<FamilyInstance>()
+                    .Select(f => (Point: (f.Location as LocationPoint)?.Point, Type: f.Symbol.Name, Family: f.Symbol.FamilyName))
+                    .Where(s => s.Point != null).ToLookup(s => RiserPointKey(s.Point));
+                bool Present(double[] point, string type) => string.IsNullOrWhiteSpace(type) ||
+                    symbols[RiserPointKey(RiserPoint(point))].Count(s =>
+                        string.Equals(type, s.Type, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(type, s.Family + ": " + s.Type, StringComparison.OrdinalIgnoreCase)) == 1;
                 try
                 {
                     foreach (var edge in rows.Cast<Dictionary<string, object>>())
@@ -53,8 +61,11 @@ namespace PDI.RevitMcp.Addin.Revit
                             if (!lines.Contains(RiserLegKey(RiserPoint(path[i - 1]), RiserPoint(path[i]))))
                                 absentLegs.Add((long)i);
                         var expected = RiserPoint(OpCatalog.Point(label, "rótulo del riser", false));
+                        var labelTotal = notes[id].Count();
                         var labelCount = notes[id].Count(n => n.Coord.DistanceTo(expected) <= (1.0 / 304.8) * view.Scale);
-                        if (absentLegs.Count == 0 && labelCount == 1)
+                        var startExists = Present(path[0], Arg.GetString(edge, "tipo_origen"));
+                        var endExists = Present(path[path.Count - 1], Arg.GetString(edge, "tipo_destino"));
+                        if (absentLegs.Count == 0 && labelCount == 1 && labelTotal == 1 && startExists && endExists)
                         {
                             found.Add(new Dictionary<string, object>
                             {
@@ -62,7 +73,11 @@ namespace PDI.RevitMcp.Addin.Revit
                                 ["abierto"] = Arg.GetBool(edge, "abierto") ?? false,
                             });
                         }
-                        else missing.Add(new Dictionary<string, object> { ["id"] = id, ["tramos_faltantes"] = absentLegs, ["rotulos_en_posicion"] = (long)labelCount });
+                        else missing.Add(new Dictionary<string, object>
+                        {
+                            ["id"] = id, ["tramos_faltantes"] = absentLegs, ["rotulos_en_posicion"] = (long)labelCount,
+                            ["rotulos_total"] = (long)labelTotal, ["simbolo_origen_ok"] = startExists, ["simbolo_destino_ok"] = endExists,
+                        });
                     }
                 }
                 catch (QueryException ex) { error = ex.Message; }
@@ -75,18 +90,19 @@ namespace PDI.RevitMcp.Addin.Revit
             {
                 Id = request.Id, Rev = revision, Estado = missing.Count > 0 ? Status.ConDiferencias : Status.Ok,
                 Datos = new Dictionary<string, object> { ["observado"] = found, ["diferencias"] = missing,
-                    ["alcance"] = "Tramos por estilo y rótulos en la vista de dibujo. No mide posición visual de símbolos ni conexiones MEP." },
+                    ["alcance"] = "Comprueba tramos, rótulos y los tipos de símbolo indicados en la vista de dibujo. La conectividad MEP se comprueba en el modelo de instalaciones." },
             };
         }
 
         private static XYZ RiserPoint(double[] point) => new XYZ(point[0], point[1], 0);
 
+        private static string RiserPointKey(XYZ p) => Math.Round(p.X, 4).ToString("0.0000", CultureInfo.InvariantCulture) + "," +
+            Math.Round(p.Y, 4).ToString("0.0000", CultureInfo.InvariantCulture);
+
         private static string RiserLegKey(XYZ a, XYZ b)
         {
-            static string Key(XYZ p) => Math.Round(p.X, 4).ToString("0.0000", CultureInfo.InvariantCulture) + "," +
-                Math.Round(p.Y, 4).ToString("0.0000", CultureInfo.InvariantCulture);
-            var first = Key(a);
-            var last = Key(b);
+            var first = RiserPointKey(a);
+            var last = RiserPointKey(b);
             return string.CompareOrdinal(first, last) < 0 ? first + "|" + last : last + "|" + first;
         }
     }

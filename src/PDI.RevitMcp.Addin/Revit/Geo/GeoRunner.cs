@@ -678,6 +678,8 @@ namespace PDI.RevitMcp.Addin.Revit.Geo
                     Cols = Spec.Points > 1
                         ? new List<string> { "id", "lvl", "clase", "gap", "gap_max", "pts", "contra", "pend", "cuerpo" }
                         : new List<string> { "id", "lvl", "clase", "gap", "contra", "cuerpo" };
+                    if (Spec.SurfaceReference)
+                        Cols.AddRange(new[] { "elemento_id", "vinculo_id", "cara_x", "cara_y", "cara_z", "cara_lado" });
                     SetNames = new Dictionary<string, string> { [MountClass.Embedded] = "$empotradas", [MountClass.Floating] = "$flotando", [MountClass.NoSurface] = "$sin_superficie" };
                     break;
                 case "choques":

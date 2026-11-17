@@ -37,14 +37,15 @@ namespace PDI.RevitMcp.Bridge
             var (pe, folders) = _engine.Value;
             var outs = new List<string>();
             var err = false;
+            var perCommand = CompactTools.MaxTextChars / lines.Count - 1;
             foreach (var l in lines)
             {
                 ct.ThrowIfCancellationRequested();
                 var d = PowerCommands.Run(pe, folders, l);
                 err |= d.TryGetValue("codigo", out var code) && code is string s && s != "OK";
-                outs.Add(Json.Write(d));
+                outs.Add(ResultStore.RenderPowerResult(d, perCommand));
             }
-            var text = ResultStore.Shorten(string.Join("\n", outs), CompactTools.MaxTextChars, "b", out _);
+            var text = string.Join("\n", outs);
             res.Content.Add(new TextContentBlock { Text = text });
             res.IsError = err && lines.Count == 1;
             UsageMetrics.Record(null, "power", Command.Parse(lines[0])?.Verb ?? "", c?.Length ?? 0, text.Length, sw.ElapsedMilliseconds, err ? "error" : "ok");

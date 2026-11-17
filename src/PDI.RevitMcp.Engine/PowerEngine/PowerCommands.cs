@@ -142,7 +142,12 @@ namespace BimBridge.PowerEngine
                 q.Existing = exl.Cast<Dictionary<string, object>>().Select(e =>
                 {
                     var p = (List<object>)e["p"];
-                    return new ExistingElement { Id = Arg.GetLong(e, "id") ?? 0, FamilyType = Arg.GetString(e, "tipo"), X = Convert.ToDouble(p[0], System.Globalization.CultureInfo.InvariantCulture), Y = Convert.ToDouble(p[1], System.Globalization.CultureInfo.InvariantCulture) };
+                    return new ExistingElement
+                    {
+                        Id = Arg.GetLong(e, "id") ?? 0, FamilyType = Arg.GetString(e, "tipo"), Level = Arg.GetString(e, "nivel"),
+                        X = Convert.ToDouble(p[0], System.Globalization.CultureInfo.InvariantCulture),
+                        Y = Convert.ToDouble(p[1], System.Globalization.CultureInfo.InvariantCulture),
+                    };
                 }).ToList();
             return PdfToPlan.Run(pe, q, folders);
         }

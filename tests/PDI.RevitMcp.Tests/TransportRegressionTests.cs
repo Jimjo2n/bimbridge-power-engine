@@ -261,5 +261,32 @@ namespace PDI.RevitMcp.Tests
             Assert.Contains("sin espacio", (string)Assert.IsType<Dictionary<string, object>>(failed.Datos)["aviso_resultado"]);
             Assert.Equal(expected, PipeHost.FitResponse(response, false, _ => throw new InvalidOperationException()));
         }
+
+        [Fact]
+        public void LargePowerResultRetainsItsStatusAndCanBeReassembledInSmallReads()
+        {
+            var data = new Dictionary<string, object>
+            {
+                ["estado"] = "con_diferencias",
+                ["detalle"] = string.Concat(System.Linq.Enumerable.Repeat("Plano 🚧\n", 2500)),
+            };
+            var expected = Json.Write(data);
+            var summary = Json.ParseObject(ResultStore.RenderPowerResult(data, 1200));
+            Assert.Equal(data["estado"], summary["estado"]);
+            var id = (string)summary["res"];
+            try
+            {
+                var detail = new System.Text.StringBuilder();
+                for (var from = 0; ; from += 2)
+                {
+                    var page = ResultStore.Read(id, from, 2, out var total);
+                    Assert.True(page.Length <= 8001);
+                    detail.Append(page.Replace("\n", ""));
+                    if (from + 2 >= total) break;
+                }
+                Assert.Equal(expected, detail.ToString());
+            }
+            finally { File.Delete(Path.Combine(ResultStore.Folder, id + ".txt")); }
+        }
     }
 }

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO.Compression;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -35,6 +36,8 @@ namespace PDI.RevitMcp.Setup
         private RadioButton _r, _rp, _rpw;
         private CheckBox _claude, _codex, _removeData;
         private readonly List<string> _log = new List<string>();
+        private CancellationTokenSource _installationWait;
+        private bool _applyingInstallation;
 
         public SetupWindow(bool uninstallMode)
         {
@@ -46,6 +49,11 @@ namespace PDI.RevitMcp.Setup
             Window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             Window.ShowInTaskbar = true;
             Window.MinHeight = 560;
+            Window.Closing += (_, e) =>
+            {
+                if (_applyingInstallation) e.Cancel = true;
+                else _installationWait?.Cancel();
+            };
             try { Window.Icon = Icons.Status(Theme.Red, 32); } catch (Exception) { }
 
             var root = new DockPanel();
@@ -162,7 +170,10 @@ namespace PDI.RevitMcp.Setup
             var options = new InstallOptions { Versions = versions, Levels = levels, Codex = _codex.IsChecked == true, AllowInUse = true, RequireManifest = true };
             var before = _core.ReadInstalled();
             var wantClaude = _claude.IsChecked == true;
+            using var waiting = new CancellationTokenSource();
+            _installationWait = waiting;
             ShowBusy(revitOpen ? "Instalación pendiente. Guarde su trabajo y cierre todas las ventanas de Revit. Deje abierto este instalador." : "Instalando…");
+            SetButtons(Btn("Cancelar", Theme.Kind.Secondary, () => Window.Close()));
 
             string error = null;
             string claudeResult = null;
@@ -171,7 +182,13 @@ namespace PDI.RevitMcp.Setup
                 try
                 {
                     using var installation = Platform.LockInstallation(_paths);
-                    if (!Platform.WaitForRevitExit()) throw new InvalidOperationException("La espera terminó con Revit abierto. Puede volver a intentar la instalación.");
+                    if (!Platform.WaitForRevitExit(waiting.Token)) throw new InvalidOperationException("La espera terminó con Revit abierto. Puede volver a intentar la instalación.");
+                    Window.Dispatcher.Invoke(() =>
+                    {
+                        waiting.Token.ThrowIfCancellationRequested();
+                        _applyingInstallation = true;
+                        ShowBusy("Instalando…");
+                    });
                     using (var zip = new ZipArchive(Platform.OpenPayload()))
                         _core.Install(zip, options, Platform.ProductVersion);
                     if (wantClaude)
@@ -188,6 +205,9 @@ namespace PDI.RevitMcp.Setup
                 catch (Exception ex) { error = ex.Message; }
             });
 
+            _applyingInstallation = false;
+            _installationWait = null;
+            if (waiting.IsCancellationRequested) return;
             if (error != null)
             {
                 ShowInstallForm();

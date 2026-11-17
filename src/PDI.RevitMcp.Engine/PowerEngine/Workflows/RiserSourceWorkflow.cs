@@ -103,7 +103,7 @@ namespace BimBridge.PowerEngine.Workflows
             var style = Text(args, "estilo");
             drawing = new List<object>();
             var operations = new List<Dictionary<string, object>>();
-            var points = new Dictionary<string, List<object>>(StringComparer.Ordinal);
+            var nodes = new Dictionary<string, (List<object> Point, string Type)>(StringComparer.Ordinal);
             var layoutEdges = new Dictionary<string, Dictionary<string, object>>(StringComparer.Ordinal);
             if (args.ContainsKey("bandas"))
                 foreach (var band in List(args, "bandas").Select(Object))
@@ -117,30 +117,38 @@ namespace BimBridge.PowerEngine.Workflows
                 var id = Text(row, "id");
                 var point = List(row, "punto");
                 OpCatalog.Point(point, "riser punto", false);
-                points.Add(Key(id), point);
+                var type = Text(row, "tipo");
+                nodes.Add(Key(id), (point, type));
                 operations.Add(new Dictionary<string, object>
                 {
-                    ["op"] = "detail_component", ["view"] = view, ["punto"] = point, ["tipo"] = Text(row, "tipo"),
+                    ["op"] = "detail_component", ["view"] = view, ["punto"] = point, ["tipo"] = type,
                 });
                 if (row.TryGetValue("rot", out var rotation)) operations[operations.Count - 1]["rot"] = rotation;
             }
             foreach (var edge in edges)
             {
-                if (!points.TryGetValue(Key(edge.Start), out var start))
+                if (!nodes.TryGetValue(Key(edge.Start), out var start))
                     throw new QueryException("falta el símbolo del origen " + edge.Start);
                 if (!layoutEdges.TryGetValue(Key(edge.Id), out var layout))
                     throw new QueryException("falta el trazado y posición del rótulo de " + edge.Id);
                 List<object> end;
+                string endType = null;
                 if (edge.End == null) end = List(layout, "fin_abierto");
-                else if (!points.TryGetValue(Key(edge.End), out end))
-                    throw new QueryException("falta el símbolo del destino " + edge.End);
-                var line = new List<object> { start };
+                else
+                {
+                    if (!nodes.TryGetValue(Key(edge.End), out var destination))
+                        throw new QueryException("falta el símbolo del destino " + edge.End);
+                    end = destination.Point;
+                    endType = destination.Type;
+                }
+                var line = new List<object> { start.Point };
                 if (layout.ContainsKey("codos")) line.AddRange(List(layout, "codos"));
                 line.Add(end);
                 var label = List(layout, "rotulo");
                 drawing.Add(new Dictionary<string, object>
                 {
                     ["id"] = edge.Id, ["origen"] = edge.Start, ["destino"] = edge.End, ["abierto"] = edge.End == null,
+                    ["tipo_origen"] = start.Type, ["tipo_destino"] = endType,
                     ["puntos"] = line, ["rotulo"] = label,
                 });
                 operations.Add(new Dictionary<string, object> { ["op"] = "detail_line", ["view"] = view, ["puntos"] = line, ["estilo"] = style });

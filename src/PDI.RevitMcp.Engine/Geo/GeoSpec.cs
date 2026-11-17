@@ -42,6 +42,7 @@ namespace PDI.RevitMcp.Engine.Geo
         public string Views;
         public string Source = "ambos";
         public bool Millimeters;
+        public bool SurfaceReference;
         public int Page = 1;
         public int PageSize = 100;
         public string Only;
@@ -145,6 +146,7 @@ namespace PDI.RevitMcp.Engine.Geo
             if (g.PageSize < 1 || g.PageSize > QuerySpec.MaxPageSize) throw new QueryException("page_size entre 1 y " + QuerySpec.MaxPageSize);
             g.Only = Arg.GetString(a, "solo");
             g.Rebuild = Arg.GetBool(a, "reconstruir") ?? false;
+            g.SurfaceReference = Arg.GetBool(a, "referencias") ?? false;
             g.ExcludeSubcategories = Arg.GetStringList(a, "sub_excluir");
             g.Worksets = Arg.GetStringList(a, "ws");
             g.Types = Arg.GetStringList(a, "type");
@@ -190,6 +192,7 @@ namespace PDI.RevitMcp.Engine.Geo
             ["tol"] = Tolerance, ["max"] = MaxRange, ["radio"] = Radius, ["minv"] = MinVolume, ["mt"] = SameType,
             ["views"] = Views ?? "", ["fuente"] = Source, ["sub"] = string.Join(",", ExcludeSubcategories),
             ["ws"] = string.Join(",", Worksets), ["type"] = string.Join(",", Types),
+            ["referencias"] = SurfaceReference,
         };
     }
 }

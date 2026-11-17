@@ -127,6 +127,16 @@ namespace PDI.RevitMcp.Engine.Geo
             if (r.Sloped) row["pend"] = true;
             if (usedBox) row["cuerpo"] = "caja";
             if (!double.IsNaN(r.GapMin)) row["mover"] = spec.Up ? r.GapMin : -r.GapMin;
+            if (spec.SurfaceReference && r.Item >= 0 && r.Item < bodies.Count)
+            {
+                var surface = bodies[r.Item];
+                row["elemento_id"] = surface.Id;
+                row["vinculo_id"] = surface.LinkId;
+                row["cara_x"] = r.SurfaceX;
+                row["cara_y"] = r.SurfaceY;
+                row["cara_z"] = r.SurfaceZ;
+                row["cara_lado"] = spec.Up ? "inferior" : "superior";
+            }
             return row;
         }
 

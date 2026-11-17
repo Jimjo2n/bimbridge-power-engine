@@ -342,7 +342,7 @@ namespace PDI.RevitMcp.Bridge
                         var txt = ResultStore.Read(id, from, n, out var total);
                         if (txt == null) return ("no existe el resultado " + id + " (se guardan " + ResultStore.KeepDays + " días)", null, null, true);
                         var end = Math.Min(total, from + n);
-                        return (txt + (end < total ? "\n… líneas " + from + "–" + end + " de " + total + "; sigue con: res " + id + " desde=" + end : ""), null, null, false);
+                        return (txt + (end < total ? "\n… líneas " + from + "–" + end + " de " + total + "; sigue con: res " + id + " desde=" + end + " n=" + n : ""), null, null, false);
                     }
                 case "cat": case "catalog":
                     op = Wire.OpCatalog;

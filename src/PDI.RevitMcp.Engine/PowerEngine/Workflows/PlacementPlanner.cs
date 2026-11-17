@@ -34,7 +34,7 @@ namespace BimBridge.PowerEngine.Workflows
     /// <summary>Elemento ya existente en el modelo (para no duplicar).</summary>
     public sealed class ExistingElement
     {
-        public long Id; public double X, Y; public string FamilyType;
+        public long Id; public double X, Y; public string FamilyType, Level;
     }
 
     public sealed class PlacementOptions
@@ -159,7 +159,8 @@ namespace BimBridge.PowerEngine.Workflows
             }
 
             // 3) lo que ya existe en el modelo
-            var ex = existing ?? new List<ExistingElement>();
+            var ex = (existing ?? new List<ExistingElement>())
+                .Where(e => string.IsNullOrWhiteSpace(e.Level) || string.Equals(e.Level, o.Level, StringComparison.OrdinalIgnoreCase)).ToList();
             if (ex.Count > 0)
             {
                 var cand = items.Where(i => i.Estado == "colocar").ToList();
@@ -168,12 +169,22 @@ namespace BimBridge.PowerEngine.Workflows
                 var r = new double[ex.Count * 2];
                 for (var j = 0; j < ex.Count; j++) { r[2 * j] = ex[j].X; r[2 * j + 1] = ex[j].Y; }
                 var nn = engine != null ? engine.Nearest(q, r, 2, o.ExistingTolFt) : GeometryKernels.Nearest(q, r, 2, o.ExistingTolFt);
+                var claims = Enumerable.Range(0, cand.Count)
+                    .Where(i => nn.Index[i] >= 0 && string.Equals(ex[nn.Index[i]].FamilyType, cand[i].FamilyType, StringComparison.Ordinal))
+                    .ToLookup(i => nn.Index[i]);
                 for (var i = 0; i < cand.Count; i++)
                 {
                     if (nn.Index[i] < 0) continue;
                     var e = ex[nn.Index[i]];
-                    if (string.Equals(e.FamilyType, cand[i].FamilyType, StringComparison.Ordinal)) { cand[i].Estado = "ya_existe"; cand[i].Motivo = "elemento " + e.Id + " del mismo tipo a " + nn.Dist[i].ToString("0.###", CultureInfo.InvariantCulture) + " ft"; }
-                    else Amb(cand[i], "conflicto_existente", "elemento " + e.Id + " de otro tipo (" + e.FamilyType + ") a " + nn.Dist[i].ToString("0.###", CultureInfo.InvariantCulture) + " ft");
+                    if (!string.Equals(e.FamilyType, cand[i].FamilyType, StringComparison.Ordinal))
+                        Amb(cand[i], "conflicto_existente", "elemento " + e.Id + " de otro tipo (" + e.FamilyType + ") a " + nn.Dist[i].ToString("0.###", CultureInfo.InvariantCulture) + " ft");
+                    else if (claims[nn.Index[i]].Count() > 1)
+                        Amb(cand[i], "existente_compartido", "el elemento " + e.Id + " coincide con más de un símbolo");
+                    else
+                    {
+                        cand[i].Estado = "ya_existe";
+                        cand[i].Motivo = "elemento " + e.Id + " del mismo tipo a " + nn.Dist[i].ToString("0.###", CultureInfo.InvariantCulture) + " ft";
+                    }
                 }
             }
 

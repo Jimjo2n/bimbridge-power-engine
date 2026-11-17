@@ -45,11 +45,8 @@ namespace PDI.RevitMcp.Engine
             foreach (var tok in tokens.Skip(1))
             {
                 var eq = tok.IndexOf('=');
-                var jsonArgument = eq > 0 && eq + 1 < tok.Length &&
-                    (tok[eq + 1] == '[' || tok[eq + 1] == '{') && CondOp(tok.Substring(0, eq)) == null;
-                var cond = jsonArgument ? null : CondOp(tok);
-                if (cond != null) { c.Where.Add(tok); continue; }
-                if (eq > 0 && tok.IndexOf('!') != eq - 1)
+                if (IsCondition(tok, eq)) { c.Where.Add(tok); continue; }
+                if (eq > 0)
                 {
                     var k = tok.Substring(0, eq).Trim();
                     var v = tok.Substring(eq + 1);
@@ -65,13 +62,16 @@ namespace PDI.RevitMcp.Engine
         }
 
         /// <summary>Condición tipo where si el token tiene &gt;, &lt;, ~, != o termina en ? o empieza con !.</summary>
-        private static string CondOp(string tok)
+        private static bool IsCondition(string tok, int equals)
         {
-            if (tok.Length < 2) return null;
-            if (tok.EndsWith("?", StringComparison.Ordinal) || (tok[0] == '!' && tok.IndexOf('=') < 0)) return "u";
+            if (tok.Length < 2) return false;
+            if (equals < 0 && (tok.EndsWith("?", StringComparison.Ordinal) || tok[0] == '!')) return true;
             foreach (var op in new[] { ">=", "<=", "!=", ">", "<", "~" })
-                if (tok.IndexOf(op, StringComparison.Ordinal) > 0) return op;
-            return null;
+            {
+                var index = tok.IndexOf(op, StringComparison.Ordinal);
+                if (index > 0 && (equals < 0 || index < equals)) return true;
+            }
+            return false;
         }
 
         private static object Value(string key, string v)
@@ -93,22 +93,16 @@ namespace PDI.RevitMcp.Engine
         {
             var list = new List<string>();
             var sb = new StringBuilder();
-            var quote = false; var depth = 0; var any = false;
-            var jsonString = false; var escaped = false;
+            var context = new TokenContext();
+            var any = false;
             foreach (var ch in line)
             {
-                if (depth > 0 && (jsonString || ch == '"'))
+                if (context.Advance(ch))
                 {
-                    if (escaped) escaped = false;
-                    else if (ch == '\\') escaped = true;
-                    else if (ch == '"') jsonString = !jsonString;
-                    sb.Append(ch);
+                    any = true;
                     continue;
                 }
-                if (ch == '"' && depth == 0) { quote = !quote; any = true; continue; }
-                if (!quote && (ch == '[' || ch == '{')) depth++;
-                if (!quote && (ch == ']' || ch == '}')) depth = Math.Max(0, depth - 1);
-                if (!quote && depth == 0 && char.IsWhiteSpace(ch))
+                if (context.AtTopLevel && char.IsWhiteSpace(ch))
                 {
                     if (sb.Length > 0 || any) { list.Add(sb.ToString()); sb.Clear(); any = false; }
                     continue;
@@ -120,8 +114,66 @@ namespace PDI.RevitMcp.Engine
         }
 
         /// <summary>Varias órdenes: una por línea o separadas por ";;".</summary>
-        public static List<string> SplitLines(string text) =>
-            (text ?? "").Replace(";;", "\n").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith("#", StringComparison.Ordinal)).ToList();
+        public static List<string> SplitLines(string text)
+        {
+            var lines = new List<string>();
+            if (string.IsNullOrEmpty(text)) return lines;
+            var start = 0;
+            var comment = false;
+            var hasContent = false;
+            var context = new TokenContext();
+            void Add(int end)
+            {
+                var line = text.Substring(start, end - start).Trim();
+                if (line.Length > 0 && !comment) lines.Add(line);
+                comment = hasContent = false;
+            }
+            for (var i = 0; i < text.Length; i++)
+            {
+                var ch = text[i];
+                var separator = ch == ';' && i + 1 < text.Length && text[i + 1] == ';';
+                if (context.AtTopLevel && (ch == '\n' || separator))
+                {
+                    Add(i);
+                    if (separator) i++;
+                    start = i + 1;
+                    continue;
+                }
+                if (!hasContent && !char.IsWhiteSpace(ch)) { hasContent = true; comment = ch == '#'; }
+                if (!comment) context.Advance(ch);
+            }
+            Add(text.Length);
+            return lines;
+        }
+
+        private struct TokenContext
+        {
+            private int _depth;
+            private bool _quoted, _jsonString, _escaped;
+            public bool AtTopLevel => !_quoted && _depth == 0;
+
+            // Returns true for the outer quotes that are removed from a token.
+            public bool Advance(char ch)
+            {
+                if (_jsonString)
+                {
+                    if (_escaped) _escaped = false;
+                    else if (ch == '\\') _escaped = true;
+                    else if (ch == '"') _jsonString = false;
+                    return false;
+                }
+                if (ch == '"')
+                {
+                    if (_depth > 0) { _jsonString = true; return false; }
+                    _quoted = !_quoted;
+                    return true;
+                }
+                if (_quoted) return false;
+                if (ch == '[' || ch == '{') _depth++;
+                if (ch == ']' || ch == '}') _depth = Math.Max(0, _depth - 1);
+                return false;
+            }
+        }
 
         /// <summary>Plan en líneas: "op ids clave=valor" → [{op, ids, …}]. Si el texto es JSON, se usa tal cual.</summary>
         public static List<object> ParseOps(string text)

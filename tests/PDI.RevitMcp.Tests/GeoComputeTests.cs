@@ -56,6 +56,26 @@ namespace PDI.RevitMcp.Tests
         }
 
         [Fact]
+        public void MountReportIdentifiesTheControllingLinkedCopyAndHostFacePoint()
+        {
+            var original = Slab(23, 24, "ARCH: losa");
+            original.LinkId = 10;
+            var translated = Slab(20, 21, "ARCH: losa");
+            translated.LinkId = 20;
+            var target = Fixture(4, 5, 6, 18, 19);
+            target.Candidates = new[] { 0, 1 };
+            var bodies = new[] { original, translated };
+            var result = Assert.Single(GeoCompute.Mount(new[] { target }, bodies, Spec("holgura", ("referencias", true)), null));
+            Assert.Equal(1L, result["elemento_id"]);
+            Assert.Equal(20L, result["vinculo_id"]);
+            Assert.Equal(5d, result["cara_x"]);
+            Assert.Equal(6d, result["cara_y"]);
+            Assert.Equal(20d, result["cara_z"]);
+            Assert.Equal("inferior", result["cara_lado"]);
+            Assert.False(Assert.Single(GeoCompute.Mount(new[] { target }, bodies, Spec("holgura"), null)).ContainsKey("vinculo_id"));
+        }
+
+        [Fact]
         public void Mount_UnderRamp_ControllingCornerIsTheLowestUnderside()
         {
             var rb = new TriMeshBuilder();

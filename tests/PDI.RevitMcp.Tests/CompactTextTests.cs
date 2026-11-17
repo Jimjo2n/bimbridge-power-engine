@@ -38,5 +38,22 @@ namespace PDI.RevitMcp.Tests
             Assert.Equal("$x", a["ids"]);
             Assert.Equal("A B", a["value"]);
         }
+
+        [Fact]
+        public void CommandsPreserveSeparatorsAndOperatorsInsideArgumentValues()
+        {
+            var commands = Command.SplitLines("""
+                # comentario con corchete [
+                chk tabla_audit tabla="Anda > 1?" celdas_esperadas=[
+                  {"fila":0,"columna":0,"texto":"A;;B \"C\""}
+                ] ;; q LF elev>=9
+                """);
+            Assert.Equal(2, commands.Count);
+            var check = Command.Parse(commands[0]);
+            Assert.Equal("Anda > 1?", check.Args["tabla"]);
+            var cell = (Dictionary<string, object>)Assert.Single((List<object>)check.Args["celdas_esperadas"]);
+            Assert.Equal("A;;B \"C\"", cell["texto"]);
+            Assert.Equal("elev>=9", Assert.Single(Command.Parse(commands[1]).Where));
+        }
     }
 }

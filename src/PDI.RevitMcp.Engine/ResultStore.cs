@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading;
+using PDI.RevitMcp.Protocol;
 
 namespace PDI.RevitMcp.Engine
 {
@@ -18,6 +19,7 @@ namespace PDI.RevitMcp.Engine
     {
         private static int _seq;
         public const int KeepDays = 7;
+        public const string JsonFragmentFormat = "json_fragmentos: concatene las líneas sin separador";
 
         public static string Folder => Home.Sub("resultados");
 
@@ -39,6 +41,33 @@ namespace PDI.RevitMcp.Engine
             if (string.IsNullOrEmpty(id) || id.Length > 40 || id[0] != 'r') return false;
             foreach (var c in id) if (!char.IsLetterOrDigit(c)) return false;
             return true;
+        }
+
+        public static string FragmentJson(string json)
+        {
+            var chunks = new StringBuilder(json.Length);
+            for (var start = 0; start < json.Length;)
+            {
+                var length = Math.Min(4000, json.Length - start);
+                if (start + length < json.Length && char.IsHighSurrogate(json[start + length - 1])) length--;
+                chunks.Append(json, start, length).Append('\n');
+                start += length;
+            }
+            return chunks.ToString();
+        }
+
+        public static string RenderPowerResult(Dictionary<string, object> result, int maxChars)
+        {
+            var json = Json.Write(result);
+            if (json.Length <= maxChars) return json;
+            var id = Save(FragmentJson(json), "b");
+            var summary = new Dictionary<string, object>
+            {
+                ["res"] = id, ["formato_res"] = JsonFragmentFormat, ["lectura"] = "res " + id + " desde=0 n=2",
+            };
+            foreach (var key in new[] { "codigo", "estado" })
+                if (result.TryGetValue(key, out var value)) summary[key] = value;
+            return Json.Write(summary);
         }
 
         /// <summary>Lee líneas [from, from+count). total = líneas totales; null si no existe.</summary>

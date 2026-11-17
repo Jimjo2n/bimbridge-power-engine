@@ -15,7 +15,7 @@ namespace PDI.RevitMcp.Engine.Geo
     {
         /// <summary>Columnas de longitud (pies) que se convierten con units=mm.</summary>
         public static readonly HashSet<string> LengthCols = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        { "z", "ztop", "zbot", "x", "y", "dist", "dist_xy", "dz", "offset", "bajo", "alto", "elev" };
+        { "z", "ztop", "zbot", "x", "y", "dist", "dist_xy", "dz", "offset", "bajo", "alto", "elev", "cara_x", "cara_y", "cara_z" };
 
         /// <summary>Orden de gravedad: lo que hay que corregir primero.</summary>
         private static readonly string[] Severity =

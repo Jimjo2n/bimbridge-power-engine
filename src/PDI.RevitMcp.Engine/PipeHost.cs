@@ -318,16 +318,8 @@ namespace PDI.RevitMcp.Engine
             {
                 try
                 {
-                    var chunks = new System.Text.StringBuilder();
-                    for (var start = 0; start < json.Length;)
-                    {
-                        var length = Math.Min(4000, json.Length - start);
-                        if (start + length < json.Length && char.IsHighSurrogate(json[start + length - 1])) length--;
-                        chunks.Append(json, start, length).Append('\n');
-                        start += length;
-                    }
-                    summary["res"] = save(chunks.ToString());
-                    summary["formato_res"] = "json_fragmentos: concatene las líneas sin separador";
+                    summary["res"] = save(ResultStore.FragmentJson(json));
+                    summary["formato_res"] = ResultStore.JsonFragmentFormat;
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {

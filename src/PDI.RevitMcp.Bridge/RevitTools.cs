@@ -333,7 +333,8 @@ namespace PDI.RevitMcp.Bridge
             int? page_size = null,
             [Description("ft o mm")] string units = null,
             bool? reconstruir = null,
-            CancellationToken ct = default)
+            CancellationToken ct = default,
+            [Description("montaje/holgura: IDs de origen y punto de la cara en el anfitrión")] bool? referencias = null)
         {
             var a = new Dictionary<string, object> { ["name"] = name };
             void Put(string k, object v) { if (v != null) a[k] = v; }
@@ -344,7 +345,7 @@ namespace PDI.RevitMcp.Bridge
             Put("sub_excluir", sub_excluir); Put("solo", solo);
             Put("page", page.HasValue ? (long?)page.Value : null);
             Put("page_size", page_size.HasValue ? (long?)page_size.Value : null);
-            Put("units", units); Put("reconstruir", reconstruir);
+            Put("units", units); Put("reconstruir", reconstruir); Put("referencias", referencias);
             return Call(server, Wire.OpGeo, a, ct);
         }
 

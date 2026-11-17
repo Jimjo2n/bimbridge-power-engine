@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using Microsoft.Win32;
 
 namespace PDI.RevitMcp.Setup
@@ -35,12 +36,13 @@ namespace PDI.RevitMcp.Setup
 
         public const int WaitingForRevit = 6;
 
-        public static bool WaitForRevitExit()
+        public static bool WaitForRevitExit(CancellationToken cancellation = default)
         {
-            if (SetupPaths.IsSandbox) return true;
+            if (SetupPaths.IsSandbox) return !cancellation.IsCancellationRequested;
             var elapsed = Stopwatch.StartNew();
-            return RevitExitWait.Run(RevitRunning, () => elapsed.Elapsed < TimeSpan.FromHours(24),
-                System.Threading.Thread.Sleep, TimeSpan.FromSeconds(1));
+            return RevitExitWait.Run(RevitRunning,
+                () => !cancellation.IsCancellationRequested && elapsed.Elapsed < TimeSpan.FromHours(24),
+                Thread.Sleep, TimeSpan.FromSeconds(1));
         }
 
         public static FileStream LockInstallation(SetupPaths paths)

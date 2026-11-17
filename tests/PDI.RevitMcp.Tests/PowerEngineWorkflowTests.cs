@@ -231,6 +231,40 @@ namespace PDI.RevitMcp.Tests
         }
 
         [Fact]
+        public void PlannerReusesEachExistingFixtureOnceAndOnlyOnTheRequestedLevel()
+        {
+            var registration = Registration.Solve(new List<Anchor>
+            {
+                new Anchor("a", 0, 0, 0, 0), new Anchor("b", 100, 0, 100, 0), new Anchor("c", 0, 100, 0, 100),
+            });
+            var symbols = new List<SymbolCandidate>
+            {
+                new SymbolCandidate { Px = 1, Py = 1, Code = "D", Confidence = 1 },
+                new SymbolCandidate { Px = 1.8, Py = 1, Code = "D", Confidence = 1 },
+            };
+            var rules = new List<TypeRule> { new TypeRule { Code = "D", FamilyType = "F: D", ElevFt = 9 } };
+            var existing = new List<ExistingElement>
+            {
+                new ExistingElement { Id = 40, X = 1.4, Y = 1, FamilyType = "F: D", Level = "L1" },
+                new ExistingElement { Id = 41, X = 1, Y = 1, FamilyType = "F: D", Level = "L2" },
+            };
+            var settings = new PlacementOptions { Level = "L1" };
+            var ambiguous = PlacementPlanner.Plan(symbols, registration, rules, settings, existing);
+            Assert.Empty(ambiguous.AlreadyThere);
+            Assert.Empty(ambiguous.Batches);
+            Assert.Equal(2, ambiguous.Ambiguous.Count);
+            Assert.All(ambiguous.Ambiguous, item => Assert.StartsWith("existente_compartido", item.Motivo));
+            existing.RemoveAt(0);
+            var first = PlacementPlanner.Plan(symbols, registration, rules, settings, existing);
+            Assert.Equal(2, first.Place.Count);
+            existing.AddRange(first.Place.Select((item, i) =>
+                new ExistingElement { Id = 50 + i, X = item.X, Y = item.Y, FamilyType = item.FamilyType, Level = "L1" }));
+            var retry = PlacementPlanner.Plan(symbols, registration, rules, settings, existing);
+            Assert.Equal(2, retry.AlreadyThere.Count);
+            Assert.Empty(retry.Batches);
+        }
+
+        [Fact]
         public void Planner_SplitsBatchesAt500()
         {
             var reg = Registration.Solve(new List<Anchor> { new Anchor("a", 0, 0, 0, 0), new Anchor("b", 100, 0, 100, 0), new Anchor("c", 0, 100, 0, 100) });

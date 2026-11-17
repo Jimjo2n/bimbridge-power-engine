@@ -24,6 +24,19 @@ namespace PDI.RevitMcp.Tests
             Assert.Empty(samples);
         }
 
+        [Fact]
+        public void UpdateWaitCanBeCancelledAfterOneOfTwoInstancesCloses()
+        {
+            var instances = 2;
+            var cancelled = false;
+            Assert.False(RevitExitWait.Run(() => instances > 0, () => !cancelled, _ =>
+            {
+                if (instances == 1) cancelled = true;
+                else instances--;
+            }, TimeSpan.FromSeconds(1)));
+            Assert.Equal(1, instances);
+        }
+
         private readonly string _root = Path.Combine(Path.GetTempPath(), "pdi-setup-" + Guid.NewGuid().ToString("N").Substring(0, 8));
         private readonly SetupPaths _p;
 
