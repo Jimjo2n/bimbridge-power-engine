@@ -1,9 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="430" height="210" viewBox="0 0 430 210">
-<rect width="430" height="210" rx="20" fill="#081925"/>
-<path d="M52 74l76-39 76 39v70l-76 39-76-39zM52 74l76 39 76-39m-76 39v70" fill="#173645" stroke="#6de6d0" stroke-width="2" stroke-linejoin="round"/>
-<path d="M90 56l76 39v69m-76 0V95l76-39M52 110l76 39 76-39" fill="none" stroke="#528495"/>
-<rect x="239" y="45" width="145" height="129" rx="12" fill="#112c3c" stroke="#426377"/>
-<rect x="255" y="64" width="51" height="23" rx="5" fill="#235057"/><rect x="312" y="64" width="55" height="23" rx="5" fill="#235057"/>
-<g fill="#c6f7ee" font-family="monospace" font-size="13"><text x="267" y="80">PDF</text><text x="324" y="80">DOCX</text></g>
-<path d="M255 105h112m-112 17h94m-94 17h104m-104 17h75" stroke="#6b92a6" stroke-width="3" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="286" viewBox="0 0 760 286" role="img">
+<title>Power Engine runtime</title>
+<defs>
+<pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+<path d="M20 0H0V20" stroke="#312025" fill="none"/>
+</pattern>
+</defs>
+<rect x="1" y="1" width="758" height="284" rx="18" fill="#101011" stroke="#3b2b2f"/>
+<rect x="31" y="28" width="4" height="33" rx="2" fill="#ef4559"/>
+<text x="47" y="52" fill="#eae7e7" font-size="25" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Power Engine runtime</text>
+<text x="598" y="49" fill="#ff7380" font-size="13" font-weight="700" font-family="Consolas, monospace">03 / ENGINE</text>
+<path d="M32 75H728" fill="none" stroke="#3b3034" />
+<rect x="32" y="94" width="340" height="147" rx="10" fill="#181719" stroke="#3a3033"/>
+<rect x="389" y="94" width="339" height="147" rx="10" fill="#181719" stroke="#3a3033"/>
+<text x="51" y="120" fill="#ff7380" font-size="13" font-weight="700" font-family="Consolas, monospace">EXECUTION BACKENDS</text>
+<text x="408" y="120" fill="#ff7380" font-size="13" font-weight="700" font-family="Consolas, monospace">JOB TELEMETRY</text>
+<text x="51" y="149" fill="#eae7e7" font-size="14" font-weight="400" font-family="Consolas, monospace">C#      Managed kernels</text>
+<text x="51" y="178" fill="#eae7e7" font-size="14" font-weight="400" font-family="Consolas, monospace">Rust    Geometry / FFI or IPC</text>
+<text x="51" y="207" fill="#eae7e7" font-size="14" font-weight="400" font-family="Consolas, monospace">Python  PDF + DOCX process</text>
+<circle cx="416" cy="143" r="3" fill="#ff6676"/>
+<text x="429" y="147" fill="#eae7e7" font-size="13" font-weight="400" font-family="Consolas, monospace">motor_ms</text>
+<circle cx="416" cy="167" r="3" fill="#ff6676"/>
+<text x="429" y="171" fill="#eae7e7" font-size="13" font-weight="400" font-family="Consolas, monospace">ipc_ms</text>
+<circle cx="416" cy="191" r="3" fill="#ff6676"/>
+<text x="429" y="195" fill="#eae7e7" font-size="13" font-weight="400" font-family="Consolas, monospace">serializacion_ms</text>
+<circle cx="416" cy="215" r="3" fill="#ff6676"/>
+<text x="429" y="219" fill="#eae7e7" font-size="13" font-weight="400" font-family="Consolas, monospace">total_ms</text>
+<text x="33" y="267" fill="#bfb4b8" font-size="13" font-weight="400" font-family="Consolas, monospace">pe=1 · JSONL · CORRELATION ID · JOB LIMITS</text>
 </svg>

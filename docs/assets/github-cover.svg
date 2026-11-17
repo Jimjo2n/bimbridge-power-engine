@@ -1,41 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="270" viewBox="0 0 1120 270" role="img" aria-labelledby="title">
-  <title id="title">BIMBRIDGE Power Engine</title>
-  <defs>
-    <linearGradient id="surface" x2="100%" y2="100%">
-      <stop stop-color="#0e2434"/>
-      <stop offset="1" stop-color="#08131f"/>
-    </linearGradient>
-    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
-      <path d="M0 24V0H24" fill="none" stroke="#254759" opacity=".55"/>
-    </pattern>
-    <clipPath id="frame"><rect width="1120" height="270" rx="22"/></clipPath>
-  </defs>
-  <g clip-path="url(#frame)">
-    <rect width="1120" height="270" fill="url(#surface)"/>
-    <rect x="690" width="430" height="270" fill="url(#grid)"/>
-    <path d="M64 72H112" stroke="#55e1cc" stroke-width="5" stroke-linecap="round"/>
-    <g font-family="Segoe UI, Arial, sans-serif">
-      <text x="64" y="145" fill="#f0fbff" font-size="68" font-weight="700" letter-spacing="2">BIMBRIDGE</text>
-      <text x="68" y="198" fill="#a6c4d5" font-size="31">Power Engine</text>
-    </g>
-    <g stroke="#62dacb" stroke-width="2" stroke-linejoin="round">
-      <path d="M770 174 889 109 1010 174 890 239Z" fill="#102c3b"/>
-      <path d="M770 125 889 60 1010 125 890 190Z" fill="#14394a"/>
-      <path d="M770 76 889 11 1010 76 890 141Z" fill="#1b4a58"/>
-      <path d="M770 76v98m120-33v98m120-163v98M830 44l120 65m-119 0 119-65" fill="none" opacity=".65"/>
-    </g>
-    <g fill="none" stroke="#8acac9" stroke-width="1" opacity=".72">
-      <path d="M750 187 890 264 1030 187M750 187v-10m280 10v-10"/>
-      <path d="M797 76 889 26 982 76 890 126Z"/>
-      <path d="M820 76 889 38 959 76 890 114Z"/>
-      <path d="M843 76 889 51 936 76 890 101Z"/>
-      <path d="M889 11v40m1 75v15M768 149l-37 20h-32m314-39 30 17h40"/>
-    </g>
-    <g fill="#91f7e8">
-      <circle cx="770" cy="76" r="4"/>
-      <circle cx="890" cy="141" r="4"/>
-      <circle cx="1010" cy="76" r="4"/>
-      <circle cx="890" cy="239" r="4"/>
-    </g>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="300" viewBox="0 0 1120 300" role="img">
+<title>BIMBRIDGE Power Engine</title>
+<defs>
+<pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+<path d="M20 0H0V20" stroke="#312025" fill="none"/>
+</pattern>
+</defs>
+<rect x="1" y="1" width="1118" height="298" rx="18" fill="#101011" stroke="#3b2b2f"/>
+<rect x="676" y="20" width="414" height="260" rx="12" fill="url(#grid)"/>
+<text x="56" y="73" fill="#ff7380" font-size="16" font-weight="700" font-family="Consolas, monospace">REVIT API  /  MCP  /  LOCAL RUNTIME</text>
+<text x="52" y="153" fill="#eae7e7" font-size="76" font-weight="700" font-family="Segoe UI, Arial, sans-serif">BIMBRIDGE</text>
+<text x="57" y="212" fill="#e4d5da" font-size="36" font-weight="400" font-family="Segoe UI, Arial, sans-serif">Power Engine</text>
+<path d="M57 242H138" fill="none" stroke="#ef4559" stroke-width="4"/>
+<path d="M710 205l166-71 165 71-165 71z" fill="#211418" stroke="#e96172" stroke-width="2"/>
+<path d="M765 181l166 71m-166-24 166-71" fill="none" stroke="#99515c" />
+<path d="M710 156l166-71 165 71-165 71z" fill="#321a20" stroke="#e96172" stroke-width="2"/>
+<path d="M765 132l166 71m-166-24 166-71" fill="none" stroke="#99515c" />
+<path d="M710 107l166-71 165 71-165 71z" fill="#50212a" stroke="#e96172" stroke-width="2"/>
+<path d="M765 83l166 71m-166-24 166-71" fill="none" stroke="#99515c" />
+<path d="M710 107v98m166-27v98m165-169v98" fill="none" stroke="#a55361" />
+<circle cx="710" cy="107" r="5" fill="#ff6676"/>
+<circle cx="876" cy="178" r="5" fill="#ff6676"/>
+<circle cx="1041" cy="107" r="5" fill="#ff6676"/>
 </svg>
