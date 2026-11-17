@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="430" height="210" viewBox="0 0 430 210">
+  <rect width="430" height="210" rx="20" fill="#081925"/>
+  <rect x="29" y="31" width="172" height="148" rx="12" fill="#102938" stroke="#315366"/>
+  <rect x="229" y="31" width="172" height="148" rx="12" fill="#102938" stroke="#315366"/>
+  <path d="M50 91h130m-130 47h130M83 75v80m63-80v80M250 91h130m-130 47h130M283 75v80m63-80v80" stroke="#527e90" fill="none"/>
+  <path d="M83 91h200m-137 47h200" stroke="#6de6d0" stroke-dasharray="4 6" opacity=".6"/>
+  <g fill="#6de6d0"><circle cx="83" cy="91" r="5"/><circle cx="146" cy="138" r="5"/><circle cx="283" cy="91" r="5"/><circle cx="346" cy="138" r="5"/></g>
+  <g fill="#c6f7ee" font-family="monospace" font-size="12">
+    <text x="49" y="58">PDF · x,y</text><text x="249" y="58">REVIT · X,Y</text>
+    <text x="90" y="85">A/1</text><text x="153" y="132">B/2</text>
+    <text x="290" y="85">A/1</text><text x="353" y="132">B/2</text>
+  </g>
+</svg>

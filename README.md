@@ -2,45 +2,36 @@
 
 # BIMBRIDGE · Power Engine
 
-**Local BIM automation and AI integration for Autodesk Revit.** Connect an MCP client to inspect models, review proposed changes, and run Revit workflows from your Windows workstation.
+**Local runtime for agent-driven BIM automation in Autodesk Revit.** BIMBRIDGE exposes the Revit API through MCP over stdio and Windows named pipes. Its C# add-in dispatches API work on Revit’s main thread through `ExternalEvent`, while Power Engine prepares geometry, document data and typed plans outside Revit.
 
 [Español](README.es.md) · [Installation](docs/getting-started/INSTALLATION.md) · [Connect a client](docs/integrations/MCP.md) · [Examples](examples/README.md) · [Documentation](docs/INDEX.md)
 
-> [!NOTE]
-> **Experimental releases.** The source targets Revit 2022–2026. Consult the validation record for the operations and Revit environments tested.
-> [Releases](https://github.com/Jimjo2n/bimbridge-power-engine/releases) · [Validation](docs/quality/VALIDATION.md)
+## Engineering highlights
 
-## See BIMBRIDGE at work
+### 01 · Revision-bound query snapshots
 
-The illustrations use sample data. BIMBRIDGE runs on your Windows workstation. The MCP client sends requests to a local C# bridge, and the Revit add-in runs model operations through the Revit API.
+<img src="docs/assets/github-query.svg" width="430" height="210" alt="Model snapshot bound to a session, document and revision, serving multiple cursor pages">
 
-### 01 · Inspect the model
+`QuerySnapshotStore` materializes query rows once and serves later pages from memory. Each cursor is bound to its session, document and revision. A TTL and an LRU memory budget govern retention. The bridge and AgentHost carry the cursor across requests, preserving row-level results through pagination. [Implementation and verification](docs/0.9.0/CONSOLIDATED_DELIVERY_REPORT.md)
 
-<img src="docs/assets/github-query.svg" width="430" height="210" alt="Illustrated floor plan with six highlighted fixtures and a result of six">
+### 02 · Transactional writes with durable recovery
 
-Ask for a lighting fixture count with `q LF n=true` in the compact MCP profile. BIMBRIDGE reads the selected Revit document and returns the count. You can also filter elements and request compact results. This query leaves model elements unchanged.
+<img src="docs/assets/github-review.svg" width="430" height="210" alt="Review of a typed parameter change, with the previous and proposed values">
 
-### 02 · Review a change before applying it
+Typed `plan` and `commit` separate change preparation from execution. The add-in applies reviewed operations in Revit transactions with conflict checks and records write intent before execution. The recovery path uses reconciliation when the outcome is uncertain. Dynamic C# execution uses a Roslyn compilation cache with single-flight coordination to share compilation across concurrent requests for the same key. [Architecture and reliability](docs/PROJECT_OVERVIEW.md) · [Roslyn cache verification](docs/0.9.0/CONSOLIDATED_DELIVERY_REPORT.md)
 
-<img src="docs/assets/github-review.svg" width="430" height="210" alt="Example of a proposed parameter change from mark L-01 to L-02">
+### 03 · Native geometry and document workers
 
-Select the target document and prepare a typed plan. The plan lets you inspect what would change, such as a fixture's **Mark** parameter. Once reviewed, commit the plan. BIMBRIDGE checks for conflicts and uses a Revit transaction to apply the changes. See the [plan and commit recipes](docs/RECETAS.md).
+<img src="docs/assets/github-workers.svg" width="430" height="210" alt="Native geometry mesh beside PDF and DOCX inputs to the document worker">
 
-### 03 · Process geometry and documents
+`PowerEngineDispatcher` selects C# kernels or Rust geometry operations such as nearest-neighbor search, matching and segment contacts. Rust can run through FFI or IPC. The Python process handles PDF and DOCX extraction. The versioned `pe=1` process protocol uses JSON lines, capability negotiation, correlation IDs and job limits. Telemetry records engine, IPC, serialization and total time separately. [Engine architecture and protocol](docs/0.9.0/POWER_ENGINE_ARCHITECTURE.md)
 
-<img src="docs/assets/github-workers.svg" width="430" height="210" alt="Wireframe geometry beside a document with PDF and DOCX labels">
+### 04 · PDF-to-model registration and independent verification
 
-The workflow host can use Rust for geometry operations and Python to extract structured content from PDFs and DOCX files. The C# add-in handles Revit model access. See the [component overview](docs/PROJECT_OVERVIEW.md).
+<img src="docs/assets/github-registration.svg" width="430" height="210" alt="Matched grid anchors in PDF page coordinates and Revit model coordinates">
 
+Python extracts grid intersections and symbol candidates in page coordinates. C# matches named anchors, fits a similarity or affine transform, checks registration residuals and sheet scale, and resolves placement into typed operations. `PlacementVerifier` compares against independent evidence and reports discrepancies in position, type, rotation, elevation and duplicate instances. [Registration and verification](docs/0.9.0/POWER_ENGINE_ARCHITECTURE.md)
 
-> [!IMPORTANT]
-> Dynamic C# runs with the Revit user's privileges. Use the [trust model](docs/security/TRUST_MODEL.md) to understand execution controls and the effects that Revit transactions can reverse.
-
-## Get started
-
-1. **Install on Windows.** Use the [installation guide](docs/getting-started/INSTALLATION.md) and review the status of the package you select.
-2. **Connect your MCP client.** Follow the [integration guide](docs/integrations/MCP.md), then try a query with the [examples](examples/README.md).
-3. **Build from source.** See [development and build](docs/DEVELOPMENT.md) for SDK requirements, the build command and test instructions. The Revit 2022–2024 targets use .NET Framework 4.8. The 2025–2026 targets use .NET 8.
 
 ## Project evidence and maintenance
 

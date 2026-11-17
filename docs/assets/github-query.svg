@@ -5,6 +5,11 @@
 <g fill="#6de6d0"><circle cx="54" cy="42" r="3"/><circle cx="66" cy="42" r="3"/><circle cx="78" cy="42" r="3"/></g>
 <path d="M62 76h176v88H62zM135 76v88m47-88v88M62 118h176" fill="none" stroke="#527e90" stroke-width="2"/>
 <g fill="#6de6d0"><circle cx="98" cy="96" r="5"/><circle cx="155" cy="96" r="5"/><circle cx="207" cy="96" r="5"/><circle cx="98" cy="144" r="5"/><circle cx="155" cy="144" r="5"/><circle cx="207" cy="144" r="5"/></g>
-<text x="289" y="91" fill="#a8d5df" font-size="14" font-family="monospace">q LF n=true</text>
-<text x="289" y="150" fill="#f2fbff" font-size="50" font-weight="700" font-family="Arial">6</text>
+<g font-family="monospace" font-size="12" fill="#a8d5df">
+  <text x="283" y="80">SNAPSHOT</text>
+  <text x="283" y="100">session · doc</text>
+  <text x="283" y="119">revision</text>
+</g>
+<rect x="282" y="132" width="102" height="28" rx="5" fill="#235057"/>
+<text x="290" y="150" fill="#c6f7ee" font-size="12" font-family="monospace">cursor=…</text>
 </svg>

@@ -2,45 +2,36 @@
 
 # BIMBRIDGE · Power Engine
 
-**Automatización BIM local e integración con IA para Autodesk Revit.** Conecta un cliente MCP para consultar modelos, revisar cambios propuestos y ejecutar flujos de trabajo de Revit desde Windows.
+**Motor local de automatización BIM con agentes para Autodesk Revit.** BIMBRIDGE conecta clientes MCP con la API de Revit mediante stdio y canales con nombre de Windows. El complemento C# despacha operaciones al hilo principal mediante `ExternalEvent`, mientras Power Engine prepara geometría, datos documentales y planes tipados fuera de Revit.
 
 [English](README.md) · [Instalación](docs/getting-started/INSTALLATION.md) · [Conectar un cliente](docs/integrations/MCP.md) · [Ejemplos](examples/README.md) · [Documentación](docs/INDEX.md)
 
-> [!NOTE]
-> **Versiones experimentales.** El código se compila para Revit 2022–2026. Consulta el registro de validación para saber qué operaciones y entornos se han probado.
-> [Versiones](https://github.com/Jimjo2n/bimbridge-power-engine/releases) · [Validación](docs/quality/VALIDATION.md)
+## Arquitectura en acción
 
-## BIMBRIDGE en acción
+### 01 · Snapshots de consulta vinculados a revisión
 
-Las ilustraciones usan datos de ejemplo. BIMBRIDGE se ejecuta en tu equipo Windows. El cliente MCP envía solicitudes a un puente local en C# y el complemento realiza las operaciones del modelo mediante la API de Revit.
+<img src="docs/assets/github-query.svg" width="430" height="210" alt="Snapshot del modelo vinculado a sesión, documento y revisión, con varias páginas por cursor">
 
-### 01 · Consulta el modelo
+`QuerySnapshotStore` materializa las filas de una consulta una vez y sirve las páginas siguientes desde memoria. Cada cursor queda vinculado a sesión, documento y revisión. La retención combina caducidad por TTL y presupuesto de memoria con expulsión LRU. El puente y AgentHost transportan el cursor entre solicitudes y conservan el resultado consultado a nivel de fila. [Implementación y verificación](docs/0.9.0/CONSOLIDATED_DELIVERY_REPORT.md)
 
-<img src="docs/assets/github-query.svg" width="430" height="210" alt="Plano ilustrado con seis luminarias resaltadas y un resultado de seis">
+### 02 · Escrituras transaccionales con recuperación durable
 
-Envía `q LF n=true` desde el perfil compacto de MCP para contar luminarias. BIMBRIDGE lee el documento de Revit seleccionado y devuelve el total. También puedes filtrar elementos y pedir resultados compactos. Esta consulta deja intactos los elementos del modelo.
+<img src="docs/assets/github-review.svg" width="430" height="210" alt="Revisión de un cambio tipado con el valor anterior y el propuesto">
 
-### 02 · Revisa un cambio antes de aplicarlo
+`plan` y `commit` separan la preparación del cambio de su ejecución. El complemento aplica operaciones revisadas dentro de transacciones de Revit, comprueba conflictos y registra la intención de escritura antes de ejecutar. Los resultados inciertos pasan por reconciliación. El C# dinámico usa una caché de compilación Roslyn con coordinación single-flight para compartir la compilación entre solicitudes concurrentes con la misma clave. [Arquitectura y recuperación](docs/PROJECT_OVERVIEW.md) · [Verificación de la caché Roslyn](docs/0.9.0/CONSOLIDATED_DELIVERY_REPORT.md)
 
-<img src="docs/assets/github-review.svg" width="430" height="210" alt="Ejemplo de cambio propuesto del parámetro de marca de L-01 a L-02">
+### 03 · Geometría nativa y procesamiento documental
 
-Selecciona el documento y prepara un plan tipado. El plan te permite inspeccionar qué cambiaría, por ejemplo el parámetro **Marca** de una luminaria. Una vez revisado, aplica el plan. BIMBRIDGE comprueba conflictos y ejecuta los cambios en una transacción de Revit. Consulta las [recetas de planificación y aplicación](docs/RECETAS.md).
+<img src="docs/assets/github-workers.svg" width="430" height="210" alt="Malla de geometría nativa junto a las entradas PDF y DOCX del proceso documental">
 
-### 03 · Procesa geometría y documentos
+`PowerEngineDispatcher` selecciona kernels C# u operaciones Rust como búsqueda de vecinos, emparejamiento y detección de contactos entre segmentos. Rust puede ejecutarse por FFI o IPC. Python extrae datos de PDF y DOCX en un proceso aparte. El contrato versionado `pe=1` usa JSON por línea, negociación de capacidades, correlación y límites por trabajo. La telemetría registra por separado los tiempos del motor, IPC, serialización y total. [Arquitectura y protocolo](docs/0.9.0/POWER_ENGINE_ARCHITECTURE.md)
 
-<img src="docs/assets/github-workers.svg" width="430" height="210" alt="Geometría en malla junto a un documento con etiquetas PDF y DOCX">
+### 04 · Registro PDF–modelo y verificación independiente
 
-El orquestador de flujos puede usar Rust para operaciones de geometría y Python para extraer contenido estructurado de PDF y DOCX. El complemento en C# se encarga del acceso al modelo de Revit. Consulta el [resumen de componentes](docs/PROJECT_OVERVIEW.md).
+<img src="docs/assets/github-registration.svg" width="430" height="210" alt="Anclas de ejes emparejadas en coordenadas de página PDF y del modelo Revit">
 
+Python extrae intersecciones de ejes y candidatos a símbolos en coordenadas de página. C# empareja anclas por nombre, ajusta una transformación de semejanza o afín, comprueba residuos y escala, y traduce la colocación a operaciones tipadas. `PlacementVerifier` compara contra evidencia independiente y reporta discrepancias de posición, tipo, giro, altura y duplicados. [Registro y verificación](docs/0.9.0/POWER_ENGINE_ARCHITECTURE.md)
 
-> [!IMPORTANT]
-> El C# dinámico se ejecuta con los privilegios del usuario de Revit. Consulta el [modelo de confianza](docs/security/TRUST_MODEL.md) para conocer los controles de ejecución y los límites de las transacciones.
-
-## Primeros pasos
-
-1. **Instala en Windows.** Sigue la [guía de instalación](docs/getting-started/INSTALLATION.md) y revisa el estado del paquete elegido.
-2. **Conecta tu cliente MCP.** Sigue la [guía de integración](docs/integrations/MCP.md) y prueba una consulta con los [ejemplos](examples/README.md).
-3. **Compila desde el código fuente.** Consulta los [requisitos y comandos](docs/DEVELOPMENT.md). Los objetivos de Revit 2022–2024 usan .NET Framework 4.8 y los de 2025–2026 usan .NET 8.
 
 ## Evidencia y mantenimiento
 
