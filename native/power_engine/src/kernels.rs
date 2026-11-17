@@ -330,15 +330,11 @@ pub fn duplicates(p: &[f64], dim: usize, tol: f64, out: &mut [i32], c: &Cancel) 
         let x = p[dim * i];
         let y = p[dim * i + 1];
         let z = if dim == 3 { p[dim * i + 2] } else { 0.0 };
-        let mut hits: Vec<usize> = Vec::new();
         work += 1 + g.near(x, y, z, |j| {
             if j > i && g.dist2(j, x, y, z) <= t2 {
-                hits.push(j);
+                uf.union(i, j);
             }
         });
-        for j in hits {
-            uf.union(i, j);
-        }
     }
     for i in 0..n {
         out[i] = uf.find(i) as i32;
@@ -524,6 +520,17 @@ mod tests {
         let mut o = [0; 4];
         duplicates(&p, 2, 0.01, &mut o, &NC).unwrap();
         assert_eq!(o, [0, 0, 0, 3]);
+    }
+
+    #[test]
+    fn duplicates_keep_the_lowest_index_across_cells_in_3d() {
+        let p = [
+            0.018, 0.0, 0.0, 5.0, 5.0, 5.0, 0.0, 0.0, 0.0,
+            0.009, 0.0, 0.0, 5.0, 5.0, 5.005, 0.0, 0.0, 0.02,
+        ];
+        let mut o = [0; 6];
+        duplicates(&p, 3, 0.01, &mut o, &NC).unwrap();
+        assert_eq!(o, [0, 1, 0, 0, 1, 5]);
     }
 
     #[test]
