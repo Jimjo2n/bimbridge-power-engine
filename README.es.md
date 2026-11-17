@@ -10,45 +10,28 @@
 > **Versiones experimentales.** El código se compila para Revit 2022–2026. Consulta el registro de validación para saber qué operaciones y entornos se han probado.
 > [Versiones](https://github.com/Jimjo2n/bimbridge-power-engine/releases) · [Validación](docs/quality/VALIDATION.md)
 
-## Qué puedes hacer
+## BIMBRIDGE en acción
 
-| Consultar el modelo | Revisar y aplicar cambios | Procesar documentos y geometría |
-| --- | --- | --- |
-| Filtra elementos, cuenta luminarias y obtén resúmenes compactos. | Prepara un plan tipado, inspecciona sus cambios y aplícalo con controles de conflictos. | Extrae datos de PDF y DOCX con Python y ejecuta operaciones de geometría con Rust. |
+Las ilustraciones usan datos de ejemplo. BIMBRIDGE se ejecuta en tu equipo Windows. El cliente MCP envía solicitudes a un puente local en C# y el complemento realiza las operaciones del modelo mediante la API de Revit.
 
-## Cómo se conecta
+### 01 · Consulta el modelo
 
-```mermaid
-flowchart TB
-  accTitle: Arquitectura de BIMBRIDGE
-  accDescr: El cliente MCP se conecta al puente C sharp. El puente se comunica con el complemento de Revit por un canal local. AgentHost usa el puente y los procesos especializados de Rust y Python.
-  Client["Cliente MCP"] -->|"stdio"| Bridge["Puente C#"]
-  Host["AgentHost<br/>Orquestación de flujos"] --> Bridge
-  Bridge -->|"Canal local de Windows"| Addin["Complemento de Revit<br/>Despachador de la API"]
-  Addin --> Model["Documento Revit<br/>Consultas y transacciones"]
-  Host --> Rust["Rust<br/>Geometría · FFI o IPC"]
-  Host --> Python["Python<br/>Extracción de PDF y DOCX"]
-  classDef engine fill:#123748,stroke:#359687,color:#f0fbff,stroke-width:2px
-  classDef worker fill:#23334d,stroke:#829ac7,color:#f0fbff
-  class Bridge,Addin engine
-  class Rust,Python worker
-```
+<img src="docs/assets/github-query.svg" width="430" height="210" alt="Plano ilustrado con seis luminarias resaltadas y un resultado de seis">
 
-[Arquitectura y componentes](docs/PROJECT_OVERVIEW.md) · [Modelo de confianza](docs/security/TRUST_MODEL.md)
+Envía `q LF n=true` desde el perfil compacto de MCP para contar luminarias. BIMBRIDGE lee el documento de Revit seleccionado y devuelve el total. También puedes filtrar elementos y pedir resultados compactos. Esta consulta deja intactos los elementos del modelo.
 
-## De una consulta a un cambio revisado
+### 02 · Revisa un cambio antes de aplicarlo
 
-```mermaid
-flowchart LR
-  accTitle: Revisión y aplicación de cambios
-  Inspect["1 · Consultar<br/>Identifica el documento"] --> Plan["2 · Planificar<br/>Prepara los cambios"]
-  Plan --> Review["3 · Revisar<br/>Comprueba la propuesta"]
-  Review --> Apply["4 · Aplicar<br/>Verifica conflictos"]
-  classDef decision fill:#123748,stroke:#359687,color:#f0fbff,stroke-width:2px
-  class Review decision
-```
+<img src="docs/assets/github-review.svg" width="430" height="210" alt="Ejemplo de cambio propuesto del parámetro de marca de L-01 a L-02">
 
-Empieza con una consulta de solo lectura. En el perfil compacto de MCP, `q LF n=true` solicita un conteo de luminarias. Para escribir en el modelo, sigue las [recetas de planificación y aplicación](docs/RECETAS.md).
+Selecciona el documento y prepara un plan tipado. El plan te permite inspeccionar qué cambiaría, por ejemplo el parámetro **Marca** de una luminaria. Una vez revisado, aplica el plan. BIMBRIDGE comprueba conflictos y ejecuta los cambios en una transacción de Revit. Consulta las [recetas de planificación y aplicación](docs/RECETAS.md).
+
+### 03 · Procesa geometría y documentos
+
+<img src="docs/assets/github-workers.svg" width="430" height="210" alt="Geometría en malla junto a un documento con etiquetas PDF y DOCX">
+
+El orquestador de flujos puede usar Rust para operaciones de geometría y Python para extraer contenido estructurado de PDF y DOCX. El complemento en C# se encarga del acceso al modelo de Revit. Consulta el [resumen de componentes](docs/PROJECT_OVERVIEW.md).
+
 
 > [!IMPORTANT]
 > El C# dinámico se ejecuta con los privilegios del usuario de Revit. Consulta el [modelo de confianza](docs/security/TRUST_MODEL.md) para conocer los controles de ejecución y los límites de las transacciones.

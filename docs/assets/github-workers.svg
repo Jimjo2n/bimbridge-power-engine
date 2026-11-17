@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="430" height="210" viewBox="0 0 430 210">
+<rect width="430" height="210" rx="20" fill="#081925"/>
+<path d="M52 74l76-39 76 39v70l-76 39-76-39zM52 74l76 39 76-39m-76 39v70" fill="#173645" stroke="#6de6d0" stroke-width="2" stroke-linejoin="round"/>
+<path d="M90 56l76 39v69m-76 0V95l76-39M52 110l76 39 76-39" fill="none" stroke="#528495"/>
+<rect x="239" y="45" width="145" height="129" rx="12" fill="#112c3c" stroke="#426377"/>
+<rect x="255" y="64" width="51" height="23" rx="5" fill="#235057"/><rect x="312" y="64" width="55" height="23" rx="5" fill="#235057"/>
+<g fill="#c6f7ee" font-family="monospace" font-size="13"><text x="267" y="80">PDF</text><text x="324" y="80">DOCX</text></g>
+<path d="M255 105h112m-112 17h94m-94 17h104m-104 17h75" stroke="#6b92a6" stroke-width="3" stroke-linecap="round"/>
+</svg>
