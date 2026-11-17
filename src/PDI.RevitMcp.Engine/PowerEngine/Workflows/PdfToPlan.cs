@@ -28,6 +28,7 @@ namespace BimBridge.PowerEngine.Workflows
             public double MinConfidence = 0.9;
             public double[] LinkTransform;
             public string Mode = "semejanza";
+            public List<object> SymbolDecisions;
         }
 
         public static Dictionary<string, object> Run(PowerEngineDispatcher pe, Request q, IEnumerable<string> authorized)
@@ -36,10 +37,15 @@ namespace BimBridge.PowerEngine.Workflows
             var args = new Dictionary<string, object> { ["ruta"] = q.PdfPath, ["paginas"] = new List<object> { (long)q.Page } };
             var grids = pe.Document("pdf_grids", args, auth);
             if (!grids.Ok) return Fail("extraccion", grids.Code + ": " + grids.Error);
+            if (q.SymbolDecisions != null) args["decisiones"] = q.SymbolDecisions;
             var syms = pe.Document("pdf_symbols", args, auth);
             if (!syms.Ok) return Fail("extraccion", syms.Code + ": " + syms.Error);
             var gp = (Dictionary<string, object>)((List<object>)grids.Result["paginas"])[0];
             var sp = (Dictionary<string, object>)((List<object>)syms.Result["paginas"])[0];
+            if (q.SymbolDecisions != null && (!sp.ContainsKey("confirmados") || !sp.ContainsKey("inventario")))
+                return Fail("extraccion", "el worker PDF no admite decisiones trazables; actualice el worker");
+            if (!Equals(grids.Result["sha256"], syms.Result["sha256"]))
+                return Fail("extraccion", "los ejes y los símbolos pertenecen a archivos distintos; repita la lectura");
             var page = ((List<object>)gp["intersecciones"]).Cast<Dictionary<string, object>>()
                 .ToDictionary(x => (string)x["nombre"], x => { var p = (List<object>)x["punto_pt"]; return (D(p[0]), D(p[1])); }, StringComparer.Ordinal);
             var model = Registration.GridIntersections(q.ModelGrids);
@@ -56,10 +62,25 @@ namespace BimBridge.PowerEngine.Workflows
             var shaPdf = (string)syms.Result["sha256"];
             var rev = sheet != null && sheet.TryGetValue("revision", out var rv) && rv is Dictionary<string, object> rvd ? Arg.GetString(rvd, "valor") : null;
             var num = sheet != null && sheet.TryGetValue("numero", out var nm) && nm is Dictionary<string, object> nmd ? Arg.GetString(nmd, "valor") : null;
-            var plan = PlacementPlanner.Plan(PlacementPlanner.FromPdfSymbols(syms.Result), reg, q.Rules,
+            var plan = PlacementPlanner.Plan(PlacementPlanner.FromPdfSymbols(syms.Result, confirmedOnly: q.SymbolDecisions != null), reg, q.Rules,
                 new PlacementOptions { Level = q.Level, MinConfidence = q.MinConfidence, SourceId = (num ?? System.IO.Path.GetFileName(q.PdfPath)) + "@" + (rev ?? "?") + "#p" + q.Page, SourceSha256 = shaPdf, SourceRevision = rev },
                 q.Existing, pe);
             var r = plan.ToJson(items: false);
+            if (q.SymbolDecisions != null && sp["inventario"] is List<object> inventory)
+            {
+                foreach (var symbol in inventory.Cast<Dictionary<string, object>>())
+                {
+                    if (!reg.Ok) break;
+                    var center = (List<object>)symbol["centro_pt"];
+                    var px = D(center[0]);
+                    var py = D(center[1]);
+                    var point = reg.Map(px, py);
+                    symbol["xy_ft"] = new List<object> { point.X, point.Y };
+                    if (Arg.GetString(symbol, "codigo_confirmado") is string code)
+                        symbol["id_colocacion"] = PlacementPlanner.StableId(shaPdf, q.Page, px, py, code);
+                }
+                r["inventario"] = inventory;
+            }
             r["anclas"] = new Dictionary<string, object>
             {
                 ["pagina"] = (long)page.Count, ["modelo"] = (long)model.Count, ["comunes"] = (long)anchors.Count,

@@ -113,6 +113,10 @@ namespace PDI.RevitMcp.Addin.Revit.Families
             if (doc.IsFamilyDocument) throw new OpFail(Status.NoSoportado, "doc pdf exporta hojas de un proyecto");
             var sheets = new List<ViewSheet>();
             var setName = Arg.GetString(a, "conjunto");
+            var checkPaper = false;
+            var order = Arg.GetString(a, "orden")?.Trim().ToLowerInvariant();
+            if (order != null && order != "numero" && order != "entrada")
+                throw new OpFail(Status.Invalido, "orden=numero o entrada");
             if (setName != null)
             {
                 var vss = new FilteredElementCollector(doc).OfClass(typeof(ViewSheetSet)).Cast<ViewSheetSet>()
@@ -123,6 +127,24 @@ namespace PDI.RevitMcp.Addin.Revit.Families
                     throw new OpFail(Status.Invalido, "no existe el conjunto de impresión '" + setName + "'. Hay: " + (names.Count == 0 ? "ninguno" : string.Join(", ", names)));
                 }
                 foreach (View v in vss.Views) if (v is ViewSheet vs) sheets.Add(vs);
+                var saved = SheetSetPdf.Read(vss);
+                checkPaper = saved.Order != null;
+                if (saved.Order != null && order != "numero")
+                {
+                    var members = sheets.ToDictionary(s => s.Id);
+                    if (saved.Order.Count != members.Count || !new HashSet<ElementId>(saved.Order).SetEquals(members.Keys))
+                        throw new OpFail(Status.Invalido, "cambiaron las hojas del conjunto; guarde el conjunto de nuevo o use orden=numero");
+                    sheets = saved.Order.Select(id => members[id]).ToList();
+                    order = "entrada";
+                }
+                else if (order == "entrada")
+                    throw new OpFail(Status.Invalido, "el conjunto carece de un orden guardado; use orden=numero o vuelva a guardar el conjunto");
+                if (saved.Preset != null)
+                {
+                    a = new Dictionary<string, object>(a, StringComparer.Ordinal);
+                    foreach (var option in saved.Preset)
+                        if (!a.ContainsKey(option.Key)) a[option.Key] = option.Value;
+                }
             }
             foreach (var raw in Arg.GetStringList(a, "hojas"))
             {
@@ -147,15 +169,13 @@ namespace PDI.RevitMcp.Addin.Revit.Families
                     sheets.Add(s);
                 }
             }
-            var order = (Arg.GetString(a, "orden") ?? "numero").Trim().ToLowerInvariant();
-            if (order != "numero" && order != "entrada") throw new OpFail(Status.Invalido, "orden=numero o entrada");
-            if (order == "entrada" && setName != null)
-                throw new OpFail(Status.Invalido, "orden=entrada exige la lista explícita de hojas; el conjunto sólo identifica miembros");
             sheets = sheets.GroupBy(s => s.Id).Select(g => g.First()).ToList();
+            order ??= "numero";
             if (order == "numero") sheets = sheets.OrderBy(s => s.SheetNumber, StringComparer.OrdinalIgnoreCase).ToList();
             if (sheets.Count == 0) throw new OpFail(Status.Invalido, "indique hojas=ids|$conjunto|números o conjunto=\"Nombre del conjunto de impresión\"");
             var notPrintable = sheets.Where(s => { try { return !s.CanBePrinted; } catch (Exception) { return false; } }).Select(s => s.SheetNumber).ToList();
             if (notPrintable.Count > 0) throw new OpFail(Status.Invalido, "hojas que Revit no puede imprimir: " + string.Join(", ", notPrintable));
+            if (checkPaper) SheetSetPdf.CheckViewportBounds(doc, sheets, diffs);
 
             var folder = Environment.ExpandEnvironmentVariables(Arg.GetString(a, "carpeta") ?? Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
             if (!Path.IsPathRooted(folder)) throw new OpFail(Status.Invalido, "carpeta= necesita una ruta completa");

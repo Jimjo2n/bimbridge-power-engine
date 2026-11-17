@@ -222,13 +222,13 @@ namespace BimBridge.PowerEngine.Workflows
                                    Math.Round(py * 8).ToString(CultureInfo.InvariantCulture) + "|" + (code ?? "")).Substring(0, 16);
 
         /// <summary>Lee los candidatos (y ambiguos, marcados con su confianza) de la salida de pdf_symbols.</summary>
-        public static List<SymbolCandidate> FromPdfSymbols(Dictionary<string, object> result, bool includeAmbiguous = true)
+        public static List<SymbolCandidate> FromPdfSymbols(Dictionary<string, object> result, bool includeAmbiguous = true, bool confirmedOnly = false)
         {
             var l = new List<SymbolCandidate>();
             foreach (Dictionary<string, object> pg in (List<object>)result["paginas"])
             {
                 var page = Convert.ToInt32(pg["pagina"], CultureInfo.InvariantCulture);
-                foreach (var key in includeAmbiguous ? new[] { "candidatos", "ambiguos" } : new[] { "candidatos" })
+                foreach (var key in confirmedOnly ? new[] { "confirmados" } : includeAmbiguous ? new[] { "candidatos", "ambiguos" } : new[] { "candidatos" })
                     foreach (Dictionary<string, object> c in (List<object>)pg[key])
                     {
                         var p = (List<object>)c["centro_pt"];

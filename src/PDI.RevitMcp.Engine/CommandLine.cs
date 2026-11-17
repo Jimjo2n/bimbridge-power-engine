@@ -44,9 +44,11 @@ namespace PDI.RevitMcp.Engine
             c.Verb = tokens[0].ToLowerInvariant();
             foreach (var tok in tokens.Skip(1))
             {
-                var cond = CondOp(tok);
-                if (cond != null) { c.Where.Add(tok); continue; }
                 var eq = tok.IndexOf('=');
+                var jsonArgument = eq > 0 && eq + 1 < tok.Length &&
+                    (tok[eq + 1] == '[' || tok[eq + 1] == '{') && CondOp(tok.Substring(0, eq)) == null;
+                var cond = jsonArgument ? null : CondOp(tok);
+                if (cond != null) { c.Where.Add(tok); continue; }
                 if (eq > 0 && tok.IndexOf('!') != eq - 1)
                 {
                     var k = tok.Substring(0, eq).Trim();
@@ -92,8 +94,17 @@ namespace PDI.RevitMcp.Engine
             var list = new List<string>();
             var sb = new StringBuilder();
             var quote = false; var depth = 0; var any = false;
+            var jsonString = false; var escaped = false;
             foreach (var ch in line)
             {
+                if (depth > 0 && (jsonString || ch == '"'))
+                {
+                    if (escaped) escaped = false;
+                    else if (ch == '\\') escaped = true;
+                    else if (ch == '"') jsonString = !jsonString;
+                    sb.Append(ch);
+                    continue;
+                }
                 if (ch == '"' && depth == 0) { quote = !quote; any = true; continue; }
                 if (!quote && (ch == '[' || ch == '{')) depth++;
                 if (!quote && (ch == ']' || ch == '}')) depth = Math.Max(0, depth - 1);

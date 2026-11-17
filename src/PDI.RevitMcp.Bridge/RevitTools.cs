@@ -288,11 +288,11 @@ namespace PDI.RevitMcp.Bridge
                      "luminarias, tags y sin_tag_en_vista, estimado por nivel y sin regenerar. exacto=true cuenta lo realmente visible pero regenera cada vista: sólo con pocas vistas (máx. 12).")]
         public Task<string> Check(
             McpServer server,
-            [Description("lighting_audit o cobertura")] string name,
+            [Description("lighting_audit, cobertura o tabla_audit")] string name,
             [Description("Niveles por nombre, separados por coma (opcional)")] string lvl = null,
             [Description("rcp (planos de techo con tags de luminarias), rcp_todos, o ids de vista separados por coma (opcional)")] string views = null,
             [Description("true = luminarias realmente visibles por vista (lento: máx. 12 vistas)")] bool? exacto = null,
-            [Description("Argumentos JSON para cobertura: q, modo=relevancia, id, dominio, estado, estrategia, categoría, documento, prioridad y versión")] string args = null,
+            [Description("Argumentos JSON. lighting_audit: manifiesto de inventario en mm; cobertura: q, modo, id y filtros; tabla_audit: tabla, ids_esperados, cantidad_esperada, filtros_esperados, celdas_esperadas.")] string args = null,
             CancellationToken ct = default)
         {
             Dictionary<string, object> a;

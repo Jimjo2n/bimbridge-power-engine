@@ -99,6 +99,39 @@ class ContractTests(unittest.TestCase):
         self.assertGreater(r["telemetria"]["motor_ms"], 0)
 
 
+class PdfDeliveryTests(unittest.TestCase):
+    def test_current_issue_passes_and_previous_issue_reports_order_stamp_color_and_receipt(self):
+        with tempfile.TemporaryDirectory(dir=FX) as folder:
+            current = os.path.join(folder, "actual.pdf")
+            previous = os.path.join(folder, "anterior.pdf")
+            for path, revision, color in ((current, "QC REV 02", "1 0 1"), (previous, "QC REV 01", "0 0 0")):
+                pdf = fixtures.Pdf()
+                contents = [
+                    "BT /F1 12 Tf 50 50 Td (E-101 " + revision + ") Tj ET\n" + color + " RG 60 70 m 120 70 l S",
+                    "BT /F1 12 Tf 50 50 Td (E-102 " + revision + ") Tj ET",
+                ]
+                if path == previous:
+                    contents.reverse()
+                for page in contents:
+                    pdf.page(612, 792, page)
+                pdf.write(path)
+            worker = Worker()
+            try:
+                receipt = worker.call("pdf_info", {"ruta": current})["resultado"]["sha256"]
+                expected = [{"textos": ["E-101", "QC REV 02"], "papel_pt": [612, 792], "rgb_vectorial": [[255, 0, 255]]},
+                            {"textos": ["E-102", "QC REV 02"]}]
+                args = {"ruta": current, "anterior": previous, "esperado": expected, "sha256_esperado": receipt}
+                valid = worker.call("pdf_verify", args)
+                self.assertEqual(valid["codigo"], "OK", valid)
+                self.assertEqual(valid["resultado"]["estado"], "verificado", valid)
+                stale = worker.call("pdf_verify", dict(args, ruta=previous))["resultado"]
+                self.assertEqual(stale["estado"], "con_diferencias")
+                self.assertEqual({d["tipo"] for d in stale["diferencias"]},
+                                 {"recibo_distinto", "igual_al_anterior", "texto_ausente", "rgb_vectorial_no_encontrado"})
+            finally:
+                worker.close()
+
+
 class PathAndNetworkGuards(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -113,6 +146,11 @@ class PathAndNetworkGuards(unittest.TestCase):
 
     def test_outside_path_denied(self):
         self.assertEqual(self.w.call("pdf_info", {"ruta": os.path.join(self.outside, "fuera.pdf")})["codigo"], "RUTA_DENEGADA")
+
+    def test_verify_checks_authorization_for_previous_issue(self):
+        reply = self.w.call("pdf_verify", {"ruta": fx("plan_vectorial.pdf"), "anterior": os.path.join(self.outside, "fuera.pdf"),
+                                           "esperado": [{"textos": ["E-101"]}]})
+        self.assertEqual(reply["codigo"], "RUTA_DENEGADA")
 
     def test_dotdot_denied(self):
         p = os.path.join(FX, "..", os.path.basename(self.outside), "fuera.pdf")

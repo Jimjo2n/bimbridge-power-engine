@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using PDI.RevitMcp.Engine.Qc;
 
 namespace PDI.RevitMcp.Engine
 {
@@ -54,6 +55,23 @@ namespace PDI.RevitMcp.Engine
         public const int MaxViewRows = 60;
 
         public const int SampleSize = 20;
+
+        public static Dictionary<string, object> CompareInventory(List<ManifestQc.Expected> expected, ManifestQc.Options options,
+            List<ManifestQc.Actual> physical, IList<Fixture> fixtures, IList<Tag> tags, IList<ViewCount> views)
+        {
+            var viewIds = new HashSet<long>(views.Select(v => v.ViewId));
+            var tagsPerFixture = tags.Where(t => (viewIds.Count == 0 || viewIds.Contains(t.ViewId)) && t.Tagged != null)
+                .SelectMany(t => t.Tagged.Distinct().Select(id => (Fixture: id, t.ViewId, Tag: t.Id)))
+                .GroupBy(t => t.Fixture).ToDictionary(g => g.Key, g => g.GroupBy(t => t.ViewId).Max(view => view.Select(t => t.Tag).Distinct().Count()));
+            foreach (var fixture in physical)
+                fixture.Tags = tagsPerFixture.TryGetValue(fixture.Id, out var count) ? count : 0;
+            var result = ManifestQc.Run(expected, physical, options).ToJson();
+            var positionedIds = new HashSet<long>(physical.Select(e => e.Id));
+            var withoutLocation = fixtures.Where(e => !positionedIds.Contains(e.Id)).Select(e => e.Id).ToArray();
+            result["sin_posicion_evaluable"] = Block(withoutLocation);
+            if (withoutLocation.Length > 0) result["aprobado"] = false;
+            return result;
+        }
 
         /// <summary>Devuelve el resumen y, aparte, los conjuntos que conviene guardar para la siguiente llamada.</summary>
         /// <param name="allFixtureIds">Todas las luminarias del modelo, aunque se filtre por nivel. Sin esto, con lvl= los tags

@@ -47,6 +47,40 @@ namespace PDI.RevitMcp.Tests
         }
 
         [Fact]
+        public void Flujo_UsesOnlyReviewedSymbolsAndCarriesTheirEvidence()
+        {
+            using var pe = new PowerEngineDispatcher(PowerEngineEnv.Options());
+            var folders = new List<string> { Fx };
+            var path = "ruta=\"" + Path.Combine(Fx, "plan_vectorial.pdf") + "\"";
+            var result = PowerCommands.Run(pe, folders, "pdf symbols " + path + " trazabilidad=true");
+            Assert.Equal("OK", result["codigo"]);
+            var symbols = (Dictionary<string, object>)result["resultado"];
+            var page = Assert.IsType<Dictionary<string, object>>(Assert.Single((List<object>)symbols["paginas"]));
+            var candidates = ((List<object>)page["candidatos"]).Cast<Dictionary<string, object>>().Take(2).ToList();
+            var included = candidates[0]["id_simbolo"];
+            var excluded = candidates[1]["id_simbolo"];
+            var review = new[]
+            {
+                new Dictionary<string, object> { ["id_simbolo"] = included, ["decision"] = "incluir", ["evidencia"] = "leyenda y nota 13" },
+                new Dictionary<string, object> { ["id_simbolo"] = excluded, ["decision"] = "excluir", ["evidencia"] = "otro dispositivo en la referencia" },
+            };
+            var command = "flujo " + path + " nivel=\"LEVEL 09\" tol=0.05 reglas=" + Rules + " ejes=" + Grids();
+            var audited = PowerCommands.Run(pe, folders, command + " decisiones=" + Json.Write(review));
+            var operation = Json.ParseObject(Assert.IsType<string>(Assert.Single((List<object>)audited["ops"])));
+            Assert.Single((List<object>)operation["puntos"]);
+            var inventory = ((List<object>)audited["inventario"]).Cast<Dictionary<string, object>>().ToDictionary(x => x["id_simbolo"]);
+            Assert.Equal("incluido", inventory[included]["estado"]);
+            Assert.True(inventory[included].ContainsKey("xy_ft"));
+            Assert.True(inventory[included].ContainsKey("id_colocacion"));
+            Assert.Equal("excluido", inventory[excluded]["estado"]);
+            Assert.Equal("otro dispositivo en la referencia", inventory[excluded]["evidencia_revision"]);
+            Assert.Contains(inventory.Values, x => Equals(x["estado"], "sin_revisar"));
+            review[0]["id_simbolo"] = "revision-anterior";
+            var stale = PowerCommands.Run(pe, folders, command + " decisiones=" + Json.Write(review));
+            Assert.False(stale.ContainsKey("ops"));
+        }
+
+        [Fact]
         public void Documents_WithoutAuthorizedFolders_AreRejected_AndOutsidePathsDenied()
         {
             using (var pe = new PowerEngineDispatcher(PowerEngineEnv.Options()))

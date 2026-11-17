@@ -7,6 +7,7 @@ Cada resultado lleva ese espacio ("pagina_pt"), el normalizado [0,1]×[0,1] del 
 """
 import math
 import re
+from hashlib import sha256
 
 from .worker import JobError, sha256_file
 
@@ -296,6 +297,96 @@ def info(args, paths):
             "aviso": None if text_chars or vec else "sin texto ni vectores extraíbles: probablemente escaneado; requiere interpretación visual autorizada"}
 
 
+def verify(args, paths):
+    """Compara un PDF emitido con un manifiesto de entrega posicional y un recibo opcional."""
+    path = paths.check(args.get("ruta"))
+    previous = paths.check(args["anterior"]) if "anterior" in args else None
+    expected = args.get("esperado")
+    if not isinstance(expected, list) or not expected:
+        raise JobError("INVALIDO", "esperado exige una lista de páginas en orden de emisión")
+    expected_hash = args.get("sha256_esperado")
+    if "sha256_esperado" in args and (not isinstance(expected_hash, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", expected_hash)):
+        raise JobError("INVALIDO", "sha256_esperado debe ser el SHA-256 hexadecimal del recibo")
+    for spec in expected:
+        if not isinstance(spec, dict) or not spec or spec.keys() - {"textos", "papel_pt", "rgb_vectorial"}:
+            raise JobError("INVALIDO", "cada página exige textos, papel_pt o rgb_vectorial")
+        if "textos" in spec and (not isinstance(spec["textos"], list) or not spec["textos"] or
+                                any(not isinstance(s, str) or not s.strip() for s in spec["textos"])):
+            raise JobError("INVALIDO", "textos exige una lista de textos visibles")
+        if "papel_pt" in spec:
+            paper = spec["papel_pt"]
+            if not isinstance(paper, list) or len(paper) != 2 or any(type(n) not in (int, float) or not 0 < n <= 1e6 for n in paper):
+                raise JobError("INVALIDO", "papel_pt exige ancho y alto positivos en puntos")
+        if "rgb_vectorial" in spec:
+            colors = spec["rgb_vectorial"]
+            if not isinstance(colors, list) or not colors or any(
+                    not isinstance(rgb, list) or len(rgb) != 3 or any(type(c) is not int or not 0 <= c <= 255 for c in rgb)
+                    for rgb in colors):
+                raise JobError("INVALIDO", "rgb_vectorial exige una lista de tripletas RGB de 0 a 255")
+
+    digest = sha256_file(path)
+    prior_digest = sha256_file(previous) if previous else None
+    raw, _, _ = _raw_pages(path)
+    differences = []
+    if len(raw) != len(expected):
+        differences.append({"tipo": "cantidad_paginas", "esperado": len(expected), "observado": len(raw)})
+    if expected_hash and digest != expected_hash.lower():
+        differences.append({"tipo": "recibo_distinto", "esperado": expected_hash, "observado": digest})
+    if prior_digest == digest:
+        differences.append({"tipo": "igual_al_anterior", "sha256": digest})
+
+    it, layout = _open_pages(path)
+
+    def leaves(obj):
+        if isinstance(obj, layout.LTTextLine) or isinstance(obj, layout.LTCurve):
+            yield obj
+        elif isinstance(obj, layout.LTContainer):
+            for child in obj:
+                yield from leaves(child)
+
+    def normalized(s):
+        return " ".join(s.split()).casefold()
+
+    pages = []
+    for i, page in enumerate(it):
+        meta = raw[i]
+        mx0, my0, mx1, my1 = meta["mediabox"]
+        cx0, cy0, cx1, cy1 = meta["cropbox"]
+        crop = (max(0, cx0 - mx0), max(0, cy0 - my0), min(mx1, cx1) - mx0, min(my1, cy1) - my0)
+        paper = [(mx1 - mx0) * meta["userunit"], (my1 - my0) * meta["userunit"]]
+        if meta["rotate"] in (90, 270):
+            paper.reverse()
+        page_number = i + 1
+        spec = expected[i] if i < len(expected) else {}
+        has_image = _has_image(layout, page)
+        lines, colors = [], set()
+        for obj in leaves(page):
+            x0, y0, x1, y1 = obj.bbox
+            if isinstance(obj, layout.LTTextLine):
+                if crop[0] <= x0 <= x1 <= crop[2] and crop[1] <= y0 <= y1 <= crop[3]:
+                    lines.append(obj.get_text())
+            elif x1 >= crop[0] and x0 <= crop[2] and y1 >= crop[1] and y0 <= crop[3]:
+                for enabled, color in ((obj.stroke, obj.stroking_color), (obj.fill, obj.non_stroking_color)):
+                    if enabled and isinstance(color, tuple) and len(color) == 3 and all(type(c) in (int, float) and 0 <= c <= 1 for c in color):
+                        colors.add(tuple(round(c * 255) for c in color))
+        text = normalized(" ".join(lines))
+        for phrase in spec.get("textos", []):
+            if normalized(phrase) not in text:
+                differences.append({"pagina": page_number, "tipo": "texto_no_evaluable" if has_image else "texto_ausente", "esperado": phrase})
+        if "papel_pt" in spec and any(abs(a - b) > 1 for a, b in zip(paper, spec["papel_pt"])):
+            differences.append({"pagina": page_number, "tipo": "papel", "esperado": spec["papel_pt"], "observado": paper})
+        for rgb in spec.get("rgb_vectorial", []):
+            if tuple(rgb) not in colors:
+                differences.append({"pagina": page_number, "tipo": "rgb_vectorial_no_encontrado", "esperado": rgb})
+        pages.append({"pagina": page_number, "papel_pt": paper, "tiene_imagen": has_image, "textos_extraibles": len(lines)})
+
+    if sha256_file(path) != digest:
+        raise JobError("INVALIDO", "el PDF cambió durante la verificación; repita con la emisión terminada")
+    return {"estado": "con_diferencias" if differences else "verificado", "sha256": digest, "sha256_anterior": prior_digest,
+            "paginas": pages, "diferencias": differences,
+            "alcance": "Texto extraíble dentro del recorte y color RGB observado en vectores. La apariencia impresa requiere cotejo visual."}
+
+
 def extract(args, paths):
     path = paths.check(args.get("ruta"))
     raw, _, _ = _raw_pages(path)
@@ -417,6 +508,22 @@ def symbols(args, paths):
     lo dudoso queda en "ambiguos" para un agente autorizado. Es extracción geométrica + reglas, no visión.
     """
     path = paths.check(args.get("ruta"))
+    traced = args.get("trazabilidad") is True or "decisiones" in args
+    decisions = {}
+    if "decisiones" in args:
+        supplied = args["decisiones"]
+        if not isinstance(supplied, list):
+            raise JobError("INVALIDO", "decisiones exige una lista por id_simbolo")
+        for item in supplied:
+            if (not isinstance(item, dict) or not isinstance(item.get("id_simbolo"), str) or
+                    item.get("decision") not in ("incluir", "excluir") or
+                    not isinstance(item.get("evidencia"), str) or not item["evidencia"].strip() or
+                    ("codigo" in item and (not isinstance(item["codigo"], str) or not CODE_RX.fullmatch(item["codigo"])))):
+                raise JobError("INVALIDO", "cada decisión exige id_simbolo, incluir|excluir, evidencia y código opcional")
+            if item["id_simbolo"] in decisions:
+                raise JobError("INVALIDO", "decisión duplicada para " + item["id_simbolo"])
+            decisions[item["id_simbolo"]] = item
+    digest = sha256_file(path) if traced else None
     raw, _, _ = _raw_pages(path)
     sel = _page_sel(args, len(raw))
     max_pt = float(args.get("max_simbolo_pt", 40.0))
@@ -472,6 +579,7 @@ def symbols(args, paths):
                     legend[s["firma"]] = {"codigo": m.group(1), "descripcion": m.group(2), "fuente_bbox": s["bbox"], "texto": text}
         cands, amb = [], []
         unclassified = {}
+        observed = []
         for i, s in enumerate(shapes):
             if i in legend_idx:
                 continue
@@ -482,6 +590,13 @@ def symbols(args, paths):
             lg = legend.get(s["firma"])
             entry = {"centro_pt": s["centro"], "centro_norm": fr.norm(cx, cy), "centro_in": fr.inches(cx, cy), "firma": s["firma"],
                      "tamano_pt": [s["w"], s["h"]], "rot_deg": s["rot_deg"], "rotulo": label}
+            if traced:
+                signature = "%s:%d:%d:%s:%s" % (digest, num, i, s["firma"], s["centro"])
+                entry["id_simbolo"] = sha256(signature.encode()).hexdigest()[:24]
+                entry["evidencia_pdf"] = {"forma_bbox": fr._box(s["bbox"]),
+                                          "rotulo_bbox": fr._box(near[0]["bbox"]) if near else None,
+                                          "leyenda_bbox": fr._box(lg["fuente_bbox"]) if lg else None}
+                observed.append(entry)
             if lg and not lg.get("conflicto"):
                 entry["codigo"] = lg["codigo"]
                 if label is None:
@@ -516,10 +631,34 @@ def symbols(args, paths):
             else:
                 rest[firma] = len(group)
         unclassified = rest
-        pages.append(fr.to_visible({"pagina": num, "marco": fr.json(), "leyenda": [dict(v, firma=k) for k, v in legend.items()], "candidatos": cands,
-                      "ambiguos": amb, "sin_leyenda": [{"firma": k, "cantidad": v} for k, v in sorted(unclassified.items())],
-                      "lamina": _sheet_meta(words, fr)}))
-    return {"sha256": sha256_file(path), "paginas": pages, "clase": "extraccion_geometrica+reglas_de_leyenda",
+        page = {"pagina": num, "marco": fr.json(), "leyenda": [dict(v, firma=k) for k, v in legend.items()], "candidatos": cands,
+                "ambiguos": amb, "sin_leyenda": [{"firma": k, "cantidad": v} for k, v in sorted(unclassified.items())],
+                "lamina": _sheet_meta(words, fr)}
+        if traced:
+            inventory = []
+            confirmed = []
+            for entry in observed:
+                decision = decisions.pop(entry["id_simbolo"], None)
+                item = dict(entry, estado="sin_revisar")
+                if decision:
+                    item["estado"] = "incluido" if decision["decision"] == "incluir" else "excluido"
+                    item["evidencia_revision"] = decision["evidencia"]
+                    if item["estado"] == "incluido":
+                        code = decision.get("codigo", entry.get("codigo"))
+                        if not code:
+                            raise JobError("INVALIDO", "indique el código confirmado de " + entry["id_simbolo"])
+                        item["codigo_confirmado"] = code
+                        confirmed.append(dict(item, codigo=code, confianza=1.0))
+                inventory.append(item)
+            page["inventario"] = inventory
+            page["confirmados"] = confirmed
+        pages.append(fr.to_visible(page))
+    if decisions:
+        raise JobError("INVALIDO", "hay decisiones de otra página, revisión o configuración de extracción: " + ", ".join(list(decisions)[:5]))
+    final_digest = sha256_file(path)
+    if traced and digest != final_digest:
+        raise JobError("INVALIDO", "el PDF cambió durante la extracción")
+    return {"sha256": final_digest, "paginas": pages, "clase": "extraccion_geometrica+reglas_de_leyenda",
             "nota": "Candidatos, no luminarias confirmadas. Las ambigüedades requieren un agente o una persona autorizados."}
 
 

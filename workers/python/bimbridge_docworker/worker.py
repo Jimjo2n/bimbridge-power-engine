@@ -88,6 +88,7 @@ def _jobs():
     from . import pdf, docx  # import diferido: el saludo no depende de pdfminer
     return {
         "pdf_info": pdf.info,
+        "pdf_verify": pdf.verify,
         "pdf_extract": pdf.extract,
         "pdf_tables": pdf.tables,
         "pdf_symbols": pdf.symbols,
@@ -96,7 +97,7 @@ def _jobs():
     }
 
 
-JOB_NAMES = ["pdf_info", "pdf_extract", "pdf_tables", "pdf_symbols", "pdf_grids", "docx_extract"]
+JOB_NAMES = ["pdf_info", "pdf_verify", "pdf_extract", "pdf_tables", "pdf_symbols", "pdf_grids", "docx_extract"]
 
 
 def capabilities():

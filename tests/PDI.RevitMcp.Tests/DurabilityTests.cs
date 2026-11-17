@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using PDI.RevitMcp.Engine;
 using PDI.RevitMcp.Protocol;
 using Xunit;
@@ -12,7 +13,8 @@ namespace PDI.RevitMcp.Tests
     /// <summary>Diario de operaciones (idempotencia y recuperación), resultados largos por handle, conjuntos por documento, matriz y regla de tags.</summary>
     public class DurabilityTests
     {
-        static DurabilityTests()
+        [ModuleInitializer]
+        internal static void IsolateTestHome()
         {
             // Nada de las pruebas escribe en %LOCALAPPDATA% real.
             Environment.SetEnvironmentVariable("PDI_REVITMCP_HOME", Path.Combine(Path.GetTempPath(), "pdi-home-" + Guid.NewGuid().ToString("N")));

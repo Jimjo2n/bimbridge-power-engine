@@ -14,21 +14,22 @@ namespace BimBridge.PowerEngine
     /// planificación. Lo que cambia el modelo sale como "ops" para plan→commit (mismas protecciones de siempre).
     ///   cap [texto|id]         descubrimiento bajo demanda (breve; con un id exacto, ficha completa)
     ///   estado                 motores, versiones, calibración, carpetas autorizadas y métricas power_engine.*
-    ///   pdf info|extract|tables|symbols|grids ruta= [paginas=[1]] [max_elementos=]
+    ///   pdf info|extract|tables|symbols|grids|verify ruta= [paginas=[1]] [max_elementos=]
     ///   docx ruta= [max=]
     ///   flujo ruta= pagina= nivel= reglas=[…] ejes=[…] [existentes=[…]] [tol=0.25] [conf=0.9] [modo=semejanza|afin]
     /// </summary>
     public static class PowerCommands
     {
         public const string Help =
-            "power (no cambia el modelo): cap [texto|id] | estado | pdf info|extract|tables|symbols|grids ruta= paginas=[1] | docx ruta= | " +
-            "flujo ruta= pagina= nivel= reglas=[{codigo,tipo,montaje|elev,ws}] ejes=[{nombre,p:[x0,y0,x1,y1]}] (pies) → plan + ops para plan→commit | " +
+            "power (no cambia el modelo): cap [texto|id] | estado | pdf info|extract|tables|symbols|grids ruta= paginas=[1] | pdf verify ruta= esperado=[{textos,papel_pt,rgb_vectorial}] [anterior=] [sha256_esperado=] | docx ruta= | " +
+            "flujo ruta= pagina= nivel= reglas=[{codigo,tipo,montaje|elev,ws}] ejes=[{nombre,p:[x0,y0,x1,y1]}] (pies) [decisiones=[{id_simbolo,decision,evidencia,codigo}]] → plan + ops para plan→commit | " +
             "red ruta=tramos.json (proximidad ≠ continuidad ≠ conexión física). " +
             "Coordenadas de página nunca son de Revit: el flujo registra con anclas y escala ambigüedades.";
 
         private static readonly Dictionary<string, string> PdfJobs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["info"] = "pdf_info", ["extract"] = "pdf_extract", ["tables"] = "pdf_tables", ["symbols"] = "pdf_symbols", ["grids"] = "pdf_grids",
+            ["verify"] = "pdf_verify",
         };
 
         /// <summary>Carpetas que un trabajo puede abrir: las de documentos y, en laboratorio, también las de laboratorio.</summary>
@@ -76,7 +77,7 @@ namespace BimBridge.PowerEngine
                     case "pdf":
                     {
                         var sub = c.Positional.FirstOrDefault() ?? "";
-                        if (!PdfJobs.TryGetValue(sub, out var job)) return Err("pdf " + sub + " desconocido", "pdf info|extract|tables|symbols|grids ruta=");
+                        if (!PdfJobs.TryGetValue(sub, out var job)) return Err("pdf " + sub + " desconocido", "pdf info|extract|tables|symbols|grids|verify ruta=");
                         return Doc(pe, folders, job, c.Args);
                     }
                     case "docx": return Doc(pe, folders, "docx_extract", c.Args);
@@ -125,6 +126,11 @@ namespace BimBridge.PowerEngine
                 Rules = PdfToPlan.RulesFromJson(reglas), ModelGrids = PdfToPlan.GridsFromJson(ejes),
                 TolFt = Num(a, "tol") ?? 0.25, MinConfidence = Num(a, "conf") ?? 0.9, Mode = Arg.GetString(a, "modo") ?? "semejanza",
             };
+            if (a.TryGetValue("decisiones", out var decisions))
+            {
+                if (!(decisions is List<object> list)) return Err("decisiones exige una lista JSON", Help);
+                q.SymbolDecisions = list;
+            }
             if (a.TryGetValue("existentes", out var ex) && ex is List<object> exl)
                 q.Existing = exl.Cast<Dictionary<string, object>>().Select(e =>
                 {

@@ -1201,6 +1201,11 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 .FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.Ordinal)) ?? throw new InvalidOperationException("Revit no guardó el conjunto '" + name + "'");
             var got = new HashSet<long>(saved.Views.Cast<View>().Select(v => Ids.ToLong(v.Id)));
             if (got.Count != ids.Count || ids.Any(i => !got.Contains(Ids.ToLong(i)))) throw new InvalidOperationException("el conjunto guardado tiene " + got.Count + " vistas, se esperaban " + ids.Count);
+            t.TryGetValue("preset_pdf", out var preset);
+            SheetSetPdf.Write(saved, ids, preset);
+            var stored = SheetSetPdf.Read(saved);
+            if (!ids.SequenceEqual(stored.Order) || OpSemantics.Canonical(preset) != OpSemantics.Canonical(stored.Preset))
+                throw new InvalidOperationException("Revit no conservó el orden o preset PDF del conjunto");
             return saved.Id;
         }
 

@@ -317,11 +317,9 @@ namespace PDI.RevitMcp.Addin.Scripting
                 {
                     try
                     {
-                        if (v.GetFilterVisibility(fid)) continue;
+                        if (!v.GetIsFilterEnabled(fid) || v.GetFilterVisibility(fid)) continue;
                         var fe = doc.GetElement(fid);
-                        bool passes = fe is ParameterFilterElement pf ? (pf.GetCategories().Contains(e.Category?.Id ?? ElementId.InvalidElementId) && (pf.GetElementFilter()?.PassesFilter(doc, e.Id) ?? true))
-                            : fe is SelectionFilterElement sf && sf.GetElementIds().Contains(e.Id);
-                        if (passes) f.HidingFilters.Add(fe.Name);
+                        if (MatchesFilter(fe, e)) f.HidingFilters.Add(fe.Name);
                     }
                     catch (Exception ex) { notes.Add("filtro " + L(fid) + ": " + ex.Message); }
                 }
@@ -396,6 +394,14 @@ namespace PDI.RevitMcp.Addin.Scripting
                 };
             }
 
+            internal static bool MatchesFilter(Element filter, Element element)
+            {
+                if (filter is ParameterFilterElement parameter)
+                    return parameter.GetCategories().Contains(element.Category?.Id ?? ElementId.InvalidElementId) &&
+                        (parameter.GetElementFilter()?.PassesFilter(element.Document, element.Id) ?? true);
+                return filter is SelectionFilterElement selection && selection.GetElementIds().Contains(element.Id);
+            }
+
             /// <summary>
             /// Filtro de vista "parámetro de texto = valor" para unas categorías. Si ya existe uno con ese nombre se devuelve sin tocarlo.
             /// Requiere transacción.
@@ -435,22 +441,30 @@ namespace PDI.RevitMcp.Addin.Scripting
                 var res = new List<ManifestQc.Actual>();
                 foreach (var e in list)
                 {
-                    var p = PointOf(e);
-                    if (p == null) continue;
-                    double? rot = null;
-                    if (e is FamilyInstance fi) { var bx = fi.GetTransform().BasisX; rot = ((Math.Atan2(bx.Y, bx.X) * 180 / Math.PI) % 360 + 360) % 360; }
-                    else if (e.Location is LocationPoint lp) rot = lp.Rotation * 180 / Math.PI;
-                    var t = doc.GetElement(e.GetTypeId()) as ElementType;
-                    var lvl = doc.GetElement(e.LevelId) as Level;
-                    if (lvl == null && e.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM)?.AsElementId() is ElementId li) lvl = doc.GetElement(li) as Level;
-                    res.Add(new ManifestQc.Actual
-                    {
-                        Id = L(e.Id), Uid = e.UniqueId, X = p.X * Ft, Y = p.Y * Ft, Z = p.Z * Ft, RotDeg = rot, Level = lvl?.Name,
-                        Family = t?.FamilyName, Type = t?.Name ?? e.Name, Tags = tagCount.TryGetValue(e.Id, out var c) ? c : 0,
-                        Group = e.GroupId != ElementId.InvalidElementId ? (doc.GetElement(e.GroupId) as Group)?.GroupType?.Name : null,
-                    });
+                    var actual = Observe(doc, e);
+                    if (actual == null) continue;
+                    actual.Tags = tagCount.TryGetValue(e.Id, out var count) ? count : 0;
+                    res.Add(actual);
                 }
                 return res;
+            }
+
+            internal static ManifestQc.Actual Observe(Document doc, Element e)
+            {
+                var p = PointOf(e);
+                if (p == null) return null;
+                double? rot = null;
+                if (e is FamilyInstance fi) { var bx = fi.GetTransform().BasisX; rot = ((Math.Atan2(bx.Y, bx.X) * 180 / Math.PI) % 360 + 360) % 360; }
+                else if (e.Location is LocationPoint lp) rot = lp.Rotation * 180 / Math.PI;
+                var t = doc.GetElement(e.GetTypeId()) as ElementType;
+                var lvl = doc.GetElement(e.LevelId) as Level;
+                if (lvl == null && e.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM)?.AsElementId() is ElementId li) lvl = doc.GetElement(li) as Level;
+                return new ManifestQc.Actual
+                {
+                    Id = L(e.Id), Uid = e.UniqueId, X = p.X * Ft, Y = p.Y * Ft, Z = p.Z * Ft, RotDeg = rot, Level = lvl?.Name,
+                    Family = t?.FamilyName, Type = t?.Name ?? e.Name,
+                    Group = e.GroupId != ElementId.InvalidElementId ? (doc.GetElement(e.GroupId) as Group)?.GroupType?.Name : null,
+                };
             }
 
             /// <summary>QC completo: lee el manifiesto (JSON de ManifestQc.Parse), compara y devuelve el resultado.</summary>

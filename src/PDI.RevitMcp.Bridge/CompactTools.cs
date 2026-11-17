@@ -47,7 +47,7 @@ namespace PDI.RevitMcp.Bridge
                      "ctx [instancia=2024] | docs | fam info|caras [familia=X] | res <id> desde= | " +
                      "cat [resumen|niveles|vistas|laminas|tipos|familias|plantillas|worksets|vinculos|filtros] | " +
                      "q <cat> lvl= t= ids= v= f= g=campos n=true digest=true timing=true s=$nombre elev>9 type~LT u=mm | get <ids|$x> [f=*] | " +
-                     "chk lighting_audit | geo <receta> <cat> lvl= | sets | job <id> | show <ids> | cap [vista] colorear=categorias resaltar=$x | " +
+                     "chk lighting_audit | chk tabla_audit tabla=<id o nombre> | geo <receta> <cat> lvl= | sets | job <id> | show <ids> | cap [vista] colorear=categorias resaltar=$x | " +
                      "tarea estado|resumen|esperar|unidades|lista|recetas <id> [desde=rev max=s] | guide [tema]\n" +
                      "cat: LF luminarias, LD dispositivos, EF tomas, EE tableros, FA alarma. Texto compacto: fijo = valor común; col# = diccionario.")]
         public async Task<CallToolResult> Revit(

@@ -1252,9 +1252,11 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 if (!sheets.Any(x => x.Id == s.Id)) sheets.Add(s);
             }
             var t = new Dictionary<string, object> { ["nombre"] = name, ["hojas"] = sheets.Select(s => (object)Ids.ToLong(s.Id)).ToList() };
+            if (op.Args.TryGetValue("preset_pdf", out var preset)) t["preset_pdf"] = SheetSetPdf.ValidatePreset(preset);
             if (existing != null) t["reemplaza"] = Ids.ToLong(existing.Id);
             var before = existing == null ? "" : existing.Views.Size + " vistas";
             var show = "conjunto '" + name + "': " + sheets.Count + " láminas (" + string.Join(", ", sheets.Take(6).Select(s => s.SheetNumber)) + (sheets.Count > 6 ? "…" : "") + ")";
+            if (t.ContainsKey("preset_pdf")) show += ", preset PDF " + Json.Write(t["preset_pdf"]);
             c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = before, After = show, Show = show, Target = t });
         }
 

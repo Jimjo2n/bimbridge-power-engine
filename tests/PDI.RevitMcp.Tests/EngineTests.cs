@@ -321,6 +321,42 @@ namespace PDI.RevitMcp.Tests
     public class LightingAuditTests
     {
         [Fact]
+        public void ManifestInventory_DetectsMissingAndPhysicalDuplicates_WithoutCountingCrossViewReferencesTwice()
+        {
+            var expected = new List<Engine.Qc.ManifestQc.Expected>
+            {
+                new Engine.Qc.ManifestQc.Expected { Ref = "ref-dos-vistas", X = 500, Y = 100, Level = "L1", Tag = true },
+                new Engine.Qc.ManifestQc.Expected { Ref = "ref-original", X = 1000, Y = 100, Level = "L1" },
+                new Engine.Qc.ManifestQc.Expected { Ref = "ref-faltante", X = 3000, Y = 100, Level = "L1" },
+            };
+            var physical = new List<Engine.Qc.ManifestQc.Actual>
+            {
+                new Engine.Qc.ManifestQc.Actual { Id = 1, X = 500, Y = 100, Level = "L1", Type = "A" },
+                new Engine.Qc.ManifestQc.Actual { Id = 2, X = 1000, Y = 100, Level = "L1", Type = "A" },
+                new Engine.Qc.ManifestQc.Actual { Id = 3, X = 1070, Y = 100, Level = "L1", Type = "A" },
+            };
+            var fixtures = physical.Select(e => new LightingAudit.Fixture { Id = e.Id, Level = e.Level, Type = e.Type }).ToList();
+            var tags = new[]
+            {
+                new LightingAudit.Tag { Id = 100, ViewId = 8, Tagged = new long[] { 1 } },
+                new LightingAudit.Tag { Id = 101, ViewId = 9, Tagged = new long[] { 1 } },
+            };
+            var views = new[]
+            {
+                new LightingAudit.ViewCount { ViewId = 8, Visible = new long[] { 1, 2, 3 } },
+                new LightingAudit.ViewCount { ViewId = 9, Visible = new long[] { 1 } },
+            };
+            var inventory = LightingAudit.CompareInventory(expected, new Engine.Qc.ManifestQc.Options(), physical, fixtures, tags, views);
+            Assert.Equal(1L, inventory["faltantes"]);
+            Assert.Equal(1L, inventory["casi_duplicados"]);
+            Assert.Equal(2L, inventory["correctos"]);
+            var counts = LightingAudit.Summarize(fixtures, tags, views, out _);
+            Assert.Equal(3L, counts["luminarias"]);
+            Assert.Equal(2L, counts["tags"]);
+            Assert.Equal(0L, ((Dictionary<string, object>)counts["tags_duplicados"])["n"]);
+        }
+
+        [Fact]
         public void Audit_FindsUntaggedOrphanAndDuplicateTags()
         {
             var fx = new List<LightingAudit.Fixture>

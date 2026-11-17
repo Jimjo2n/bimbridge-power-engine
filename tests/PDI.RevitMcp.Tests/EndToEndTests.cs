@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using ModelContextProtocol.Client;
@@ -70,6 +71,40 @@ namespace PDI.RevitMcp.Tests
             var r = await c.CallToolAsync(tool, args ?? new Dictionary<string, object>());
             var text = r.Content.OfType<TextContentBlock>().First().Text;
             return Json.ParseObject(text);
+        }
+
+        [Fact]
+        public async Task FullQueryRecoversAnOversizeCellThroughResThenContinuesWithCursor()
+        {
+            await using var client = await Connect("consulta-paginada");
+            var first = await Call(client, "query", new Dictionary<string, object>
+            {
+                ["ids"] = "70001,70002", ["f"] = "id,comments", ["full"] = true, ["page_size"] = 1,
+            });
+            var id = Assert.IsType<string>(first["res"]);
+            try
+            {
+                Assert.Equal(2L, first["pages"]);
+                var reconstructed = new StringBuilder();
+                for (var from = 0; ; from += 7)
+                {
+                    var part = await Call(client, "res", new Dictionary<string, object> { ["id"] = id, ["desde"] = from, ["lineas"] = 7 });
+                    Assert.Equal((long)from, part["desde"]);
+                    reconstructed.Append(((string)part["texto"]).Replace("\n", ""));
+                    if (from + 7 >= (long)part["total_lineas"]) break;
+                }
+                var original = Assert.IsType<Dictionary<string, object>>(Response.FromJson(reconstructed.ToString()).Datos);
+                Assert.Equal(first["cursor"], original["cursor"]);
+                var largeRow = Assert.IsType<List<object>>(Assert.Single(Assert.IsType<List<object>>(original["rows"])));
+                Assert.Equal(new object[] { 70001L, FakeRevit.WideCell }, largeRow);
+
+                var next = await Call(client, "query", new Dictionary<string, object> { ["cursor"] = first["cursor"], ["page"] = 2 });
+                Assert.Equal(first["rev_instantanea"], next["rev_instantanea"]);
+                Assert.Equal(2L, next["page"]);
+                var nextRow = Assert.IsType<List<object>>(Assert.Single(Assert.IsType<List<object>>(next["rows"])));
+                Assert.Equal(new object[] { 70002L, "segunda fila" }, nextRow);
+            }
+            finally { File.Delete(Path.Combine(ResultStore.Folder, id + ".txt")); }
         }
 
         [Fact]
@@ -402,6 +437,8 @@ namespace PDI.RevitMcp.Tests
         /// <summary>Add-in simulado: mismas respuestas que el real, con datos fijos.</summary>
         private sealed class FakeRevit : IRequestHandler
         {
+            private readonly QuerySnapshotStore _snapshots = new QuerySnapshotStore();
+            internal static readonly string WideCell = new string('é', 600000) + "🚧\nfin";
             public volatile bool SlowCancelled;
             public readonly List<string> Seen = new List<string>();
             public readonly ConcurrentDictionary<string, Session> SeenSessions = new ConcurrentDictionary<string, Session>();
@@ -438,6 +475,27 @@ namespace PDI.RevitMcp.Tests
 
             public Dictionary<string, object> HelloInfo() => new Dictionary<string, object> { ["revit"] = "2024" };
 
+            private Response WideQuery(Session session, Request request, string cursor)
+            {
+                if (cursor == null)
+                {
+                    var spec = QuerySpec.Parse(request.Args);
+                    var rows = new List<Dictionary<string, object>>
+                    {
+                        new Dictionary<string, object> { ["id"] = 70001L, ["comments"] = WideCell },
+                        new Dictionary<string, object> { ["id"] = 70002L, ["comments"] = "segunda fila" },
+                    };
+                    cursor = _snapshots.Put(session.Id, Doc, _versions.Rev, spec, rows, () => _versions.Rev, out var refusal);
+                    Assert.True(cursor != null, refusal);
+                }
+                Assert.Equal(SnapshotLookup.Ok, _snapshots.Get(cursor, session.Id, Doc, out var snapshot));
+                var page = (int)(Arg.GetLong(request.Args, "page") ?? 1L);
+                var data = (Dictionary<string, object>)ResultTable.Render(snapshot.Spec, snapshot.Rows, page, snapshot.Spec.PageSize);
+                data["cursor"] = cursor;
+                data["rev_instantanea"] = snapshot.Rev;
+                return new Response { Id = request.Id, Rev = snapshot.Rev, Datos = data };
+            }
+
             public async Task<Response> HandleAsync(Session s, Request r, CancellationToken ct)
             {
                 SeenSessions[s.Id] = s;
@@ -451,6 +509,9 @@ namespace PDI.RevitMcp.Tests
                         catch (OperationCanceledException) { SlowCancelled = true; return Response.Fail(r.Id, Status.TiempoAgotado, "cancelado"); }
                         return new Response { Id = r.Id };
                     case Wire.OpQuery:
+                        var cursor = Arg.GetString(r.Args, "cursor");
+                        if (cursor != null || Arg.GetString(r.Args, "ids") == "70001,70002")
+                            return WideQuery(s, r, cursor);
                         QuerySpec q;
                         try { q = QuerySpec.Parse(r.Args); }
                         catch (Exception ex) when (ex is QueryException || ex is ArgumentException) { return Response.Fail(r.Id, Status.Invalido, ex.Message); }

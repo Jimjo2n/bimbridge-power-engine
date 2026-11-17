@@ -5,7 +5,9 @@ using System.Diagnostics;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using PDI.RevitMcp.Addin.Scripting;
 using PDI.RevitMcp.Engine;
+using PDI.RevitMcp.Engine.Qc;
 using PDI.RevitMcp.Protocol;
 
 namespace PDI.RevitMcp.Addin.Revit
@@ -19,6 +21,7 @@ namespace PDI.RevitMcp.Addin.Revit
         private readonly List<string> _levels;
         private readonly string _viewsArg;
         private readonly bool _exact;
+        private readonly bool _readInventory;
         private int _phase;
         private List<ElementId> _viewIds;
         private int _nextView;
@@ -26,11 +29,13 @@ namespace PDI.RevitMcp.Addin.Revit
         public readonly List<LightingAudit.Fixture> Fixtures = new List<LightingAudit.Fixture>();
         public readonly List<LightingAudit.Tag> Tags = new List<LightingAudit.Tag>();
         public readonly List<LightingAudit.ViewCount> Views = new List<LightingAudit.ViewCount>();
+        public readonly List<ManifestQc.Actual> Inventory = new List<ManifestQc.Actual>();
         /// <summary>Todas las luminarias del modelo (también fuera del filtro de nivel), para no confundir tags de otros niveles con huérfanos.</summary>
         public readonly HashSet<long> AllFixtureIds = new HashSet<long>();
         public List<string> Levels => _levels;
         public long Rev;
         public string Error;
+        public bool Stale;
         /// <summary>0.9.1: caché de nombres de la auditoría (aciertos y fallos observados para las métricas).</summary>
         public readonly ElementFields.NameCache Names = new ElementFields.NameCache();
         /// <summary>Luminarias y etiquetas abiertas (observado).</summary>
@@ -41,11 +46,12 @@ namespace PDI.RevitMcp.Addin.Revit
         /// planos de techo; o ids separados por coma. Con <paramref name="levels"/> sólo las vistas de esos niveles.</param>
         /// <param name="exact">true = luminarias realmente visibles (regenera cada vista; máximo LightingAudit.MaxExactViews).
         /// false = estimación por nivel asociado, sin regenerar nada.</param>
-        public LightingAuditRunner(List<string> levels, string views, bool exact)
+        public LightingAuditRunner(List<string> levels, string views, bool exact, bool readInventory = false)
         {
             _levels = levels ?? new List<string>();
             _viewsArg = string.IsNullOrWhiteSpace(views) ? null : views.Trim();
             _exact = exact;
+            _readInventory = readInventory;
         }
 
         public bool Step(UIApplication app, Stopwatch sw, int budgetMs, DocumentTracker tracker)
@@ -54,6 +60,12 @@ namespace PDI.RevitMcp.Addin.Revit
             if (doc == null) { Error = docError; return true; }
             if (doc.IsFamilyDocument) { Error = Status.NoSoportado + ": lighting_audit revisa proyectos; el destino " + DocTarget.Current?.Describe() + " es una familia. Use fam info o exec"; return true; }
             var deadline = sw.ElapsedMilliseconds + budgetMs;
+            if (_readInventory && _phase != 0 && (tracker.For(doc)?.Rev ?? 0) != Rev)
+            {
+                Stale = true;
+                Error = "el documento cambió durante la lectura de luminarias, etiquetas y vistas; repita la auditoría";
+                return true;
+            }
 
             if (_phase == 0)
             {
@@ -77,6 +89,8 @@ namespace PDI.RevitMcp.Addin.Revit
                         Workset = ws == null ? null : (wsNames.TryGetValue(e.WorksetId.IntegerValue, out var wn) ? wn : wsNames[e.WorksetId.IntegerValue] = ws.GetWorkset(e.WorksetId)?.Name),
                         Type = fi?.Symbol != null ? fi.Symbol.FamilyName + ": " + fi.Symbol.Name : e.Name,
                     });
+                    if (_readInventory && Bim.Manifiesto.Observe(doc, e) is ManifestQc.Actual actual)
+                        Inventory.Add(actual);
                 }
                 _phase = 1;
                 if (sw.ElapsedMilliseconds >= deadline) return false;

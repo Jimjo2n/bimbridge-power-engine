@@ -13,6 +13,7 @@ using PDI.RevitMcp.Addin.Revit.Geo;
 using PDI.RevitMcp.Addin.Revit.Writes;
 using PDI.RevitMcp.Engine;
 using PDI.RevitMcp.Engine.Geo;
+using PDI.RevitMcp.Engine.Qc;
 using PDI.RevitMcp.Protocol;
 
 namespace PDI.RevitMcp.Addin.Revit
@@ -517,22 +518,41 @@ namespace PDI.RevitMcp.Addin.Revit
             if (name == "copy_monitor") return await CopyMonitorCheck(session, request, ct).ConfigureAwait(false);
             if (name == "cobertura") return CoverageCheck(request);
             if (name == "historial") return HistoryCheck(session, request);
+            if (name == "tabla_audit") return await ScheduleCheck(request, ct).ConfigureAwait(false);
+            if (name == "vista_audit") return await VisibilityCheck(request, ct).ConfigureAwait(false);
             if (name == "model_health") return await ModelHealthCheck(request, ct).ConfigureAwait(false);
             if (name != "lighting_audit")
-                return Response.Fail(request.Id, Status.Invalido, "check disponible en esta versión: lighting_audit, copy_monitor");
+                return Response.Fail(request.Id, Status.Invalido, "check disponible: lighting_audit, tabla_audit, vista_audit, copy_monitor, cobertura, historial, model_health");
 
             var tagRule = Arg.GetString(request.Args, "tags") ?? "uno";
             if (tagRule != "uno" && tagRule != "ninguno" && tagRule != "ignorar")
                 return Response.Fail(request.Id, Status.Invalido, "tags debe ser uno (un tag por luminaria), ninguno (sin tags) o ignorar");
+            List<ManifestQc.Expected> inventory = null;
+            ManifestQc.Options inventoryOptions = null;
+            if (request.Args.TryGetValue("manifiesto", out var rawManifest))
+            {
+                if (!(rawManifest is Dictionary<string, object> manifest))
+                    return Response.Fail(request.Id, Status.Invalido, "manifiesto exige un objeto JSON con elementos en mm");
+                try { inventory = ManifestQc.Parse(manifest, out inventoryOptions); }
+                catch (ArgumentException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
+            }
             var runner = new LightingAuditRunner(Arg.GetStringList(request.Args, "lvl"), Arg.GetString(request.Args, "views"),
-                Arg.GetBool(request.Args, "exacto") ?? false);
+                Arg.GetBool(request.Args, "exacto") ?? false, readInventory: inventory != null);
             var sw = Stopwatch.StartNew();
             var result = await RunMain((app, watch, budget) => runner.Step(app, watch, budget, _tracker),
                 highPriority: true, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!result.Ok) return FromWork(request.Id, result);
-            if (runner.Error != null) return Response.Fail(request.Id, Status.Invalido, runner.Error);
+            if (runner.Error != null) return Response.Fail(request.Id, runner.Stale ? Status.Conflicto : Status.Invalido, runner.Error);
 
             var datos = LightingAudit.Summarize(runner.Fixtures, runner.Tags, runner.Views, out var sets, runner.AllFixtureIds, runner.Levels, tagRule);
+            var state = Status.Ok;
+            if (inventory != null)
+            {
+                var comparison = LightingAudit.CompareInventory(inventory, inventoryOptions, runner.Inventory, runner.Fixtures, runner.Tags, runner.Views);
+                datos["inventario"] = comparison;
+                if (Equals(comparison["aprobado"], false) || (datos.TryGetValue("cumple_regla", out var passed) && Equals(passed, false)))
+                    state = Status.ConDiferencias;
+            }
             if (sets.Count > 0)
             {
                 foreach (var kv in sets) session.Sets.Save(kv.Key, kv.Value, TargetId, TargetTitle);
@@ -544,7 +564,7 @@ namespace PDI.RevitMcp.Addin.Revit
                 datos["metricas"] = WorkflowMetrics.FromMainThread(sw.ElapsedMilliseconds, result.WaitMs, result.BusyMs, result.Slices, result.MaxSliceMs)
                     .Observe("elements_read", runner.ElementsRead).Observe("elements_written", 0).Observe("transactions", 0)
                     .Observe("cache_hits", runner.Names.Hits).Observe("cache_misses", runner.Names.Misses).ToJson();
-            return new Response { Id = request.Id, Rev = runner.Rev, Datos = datos };
+            return new Response { Id = request.Id, Rev = runner.Rev, Datos = datos, Estado = state };
         }
 
         // ---------------- plan / commit / job (fase 3) ----------------
