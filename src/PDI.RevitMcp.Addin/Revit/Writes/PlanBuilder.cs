@@ -68,6 +68,14 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 case "group_create": GroupCreate(ctx, op, ids, c); break;
                 case "ungroup": Ungroup(ctx, op, ids, c); break;
                 case "group_place": GroupPlace(ctx, op, c); break;
+                case "group_variant":
+                {
+                    var target = GroupVariant.Plan(ctx, ids.Single(), op.Args);
+                    var show = "crear variante de grupo " + Arg.GetString(target, "nombre") + " desde " + ids[0] +
+                        " con " + ((Dictionary<string, object>)target["cambios"]).Count + " sustituciones";
+                    c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = target });
+                    break;
+                }
                 case "view_create": ViewCreate(ctx, op, c); break;
                 case "view_set": ViewSet(ctx, op, ids, c); break;
                 case "view_hide": ViewHide(ctx, op, ids, c); break;
@@ -76,6 +84,8 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 case "sheet_place": SheetPlace(ctx, op, c); break;
                 case "sheet_set": SheetSetOp(ctx, op, c); break;
                 case "text_note": TextNoteOp(ctx, op, c); break;
+                case "text_note_refresh": RefreshTextNotes(ctx, ids, c); break;
+                case "annotation_rebind": RebindAnnotation(ctx, op, ids.Single(), c); break;
                 case "filled_region": FilledRegionOp(ctx, op, c); break;
                 case "detail_line": DetailCurvesOp(ctx, op, c, "detail_line"); break;
                 case "detail_rect": DetailCurvesOp(ctx, op, c, "detail_rect"); break;
@@ -747,12 +757,49 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
             if (gref == 0) gt = ctx.Model.FindType(Arg.GetString(op.Args, "tipo"), "group_place", t => t is GroupType, "tipos de grupo") as GroupType;
             else if (!ctx.Ops.TryGetValue(gref, out var src) || src.Kind != "group_create")
                 throw new QueryException("group_place tipo: @" + gref + " debe ser un group_create de este plan");
+            var level = Arg.GetString(op.Args, "nivel") is string levelName ? ctx.Model.FindLevel(levelName, op.Kind) : null;
+            var workset = Arg.GetString(op.Args, "ws") is string worksetName ? ctx.Model.FindWorkset(worksetName, op.Kind) : null;
+            var rotation = OpCatalog.Number(op.Args, "rot", op.Kind);
+            var reuse = Arg.GetBool(op.Args, "reutilizar") == true;
+            Group prototype = null;
+            string signature = null;
+            if (Arg.GetLong(op.Args, "prototipo") is long sourceId)
+            {
+                prototype = ctx.Doc.GetElement(Ids.ToId(sourceId)) as Group;
+                if (prototype == null || gt == null || prototype.GetTypeId() != gt.Id)
+                    throw new QueryException("group_place: el prototipo debe existir y corresponder al tipo de esta variante");
+                signature = GroupPlacement.Signature(prototype);
+            }
             var points = OpCatalog.Points(op.Args["puntos"], "group_place puntos", 1, 200);
             foreach (var p in points)
             {
-                var t = new Dictionary<string, object> { ["x"] = p[0], ["y"] = p[1], ["z"] = p.Length > 2 ? p[2] : 0.0 };
+                var t = new Dictionary<string, object>
+                {
+                    ["x"] = p[0], ["y"] = p[1], ["z"] = (p.Length > 2 ? p[2] : 0.0) + (level?.ProjectElevation ?? 0),
+                };
                 if (gt != null) t["gtype"] = Ids.ToLong(gt.Id); else t["gref"] = (long)gref;
+                if (level != null) t["nivel"] = Ids.ToLong(level.Id);
+                if (rotation.HasValue) t["rot"] = rotation.Value;
+                if (workset != null) t["ws"] = (long)workset.Id.IntegerValue;
+                if (signature != null) { t["firma_miembros"] = signature; t["prototipo"] = Ids.ToLong(prototype.Id); }
+                if (reuse)
+                {
+                    t["reutilizar"] = true;
+                    if (gt != null)
+                    {
+                        var matches = GroupPlacement.AtPoint(ctx.Doc, gt.Id, GroupPlacement.Point(t));
+                        if (matches.Count > 1) throw new QueryException("hay más de un grupo de este tipo en el punto");
+                        if (matches.Count == 1)
+                        {
+                            var found = GroupPlacement.Difference(matches[0], t);
+                            if (found != null) throw new QueryException("el grupo existente difiere en " + found);
+                            c.Note("se conserva el grupo verificado " + Ids.ToLong(matches[0].Id));
+                            continue;
+                        }
+                    }
+                }
                 var show = "grupo " + (gt?.Name ?? "@" + gref) + " en (" + Math.Round(p[0], 3) + ", " + Math.Round(p[1], 3) + (p.Length > 2 ? ", " + Math.Round(p[2], 3) : "") + ")";
+                if (level != null) show += " relativo a " + level.Name;
                 c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });
             }
         }
@@ -1291,11 +1338,61 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
             ElementId typeId = tn != null ? ctx.Model.FindType(tn, "text_note", x => x is TextNoteType, "tipos de texto").Id : ctx.Doc.GetDefaultElementTypeId(ElementTypeGroup.TextNoteType);
             if (typeId == null || typeId == ElementId.InvalidElementId) throw new QueryException("text_note: no hay tipo de texto por defecto; dé tipo");
             var t = new Dictionary<string, object> { ["x"] = p[0], ["y"] = p[1], ["texto"] = text, ["ttype"] = Ids.ToLong(typeId) };
+            if (Arg.GetLong(op.Args, "luminaria") is long light)
+            {
+                var config = LightingCallout.Bind(ctx.Doc, light, op.Args);
+                var uid = Arg.GetString(config, "uid");
+                var key = "llamada:" + (view?.UniqueId ?? "@" + viewRef) + ":" + uid;
+                if (!ctx.NewNames.Add(key) || (view != null && LightingCallout.InView(ctx.Doc, view.Id)
+                    .Any(note => Arg.GetString(LightingCallout.Read(note), "uid") == uid)))
+                    throw new QueryException("ya existe una llamada gestionada de esta luminaria en la vista. Use text_note_refresh");
+                var state = LightingCallout.Observe(ctx.Doc, config);
+                text = state.Text;
+                t["texto"] = text;
+                t["llamada"] = config;
+                t["huella_origen"] = LightingCallout.Fingerprint(config, state.Text, state.Point, state.TypeUid);
+            }
             foreach (var key in new[] { "negrita", "subrayado" })
                 if (Arg.GetBool(op.Args, key) is bool value) t[key] = value;
             if (view != null) t["view"] = Ids.ToLong(view.Id); else t["view_ref"] = (long)viewRef;
             var show = "nota '" + (text.Length > 40 ? text.Substring(0, 40) + "…" : text) + "' en " + (view?.Name ?? "@" + viewRef);
             c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });
+        }
+
+        private static void RefreshTextNotes(BuildContext ctx, IList<long> ids, Collector c)
+        {
+            foreach (var id in ids.Distinct())
+            {
+                if (!(ctx.Doc.GetElement(Ids.ToId(id)) is TextNote note) || LightingCallout.Read(note) is not Dictionary<string, object> config)
+                    throw new QueryException("la nota " + id + " no tiene una asociación gestionada");
+                var state = LightingCallout.Observe(ctx.Doc, config);
+                if (LightingCallout.IsCurrent(note, config, state.Text, state.Point, state.TypeUid)) continue;
+                var source = LightingCallout.Fingerprint(config, state.Text, state.Point, state.TypeUid);
+                var view = ctx.Doc.GetElement(note.OwnerViewId) as View ?? throw new QueryException("la vista de la nota ya no existe");
+                var future = LightingCallout.WithSource(config, state.Point, state.TypeUid);
+                var futureSource = LightingCallout.Fingerprint(future, state.Text, state.Point, state.TypeUid);
+                var position = LightingCallout.Reposition(note, view, config, state.Point);
+                var show = "Regenerar llamada " + id + ": " + note.Text + " → " + state.Text;
+                c.Add(new PlanEntry { Id = id, Key = "llamada_luminaria", Before = LightingCallout.NoteFingerprint(note, config, source),
+                    After = LightingCallout.NoteFingerprint(state.Text, position, future, futureSource), Show = show, Target = new Dictionary<string, object>() });
+            }
+        }
+
+        private static void RebindAnnotation(BuildContext ctx, OpSpec op, long id, Collector c)
+        {
+            if (ctx.Doc.IsFamilyDocument) throw new QueryException("annotation_rebind sólo admite anotaciones de un proyecto");
+            var original = ctx.Doc.GetElement(Ids.ToId(id));
+            if (original == null || original.Pinned) throw new QueryException("la anotación debe existir y estar desbloqueada");
+            if (!ctx.NewNames.Add("annotation_rebind:" + id)) throw new QueryException("la anotación ya está en otro reemplazo del plan");
+            var data = new Dictionary<string, object> { ["original"] = id };
+            foreach (var key in new[] { "destino", "refs_estables" })
+                if (op.Args.TryGetValue(key, out var value)) data[key] = value;
+            var references = AnnotationRepair.ResolveTargets(ctx.Doc, original, data);
+            data["original_firma"] = AnnotationRepair.Fingerprint(original);
+            data["refs_destino"] = references.Select(r => (object)r.ConvertToStableRepresentation(ctx.Doc)).ToList();
+            var show = "reparar anotación " + id + " en la vista " + Ids.ToLong(original.OwnerViewId) +
+                " con referencias a " + string.Join(", ", references.Select(r => Ids.ToLong(r.ElementId)));
+            c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = data });
         }
 
         private static void FilledRegionOp(BuildContext ctx, OpSpec op, Collector c)

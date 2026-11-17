@@ -20,6 +20,7 @@ namespace PDI.RevitMcp.Tests
             public readonly List<string> Ops = new List<string>();
             public Correlation LastCorrelation;
             public Dictionary<string, object> LastArgs;
+            public Action<Session> SessionClosed;
             /// <summary>Si se fija, ctx agente=… registra como lo hace el add-in (TryRegister sobre el registro de sesiones).</summary>
             public SessionRegistry Registry;
             public Dictionary<string, object> HelloInfo() => new Dictionary<string, object>();
@@ -36,7 +37,7 @@ namespace PDI.RevitMcp.Tests
                 if (request.Op == Wire.OpCommit) d["plan_id"] = "P-0001";
                 return Task.FromResult(new Response { Id = request.Id, Estado = Status.Ok, Datos = d });
             }
-            public void OnSessionClosed(Session session) { }
+            public void OnSessionClosed(Session session) => SessionClosed?.Invoke(session);
         }
 
         private static async Task<NamedPipeClientStream> Connect(string pipe, string agent = null, string client = "prueba", long pid = 4242)
@@ -126,7 +127,13 @@ namespace PDI.RevitMcp.Tests
         {
             var pipe = NewPipe();
             var sessions = new SessionRegistry();
-            var h = new Recorder { Registry = sessions };
+            var closedCount = 0;
+            var bothClosed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var h = new Recorder
+            {
+                Registry = sessions,
+                SessionClosed = _ => { if (Interlocked.Increment(ref closedCount) == 2) bothClosed.TrySetResult(true); },
+            };
             using (var host = new PipeHost(pipe, null, sessions, h, new EngineConfig()))
             {
                 host.Start();
@@ -142,6 +149,7 @@ namespace PDI.RevitMcp.Tests
                     Assert.Equal(Status.Ok, (await qa).Estado);
                     Assert.Equal(Status.Ok, (await qb).Estado);
                 }
+                await bothClosed.Task.WaitAsync(TimeSpan.FromSeconds(10));
             }
             var ids = sessions.Closed().Select(x => x.Id).ToList();
             Assert.Equal(2, ids.Distinct().Count());

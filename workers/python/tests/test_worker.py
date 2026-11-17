@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 import unittest
+import zipfile
 from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -128,6 +129,36 @@ class PdfDeliveryTests(unittest.TestCase):
                 self.assertEqual(stale["estado"], "con_diferencias")
                 self.assertEqual({d["tipo"] for d in stale["diferencias"]},
                                  {"recibo_distinto", "igual_al_anterior", "texto_ausente", "rgb_vectorial_no_encontrado"})
+            finally:
+                worker.close()
+
+
+class FeederWorkbookTests(unittest.TestCase):
+    def test_xlsx_schedule_reads_source_cells_and_explicit_open_terminal(self):
+        with tempfile.TemporaryDirectory(dir=FX) as folder:
+            path = os.path.join(folder, "feeders.xlsx")
+            namespace = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+            relationship = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            with zipfile.ZipFile(path, "w") as book:
+                book.writestr("xl/workbook.xml",
+                              f'<workbook xmlns="{namespace}" xmlns:r="{relationship}"><sheets><sheet name="Feeders" r:id="r1"/></sheets></workbook>')
+                book.writestr("xl/_rels/workbook.xml.rels", '<Relationships><Relationship Id="r1" Target="worksheets/sheet1.xml"/></Relationships>')
+                book.writestr("xl/sharedStrings.xml", f'<sst xmlns="{namespace}"><si><t>XF-2</t></si></sst>')
+                book.writestr("xl/worksheets/sheet1.xml", f"""<worksheet xmlns="{namespace}"><sheetData>
+                    <row r="1"><c r="A1" t="inlineStr"><is><t>ID</t></is></c><c r="B1" t="inlineStr"><is><t>Origen</t></is></c>
+                    <c r="C1" t="inlineStr"><is><t>Destino</t></is></c><c r="D1" t="inlineStr"><is><t>Abierto</t></is></c></row>
+                    <row r="2"><c r="A2" t="s"><v>0</v></c><c r="B2" t="inlineStr"><is><t>METER</t></is></c>
+                    <c r="D2" t="b"><v>1</v></c></row>
+                    </sheetData></worksheet>""")
+            worker = Worker()
+            try:
+                response = worker.call("xlsx_feeders", {"ruta": path, "hoja": "Feeders"})
+                self.assertEqual(response["codigo"], "OK", response)
+                edge, = response["resultado"]["aristas"]
+                self.assertEqual(edge["id"], "XF-2")
+                self.assertIsNone(edge["destino"])
+                self.assertTrue(edge["abierto"])
+                self.assertEqual(edge["fuente"]["celdas"]["origen"], "B2")
             finally:
                 worker.close()
 

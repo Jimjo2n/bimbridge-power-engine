@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -13,6 +14,16 @@ namespace PDI.RevitMcp.Tests
     /// <summary>Instalador: detecta Revit, instala por versión, conserva la config, Codex y desinstala.</summary>
     public class SetupTests : IDisposable
     {
+        [Fact]
+        public void UpdateWaitRestartsWhenRevitIsReopenedBeforeAStableExit()
+        {
+            var samples = new Queue<bool>(new[] { true, true, false, true, false, false });
+            var polls = 0;
+            Assert.True(RevitExitWait.Run(() => samples.Dequeue(), () => true, _ => polls++, TimeSpan.FromSeconds(1)));
+            Assert.Equal(5, polls);
+            Assert.Empty(samples);
+        }
+
         private readonly string _root = Path.Combine(Path.GetTempPath(), "pdi-setup-" + Guid.NewGuid().ToString("N").Substring(0, 8));
         private readonly SetupPaths _p;
 

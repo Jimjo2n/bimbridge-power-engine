@@ -144,8 +144,29 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 ["diametro"] = OpCatalog.Length(op.Args, "diametro", op.Kind).Value,
             };
             if (op.Kind == "conduit_route")
-                settings["puntos"] = OpCatalog.Points(op.Args["puntos"], op.Kind + " puntos", 3, 100)
-                    .Select(p => (object)WriteKit.List(p[0], p[1], p[2])).ToList();
+            {
+                var points = OpCatalog.Points(op.Args["puntos"], op.Kind + " puntos", 3, 100);
+                settings["puntos"] = points.Select(p => (object)WriteKit.List(p[0], p[1], p[2])).ToList();
+                var a = new XYZ(points[0][0], points[0][1], points[0][2]);
+                var b = new XYZ(points.Last()[0], points.Last()[1], points.Last()[2]);
+                if (op.Args.TryGetValue("reemplazar_ids", out var replace))
+                {
+                    var replacing = ((List<object>)replace).Cast<long>().ToList();
+                    foreach (var id in replacing)
+                        if (!ctx.NewNames.Add("conduit_route:" + id))
+                            throw new QueryException("el ID " + id + " ya está en el alcance de otro reemplazo del plan");
+                    var original = ConduitRouteScope.Capture(ctx.Doc, replacing, a, b);
+                    settings["reemplazar_ids"] = replace;
+                    settings["huella_original"] = original["huella"];
+                    settings["extremos"] = original["extremos"];
+                }
+                else if (op.Args.ContainsKey("terminal_inicio") || op.Args.ContainsKey("terminal_fin"))
+                {
+                    object Terminal(string name, XYZ point) => op.Args.TryGetValue(name, out var port)
+                        ? ConduitRouteScope.Terminal(ctx.Doc, (Dictionary<string, object>)port, point, mustBeFree: true) : null;
+                    settings["extremos"] = new List<object> { Terminal("terminal_inicio", a), Terminal("terminal_fin", b) };
+                }
+            }
             else
             {
                 var a = OpCatalog.Point(op.Args["inicio"], op.Kind + " inicio", true);
@@ -156,6 +177,8 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
             if (ws != null) settings["ws"] = (long)ctx.Model.FindWorkset(ws, op.Kind).Id.IntegerValue;
             var show = (op.Kind == "conduit_route" ? "recorrido de conduit " : "conduit ") +
                 type.Name + " Ø" + Ft((double)settings["diametro"]) + " en " + level.Name;
+            if (settings.TryGetValue("reemplazar_ids", out var old))
+                show += " reemplazando " + ((List<object>)old).Count + " elementos, con extremos conservados";
             c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = settings });
         }
 

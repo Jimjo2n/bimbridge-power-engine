@@ -93,6 +93,7 @@ $required = @(
   "bridge/power_engine/python/bimbridge_docworker/worker.py",
   "bridge/power_engine/python/bimbridge_docworker/pdf.py",
   "bridge/power_engine/python/bimbridge_docworker/docx.py",
+  "bridge/power_engine/python/bimbridge_docworker/xlsx.py",
   "bridge/power_engine/python/vendor/pdfminer/__init__.py",
   "bridge/power_engine/python/vendor/charset_normalizer/__init__.py"
 )

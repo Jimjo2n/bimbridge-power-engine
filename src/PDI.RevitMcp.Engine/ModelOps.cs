@@ -146,6 +146,22 @@ namespace PDI.RevitMcp.Engine
                         if (points[i].Zip(points[i - 1], (a, b) => (a - b) * (a - b)).Sum() < Draw2D.ShortCurve * Draw2D.ShortCurve)
                             throw new QueryException("conduit_route: los puntos consecutivos coinciden o forman un tramo demasiado corto");
                     if (!Positive(o, "diametro", kind, 20).HasValue) throw new QueryException("conduit_route: indique diametro");
+                    if (o.TryGetValue("reemplazar_ids", out var replace))
+                    {
+                        if (!(replace is List<object> ids) || ids.Count < 1 || ids.Count > 200 ||
+                            ids.Any(id => !(id is long n) || n <= 0) || ids.Distinct().Count() != ids.Count)
+                            throw new QueryException("conduit_route: reemplazar_ids exige de 1 a 200 IDs positivos y únicos de tramos y codos");
+                        if (o.ContainsKey("terminal_inicio") || o.ContainsKey("terminal_fin"))
+                            throw new QueryException("conduit_route: al reemplazar, los terminales se conservan desde las conexiones existentes");
+                    }
+                    foreach (var key in new[] { "terminal_inicio", "terminal_fin" })
+                    {
+                        if (!o.TryGetValue(key, out var value)) continue;
+                        if (!(value is Dictionary<string, object> terminal) || terminal.Count != 2 ||
+                            !(Arg.GetLong(terminal, "id") is long id) || id <= 0 ||
+                            !(Arg.GetLong(terminal, "conector") is long port) || port < 0 || port > int.MaxValue)
+                            throw new QueryException("conduit_route: " + key + " exige {id,conector}");
+                    }
                     break;
                 }
                 case "circuit_create":

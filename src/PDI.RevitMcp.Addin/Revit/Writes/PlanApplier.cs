@@ -70,6 +70,14 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 case "loc": return WriteKit.Loc(e);
                 case "rot": return WriteKit.Loc(e) + "|" + WriteKit.Rot(e);
                 case "head": return e is IndependentTag tag ? PlanBuilder.HeadCanon(tag) : WriteKit.Missing;
+                case "llamada_luminaria":
+                    if (!(e is TextNote note) || LightingCallout.Read(note) is not Dictionary<string, object> link) return WriteKit.Missing;
+                    try
+                    {
+                        var state = LightingCallout.Observe(_doc, link);
+                        return LightingCallout.NoteFingerprint(note, link, LightingCallout.Fingerprint(link, state.Text, state.Point, state.TypeUid));
+                    }
+                    catch (QueryException ex) { return "\u0000" + ex.Message; }
                 case "plantilla": return v == null ? WriteKit.Missing : (_doc.GetElement(v.ViewTemplateId) as View)?.Name ?? "ninguna";
                 case "rango": return v is ViewPlan vp ? PlanBuilder.RangeCanon(_doc, vp) : "";
                 case "escala": return v == null ? WriteKit.Missing : PlanEntry.Canon((long)v.Scale);
@@ -130,7 +138,13 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                     }
                     return "";
                 case "group_place":
-                    return Exists("gtype") ? "" : "\u0000el tipo de grupo ya no existe";
+                    if (!Exists("gtype") || !Exists("nivel") || !Exists("prototipo")) return "\u0000el tipo, nivel o prototipo de grupo ya no existe";
+                    if (t.ContainsKey("prototipo") && GroupPlacement.Signature((Group)_doc.GetElement(Ids.ToId(WriteKit.L(t, "prototipo")))) != WriteKit.S(t, "firma_miembros"))
+                        return "\u0000cambiaron los miembros del prototipo";
+                    return "";
+                case "group_variant":
+                    try { GroupVariant.Validate(_doc, t); return ""; }
+                    catch (QueryException ex) { return "\u0000" + ex.Message; }
                 case "view_create":
                 {
                     if (!Exists("nivel") || !Exists("vft") || !Exists("origen") || (t.ContainsKey("plantilla") && !Exists("plantilla"))) return "\u0000el nivel, tipo, plantilla u origen ya no existe";
@@ -166,8 +180,22 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                     return "";
                 }
                 case "text_note":
+                    if (t.TryGetValue("llamada", out var data) && data is Dictionary<string, object> config)
+                    {
+                        try
+                        {
+                            var state = LightingCallout.Observe(_doc, config);
+                            if (LightingCallout.Fingerprint(config, state.Text, state.Point, state.TypeUid) != WriteKit.S(t, "huella_origen"))
+                                return "\u0000cambió la luminaria de origen";
+                        }
+                        catch (QueryException ex) { return "\u0000" + ex.Message; }
+                    }
+                    return Exists("view") && Exists("ttype") ? "" : "\u0000la vista o el tipo ya no existe";
                 case "filled_region":
                     return Exists("view") && Exists("ttype") && Exists("frtype") ? "" : "\u0000la vista o el tipo ya no existe";
+                case "annotation_rebind":
+                    try { ReadAnnotationTargets(t); return ""; }
+                    catch (QueryException ex) { return "\u0000" + ex.Message; }
                 case "detail_line": case "detail_rect": case "detail_polygon": case "detail_arc":
                     return Exists("view") && Exists("gs") ? "" : "\u0000la vista o el estilo de línea ya no existe";
                 case "detail_component":
@@ -311,6 +339,19 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                     }
                     var verificationError = VerifySourcePlacements() ?? VerifyConduitRoutes();
                     if (verificationError != null) return AbortGroup(group, verificationError);
+                    foreach (var callout in _plan.Entries.Where(e => e.Key == "llamada_luminaria"))
+                        if (!PlanEntry.Same(Current(callout), callout.After))
+                            return AbortGroup(group, "La llamada " + callout.Id + " no conservó texto, posición o asociación después de regenerarse");
+                    foreach (var (target, id) in _managedGroups)
+                        if (GroupPlacement.Difference(_doc.GetElement(id) as Group, target) is string difference)
+                            return AbortGroup(group, "El grupo " + Ids.ToLong(id) + " difiere en " + difference);
+                    foreach (var annotation in _replacementAnnotations)
+                        if (!ReplacementAnnotationIsValid(annotation))
+                            return AbortGroup(group, "La anotación nueva " + Ids.ToLong(annotation.NewId) + " perdió las referencias previstas");
+                    foreach (var (target, id) in _groupVariants)
+                        if (_doc.GetElement(Ids.ToId(WriteKit.L(target, "grupo"))) != null ||
+                            !GroupVariant.Matches(_doc.GetElement(id) as Group, target))
+                            return AbortGroup(group, "La variante de grupo perdió sus miembros o su montaje");
                     if (Trial) return FinishTrial(group);
                     if (group.Assimilate() != TransactionStatus.Committed)
                         return AbortGroup(group, "Revit no confirmó la asimilación del grupo");
@@ -647,6 +688,17 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                     Ids.ToLong(f.LevelId) != WriteKit.L(t, "lvl") || point.DistanceTo(wanted) > oneMillimeter ||
                     (t.ContainsKey("ws") && f.WorksetId.IntegerValue != WriteKit.L(t, "ws")))
                     return "Colocación: " + (WriteKit.S(t, "item_fuente") ?? Where(entry)) + " (id " + Ids.ToLong(id) + ") no coincide en tipo, nivel, posición o workset";
+                if (t.TryGetValue("params", out var parameters) && parameters is Dictionary<string, object> expectedParams)
+                    foreach (var pair in expectedParams)
+                    {
+                        var parameter = f.LookupParameter(pair.Key);
+                        var value = pair.Value;
+                        if (value is Dictionary<string, object> raw && raw.TryGetValue("raw", out var input) &&
+                            (parameter == null || !WriteKit.TryTarget(_doc, parameter, input, out value, out _, out _)))
+                            return "Colocación: no se pudo releer el parámetro " + pair.Key + " en " + Ids.ToLong(id);
+                        if (!PlanEntry.Same(WriteKit.ParamValue(parameter), PlanEntry.Canon(value)))
+                            return "Colocación: no coincide el parámetro " + pair.Key + " en " + Ids.ToLong(id);
+                    }
             }
             return null;
         }
@@ -767,6 +819,9 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 }
                 case "head":
                     MoveTag(e as IndependentTag ?? throw new InvalidOperationException("no es un tag"), t);
+                    break;
+                case "llamada_luminaria":
+                    RefreshCallout(entry, e as TextNote ?? throw new InvalidOperationException("la nota ya no existe"));
                     break;
                 case "plantilla":
                     if (v == null) throw new InvalidOperationException("no es una vista");
@@ -958,11 +1013,13 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 case "tag": return new[] { CreateTag(t) };
                 case "group_create": return new[] { GroupCreate(t) };
                 case "group_place": return new[] { GroupPlace(t) };
+                case "group_variant": return new[] { RebuildGroupVariant(t) };
                 case "view_create": return new[] { ViewCreate(t) };
                 case "sheet_create": return new[] { SheetCreate(t) };
                 case "sheet_place": return new[] { SheetPlace(t) };
                 case "sheet_set": return new[] { SheetSetCreate(t) };
                 case "text_note": return new[] { TextNoteCreate(t) };
+                case "annotation_rebind": return new[] { AnnotationRebind(t) };
                 case "filled_region": return new[] { FilledRegionCreate(t) };
                 case "detail_line": case "detail_rect": case "detail_polygon": return DetailCurvesCreate(t);
                 case "detail_arc": return new[] { DetailArcCreate(t) };
@@ -1092,14 +1149,55 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
             return g.Id;
         }
 
+        private readonly List<(Dictionary<string, object> Target, ElementId Id)> _managedGroups =
+            new List<(Dictionary<string, object>, ElementId)>();
+        private readonly List<(Dictionary<string, object> Target, ElementId Id)> _groupVariants =
+            new List<(Dictionary<string, object>, ElementId)>();
+
+        private ElementId RebuildGroupVariant(Dictionary<string, object> target)
+        {
+            var group = GroupVariant.Rebuild(_doc, target);
+            _deleted.Add(WriteKit.L(target, "grupo"));
+            _r.Deleted++;
+            _groupVariants.Add((target, group.Id));
+            return group.Id;
+        }
+
         private ElementId GroupPlace(Dictionary<string, object> t)
         {
             GroupType gt;
             if (t.ContainsKey("gtype")) gt = _doc.GetElement(Ids.ToId(WriteKit.L(t, "gtype"))) as GroupType;
             else gt = (_doc.GetElement(Ids.ToId(FirstCreated((int)WriteKit.L(t, "gref"), "tipo"))) as Group)?.GroupType;
             if (gt == null) throw new InvalidOperationException("el tipo de grupo ya no existe");
-            var g = _doc.Create.PlaceGroup(new XYZ(WriteKit.D(t, "x"), WriteKit.D(t, "y"), WriteKit.D(t, "z", 0)), gt);
-            return g?.Id ?? throw new InvalidOperationException("Revit no colocó el grupo");
+            var point = GroupPlacement.Point(t);
+            if (WriteKit.B(t, "reutilizar") && GroupPlacement.AtPoint(_doc, gt.Id, point).Count > 0)
+                throw new InvalidOperationException("apareció un grupo en el punto previsto; vuelva a planificar");
+            var g = _doc.Create.PlaceGroup(point, gt) ?? throw new InvalidOperationException("Revit no colocó el grupo");
+            if (t.ContainsKey("nivel"))
+            {
+                var wanted = Ids.ToId(WriteKit.L(t, "nivel"));
+                var parameter = g.get_Parameter(BuiltInParameter.GROUP_LEVEL);
+                if (parameter == null || (parameter.AsElementId() != wanted && (parameter.IsReadOnly || !parameter.Set(wanted))))
+                    throw new InvalidOperationException("Revit no admitió el nivel de referencia del grupo");
+                _doc.Regenerate();
+                if (g.Location is LocationPoint location && location.Point.DistanceTo(point) > Tol)
+                    ElementTransformUtils.MoveElement(_doc, g.Id, point - location.Point);
+            }
+            if (t.ContainsKey("rot"))
+            {
+                var location = (LocationPoint)g.Location;
+                location.Rotate(Line.CreateBound(point, point + XYZ.BasisZ), WriteKit.D(t, "rot") * Math.PI / 180 - location.Rotation);
+            }
+            if (t.ContainsKey("ws"))
+            {
+                var workset = g.get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM);
+                var wanted = (int)WriteKit.L(t, "ws");
+                if (workset == null || (workset.AsInteger() != wanted && (workset.IsReadOnly || !workset.Set(wanted))))
+                    throw new InvalidOperationException("Revit no admitió el workset del grupo");
+            }
+            if (t.ContainsKey("nivel") || t.ContainsKey("rot") || t.ContainsKey("ws") || t.ContainsKey("firma_miembros"))
+                _managedGroups.Add((t, g.Id));
+            return g.Id;
         }
 
         private ElementId ViewCreate(Dictionary<string, object> t)
@@ -1258,16 +1356,74 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
         private ElementId TextNoteCreate(Dictionary<string, object> t)
         {
             var view = ViewOf(t) ?? throw new InvalidOperationException("la vista ya no existe");
+            var config = t.TryGetValue("llamada", out var data) ? data as Dictionary<string, object> : null;
+            if (config != null && LightingCallout.InView(_doc, view.Id)
+                .Any(existing => Arg.GetString(LightingCallout.Read(existing), "uid") == Arg.GetString(config, "uid")))
+                throw new InvalidOperationException("la luminaria ya tiene una llamada gestionada en la vista");
             var note = TextNote.Create(_doc, view.Id, ViewPoint(view, WriteKit.D(t, "x"), WriteKit.D(t, "y")), WriteKit.S(t, "texto") ?? "", Ids.ToId(WriteKit.L(t, "ttype")));
             if (note == null) throw new InvalidOperationException("Revit no creó la nota");
-            if (t.ContainsKey("negrita") || t.ContainsKey("subrayado"))
+            LightingCallout.Format(note, t);
+            if (config != null)
             {
-                var text = note.GetFormattedText();
-                if (t.ContainsKey("negrita")) text.SetBoldStatus(WriteKit.B(t, "negrita"));
-                if (t.ContainsKey("subrayado")) text.SetUnderlineStatus(WriteKit.B(t, "subrayado"));
-                note.SetFormattedText(text);
+                var state = LightingCallout.Observe(_doc, config);
+                if (LightingCallout.Fingerprint(config, state.Text, state.Point, state.TypeUid) != WriteKit.S(t, "huella_origen"))
+                    throw new InvalidOperationException("cambió la luminaria de origen después de planificar la nota");
+                LightingCallout.Write(note, config, state.Point, state.TypeUid);
             }
             return note.Id;
+        }
+
+        private void RefreshCallout(PlanEntry entry, TextNote note)
+        {
+            var config = LightingCallout.Read(note) ?? throw new InvalidOperationException("la nota perdió la asociación");
+            var state = LightingCallout.Observe(_doc, config);
+            var source = LightingCallout.Fingerprint(config, state.Text, state.Point, state.TypeUid);
+            if (LightingCallout.NoteFingerprint(note, config, source) != entry.Before)
+                throw new InvalidOperationException("la nota o la luminaria cambió después de planificar");
+            var view = _doc.GetElement(note.OwnerViewId) as View ?? throw new InvalidOperationException("la vista ya no existe");
+            note.Coord = LightingCallout.Reposition(note, view, config, state.Point);
+            if (note.Text != state.Text)
+            {
+                note.Text = state.Text;
+                LightingCallout.Format(note, config);
+            }
+            LightingCallout.Write(note, config, state.Point, state.TypeUid);
+        }
+
+        private readonly List<(ElementId OldId, ElementId NewId, ElementId ViewId, List<string> References)> _replacementAnnotations =
+            new List<(ElementId, ElementId, ElementId, List<string>)>();
+
+        private (Element Original, List<Reference> Resolved) ReadAnnotationTargets(Dictionary<string, object> data)
+        {
+            var old = _doc.GetElement(Ids.ToId(WriteKit.L(data, "original")));
+            if (old == null || old.Pinned || AnnotationRepair.Fingerprint(old) != WriteKit.S(data, "original_firma"))
+                throw new QueryException("la anotación original cambió después de planificar");
+            var targets = AnnotationRepair.ResolveTargets(_doc, old, data);
+            if (!targets.Select(r => r.ConvertToStableRepresentation(_doc)).SequenceEqual(Arg.GetStringList(data, "refs_destino")))
+                throw new QueryException("cambiaron las referencias destino");
+            return (old, targets);
+        }
+
+        private ElementId AnnotationRebind(Dictionary<string, object> data)
+        {
+            var (old, targets) = ReadAnnotationTargets(data);
+            var view = _doc.GetElement(old.OwnerViewId) as View ?? throw new InvalidOperationException("no existe la vista de la anotación");
+            var created = AnnotationRepair.Recreate(old, view, targets);
+            var oldId = old.Id;
+            var removed = _doc.Delete(oldId);
+            if (removed.Count != 1 || !removed.Contains(oldId))
+                throw new InvalidOperationException("Revit intentó borrar otros elementos al sustituir la anotación");
+            _deleted.Add(Ids.ToLong(oldId));
+            _r.Deleted++;
+            _replacementAnnotations.Add((oldId, created.Id, view.Id, Arg.GetStringList(data, "refs_destino")));
+            return created.Id;
+        }
+
+        private bool ReplacementAnnotationIsValid((ElementId OldId, ElementId NewId, ElementId ViewId, List<string> References) annotation)
+        {
+            var live = _doc.GetElement(annotation.NewId);
+            if (_doc.GetElement(annotation.OldId) != null || live == null || live.OwnerViewId != annotation.ViewId) return false;
+            return AnnotationRepair.References(live).Select(r => r.ConvertToStableRepresentation(_doc)).SequenceEqual(annotation.References);
         }
 
         private ElementId FilledRegionCreate(Dictionary<string, object> t)

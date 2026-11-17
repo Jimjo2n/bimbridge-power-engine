@@ -14,6 +14,24 @@ namespace PDI.RevitMcp.Tests
     /// </summary>
     public class ModelOpsTests
     {
+        [Fact]
+        public void ConduitReplacementAndNewTerminalAttachmentsAreDistinctContracts()
+        {
+            Dictionary<string, object> Route() => Json.ParseObject(OpCatalog.ByKind["conduit_route"].Example);
+            var replace = Route();
+            replace["reemplazar_ids"] = new List<object> { 1L, 2L, 3L };
+            Assert.Equal("conduit_route", OpSpec.Parse(replace).Kind);
+            var port = new Dictionary<string, object> { ["id"] = 900L, ["conector"] = 2L };
+            replace["terminal_inicio"] = port;
+            Assert.Throws<QueryException>(() => OpSpec.Parse(replace));
+            replace.Remove("terminal_inicio");
+            replace["reemplazar_ids"] = new List<object> { 1L, 1L };
+            Assert.Throws<QueryException>(() => OpSpec.Parse(replace));
+            var create = Route();
+            create["terminal_inicio"] = port;
+            Assert.Equal("conduit_route", OpSpec.Parse(create).Kind);
+        }
+
         private static List<OpSpec> Plan(string opsJson) => OpSpec.ParseAll(Json.ParseObject("{\"ops\":[" + opsJson + "]}"));
 
         private static void Rejected(string opJson, string fragment)

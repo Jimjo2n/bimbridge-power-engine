@@ -520,9 +520,16 @@ namespace PDI.RevitMcp.Addin.Revit
             if (name == "historial") return HistoryCheck(session, request);
             if (name == "tabla_audit") return await ScheduleCheck(request, ct).ConfigureAwait(false);
             if (name == "vista_audit") return await VisibilityCheck(request, ct).ConfigureAwait(false);
+            if (name == "llamadas_audit") return await CalloutCheck(session, request, ct).ConfigureAwait(false);
+            if (name == "terminales_audit") return await TerminalCheck(request, ct).ConfigureAwait(false);
+            if (name == "equipos_audit") return await TerminalCheck(request, ct, equipment: true).ConfigureAwait(false);
+            if (name == "ruta_audit") return await RouteAuditCheck(request, ct).ConfigureAwait(false);
+            if (name == "grupos_audit") return await GroupAuditCheck(request, ct).ConfigureAwait(false);
+            if (name == "anotaciones_audit") return await AnnotationAuditCheck(request, ct).ConfigureAwait(false);
+            if (name == "riser_geometria") return await RiserDrawingCheck(request, ct).ConfigureAwait(false);
             if (name == "model_health") return await ModelHealthCheck(request, ct).ConfigureAwait(false);
             if (name != "lighting_audit")
-                return Response.Fail(request.Id, Status.Invalido, "check disponible: lighting_audit, tabla_audit, vista_audit, copy_monitor, cobertura, historial, model_health");
+                return Response.Fail(request.Id, Status.Invalido, "check disponible: lighting_audit, tabla_audit, vista_audit, llamadas_audit, terminales_audit, equipos_audit, ruta_audit, grupos_audit, anotaciones_audit, riser_geometria, copy_monitor, cobertura, historial, model_health");
 
             var tagRule = Arg.GetString(request.Args, "tags") ?? "uno";
             if (tagRule != "uno" && tagRule != "ninguno" && tagRule != "ignorar")

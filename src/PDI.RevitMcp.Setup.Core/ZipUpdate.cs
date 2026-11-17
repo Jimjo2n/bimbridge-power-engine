@@ -453,6 +453,21 @@ namespace PDI.RevitMcp.Setup
         public Func<ProfilePolicy> Policy = () => new ProfilePolicy();
     }
 
+    public static class RevitExitWait
+    {
+        public static bool Run(Func<bool> running, Func<bool> continueWaiting, Action<TimeSpan> sleep, TimeSpan poll)
+        {
+            var clear = 0;
+            while (continueWaiting())
+            {
+                clear = running() ? 0 : clear + 1;
+                if (clear == 2) return true;
+                sleep(poll);
+            }
+            return false;
+        }
+    }
+
     /// <summary>
     /// El proceso externo que aplica una actualización preparada. Espera a que no haya ningún Revit abierto (dos lecturas seguidas),
     /// nunca cierra ni mata Revit, re-verifica el instalador, lo ejecuta, verifica la instalación y, si no queda bien, vuelve a la anterior.
@@ -468,15 +483,18 @@ namespace PDI.RevitMcp.Setup
             var start = h.UtcNow();
             SetState(updatesDir, p, "esperando_cierre_revit");
             h.Log("Esperando a que el usuario cierre Revit para instalar " + p.Version + ". BIMBRIDGE no cierra Revit.");
-            var clear = 0;
-            while (clear < 2)
+            string stopped = null;
+            bool ContinueWaiting()
             {
                 var cur = ZipUpdate.ReadPending(updatesDir);
-                if (cur == null || cur.Id != p.Id) return Finish(updatesDir, p, "cancelada_usuario", "se canceló o reemplazó la actualización preparada");
-                if (h.UtcNow() - start > maxWait) return Finish(updatesDir, p, "cancelada_tiempo", "Revit siguió abierto más de " + maxWait.TotalHours.ToString("0.#", CultureInfo.InvariantCulture) + " h; no se instaló nada");
-                clear = h.RevitRunning() ? 0 : clear + 1;
-                if (clear < 2) h.Sleep(Poll);
+                if (cur == null || cur.Id != p.Id) stopped = "cancelada_usuario";
+                else if (h.UtcNow() - start > maxWait) stopped = "cancelada_tiempo";
+                return stopped == null;
             }
+            if (!RevitExitWait.Run(h.RevitRunning, ContinueWaiting, h.Sleep, Poll))
+                return stopped == "cancelada_usuario"
+                    ? Finish(updatesDir, p, stopped, "se canceló o reemplazó la actualización preparada")
+                    : Finish(updatesDir, p, stopped, "Revit siguió abierto más de " + maxWait.TotalHours.ToString("0.#", CultureInfo.InvariantCulture) + " h; no se instaló nada");
 
             var prov = ZipUpdate.VerifyStagedProvenance(p, h.Keys(), h.Policy());
             if (prov != null) return Finish(updatesDir, p, "procedencia_rechazada", prov + ". No se instaló nada.");

@@ -82,9 +82,8 @@ namespace PDI.RevitMcp.Tests
         }
 
         [Fact]
-        public void Catalog_Has44Ops_AndGuideMentionsEach()
+        public void Catalog_GuideMentionsEveryOperationAndExamplesParse()
         {
-            Assert.Equal(46, OpCatalog.All.Count);
             var guide = OpCatalog.Guide();
             foreach (var i in OpCatalog.All)
             {

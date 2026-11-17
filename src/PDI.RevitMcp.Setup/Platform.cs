@@ -25,19 +25,22 @@ namespace PDI.RevitMcp.Setup
 
         public static Stream OpenPayload() => Assembly.GetExecutingAssembly().GetManifestResourceStream("payload.zip");
 
-        public static bool RevitRunning() => !SetupPaths.IsSandbox && Process.GetProcessesByName("Revit").Length > 0;
+        public static bool RevitRunning()
+        {
+            if (SetupPaths.IsSandbox) return false;
+            var instances = Process.GetProcessesByName("Revit");
+            try { return instances.Length > 0; }
+            finally { foreach (var instance in instances) instance.Dispose(); }
+        }
 
         public const int WaitingForRevit = 6;
 
         public static bool WaitForRevitExit()
         {
+            if (SetupPaths.IsSandbox) return true;
             var elapsed = Stopwatch.StartNew();
-            while (RevitRunning())
-            {
-                if (elapsed.Elapsed >= TimeSpan.FromHours(24)) return false;
-                System.Threading.Thread.Sleep(1000);
-            }
-            return true;
+            return RevitExitWait.Run(RevitRunning, () => elapsed.Elapsed < TimeSpan.FromHours(24),
+                System.Threading.Thread.Sleep, TimeSpan.FromSeconds(1));
         }
 
         public static FileStream LockInstallation(SetupPaths paths)
@@ -261,10 +264,8 @@ namespace PDI.RevitMcp.Setup
                     return 5;
                 }
                 if (Platform.RevitRunning())
-                {
                     Report(paths, Platform.WaitingForRevit, "Instalación pendiente. Cierre todas las ventanas de Revit para aplicarla.");
-                    if (!Platform.WaitForRevitExit()) return Report(paths, 2, "La espera terminó con Revit abierto.");
-                }
+                if (!Platform.WaitForRevitExit()) return Report(paths, 2, "La espera terminó con Revit abierto.");
                 using (var zip = new System.IO.Compression.ZipArchive(Platform.OpenPayload()))
                     core.Install(zip, new InstallOptions { Versions = versions.ToList(), Levels = c.Levels ?? before?.Levels ?? "R", Codex = c.Codex || (before?.Codex ?? false), AllowInUse = true, RequireManifest = true }, Platform.ProductVersion);
                 if (c.Claude)
@@ -305,10 +306,8 @@ namespace PDI.RevitMcp.Setup
         {
             using var installation = Platform.LockInstallation(paths);
             if (Platform.RevitRunning())
-            {
                 Report(paths, Platform.WaitingForRevit, "Actualización pendiente. Cierre todas las ventanas de Revit para aplicarla. Abra Revit después de que termine la instalación.");
-                if (!Platform.WaitForRevitExit()) return Report(paths, 2, "La espera terminó con Revit abierto.");
-            }
+            if (!Platform.WaitForRevitExit()) return Report(paths, 2, "La espera terminó con Revit abierto.");
             var before = core.ReadInstalled();
             if (before == null || before.Versions.Count == 0) return Report(paths, 3, "No hay una instalación previa: use el instalador normal.");
             var mine = Updates.Parse(Platform.ProductVersion);

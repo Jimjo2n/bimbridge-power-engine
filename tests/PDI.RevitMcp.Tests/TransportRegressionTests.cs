@@ -64,6 +64,81 @@ namespace PDI.RevitMcp.Tests
         }
 
         [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task SourceBoundWrite_ReconnectsToOriginalReceiptAndRetryUsesTheSameOutcome(bool queued)
+        {
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            const string doc = "documento-prueba";
+            const string model = "huella-modelo-prueba";
+            const string agent = "agente-de-prueba";
+            const string plan = "P-1";
+            var source = SourceBinding.Resolve(new List<object>
+            {
+                new Dictionary<string, object>
+                {
+                    ["op"] = "place", [SourceBinding.OpField] = SourceBinding.Token("pdf", "fixture", "sha", "1", "registro", "lote", 1),
+                },
+            });
+            var journal = Journal();
+            var pipe = "bimbridge-resume-" + Guid.NewGuid().ToString("N");
+            using var server = new NamedPipeServerStream(pipe, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+            using var bridge = new RevitConnection { FixedTarget = (pipe, null) };
+            var mutations = 0;
+            async Task<Request> Read() => Request.FromJson(await Frame.ReadAsync(server, deadline.Token));
+            Task Reply(Request request, object data) => Frame.WriteAsync(server, Json.Write(new Response { Id = request.Id, Datos = data }), deadline.Token);
+            async Task Accept()
+            {
+                await server.WaitForConnectionAsync(deadline.Token);
+                var hello = await Read();
+                Assert.Equal(Wire.OpHello, hello.Op);
+                await Reply(hello, new Dictionary<string, object> { [Wire.WriteReceiptFeature] = true });
+            }
+            async Task Peer()
+            {
+                await Accept();
+                var sent = await Read();
+                Assert.Equal(Wire.OpCommit, sent.Op);
+                Assert.Equal(source.Key, sent.Args[Wire.KeyArg]);
+                Assert.Equal(OperationJournal.BeginKind.New, journal.Begin(source.Key, doc, Wire.OpCommit, source.Hash, null,
+                    "primera", OperationJournal.ReconcileMode.None, model, "generation", sent.AttemptId, agent, plan).Kind);
+                if (queued) journal.LinkJob(source.Key, doc, "cola-1");
+                mutations++;
+                journal.Complete(source.Key, doc, Status.Ok, new Dictionary<string, object> { ["id"] = 771L });
+                server.Disconnect();
+
+                await Accept();
+                var query = await Read();
+                Assert.Equal(Wire.OpJob, query.Op);
+                var reopened = new OperationJournal(journal.Path_);
+                var receipt = reopened.FindReceipt(Arg.GetString(query.Args, "intento_id"), "segunda", agent, doc, model);
+                await Reply(query, receipt);
+                var retry = await Read();
+                Assert.Equal(Wire.OpCommit, retry.Op);
+                Assert.Equal(source.Key, retry.Args[Wire.KeyArg]);
+                var replay = reopened.Begin(source.Key, doc, Wire.OpCommit, source.Hash, null, "segunda");
+                Assert.Equal(OperationJournal.BeginKind.Completed, replay.Kind);
+                await Reply(retry, new Dictionary<string, object> { ["repeticion"] = true });
+            }
+            var peer = Peer();
+            var commit = new Dictionary<string, object> { ["plan_id"] = plan, [Wire.KeyArg] = source.Key };
+            var lost = await bridge.CallAsync(Wire.OpCommit, commit, TimeSpan.FromSeconds(5), deadline.Token);
+            Assert.Equal(Status.Desconocido, lost.Estado);
+            var data = Assert.IsType<Dictionary<string, object>>(lost.Datos);
+            var intent = Assert.IsType<Dictionary<string, object>>(data["recibo"])["intento_id"];
+            var recovered = await bridge.CallAsync(Wire.OpJob, new Dictionary<string, object> { ["intento_id"] = intent },
+                TimeSpan.FromSeconds(5), deadline.Token);
+            var saved = Assert.IsType<Dictionary<string, object>>(recovered.Datos);
+            Assert.Equal(Status.Ok, saved["estado"]);
+            Assert.Equal(intent, saved["intento_id"]);
+            Assert.Equal(queued ? "cola-1" : null, saved["job_id"]);
+            var replayed = await bridge.CallAsync(Wire.OpCommit, commit, TimeSpan.FromSeconds(5), deadline.Token);
+            Assert.Equal(true, Assert.IsType<Dictionary<string, object>>(replayed.Datos)["repeticion"]);
+            await peer;
+            Assert.Equal(1, mutations);
+        }
+
+        [Theory]
         [InlineData("escribir")]
         [InlineData(" ejecutar ")]
         public void AcceptedWriteModeMustNeverBeClassifiedAsRead(string mode)

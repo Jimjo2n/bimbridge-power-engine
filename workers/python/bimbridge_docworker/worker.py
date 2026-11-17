@@ -85,7 +85,7 @@ def sha256_file(path):
 # ---------------- trabajos ----------------
 
 def _jobs():
-    from . import pdf, docx  # import diferido: el saludo no depende de pdfminer
+    from . import pdf, docx, xlsx  # import diferido: el saludo no depende de pdfminer
     return {
         "pdf_info": pdf.info,
         "pdf_verify": pdf.verify,
@@ -94,10 +94,11 @@ def _jobs():
         "pdf_symbols": pdf.symbols,
         "pdf_grids": pdf.grids,
         "docx_extract": docx.extract,
+        "xlsx_feeders": xlsx.read_feeders,
     }
 
 
-JOB_NAMES = ["pdf_info", "pdf_verify", "pdf_extract", "pdf_tables", "pdf_symbols", "pdf_grids", "docx_extract"]
+JOB_NAMES = ["pdf_info", "pdf_verify", "pdf_extract", "pdf_tables", "pdf_symbols", "pdf_grids", "docx_extract", "xlsx_feeders"]
 
 
 def capabilities():

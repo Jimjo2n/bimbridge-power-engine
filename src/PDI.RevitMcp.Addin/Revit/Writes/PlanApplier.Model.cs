@@ -46,6 +46,8 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
             var name = WriteKit.S(t, "nombre");
             switch (op)
             {
+                case "conduit_route":
+                    return VerifyRouteScope(t) is string routeError ? "\u0000" + routeError : "";
                 case "level_create":
                     if (name != null && new FilteredElementCollector(_doc).OfClass(typeof(Level)).Any(l => string.Equals(l.Name, name, StringComparison.OrdinalIgnoreCase)))
                         return "\u0000ya existe el nivel '" + name + "'";
@@ -237,6 +239,18 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
         private IEnumerable<ElementId> CreateConduitRoute(Dictionary<string, object> target)
         {
             var points = RoutePoints(target);
+            var scopeError = VerifyRouteScope(target);
+            if (scopeError != null) throw new InvalidOperationException(scopeError);
+            if (target.ContainsKey("reemplazar_ids"))
+            {
+                var replacement = WriteKit.Longs(target, "reemplazar_ids").Select(Ids.ToId).ToList();
+                var removed = _doc.Delete(replacement);
+                if (!new HashSet<ElementId>(removed).SetEquals(replacement))
+                    throw new InvalidOperationException("Revit intentó eliminar elementos fuera del alcance; se revierte el reemplazo");
+                foreach (var id in removed) _deleted.Add(Ids.ToLong(id));
+                _r.Deleted += removed.Count;
+                _doc.Regenerate();
+            }
             var segments = new List<Conduit>();
             for (var i = 1; i < points.Count; i++) segments.Add(CreateConduit(target, points[i - 1], points[i]));
             _doc.Regenerate();
@@ -249,6 +263,12 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 SetConduitWorkset(elbow, target);
                 elbows.Add(elbow.Id);
             }
+            _doc.Regenerate();
+            var terminals = RouteTerminals(target);
+            if (terminals[0] is Dictionary<string, object> first)
+                AtEnd(segments[0], points[0]).ConnectTo(ConduitRouteScope.Resolve(_doc, first, points[0], mustBeFree: true));
+            if (terminals[1] is Dictionary<string, object> last)
+                AtEnd(segments.Last(), points.Last()).ConnectTo(ConduitRouteScope.Resolve(_doc, last, points.Last(), mustBeFree: true));
             var ids = segments.Select(s => s.Id).ToList();
             _conduitRoutes.Add((target, ids, elbows));
             return ids.Concat(elbows).ToArray();
@@ -256,6 +276,31 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
 
         private static List<XYZ> RoutePoints(Dictionary<string, object> t) =>
             OpCatalog.Points(t["puntos"], "conduit_route puntos", 3, 100).Select(p => new XYZ(p[0], p[1], p[2])).ToList();
+
+        private static List<object> RouteTerminals(Dictionary<string, object> target) =>
+            target.TryGetValue("extremos", out var ends) ? (List<object>)ends : new List<object> { null, null };
+
+        private string VerifyRouteScope(Dictionary<string, object> target)
+        {
+            if (!target.ContainsKey("extremos")) return null;
+            try
+            {
+                var points = RoutePoints(target);
+                var replacing = target.ContainsKey("reemplazar_ids");
+                if (replacing)
+                {
+                    var current = ConduitRouteScope.Capture(_doc, WriteKit.Longs(target, "reemplazar_ids").ToList(), points[0], points.Last());
+                    if (!Equals(current["huella"], target["huella_original"])) return "cambió el recorrido original después de planificar";
+                }
+                var terminals = RouteTerminals(target);
+                if (terminals[0] is Dictionary<string, object> first)
+                    ConduitRouteScope.Resolve(_doc, first, points[0], mustBeFree: !replacing);
+                if (terminals[1] is Dictionary<string, object> last)
+                    ConduitRouteScope.Resolve(_doc, last, points.Last(), mustBeFree: !replacing);
+                return null;
+            }
+            catch (QueryException ex) { return ex.Message; }
+        }
 
         private static Connector AtEnd(Conduit segment, XYZ point)
         {
@@ -273,27 +318,57 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
                 var points = RoutePoints(target);
                 var live = segments.Select(id => _doc.GetElement(id) as Conduit).ToList();
                 if (live.Any(s => s == null)) return "Recorrido: falta un tramo creado";
-                bool HasEnd(Conduit s, XYZ point) => s.ConnectorManager.Connectors.Cast<Connector>()
-                    .Any(c => c.ConnectorType == ConnectorType.End && Near(c.Origin, point) && !c.IsConnected);
+                bool HasEnd(Conduit s, XYZ point, object terminal)
+                {
+                    var connector = s.ConnectorManager.Connectors.Cast<Connector>()
+                        .SingleOrDefault(c => c.ConnectorType == ConnectorType.End &&
+                            c.Origin.DistanceTo(point) <= (terminal == null ? Tol : 1.0 / 304.8));
+                    if (connector == null) return false;
+                    if (!(terminal is Dictionary<string, object> saved)) return !connector.IsConnected;
+                    try
+                    {
+                        var external = ConduitRouteScope.Resolve(_doc, saved, point, mustBeFree: false);
+                        var refs = ConduitRouteScope.PhysicalReferences(connector);
+                        return refs.Count == 1 && connector.IsConnectedTo(external);
+                    }
+                    catch (QueryException) { return false; }
+                }
                 bool Connects(Conduit s, ElementId elbow) => s.ConnectorManager.Connectors.Cast<Connector>()
                     .Any(c => c.ConnectorType == ConnectorType.End && c.IsConnected &&
                         c.AllRefs.Cast<Connector>().Any(r => r.ConnectorType == ConnectorType.End && r.Owner.Id == elbow));
-                if (!HasEnd(live[0], points[0]) || !HasEnd(live.Last(), points.Last()))
+                var terminals = RouteTerminals(target);
+                if (!HasEnd(live[0], points[0], terminals[0]) || !HasEnd(live.Last(), points.Last(), terminals[1]))
                     return "Recorrido: cambiaron los extremos";
                 for (var i = 0; i < elbows.Count; i++)
                     if (_doc.GetElement(elbows[i]) == null || !Connects(live[i], elbows[i]) || !Connects(live[i + 1], elbows[i]))
                         return "Recorrido: el codo " + (i + 1) + " no conecta sus dos tramos";
-                foreach (var s in live)
+                for (var i = 0; i < live.Count; i++)
                 {
+                    var s = live[i];
                     var size = s.get_Parameter(BuiltInParameter.RBS_CONDUIT_DIAMETER_PARAM);
                     if (size == null || ModelOps.Differs(size.AsDouble(), WriteKit.D(target, "diametro"), Tol) ||
                         Ids.ToLong(s.GetTypeId()) != WriteKit.L(target, "ctype") ||
                         Ids.ToLong(s.ReferenceLevel?.Id) != WriteKit.L(target, "nivel") ||
                         (target.ContainsKey("ws") && s.WorksetId.IntegerValue != WriteKit.L(target, "ws")))
                         return "Recorrido: el tipo, nivel, diámetro o workset no coincide";
+                    if (!((s.Location as LocationCurve)?.Curve is Line line) ||
+                        !WithinLeg(line.GetEndPoint(0), points[i], points[i + 1]) ||
+                        !WithinLeg(line.GetEndPoint(1), points[i], points[i + 1]))
+                        return "Recorrido: el eje del tramo " + (i + 1) + " no coincide con el trazado previsto";
                 }
             }
             return null;
+        }
+
+        private static bool WithinLeg(XYZ point, XYZ start, XYZ end)
+        {
+            const double tolerance = 1.0 / 304.8;
+            var axis = end - start;
+            var offset = point - start;
+            var direction = axis.Normalize();
+            var projection = offset.DotProduct(direction);
+            return projection >= -tolerance && projection <= axis.GetLength() + tolerance &&
+                (offset - projection * direction).GetLength() <= tolerance;
         }
 
         private static IEnumerable<(string, BuiltInParameter)> SizeParams(string op) => op == "duct_create"

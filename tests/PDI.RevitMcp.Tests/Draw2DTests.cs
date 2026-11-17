@@ -43,6 +43,27 @@ namespace PDI.RevitMcp.Tests
         }
 
         [Fact]
+        public void ManagedLightingNotesUseARealSourceAndRefreshBySelectedIds()
+        {
+            var ops = Parse("{\"op\":\"text_note\",\"view\":123,\"punto\":[8,9],\"luminaria\":456,\"descontar_tipo_param\":\"Height\"}," +
+                "{\"op\":\"text_note_refresh\",\"ids\":\"$llamadas_desactualizadas\"}");
+            Assert.Equal(456L, Arg.GetLong(ops[0].Args, "luminaria"));
+            Assert.Equal("$llamadas_desactualizadas", ops[1].Set);
+            Assert.Throws<QueryException>(() => Parse("{\"op\":\"text_note\",\"view\":1,\"punto\":[8,9],\"luminaria\":2,\"texto\":\"manual\"}"));
+            Assert.Throws<QueryException>(() => Parse("{\"op\":\"text_note\",\"view\":1,\"punto\":[8,9]}"));
+            Assert.Throws<QueryException>(() => Parse("{\"op\":\"text_note_refresh\"}"));
+        }
+
+        [Fact]
+        public void AnnotationRepairRequiresOneAnnotationAndExplicitDestinationReferences()
+        {
+            Assert.Single(Parse("{\"op\":\"annotation_rebind\",\"ids\":[101],\"destino\":202}"));
+            Assert.Single(Parse("{\"op\":\"annotation_rebind\",\"ids\":[101],\"refs_estables\":[\"uidA:LINEAR\",\"uidB:LINEAR\"]}"));
+            Assert.Throws<QueryException>(() => Parse("{\"op\":\"annotation_rebind\",\"ids\":[101,102],\"destino\":202}"));
+            Assert.Throws<QueryException>(() => Parse("{\"op\":\"annotation_rebind\",\"ids\":[101],\"refs_estables\":[\"same\",\"same\"]}"));
+        }
+
+        [Fact]
         public void Geometry_RectPolygonArea_AndPaperViewRoundTrip()
         {
             var r = Draw2D.Rect(new double[] { 4, 2 }, new double[] { 0, 0 }, out var e);

@@ -205,6 +205,18 @@ namespace PDI.RevitMcp.Engine
                     break;
                 case "group_place":
                     OpCatalog.Points(o["puntos"], "group_place puntos", 1, 1000);
+                    OpCatalog.Number(o, "rot", "group_place");
+                    if (o.ContainsKey("reutilizar") && !Arg.GetBool(o, "reutilizar").HasValue)
+                        throw new QueryException("group_place reutilizar: indique true o false");
+                    if (o.ContainsKey("prototipo") && (!(Arg.GetLong(o, "prototipo") is long prototype) || prototype <= 0))
+                        throw new QueryException("group_place prototipo: indique el ID positivo del grupo de referencia");
+                    break;
+                case "group_variant":
+                    if (s.Ids.Count != 1 || s.Ids[0] <= 0 || s.Set != null || s.RefOps.Count != 0 ||
+                        !(o["reglas"] is Dictionary<string, object> groupRules) || groupRules.Count == 0 ||
+                        groupRules.Any(pair => string.IsNullOrWhiteSpace(pair.Key) ||
+                            !(pair.Value is string targetType) || string.IsNullOrWhiteSpace(targetType)))
+                        throw new QueryException("group_variant: indique el ID de un grupo y reglas {tipo anterior: tipo nuevo}");
                     break;
                 case "view_create":
                     var vt = (Arg.GetString(o, "tipo") ?? "").Trim().ToLowerInvariant();
@@ -243,9 +255,30 @@ namespace PDI.RevitMcp.Engine
                     break;
                 case "text_note":
                     OpCatalog.Point(o["punto"], "text_note punto", false);
+                    var linked = o.ContainsKey("luminaria");
+                    if (linked && (!(Arg.GetLong(o, "luminaria") is long lightId) || lightId <= 0 || o.ContainsKey("texto")))
+                        throw new QueryException("text_note: luminaria exige su ID positivo y genera el texto desde el modelo");
+                    if (!linked && string.IsNullOrWhiteSpace(Arg.GetString(o, "texto")))
+                        throw new QueryException("text_note: indique texto o luminaria");
+                    foreach (var key in new[] { "codigo_param", "altura_param", "descontar_tipo_param" })
+                        if (o.TryGetValue(key, out var name) && (!linked || !(name is string param) || string.IsNullOrWhiteSpace(param)))
+                            throw new QueryException("text_note: " + key + " exige una luminaria y el nombre de un parámetro");
                     foreach (var key in new[] { "negrita", "subrayado" })
                         if (o.ContainsKey(key) && !Arg.GetBool(o, key).HasValue)
                             throw new QueryException("text_note " + key + ": indique true o false");
+                    break;
+                case "annotation_rebind":
+                    if (s.Ids.Count != 1 || s.Ids[0] <= 0 || s.Set != null || s.RefOps.Count != 0)
+                        throw new QueryException("annotation_rebind: indique el ID de una sola anotación");
+                    if (o.ContainsKey("destino") == o.ContainsKey("refs_estables"))
+                        throw new QueryException("annotation_rebind: indique destino o refs_estables");
+                    if (o.ContainsKey("destino") && (!(Arg.GetLong(o, "destino") is long destination) || destination <= 0))
+                        throw new QueryException("annotation_rebind: destino debe ser un ID positivo");
+                    if (o.TryGetValue("refs_estables", out var stableRefs) &&
+                        (!(stableRefs is List<object> stable) || stable.Count < 2 || stable.Count > 100 ||
+                         stable.Any(x => !(x is string reference) || string.IsNullOrWhiteSpace(reference)) ||
+                         stable.Distinct().Count() != stable.Count))
+                        throw new QueryException("annotation_rebind: refs_estables exige de 2 a 100 referencias no repetidas");
                     break;
                 case "level_create":
                 case "grid_create":
