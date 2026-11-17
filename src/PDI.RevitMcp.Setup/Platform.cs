@@ -257,7 +257,7 @@ namespace PDI.RevitMcp.Setup
                 var before = core.ReadInstalled();
                 // 0.6.0: sin revit=/niveles= se conservan la elección y los permisos de la instalación anterior (p. ej. RPW).
                 var versions = c.Versions ?? (before != null && before.Versions.Count > 0 ? before.Versions.ToArray() : core.DetectRevit().Where(r => r.Installed).Select(r => r.Version).ToArray());
-                if (versions.Length == 0) { Console.Error.WriteLine("No se encontró Revit 2022-2026."); return 1; }
+                if (versions.Length == 0) { Console.Error.WriteLine("No se encontró Revit 2022-2027."); return 1; }
                 // Nunca sobre una instalación existente sin pedirlo; podría ser la de trabajo.
                 var conflicts = core.DetectConflicts(Platform.ProductVersion);
                 if (conflicts.Count > 0 && !c.Replace)

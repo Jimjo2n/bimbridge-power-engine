@@ -32,7 +32,7 @@ Dynamic C# is enabled by default for authorized local agents. It executes with t
 
 ## Compatibility and build
 
-Source build targets Revit 2022–2026. The add-in uses .NET Framework 4.8 for 2022–2024 and .NET 8 for 2025–2026. Revit 2024.3 is the environment named in the supplied partial native report; support targets are not equivalent to complete native acceptance.
+Source builds target Revit 2022–2027. The add-in targets .NET Framework 4.8 for 2022–2024, .NET 8 for 2025–2026 and .NET 10 for 2027. The supplied partial native report covers Revit 2024.3.
 
 A full Windows build requires the .NET 8 SDK, .NET Framework targeting support, Rust x64, Git, a real CPython executable and package restore access or populated caches.
 

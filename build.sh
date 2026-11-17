@@ -13,10 +13,10 @@ rm -rf dist && mkdir -p dist
 # Compilador del runner exec (Roslyn): va en addin/<v>/PDI.RevitMcp/roslyn/ y sólo se carga al primer exec.
 dotnet build src/PDI.RevitMcp.Scripting -c Release -v q
 ROSLYN=src/PDI.RevitMcp.Scripting/bin/Release/netstandard2.0
-for v in 2022 2023 2024 2025 2026; do
+for v in 2022 2023 2024 2025 2026 2027; do
   mkdir -p dist/addin/$v/PDI.RevitMcp
   if [ "$v" -ge 2025 ]; then
-    # Revit 2025–2026 (.NET 8): DLL precompiladas ReadyToRun (código nativo x64 + IL de respaldo) → sin compilar al primer uso.
+    # Revit 2025–2027: ReadyToRun (código nativo x64 + IL de respaldo) para el runtime del año.
     rm -rf obj/r2r_$v
     dotnet publish src/PDI.RevitMcp.Addin -c Release -p:RevitVersion=$v -r win-x64 --self-contained false \
       -p:PublishReadyToRun=true -o obj/r2r_$v -v q
@@ -38,6 +38,7 @@ done
 # Pruebas DESPUÉS de compilar los add-ins: las de exec compilan scripts contra el add-in de cada año.
 dotnet build src/PDI.RevitMcp.Addin -c Release -p:RevitVersion=2025 -v q
 dotnet build src/PDI.RevitMcp.Addin -c Release -p:RevitVersion=2026 -v q
+dotnet build src/PDI.RevitMcp.Addin -c Release -p:RevitVersion=2027 -v q
 dotnet test tests/PDI.RevitMcp.Tests
 dotnet publish src/PDI.RevitMcp.Bridge -c Release -r win-x64 --self-contained true \
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true \

@@ -14,7 +14,7 @@ namespace PDI.RevitMcp.Engine.Coverage
         public string Domain;        // F01..F37
         public string Status;        // CoverageStatus
         public string Strategy;      // prefijo: typed, query, doc, exec, engine, postcommand, none…
-        public int? Version;         // 2022..2026
+        public int? Version;         // 2022..2027, según la capacidad
         public string Category;      // categoría Revit
         public string DocumentKind;  // project | family | any
         public string Priority;      // P0..P3

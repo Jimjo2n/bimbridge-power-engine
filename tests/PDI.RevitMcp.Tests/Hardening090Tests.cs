@@ -165,7 +165,7 @@ namespace PDI.RevitMcp.Tests
             Assert.Equal("no_independiente", r.Estado);
             // huella independiente del orden
             var x = new[] { new IndependentVerifier.Item { Key = "a", X = 1 }, new IndependentVerifier.Item { Key = "b", Y = 2 } };
-            Assert.Equal(IndependentVerifier.Fingerprint(x), IndependentVerifier.Fingerprint(x.Reverse()));
+            Assert.Equal(IndependentVerifier.Fingerprint(x), IndependentVerifier.Fingerprint(Enumerable.Reverse(x)));
         }
 
         // ---------- P0.4: recibos críticos con revisión y procedencia ----------

@@ -35,7 +35,7 @@ namespace BimBridge.PowerEngine
             new Entry { Id = id, State = state, Engine = engine, Permission = permission, Function = function, Params = pars, Constraints = constraints, Example = example, Compatibility = compat, Tags = tags };
 
         private const string Csharp = "csharp", Rust = "rust (ffi|ipc) con respaldo C#", Python = "python (respaldo .NET sólo docx)", RevitApi = "C# + Revit API (add-in)";
-        private const string Revit = "Revit 2022–2026 (add-in)";
+        private const string Revit = "Revit 2022–2027 (add-in)";
         private const string NoRevit = "independiente de Revit";
 
         public static readonly List<Entry> All = new List<Entry>

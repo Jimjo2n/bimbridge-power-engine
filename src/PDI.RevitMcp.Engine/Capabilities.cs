@@ -15,7 +15,7 @@ namespace PDI.RevitMcp.Engine
     public static class Capabilities
     {
         /// <summary>Niveles de evidencia, de menor a mayor.</summary>
-        public const string Compila = "compila 2022–2026";
+        public const string Compila = "compila 2022–2027";
         public const string Unitaria = "compila + prueba sin Revit";
         public const string Fake = "compila + prueba con Revit simulado (motor/transporte)";
         public const string RevitLectura2024 = "probado en Revit 2024 (lectura, 0.2.x)";
@@ -108,7 +108,7 @@ namespace PDI.RevitMcp.Engine
             sb.Append("# Matriz de capacidades — BIMBRIDGE - Power Engine ").Append(version).Append("\n\n");
             sb.Append("Generada desde `src/PDI.RevitMcp.Engine/Capabilities.cs` (una prueba comprueba que coincide). ");
             sb.Append("Columna *evidencia*: lo que de verdad se comprobó. Lo nuevo de 0.6.0 todavía no se ha ejecutado dentro de Revit: ");
-            sb.Append("está compilado para 2022–2026 y probado sin Revit; la prueba nativa es `tools/aceptacion/PROCEDIMIENTO_0.6.0.md`.\n\n");
+            sb.Append("está compilado para 2022–2027 y probado sin Revit; la prueba nativa es `tools/aceptacion/PROCEDIMIENTO_0.6.0.md`.\n\n");
             sb.Append("| Orden | Qué hace | Proyecto | Familia | Nivel | Desde | Evidencia | Notas |\n|---|---|---|---|---|---|---|---|\n");
             foreach (var r in All)
                 sb.Append("| ").Append(r.Orden).Append(" | ").Append(r.Que).Append(" | ").Append(r.Proyecto).Append(" | ").Append(r.Familia)
@@ -120,6 +120,7 @@ namespace PDI.RevitMcp.Engine
             sb.Append("| 2024 | .NET Framework 4.8 | Roslyn 4.8 (en carpeta roslyn) | Nice3point 2024.3.60 |\n");
             sb.Append("| 2025 | .NET 8 | Roslyn 4.8 (contexto de carga propio) | Nice3point 2025.4.60 |\n");
             sb.Append("| 2026 | .NET 8 | Roslyn 4.8 (contexto de carga propio) | Nice3point 2026.4.10 |\n");
+            sb.Append("| 2027 | .NET 10 | Roslyn 4.8 (contexto de carga propio) | Nice3point 2027.0.0 |\n");
             sb.Append("\nEl build mínimo real de cada año no está comprobado: compilar contra la API de referencia no prueba que un método exista en un build anterior. ");
             sb.Append("ctx informa el build exacto y el runner informa el error concreto (MissingMethodException) si un método no existe.\n");
             return sb.ToString();

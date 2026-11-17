@@ -126,7 +126,7 @@ namespace PDI.RevitMcp.Setup
             }
             revit.Children.Add(wrap);
             if (!_core.DetectRevit().Any(r => r.Installed))
-                revit.Children.Add(Hint("No se encontró Revit 2022–2026 en C:\\Program Files\\Autodesk. Instale Revit primero."));
+                revit.Children.Add(Hint("No se encontró Revit 2022–2027 en C:\\Program Files\\Autodesk. Instale Revit primero."));
             body.Children.Add(Theme.Card(revit));
 
             // 2. Permisos

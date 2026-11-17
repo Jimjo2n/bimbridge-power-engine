@@ -353,7 +353,7 @@ namespace PDI.RevitMcp.Tests
         // ------------------------------------------------------------------ #23 matriz de capacidades
 
         [Theory]
-        [InlineData(2022)] [InlineData(2023)] [InlineData(2024)] [InlineData(2025)] [InlineData(2026)]
+        [InlineData(2022)] [InlineData(2023)] [InlineData(2024)] [InlineData(2025)] [InlineData(2026)] [InlineData(2027)]
         public void CopyMonitor_HasNoDirectApi_AndUiAssistedDependsOnTheRealClient(int year)
         {
             var noUi = NativeCapabilities.Describe(NativeCapabilities.CopyMonitorFixtures, year, new ClientEnvironment());

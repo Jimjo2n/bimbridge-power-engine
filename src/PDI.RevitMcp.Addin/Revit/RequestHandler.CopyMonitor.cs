@@ -232,7 +232,7 @@ namespace PDI.RevitMcp.Addin.Revit
                 session.Sets.Save(setName, baseline.Ids, TargetId, TargetTitle);
                 datos["conjunto_antes"] = "$" + setName;
                 var year = int.TryParse(probe.RevitVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out var y) ? y : 0;
-                if (year >= 2022 && year <= 2026)
+                if (year >= 2022 && year <= 2027)
                 {
                     // Sin ejecutor de UI autorizado (este add-in no lo tiene): el camino veraz es el traspaso manual.
                     var cap = NativeCapabilities.Describe(NativeCapabilities.CopyMonitorFixtures, year, new ClientEnvironment());

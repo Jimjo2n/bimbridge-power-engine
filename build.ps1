@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Compila y prueba todo, y arma dist\ en Windows.
 # Opcional: -RevitRoot "C:\Program Files\Autodesk" para compilar contra las DLL instaladas en vez de los paquetes de referencia.
-param([string]$RevitRoot = "", [string]$Python = "python.exe")
+param([string]$RevitRoot = "", [string]$Python = "python.exe", [switch]$SkipBenchmarks)
 $ErrorActionPreference = "Stop"
 # Sin BOM: los workers reciben JSONL por stdin y lo rechazan con razón si llega con BOM.
 $OutputEncoding = New-Object System.Text.UTF8Encoding($false)
@@ -38,14 +38,14 @@ Run "cargo build --locked --release --manifest-path native/power_engine/Cargo.to
 if ($LASTEXITCODE -ne 0) { throw "Falló la suite Python" }
 Run "dotnet build src/PDI.RevitMcp.Scripting -c Release -v q"
 $roslyn = "src/PDI.RevitMcp.Scripting/bin/Release/netstandard2.0"
-foreach ($v in 2022, 2023, 2024, 2025, 2026) {
+foreach ($v in 2022..2027) {
   $dir = if ($RevitRoot) { Join-Path $RevitRoot "Revit $v" }
   $extra = ""
   if ($RevitRoot -and (Test-Path (Join-Path $dir "RevitAPI.dll"))) { $extra = "`"-p:RevitApiDir=$dir`"" }
   $out = "dist/addin/$v/PDI.RevitMcp"
   New-Item -ItemType Directory -Force $out | Out-Null
   if ($v -ge 2025) {
-    # Revit 2025–2026 (.NET 8): ReadyToRun (código nativo x64 + IL de respaldo) → sin compilar al primer uso.
+    # Revit 2025–2027: ReadyToRun (código nativo x64 + IL de respaldo) para el runtime del año.
     $r2r = "obj/r2r_$v"
     Clear-BuildFolder $r2r
     Run "dotnet publish src/PDI.RevitMcp.Addin -c Release -p:RevitVersion=$v -r win-x64 --self-contained false -p:PublishReadyToRun=true -o $r2r -v q $extra"
@@ -63,7 +63,7 @@ foreach ($v in 2022, 2023, 2024, 2025, 2026) {
   Remove-Item "$out/PDI.RevitMcp.Scripting.dll" -ErrorAction SilentlyContinue
 }
 # Pruebas después de compilar los add-ins (las de exec compilan scripts contra el add-in de cada año).
-foreach ($v in 2025, 2026) { Run "dotnet build src/PDI.RevitMcp.Addin -c Release -p:RevitVersion=$v -v q" }
+foreach ($v in 2025..2027) { Run "dotnet build src/PDI.RevitMcp.Addin -c Release -p:RevitVersion=$v -v q" }
 Run "dotnet publish src/PDI.RevitMcp.Bridge -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o dist/bridge"
 Run "dotnet publish src/PDI.RevitMcp.AgentHost -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o dist/bridge"
 
@@ -97,7 +97,7 @@ $required = @(
   "bridge/power_engine/python/vendor/pdfminer/__init__.py",
   "bridge/power_engine/python/vendor/charset_normalizer/__init__.py"
 )
-foreach ($v in 2022..2026) {
+foreach ($v in 2022..2027) {
   $required += "addin/$v/PDI.RevitMcp.addin"
   foreach ($dll in "Addin", "Protocol", "Engine", "Setup.Core") {
     $required += "addin/$v/PDI.RevitMcp/PDI.RevitMcp.$dll.dll"
@@ -124,7 +124,8 @@ Get-ChildItem -Recurse -File addin, bridge | Sort-Object FullName | ForEach-Obje
 Pop-Location
 @{ version = $ver; commit = $env:SourceRevisionId; estado = "NATIVE_ACCEPTANCE_PENDING"; requeridos = $required; archivos = $files } | ConvertTo-Json -Depth 3 | Set-Content -Encoding UTF8 dist/manifest.json
 Compress-Archive -Path dist/addin, dist/bridge, dist/manifest.json -DestinationPath $payload
-Run "dotnet test tests/PDI.RevitMcp.Tests -- RunConfiguration.MaxCpuCount=1 xUnit.MaxParallelThreads=1"
+$testFilter = if ($SkipBenchmarks) { " --filter 'FullyQualifiedName!~MeasurementTests&FullyQualifiedName!~Bench_'" } else { '' }
+Run "dotnet test tests/PDI.RevitMcp.Tests$testFilter -- RunConfiguration.MaxCpuCount=1 xUnit.MaxParallelThreads=1"
 Run "dotnet build src/PDI.RevitMcp.Setup -c Release -v q"
 Copy-Item src/PDI.RevitMcp.Setup/bin/Release/net48/PDI.RevitMcp.Setup.exe dist/
 Write-Host "Instalador: dist/PDI.RevitMcp.Setup.exe"

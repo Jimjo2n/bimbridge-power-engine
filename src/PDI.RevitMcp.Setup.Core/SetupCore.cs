@@ -100,7 +100,7 @@ namespace PDI.RevitMcp.Setup
     /// </summary>
     public sealed class SetupCore
     {
-        public static readonly string[] SupportedVersions = { "2022", "2023", "2024", "2025", "2026" };
+        public static readonly string[] SupportedVersions = { "2022", "2023", "2024", "2025", "2026", "2027" };
         public const string CodexSection = "[mcp_servers.pdi-revit]";
 
         private readonly SetupPaths _p;

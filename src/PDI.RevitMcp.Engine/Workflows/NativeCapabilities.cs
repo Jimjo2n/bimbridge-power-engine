@@ -69,7 +69,7 @@ namespace PDI.RevitMcp.Engine.Workflows
 
         public static NativeCapability Describe(string operation, int revitVersion, ClientEnvironment env)
         {
-            if (revitVersion < 2022 || revitVersion > 2026) throw new ArgumentOutOfRangeException(nameof(revitVersion), "Revit 2022–2026");
+            if (revitVersion < 2022 || revitVersion > 2027) throw new ArgumentOutOfRangeException(nameof(revitVersion), "Revit 2022–2027");
             env = env ?? new ClientEnvironment();
             switch (operation)
             {
@@ -79,7 +79,7 @@ namespace PDI.RevitMcp.Engine.Workflows
                     c.Modes.Add(new ModeSupport { Mode = ExecMode.read, Level = SupportLevel.experimental, Why = "inventario de vínculos, aparatos de origen y del anfitrión con la API pública" });
                     c.Modes.Add(new ModeSupport { Mode = ExecMode.preflight, Level = SupportLevel.experimental, Why = "vínculo cargado, transformación, niveles, categorías y conteos por tipo" });
                     c.Modes.Add(new ModeSupport { Mode = ExecMode.plan, Level = SupportLevel.experimental, Why = "mapeo de tipos propuesto y excepciones esperadas, sin tocar el modelo" });
-                    c.Modes.Add(new ModeSupport { Mode = ExecMode.direct_api, Level = SupportLevel.unavailable, Why = "no hay API pública de Copia por lotes / Coordination Settings en 2022–2026 (inventario offline)" });
+                    c.Modes.Add(new ModeSupport { Mode = ExecMode.direct_api, Level = SupportLevel.unavailable, Why = "BIMBRIDGE usa el traspaso interactivo para configurar y ejecutar la copia por lotes" });
                     c.Modes.Add(new ModeSupport { Mode = ExecMode.interactive_invocation, Level = SupportLevel.experimental, Why = "PostCommand(CopyMonitorSelectLink) sólo abre el modo nativo: aceptar la orden no es copiar" });
                     c.Modes.Add(env.UiExecutorAvailable
                         ? new ModeSupport { Mode = ExecMode.ui_assisted, Level = SupportLevel.experimental, Why = "ejecutor de UI declarado: " + (env.UiExecutorName ?? "sin nombre") + "; cada paso se demuestra con evidencia observada" }

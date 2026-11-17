@@ -114,7 +114,7 @@ namespace PDI.RevitMcp.AgentHost
                     var keyFile = Opt(a, "--clave-privada");
                     if (keyFile != null) { signer = System.Security.Cryptography.RSA.Create(); signer.FromXmlString(File.ReadAllText(keyFile)); }
                     var m = PDI.RevitMcp.Setup.ZipUpdate.Build(Opt(a, "--salida"), files, Opt(a, "--version"), Opt(a, "--commit"),
-                        (Opt(a, "--revit", "2022,2023,2024,2025,2026")).Split(','), Opt(a, "--desde-minima"), signer);
+                        (Opt(a, "--revit", "2022,2023,2024,2025,2026,2027")).Split(','), Opt(a, "--desde-minima"), signer);
                     Console.WriteLine(Json.Write(m));
                     return 0;
                 }

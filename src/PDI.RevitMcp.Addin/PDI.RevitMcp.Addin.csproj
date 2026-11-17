@@ -3,6 +3,7 @@
     Add-in de Revit. Se compila una vez por versión:
       dotnet build -c Release -p:RevitVersion=2024   (net48)
       dotnet build -c Release -p:RevitVersion=2025   (net8.0-windows)
+      dotnet build -c Release -p:RevitVersion=2027   (net10.0-windows)
     En la PC de desarrollo se puede compilar contra la instalación real:
       -p:RevitApiDir="C:\Program Files\Autodesk\Revit 2024"
     Sin eso se usan los paquetes de referencia Nice3point.Revit.Api (sólo para compilar; no se copian ni se distribuyen).
@@ -11,6 +12,7 @@
     <RevitVersion Condition="'$(RevitVersion)' == ''">2024</RevitVersion>
     <TargetFramework Condition="$(RevitVersion) &lt; 2025">net48</TargetFramework>
     <TargetFramework Condition="$(RevitVersion) &gt;= 2025">net8.0-windows</TargetFramework>
+    <TargetFramework Condition="$(RevitVersion) &gt;= 2027">net10.0-windows</TargetFramework>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>PDI.RevitMcp.Addin</AssemblyName>
     <RootNamespace>PDI.RevitMcp.Addin</RootNamespace>
@@ -28,6 +30,7 @@
     <RevitRefVersion Condition="'$(RevitVersion)' == '2024'">2024.3.60</RevitRefVersion>
     <RevitRefVersion Condition="'$(RevitVersion)' == '2025'">2025.4.60</RevitRefVersion>
     <RevitRefVersion Condition="'$(RevitVersion)' == '2026'">2026.4.10</RevitRefVersion>
+    <RevitRefVersion Condition="'$(RevitVersion)' == '2027'">2027.0.0</RevitRefVersion>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(RevitApiDir)' == ''">

@@ -2,7 +2,7 @@
   <!--
     Instalador de doble clic: PDI.RevitMcp.Setup.exe
     net48 porque viene con Windows 10/11: no hay que instalar nada antes.
-    Lleva dentro payload.zip (add-in 2022-2026 + puente autocontenido), que arma build.sh/build.ps1.
+    Lleva dentro payload.zip (add-in 2022-2027 + puente autocontenido), que arma build.sh/build.ps1.
   -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>

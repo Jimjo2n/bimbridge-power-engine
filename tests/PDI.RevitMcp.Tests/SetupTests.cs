@@ -49,7 +49,7 @@ namespace PDI.RevitMcp.Tests
                 UserProfile = Path.Combine(_root, "user"),
                 ProgramFiles = Path.Combine(_root, "PF"),
             };
-            foreach (var v in new[] { "2024", "2025" })
+            foreach (var v in new[] { "2024", "2025", "2027" })
             {
                 Directory.CreateDirectory(Path.Combine(_p.ProgramFiles, "Autodesk", "Revit " + v));
                 File.WriteAllText(Path.Combine(_p.ProgramFiles, "Autodesk", "Revit " + v, "Revit.exe"), "");
@@ -118,7 +118,7 @@ namespace PDI.RevitMcp.Tests
         public void DetectsInstalledRevitVersions()
         {
             var found = new SetupCore(_p).DetectRevit().Where(r => r.Installed).Select(r => r.Version).ToArray();
-            Assert.Equal(new[] { "2024", "2025" }, found);
+            Assert.Equal(new[] { "2024", "2025", "2027" }, found);
         }
 
         [Fact]

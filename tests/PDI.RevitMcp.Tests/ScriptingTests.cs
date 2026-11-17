@@ -21,7 +21,7 @@ namespace PDI.RevitMcp.Tests
         private static readonly string Nuget = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
         private static readonly Dictionary<int, string> RefVersion = new Dictionary<int, string>
         {
-            [2022] = "2022.1.80", [2023] = "2023.1.90", [2024] = "2024.3.60", [2025] = "2025.4.60", [2026] = "2026.4.10",
+            [2022] = "2022.1.80", [2023] = "2023.1.90", [2024] = "2024.3.60", [2025] = "2025.4.60", [2026] = "2026.4.10", [2027] = "2027.0.0",
         };
 
         private static string FindRoot()
@@ -43,15 +43,16 @@ namespace PDI.RevitMcp.Tests
             }
             else
             {
-                var dotnetRoot = Path.GetDirectoryName(typeof(object).Assembly.Location); // …/shared/Microsoft.NETCore.App/8.x
-                var packs = Path.GetFullPath(Path.Combine(dotnetRoot, "..", "..", "..", "packs", "Microsoft.NETCore.App.Ref"));
-                var pack = Directory.GetDirectories(packs).Where(x => Path.GetFileName(x).StartsWith("8.")).OrderBy(x => x).Last();
-                refs.AddRange(Directory.GetFiles(Path.Combine(pack, "ref", "net8.0"), "*.dll"));
-                var desktop = Path.Combine(Path.GetDirectoryName(packs), "Microsoft.WindowsDesktop.App.Ref");
-                if (!Directory.Exists(desktop))
-                    desktop = Path.Combine(Nuget, "microsoft.windowsdesktop.app.ref");
-                var wd = Directory.GetDirectories(desktop).Where(x => Path.GetFileName(x).StartsWith("8.")).OrderBy(x => x).Last();
-                refs.AddRange(Directory.GetFiles(Path.Combine(wd, "ref", "net8.0"), "*.dll"));
+                var major = year >= 2027 ? "10" : "8";
+                var runtime = Path.GetDirectoryName(typeof(object).Assembly.Location);
+                var packs = Path.GetFullPath(Path.Combine(runtime, "..", "..", "..", "packs"));
+                foreach (var name in new[] { "Microsoft.NETCore.App.Ref", "Microsoft.WindowsDesktop.App.Ref" })
+                {
+                    var candidates = new[] { Path.Combine(packs, name), Path.Combine(Nuget, name.ToLowerInvariant()) }
+                        .Where(Directory.Exists).SelectMany(folder => Directory.GetDirectories(folder, major + ".*"));
+                    var pack = candidates.OrderBy(folder => Version.Parse(Path.GetFileName(folder))).Last();
+                    refs.AddRange(Directory.GetFiles(Path.Combine(pack, "ref", "net" + major + ".0"), "*.dll"));
+                }
             }
             foreach (var pkg in new[] { "nice3point.revit.api.revitapi", "nice3point.revit.api.revitapiui" })
                 refs.AddRange(Directory.GetFiles(Path.Combine(Nuget, pkg, RefVersion[year], "ref"), "*.dll", SearchOption.AllDirectories));
@@ -116,7 +117,7 @@ namespace PDI.RevitMcp.Tests
             Assert.Empty(Caps("return new FilteredElementCollector(doc).GetElementCount();", year));
         }
 
-        public static IEnumerable<object[]> Years() => new[] { 2022, 2023, 2024, 2025, 2026 }.Select(y => new object[] { y });
+        public static IEnumerable<object[]> Years() => RefVersion.Keys.OrderBy(y => y).Select(y => new object[] { y });
 
         [Theory, MemberData(nameof(Years))]
         public void Lavamanos_CompilesAgainstEachYearsApi(int year)
@@ -169,7 +170,7 @@ namespace PDI.RevitMcp.Tests
             if (string.IsNullOrEmpty(outPath)) return;
             var code = File.ReadAllText(Path.Combine(Root, "tools", "aceptacion", "lavamanos_exec.cs"));
             var lines = new List<string> { "año;primera_ms;siguientes_mediana_ms;referencias" };
-            foreach (var y in new[] { 2022, 2023, 2024, 2025, 2026 })
+            foreach (var y in RefVersion.Keys.OrderBy(year => year))
             {
                 var refs = References(y);
                 var w = ScriptSource.Wrap(code, "B" + y);

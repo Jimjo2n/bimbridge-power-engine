@@ -321,6 +321,8 @@ namespace PDI.RevitMcp.Engine.Coverage
                     new[] { "AgentIdentityGateTests" }, "diario con agent_id, session_id, request_id, trace_id"),
             };
             Expand(l);
+            foreach (var entry in l.Where(e => e.Status == CoverageStatus.IMPLEMENTED_UNVERIFIED || e.Status == CoverageStatus.OFFLINE_VERIFIED))
+                entry.MaxVersion = 2027;
             return l;
         }
 
