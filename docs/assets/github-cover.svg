@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="270" viewBox="0 0 1120 270" role="img" aria-labelledby="title">
   <title id="title">BIMBRIDGE Power Engine</title>
   <defs>
-    <linearGradient id="surface" x2="1" y2="1">
+    <linearGradient id="surface" x2="100%" y2="100%">
       <stop stop-color="#0e2434"/>
       <stop offset="1" stop-color="#08131f"/>
     </linearGradient>
@@ -23,6 +23,13 @@
       <path d="M770 125 889 60 1010 125 890 190Z" fill="#14394a"/>
       <path d="M770 76 889 11 1010 76 890 141Z" fill="#1b4a58"/>
       <path d="M770 76v98m120-33v98m120-163v98M830 44l120 65m-119 0 119-65" fill="none" opacity=".65"/>
+    </g>
+    <g fill="none" stroke="#8acac9" stroke-width="1" opacity=".72">
+      <path d="M750 187 890 264 1030 187M750 187v-10m280 10v-10"/>
+      <path d="M797 76 889 26 982 76 890 126Z"/>
+      <path d="M820 76 889 38 959 76 890 114Z"/>
+      <path d="M843 76 889 51 936 76 890 101Z"/>
+      <path d="M889 11v40m1 75v15M768 149l-37 20h-32m314-39 30 17h40"/>
     </g>
     <g fill="#91f7e8">
       <circle cx="770" cy="76" r="4"/>

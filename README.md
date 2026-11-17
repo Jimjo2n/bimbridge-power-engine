@@ -1,78 +1,72 @@
-<img src="docs/assets/github-cover.svg" alt="" width="1120" height="270">
+<img src="docs/assets/github-cover.svg" width="1120" height="270" alt="">
 
-# BIMBRIDGE – Power Engine
+# BIMBRIDGE · Power Engine
 
-Local BIM automation and AI-agent integration for Autodesk Revit, built with C#/.NET, Rust and Python.
+**Local BIM automation and AI integration for Autodesk Revit.** Connect an MCP client to inspect models, review proposed changes, and run Revit workflows from your Windows workstation.
 
-BIMBRIDGE connects MCP clients to the Revit API through a local bridge and add-in. It provides declarative queries, typed modification plans, dynamic C# execution, durable recovery records and specialized geometry/document processing.
+[Español](README.es.md) · [Installation](docs/getting-started/INSTALLATION.md) · [Connect a client](docs/integrations/MCP.md) · [Examples](examples/README.md) · [Documentation](docs/INDEX.md)
 
-**Development candidate: 0.9.0+commit. Native acceptance is partial. See [validation](docs/quality/VALIDATION.md) for current coverage.**
+> [!NOTE]
+> **Experimental releases.** The source targets Revit 2022–2026. Consult the validation record for the operations and Revit environments tested.
+> [Releases](https://github.com/Jimjo2n/bimbridge-power-engine/releases) · [Validation](docs/quality/VALIDATION.md)
 
-[Español](README.es.md) · [Documentation](docs/INDEX.md) · [Build](docs/DEVELOPMENT.md) · [Security](docs/security/TRUST_MODEL.md) · [Contribute](CONTRIBUTING.md) · [Roadmap](docs/roadmap/BACKLOG.md)
+## What you can do
 
-## Architecture
+| Inspect a model | Review and apply changes | Process documents and geometry |
+| --- | --- | --- |
+| Query elements, filter results, count fixtures and retrieve compact summaries. | Prepare a typed plan, inspect its proposed changes and apply it with conflict checks. | Extract data from PDFs and DOCX files in Python and run dedicated geometry operations in Rust. |
+
+## How it connects
+
+```mermaid
+flowchart TB
+  accTitle: BIMBRIDGE system architecture
+  accDescr: The MCP client connects to a C sharp bridge. The bridge communicates with the Revit add-in through a local named pipe. AgentHost uses the bridge and the specialized Rust and Python workers.
+  Client["MCP client"] -->|"stdio"| Bridge["C# bridge"]
+  Host["AgentHost<br/>Workflow orchestration"] --> Bridge
+  Bridge -->|"Local named pipe"| Addin["Revit add-in<br/>API dispatcher"]
+  Addin --> Model["Revit document<br/>Queries and transactions"]
+  Host --> Rust["Rust<br/>Geometry · FFI or IPC"]
+  Host --> Python["Python<br/>PDF and DOCX extraction"]
+  classDef engine fill:#123748,stroke:#359687,color:#f0fbff,stroke-width:2px
+  classDef worker fill:#23334d,stroke:#829ac7,color:#f0fbff
+  class Bridge,Addin engine
+  class Rust,Python worker
+```
+
+[Architecture and component responsibilities](docs/PROJECT_OVERVIEW.md) · [Trust model](docs/security/TRUST_MODEL.md)
+
+## From a query to a reviewed change
 
 ```mermaid
 flowchart LR
-  accTitle: BIMBRIDGE architecture
-  accDescr: Revit requests travel through the local C# bridge. AgentHost also connects to Rust and Python workers.
-  Client["MCP client"] --> Bridge["C# stdio bridge"]
-  Bridge -->|"local named pipe"| Addin["Revit add-in / dispatcher"]
-  Addin --> Model["Revit document / transactions"]
-  Host["AgentHost / workflows"] --> Bridge
-  Host --> Rust["Rust geometry: FFI or IPC"]
-  Host --> Python["Python document worker"]
-
-  classDef engine fill:#123748,stroke:#359687,color:#f0fbff,stroke-width:2px
-  class Bridge,Addin engine
+  accTitle: Review and apply a model change
+  Inspect["1 · Inspect<br/>Choose the target document"] --> Plan["2 · Plan<br/>Prepare typed changes"]
+  Plan --> Review["3 · Review<br/>Check the proposed diff"]
+  Review --> Apply["4 · Commit<br/>Apply with conflict checks"]
+  classDef decision fill:#123748,stroke:#359687,color:#f0fbff,stroke-width:2px
+  class Review decision
 ```
 
-## Capabilities
+Start with a read-only request. In the compact MCP profile, `q LF n=true` requests a lighting fixture count. For writes, follow the [plan and commit recipes](docs/RECETAS.md) and consult the [operations and recovery guides](docs/INDEX.md) if an outcome is uncertain.
 
-- Per-client sessions, declared agent aliases and Windows-principal access boundaries.
-- Model queries, compact results, canonical digests and timing.
-- Typed plans, conflict checks, transactional trials and commits.
-- Dynamic C# execution with a persistent blocking control.
-- Durable write intent, uncertain-outcome detection and reconciliation.
-- Rust geometry operations; Python PDF/DOCX extraction.
-- Windows installation, backup, recovery and operational status views.
+> [!IMPORTANT]
+> Dynamic C# runs with the Revit user's privileges. Use the [trust model](docs/security/TRUST_MODEL.md) to understand execution controls and the effects that Revit transactions can reverse.
 
-Dynamic C# is enabled by default for authorized local agents. It executes with the user's privileges and **is not a sandbox**. See the [trust model](docs/security/TRUST_MODEL.md).
+## Get started
 
-## Compatibility and build
+1. **Install on Windows.** Use the [installation guide](docs/getting-started/INSTALLATION.md) and review the status of the package you select.
+2. **Connect your MCP client.** Follow the [integration guide](docs/integrations/MCP.md), then try a query with the [examples](examples/README.md).
+3. **Build from source.** See [development and build](docs/DEVELOPMENT.md) for SDK requirements, the build command and test instructions. The Revit 2022–2024 targets use .NET Framework 4.8. The 2025–2026 targets use .NET 8.
 
-Source build targets Revit 2022–2026. The add-in uses .NET Framework 4.8 for 2022–2024 and .NET 8 for 2025–2026. Revit 2024.3 is the environment named in the supplied partial native report; support targets are not equivalent to complete native acceptance.
+## Project evidence and maintenance
 
-A full Windows build requires the .NET 8 SDK, .NET Framework targeting support, Rust x64, Git, a real CPython executable and package restore access or populated caches.
+| If you want to… | Start here |
+| --- | --- |
+| Review what has been tested | [Validation](docs/quality/VALIDATION.md) · [CI scope](docs/quality/CI.md) |
+| Assess performance | [Benchmarks and methodology](docs/performance/BENCHMARKS.md) |
+| Follow work in progress | [Roadmap](docs/roadmap/BACKLOG.md) · [Development state](DEVELOPMENT_STATE.md) |
+| Understand the source history | [Repository provenance](docs/REPOSITORY_SETUP.md) |
+| Contribute or report a problem | [Contributing](CONTRIBUTING.md) · [Security reporting](SECURITY.md) |
 
-```powershell
-./build.ps1 -Python C:/path/to/python.exe
-```
-
-This existing script builds and tests the distribution under ignored `dist/`; it does not install the add-in. Installation requires a reviewed Windows package and closed Revit instances. No installer from the incoming audit package is distributed through this repository. See [build and installation](docs/DEVELOPMENT.md).
-
-## Usage
-
-Connect an MCP-compatible client using the bridge configuration described in [client integration](docs/integrations/MCP.md). A compact-profile query such as:
-
-```text
-q LF n=true
-```
-
-requests a lighting-fixture count. Tool names depend on the configured MCP profile. Before writes, fix the target document, inspect the proposed diff and use the appropriate typed plan/commit workflow. See [recipes](docs/RECETAS.md).
-
-## Evidence and limitations
-
-The verified input delivery is `0.9.0+a291cc6`. Its source archive matches its Git bundle. Original history remains privately archived; this repository contains a sanitized import with an explicit [provenance record](docs/REPOSITORY_SETUP.md).
-
-The delivery reports 610 C# tests, 13 Rust tests and 29 Python passes with 2 skips. Those are **delivery-reported results**, not a claim about every later commit. Current validation is tracked in [quality](docs/quality/VALIDATION.md).
-
-Reported A/B medians include approximately 1.90× for grouped reads and 1.32× for a five-operation single-trip batch. Complete paginated reads were approximately 6.1× slower. Digest output is not equivalent to returning every row. A general 3–5× speedup is **not established**. See [methodology and results](docs/performance/BENCHMARKS.md).
-
-Known work includes the long-operation session timeout, paginated-read regression, partial native acceptance and incomplete visual validation of the status panel. See [backlog](docs/roadmap/BACKLOG.md).
-
-## Maintenance
-
-Maintainer: Jose Jimenez ([Jimjo2n](https://github.com/Jimjo2n)). Report reproducible defects through issues using synthetic or sanitized data. Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md). Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md).
-
-Original code: **GPL-3.0-only**. See [LICENSE](LICENSE), [license guide](docs/LICENSING.md) and [third-party notices](THIRD_PARTY_NOTICES.md). Autodesk reference binaries, credentials, live models and private audit logs are excluded.
+Maintained by [Jose Jimenez](https://github.com/Jimjo2n). First-party code is [GPL-3.0-only](LICENSE). See [third-party notices](THIRD_PARTY_NOTICES.md) for bundled components.
