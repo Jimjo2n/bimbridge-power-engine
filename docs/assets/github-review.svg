@@ -1,25 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="286" viewBox="0 0 760 286" role="img">
-<title>Typed writes &amp; recovery</title>
-<defs>
-<pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-<path d="M20 0H0V20" stroke="#312025" fill="none"/>
-</pattern>
-</defs>
-<rect x="1" y="1" width="758" height="284" rx="18" fill="#101011" stroke="#3b2b2f"/>
-<rect x="31" y="28" width="4" height="33" rx="2" fill="#ef4559"/>
-<text x="47" y="52" fill="#eae7e7" font-size="25" font-weight="700" font-family="Segoe UI, Arial, sans-serif">Typed writes &amp; recovery</text>
-<text x="598" y="49" fill="#ff7380" font-size="13" font-weight="700" font-family="Consolas, monospace">02 / WRITE</text>
-<path d="M32 75H728" fill="none" stroke="#3b3034" />
-<rect x="32" y="94" width="340" height="147" rx="10" fill="#181719" stroke="#3a3033"/>
-<rect x="389" y="94" width="339" height="147" rx="10" fill="#181719" stroke="#3a3033"/>
-<text x="51" y="120" fill="#ff7380" font-size="13" font-weight="700" font-family="Consolas, monospace">PLAN DIFF · EXAMPLE</text>
-<text x="408" y="120" fill="#ff7380" font-size="13" font-weight="700" font-family="Consolas, monospace">EXECUTION RECORD</text>
-<rect x="51" y="137" width="301" height="35" rx="6" fill="#28191e" stroke="#523239"/>
-<text x="64" y="160" fill="#efb6bf" font-size="14" font-weight="400" font-family="Consolas, monospace">−  Mark = L-01</text>
-<rect x="51" y="181" width="301" height="35" rx="6" fill="#382025" stroke="#7b3845"/>
-<text x="64" y="204" fill="#ffd4d9" font-size="14" font-weight="400" font-family="Consolas, monospace">+  Mark = L-02</text>
-<text x="410" y="150" fill="#eae7e7" font-size="14" font-weight="400" font-family="Consolas, monospace">01   Durable write intent</text>
-<text x="410" y="178" fill="#eae7e7" font-size="14" font-weight="400" font-family="Consolas, monospace">02   Revit transaction</text>
-<text x="410" y="206" fill="#eae7e7" font-size="14" font-weight="400" font-family="Consolas, monospace">03   Outcome reconciliation</text>
-<text x="33" y="267" fill="#bfb4b8" font-size="13" font-weight="400" font-family="Consolas, monospace">PLAN / COMMIT · CONFLICT CHECKS</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="280" viewBox="0 0 760 280" role="img">
+<title>Transactional writes + recovery</title>
+<rect x="1" y="1" width="758" height="278" rx="16" fill="#0e0d0f" stroke="#493438"/>
+<rect x="28" y="27" width="6" height="30" rx="2" fill="#ff203c"/>
+<text x="48" y="51" fill="#f7f2f3" font-size="25" font-family="Consolas, monospace">Transactional writes + recovery</text>
+<text x="684" y="50" fill="#ff203c" font-size="19" font-family="Consolas, monospace">03</text>
+<path d="M31 73h698" stroke="#4c3439" stroke-width="1" fill="none" />
+<rect x="31" y="90" width="334" height="143" rx="8" fill="#191719" stroke="#4c3439"/>
+<rect x="392" y="90" width="337" height="143" rx="8" fill="#191719" stroke="#4c3439"/>
+<text x="50" y="120" fill="#ffb7c0" font-size="15" font-family="Consolas, monospace">TYPED PLAN DIFF</text>
+<text x="411" y="120" fill="#ffb7c0" font-size="15" font-family="Consolas, monospace">DURABLE WRITE RECORD</text>
+<rect x="55" y="140" width="270" height="32" rx="6" fill="#212023" stroke="#4c3439"/>
+<text x="65" y="161" fill="#f7f2f3" font-size="14" font-family="Consolas, monospace">−  Mark = L-01</text>
+<rect x="55" y="182" width="270" height="32" rx="6" fill="#6a0e1c" stroke="#ff203c"/>
+<text x="65" y="203" fill="#f7f2f3" font-size="14" font-family="Consolas, monospace">+  Mark = L-02</text>
+<path d="M427 145v67" stroke="#4c3439" stroke-width="3" fill="none" />
+<circle cx="427" cy="146" r="5" fill="#ff203c"/>
+<text x="445" y="151" fill="#ffb7c0" font-size="13" font-family="Consolas, monospace">INTENT</text>
+<text x="520" y="151" fill="#f7f2f3" font-size="13" font-family="Consolas, monospace">write-ahead</text>
+<circle cx="427" cy="176" r="5" fill="#ff203c"/>
+<text x="445" y="181" fill="#ffb7c0" font-size="13" font-family="Consolas, monospace">APPLY</text>
+<text x="520" y="181" fill="#f7f2f3" font-size="13" font-family="Consolas, monospace">Revit transaction</text>
+<circle cx="427" cy="206" r="5" fill="#ff203c"/>
+<text x="445" y="211" fill="#ffb7c0" font-size="13" font-family="Consolas, monospace">VERIFY</text>
+<text x="520" y="211" fill="#f7f2f3" font-size="13" font-family="Consolas, monospace">outcome / reconcile</text>
+<text x="32" y="260" fill="#c3b7ba" font-size="14" font-family="Consolas, monospace">plan / commit / reconcile</text>
 </svg>

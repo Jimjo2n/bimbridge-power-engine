@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="280" viewBox="0 0 760 280" role="img">
+<title>BIM workflows + quality checks</title>
+<rect x="1" y="1" width="758" height="278" rx="16" fill="#0e0d0f" stroke="#493438"/>
+<rect x="28" y="27" width="6" height="30" rx="2" fill="#ff203c"/>
+<text x="48" y="51" fill="#f7f2f3" font-size="25" font-family="Consolas, monospace">BIM workflows + quality checks</text>
+<text x="684" y="50" fill="#ff203c" font-size="19" font-family="Consolas, monospace">08</text>
+<path d="M31 73h698" stroke="#4c3439" stroke-width="1" fill="none" />
+<rect x="31" y="90" width="334" height="143" rx="8" fill="#191719" stroke="#4c3439"/>
+<rect x="392" y="90" width="337" height="143" rx="8" fill="#191719" stroke="#4c3439"/>
+<text x="50" y="120" fill="#ffb7c0" font-size="15" font-family="Consolas, monospace">MEP CONNECTOR GRAPH</text>
+<text x="411" y="120" fill="#ffb7c0" font-size="15" font-family="Consolas, monospace">COPY/MONITOR EVIDENCE</text>
+<path d="M75 153h85l53 51h95m-148-51h120m-67 51 67-51" stroke="#ff203c" stroke-width="3" fill="none" />
+<circle cx="75" cy="153" r="10" fill="#560c19"/>
+<circle cx="75" cy="153" r="4" fill="#ff203c"/>
+<circle cx="160" cy="153" r="10" fill="#560c19"/>
+<circle cx="160" cy="153" r="4" fill="#ff203c"/>
+<circle cx="213" cy="204" r="10" fill="#560c19"/>
+<circle cx="213" cy="204" r="4" fill="#ff203c"/>
+<circle cx="308" cy="204" r="10" fill="#560c19"/>
+<circle cx="308" cy="204" r="4" fill="#ff203c"/>
+<circle cx="280" cy="153" r="10" fill="#560c19"/>
+<circle cx="280" cy="153" r="4" fill="#ff203c"/>
+<rect x="425" y="137" width="103" height="74" rx="8" fill="#241c1f" stroke="#4c3439"/>
+<rect x="585" y="137" width="103" height="74" rx="8" fill="#241c1f" stroke="#4c3439"/>
+<path d="M443 193v-35h66v35zm160 0v-35h66v35z" stroke="#b79fa5" stroke-width="2" fill="none" />
+<path d="M535 174H576m-7-5 7 5-7 5" stroke="#ff203c" stroke-width="2" fill="none" />
+<path d="M650 200l5 5 10-11" stroke="#ff203c" stroke-width="2" fill="none" />
+<text x="32" y="260" fill="#c3b7ba" font-size="14" font-family="Consolas, monospace">connectivity / correspondence / QA</text>
+</svg>

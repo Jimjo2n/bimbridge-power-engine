@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="280" viewBox="0 0 760 280" role="img">
+<title>Resumable tasks + workflow receipts</title>
+<rect x="1" y="1" width="758" height="278" rx="16" fill="#0e0d0f" stroke="#493438"/>
+<rect x="28" y="27" width="6" height="30" rx="2" fill="#ff203c"/>
+<text x="48" y="51" fill="#f7f2f3" font-size="25" font-family="Consolas, monospace">Resumable tasks + workflow receipts</text>
+<text x="684" y="50" fill="#ff203c" font-size="19" font-family="Consolas, monospace">04</text>
+<path d="M31 73h698" stroke="#4c3439" stroke-width="1" fill="none" />
+<rect x="31" y="90" width="334" height="143" rx="8" fill="#191719" stroke="#4c3439"/>
+<rect x="392" y="90" width="337" height="143" rx="8" fill="#191719" stroke="#4c3439"/>
+<text x="50" y="120" fill="#ffb7c0" font-size="15" font-family="Consolas, monospace">EXECUTION UNITS</text>
+<text x="411" y="120" fill="#ffb7c0" font-size="15" font-family="Consolas, monospace">PERSISTED RECEIPT</text>
+<rect x="52" y="147" width="88" height="32" rx="6" fill="#212023" stroke="#4c3439"/>
+<text x="62" y="168" fill="#f7f2f3" font-size="14" font-family="Consolas, monospace">UNIT 01</text>
+<rect x="151" y="147" width="88" height="32" rx="6" fill="#6a0e1c" stroke="#ff203c"/>
+<text x="161" y="168" fill="#f7f2f3" font-size="14" font-family="Consolas, monospace">UNIT 02</text>
+<rect x="250" y="147" width="88" height="32" rx="6" fill="#212023" stroke="#4c3439"/>
+<text x="260" y="168" fill="#f7f2f3" font-size="14" font-family="Consolas, monospace">UNIT 03</text>
+<path d="M63 209h270" stroke="#4c3439" stroke-width="4" fill="none" />
+<circle cx="63" cy="209" r="5" fill="#ff203c"/>
+<circle cx="162" cy="209" r="5" fill="#ff203c"/>
+<circle cx="261" cy="209" r="5" fill="#766067"/>
+<rect x="427" y="137" width="242" height="85" rx="8" fill="#231b1e" stroke="#4c3439"/>
+<path d="M444 157l5 5 10-11" stroke="#ff203c" stroke-width="2" fill="none" />
+<path d="M468 158h155" stroke="#c3b7ba" stroke-width="2" fill="none" />
+<path d="M444 180l5 5 10-11" stroke="#ff203c" stroke-width="2" fill="none" />
+<path d="M468 181h137" stroke="#c3b7ba" stroke-width="2" fill="none" />
+<path d="M444 203l5 5 10-11" stroke="#ff203c" stroke-width="2" fill="none" />
+<path d="M468 204h119" stroke="#c3b7ba" stroke-width="2" fill="none" />
+<text x="32" y="260" fill="#c3b7ba" font-size="14" font-family="Consolas, monospace">checkpoint / resume / verify</text>
+</svg>

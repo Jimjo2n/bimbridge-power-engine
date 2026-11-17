@@ -6,32 +6,87 @@
 
 [Español](README.es.md) · [Installation](docs/getting-started/INSTALLATION.md) · [Connect a client](docs/integrations/MCP.md) · [Examples](examples/README.md) · [Documentation](docs/INDEX.md)
 
-## Engineering highlights
+## Technical catalog
 
-### 01 · Revision-bound query snapshots
+These plates describe the repository’s contracts, components and operations. Drawn values and relationships are illustrative.
 
-<img src="docs/assets/github-query.svg" width="760" height="286" alt="Model snapshot bound to a session, document and revision, serving multiple cursor pages">
+[MCP transport and Revit dispatch](#01-mcp-transport-and-revit-dispatch) · [Queries, snapshots and cursors](#02-queries-snapshots-and-cursors) · [Typed plans, transactions and recovery](#03-typed-plans-transactions-and-recovery) · [Resumable tasks and receipts](#04-resumable-tasks-and-receipts) · [Dynamic C#, Roslyn and BIM helpers](#05-dynamic-c-roslyn-and-bim-helpers) · [Power Engine dispatch and workers](#06-power-engine-dispatch-and-workers) · [PDF–Revit registration and verification](#07-pdfrevit-registration-and-verification) · [BIM workflows, MEP and quality control](#08-bim-workflows-mep-and-quality-control) · [Families, documents and export](#09-families-documents-and-export) · [Identity, permissions and observability](#10-identity-permissions-and-observability) · [Build, testing and distribution](#11-build-testing-and-distribution)
 
-`QuerySnapshotStore` materializes query rows once and serves later pages from memory. Each cursor is bound to its session, document and revision. A TTL and an LRU memory budget govern retention. The bridge and AgentHost carry the cursor across requests, preserving row-level results through pagination. [Implementation and verification](docs/0.9.0/CONSOLIDATED_DELIVERY_REPORT.md)
+### 01. MCP transport and Revit dispatch
 
-### 02 · Transactional writes with durable recovery
+<img src="docs/assets/github-transport.svg" width="760" height="280" alt="MCP transport + Revit dispatch">
 
-<img src="docs/assets/github-review.svg" width="760" height="286" alt="Review of a typed parameter change, with the previous and proposed values">
+`PDI.RevitMcp.Bridge` exposes MCP over stdio and translates requests into a local Windows named-pipe protocol. `PDI.RevitMcp.Addin` queues API access and dispatches it on Revit’s main thread through `ExternalEvent`. `PDI.RevitMcp.Protocol` holds the shared contracts. [Technical reference](docs/integrations/MCP.md)
 
-Typed `plan` and `commit` separate change preparation from execution. The add-in applies reviewed operations in Revit transactions with conflict checks and records write intent before execution. The recovery path uses reconciliation when the outcome is uncertain. Dynamic C# execution uses a Roslyn compilation cache with single-flight coordination to share compilation across concurrent requests for the same key. [Architecture and reliability](docs/PROJECT_OVERVIEW.md) · [Roslyn cache verification](docs/0.9.0/CONSOLIDATED_DELIVERY_REPORT.md)
+### 02. Queries, snapshots and cursors
 
-### 03 · Native geometry and document workers
+<img src="docs/assets/github-query.svg" width="760" height="280" alt="Revision-bound query snapshots">
 
-<img src="docs/assets/github-workers.svg" width="760" height="286" alt="Power Engine backends and timing fields for engine, IPC, serialization and total time">
+`ctx`, `cat`, `q`, `get` and `geo` expose document context, catalogs, elements and geometry. `QuerySnapshotStore` materializes rows for in-memory pagination. Cursors bind to session, document and revision, with TTL and LRU eviction under a memory budget. [Technical reference](docs/0.9.0/CONSOLIDATED_DELIVERY_REPORT.md)
 
-`PowerEngineDispatcher` selects C# kernels or Rust geometry operations such as nearest-neighbor search, matching and segment contacts. Rust can run through FFI or IPC. The Python process handles PDF and DOCX extraction. The versioned `pe=1` process protocol uses JSON lines, capability negotiation, correlation IDs and job limits. Telemetry records engine, IPC, serialization and total time separately. [Engine architecture and protocol](docs/0.9.0/POWER_ENGINE_ARCHITECTURE.md)
+### 03. Typed plans, transactions and recovery
 
-### 04 · PDF-to-model registration and independent verification
+<img src="docs/assets/github-review.svg" width="760" height="280" alt="Transactional writes + recovery">
 
-<img src="docs/assets/github-registration.svg" width="760" height="286" alt="Matched grid anchors in PDF page coordinates and Revit model coordinates">
+`plan` prepares a diff and `commit` applies reviewed operations through `PlanApplier`. Typed operations cover parameters, architectural and MEP elements, annotation and sheets. The engine checks conflicts, records write intent and retains evidence for reconciling uncertain outcomes. [Technical reference](docs/PROJECT_OVERVIEW.md)
 
-Python extracts grid intersections and symbol candidates in page coordinates. C# matches named anchors, fits a similarity or affine transform, checks registration residuals and sheet scale, and resolves placement into typed operations. `PlacementVerifier` compares against independent evidence and reports discrepancies in position, type, rotation, elevation and duplicate instances. [Registration and verification](docs/0.9.0/POWER_ENGINE_ARCHITECTURE.md)
+### 04. Resumable tasks and receipts
 
+<img src="docs/assets/github-tasks.svg" width="760" height="280" alt="Resumable tasks + workflow receipts">
+
+`TaskRunner` divides long tasks into units, persists their state and coordinates barriers such as save, sync and export. Resume uses stored state and reconciliation records an explicit decision. `WorkflowReceipt` captures execution and verification evidence in workflows that use it. [Technical reference](docs/MATRIZ_CAPACIDADES.md)
+
+### 05. Dynamic C#, Roslyn and BIM helpers
+
+<img src="docs/assets/github-scripting.svg" width="760" height="280" alt="Dynamic C# + Roslyn cache">
+
+`exec` exposes dynamic C# queries and execution with transaction modes. `CompileCache` coordinates concurrent requests for the same key with single-flight compilation. `PDI.RevitMcp.Scripting` provides `Bim.*` helpers for mounting, visibility, groups and manifest-based checks. [Technical reference](docs/0.9.0/DYNAMIC_CODE_EXECUTION_POLICY.md)
+
+### 06. Power Engine dispatch and workers
+
+<img src="docs/assets/github-workers.svg" width="760" height="280" alt="Power Engine execution backends">
+
+`PowerEngineDispatcher` selects managed kernels and Rust geometry operations over FFI or IPC. The Python process extracts PDF and DOCX data. The `pe=1` contract uses JSON Lines, capability negotiation, correlation and job limits. The bars illustrate telemetry fields with sample lengths. [Technical reference](docs/0.9.0/POWER_ENGINE_ARCHITECTURE.md)
+
+### 07. PDF–Revit registration and verification
+
+<img src="docs/assets/github-registration.svg" width="760" height="280" alt="PDF-to-model registration">
+
+`pdf_grids` and `pdf_symbols` extract grids and candidates in page coordinates. Registration matches named anchors and fits a similarity or affine transform with residual and scale checks. `PlacementVerifier` compares placement against independent evidence and classifies discrepancies. [Technical reference](docs/0.9.0/POWER_ENGINE_ARCHITECTURE.md)
+
+### 08. BIM workflows, MEP and quality control
+
+<img src="docs/assets/github-workflows.svg" width="760" height="280" alt="BIM workflows + quality checks">
+
+`MepNetwork` separates proximity, geometric continuity and physical connector links. `RiserGraph`, `GroupVariants` and `AnnotationLayout` cover riser graphs, variant signatures and annotation placement. `chk copy_monitor` inventories links, prepares the handoff and verifies correspondence. `chk model_health` groups warnings and other model-health signals. [Technical reference](docs/MATRIZ_CAPACIDADES.md)
+
+### 09. Families, documents and export
+
+<img src="docs/assets/github-documents.svg" width="760" height="280" alt="Families + document operations">
+
+`fam` covers type, parameter and connector inspection, RFA indexing, editing through `EditFamily` and reload through `IFamilyLoadOptions`. `doc` covers `Save`, `SaveAs`, central synchronization and PDF, IFC and CSV export, with output-specific verification. [Technical reference](docs/MATRIZ_CAPACIDADES.md)
+
+### 10. Identity, permissions and observability
+
+<img src="docs/assets/github-trust.svg" width="760" height="280" alt="Identity, permissions + observability">
+
+The Windows principal and local transport form part of the trust boundary. Sessions and aliases add client context, and permissions distinguish reading, modifying, exporting and running dynamic C#. Operation history and correlation identifiers help trace requests and outcomes where emitted. [Technical reference](docs/security/TRUST_MODEL.md)
+
+### 11. Build, testing and distribution
+
+<img src="docs/assets/github-delivery.svg" width="760" height="280" alt="Build, test + Windows distribution">
+
+`build.ps1` produces Revit 2022–2026 targets using .NET Framework 4.8 for 2022–2024 and .NET 8 for 2025–2026. GitHub Actions checks repository hygiene, worker contracts and Windows distribution. `Setup` and `Setup.Core` validate the manifest and hashes and handle installation and rollback. [Technical reference](docs/DEVELOPMENT.md)
+
+## Repository map
+
+| Path | Contents |
+| --- | --- |
+| [`src/`](src) | Add-in, MCP bridge, contracts, engine, AgentHost, scripting and setup. |
+| [`native/`](native/power_engine) + [`workers/`](workers/python) | Rust geometry engine and Python document worker. |
+| [`tests/`](tests) + [`benchmarks/`](benchmarks) | Contract and regression tests, simulation and reproducible measurements. |
+| [`tools/`](tools) + [`.github/`](.github) | Acceptance harnesses, verification, packaging, CI and releases. |
+| [`docs/`](docs/INDEX.md) + [`examples/`](examples) | Architecture, design decisions, recipes, evidence and integration guides. |
 
 ## Project evidence and maintenance
 
