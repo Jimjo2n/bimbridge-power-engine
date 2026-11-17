@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- perf(geometry): merge duplicate points as the Rust grid finds them, avoiding temporary neighbor lists.
+
 ## 0.9.3 experimental
 
 - Added Revit 2027 build and installer support with .NET 10.
