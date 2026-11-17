@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using PDI.RevitMcp.Engine;
+using PDI.RevitMcp.Engine.Qa;
 using PDI.RevitMcp.Protocol;
 
 namespace PDI.RevitMcp.Addin.Revit.Families
@@ -132,19 +133,14 @@ namespace PDI.RevitMcp.Addin.Revit.Families
                 if (saved.Order != null && order != "numero")
                 {
                     var members = sheets.ToDictionary(s => s.Id);
-                    if (saved.Order.Count != members.Count || !new HashSet<ElementId>(saved.Order).SetEquals(members.Keys))
+                    if (!PrintSheetSet.MatchesMembership(saved.Order.Select(Ids.ToLong).ToList(), members.Keys.Select(Ids.ToLong)))
                         throw new OpFail(Status.Invalido, "cambiaron las hojas del conjunto; guarde el conjunto de nuevo o use orden=numero");
                     sheets = saved.Order.Select(id => members[id]).ToList();
                     order = "entrada";
                 }
                 else if (order == "entrada")
                     throw new OpFail(Status.Invalido, "el conjunto carece de un orden guardado; use orden=numero o vuelva a guardar el conjunto");
-                if (saved.Preset != null)
-                {
-                    a = new Dictionary<string, object>(a, StringComparer.Ordinal);
-                    foreach (var option in saved.Preset)
-                        if (!a.ContainsKey(option.Key)) a[option.Key] = option.Value;
-                }
+                if (saved.Preset != null) a = PrintSheetSet.ApplyPreset(a, saved.Preset);
             }
             foreach (var raw in Arg.GetStringList(a, "hojas"))
             {

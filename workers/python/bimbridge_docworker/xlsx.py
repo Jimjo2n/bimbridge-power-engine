@@ -52,6 +52,13 @@ def read_feeders(args, paths):
     headers = {k: v.strip().casefold() for k, v in columns.items() if k in ("id", "origen", "destino", "abierto") and isinstance(v, str)}
     if len(set(headers.values())) != len(headers):
         raise JobError("INVALIDO", "los campos Excel deben tener encabezados distintos")
+    header_row = args.get("fila_encabezado", 1)
+    if type(header_row) is not int or header_row < 1:
+        raise JobError("INVALIDO", "fila_encabezado debe ser un entero positivo")
+    first_row = args.get("fila_inicio", header_row + 1)
+    last_row = args.get("fila_final", 1048576)
+    if type(first_row) is not int or type(last_row) is not int or not header_row < first_row <= last_row <= 1048576:
+        raise JobError("INVALIDO", "el intervalo exige fila_encabezado < fila_inicio <= fila_final")
     digest = sha256_file(path)
     try:
         with zipfile.ZipFile(path) as book:
@@ -75,10 +82,9 @@ def read_feeders(args, paths):
                 raise JobError("DEMASIADO_GRANDE", "la hoja supera 50.000 filas")
             output = []
             positions = None
-            header_row = int(args.get("fila_encabezado", 1))
             for row in rows:
                 index = int(row.get("r", 0))
-                if index < header_row:
+                if index != header_row and not first_row <= index <= last_row:
                     continue
                 if index == header_row:
                     header_cells = {}

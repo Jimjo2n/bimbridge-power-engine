@@ -204,7 +204,7 @@ def _words(layout, page, frame):
     return words
 
 
-def _vectors(layout, page):
+def _vectors(layout, page, curve_paths=False):
     """Primitivas geométricas: líneas, rectángulos y curvas (polilíneas de puntos), con trazo/relleno."""
     lines, rects, curves = [], [], []
 
@@ -216,6 +216,8 @@ def _vectors(layout, page):
         elif isinstance(o, layout.LTCurve):
             curves.append({"pts": [[_r(x), _r(y)] for (x, y) in o.pts], "bbox": [_r(o.x0), _r(o.y0), _r(o.x1), _r(o.y1)],
                            "relleno": bool(o.fill), "cerrada": _closed(o.pts), "ancho": _r(o.linewidth, 2)})
+            if curve_paths and o.original_path:
+                curves[-1]["ruta"] = tuple(o.original_path)
         elif isinstance(o, layout.LTContainer) and not isinstance(o, layout.LTTextContainer):
             for c in o:
                 walk(c)
@@ -535,7 +537,7 @@ def symbols(args, paths):
         r = raw[num - 1]
         fr = Frame(pg.width, pg.height, r["userunit"], r["rotate"], r["mediabox"])
         words = _words(layout, pg, fr)
-        _, rects, curves = _vectors(layout, pg)
+        _, rects, curves = _vectors(layout, pg, curve_paths=True)
         shapes = []
         for c in curves:
             if not c["cerrada"]:
@@ -544,23 +546,35 @@ def symbols(args, paths):
             w, h = x1 - x0, y1 - y0
             if 0.5 < w <= max_pt and 0.5 < h <= max_pt:
                 kind = "circulo" if abs(w - h) < 0.15 * max(w, h) and len(c["pts"]) >= 4 else "curva"
-                shapes.append({"tipo": kind, "bbox": c["bbox"], "relleno": c["relleno"]})
+                shapes.append({"tipo": kind, "bbox": c["bbox"], "relleno": c["relleno"],
+                               "puntos": c.get("ruta") or tuple(map(tuple, c["pts"]))})
         for r in rects:
             x0, y0, x1, y1 = r["bbox"]
             w, h = x1 - x0, y1 - y0
             if 0.5 < w <= max_pt * 2 and 0.5 < h <= max_pt and min(w, h) < max_pt:
                 shapes.append({"tipo": "rectangulo", "bbox": r["bbox"], "relleno": r["relleno"]})
-        for s in shapes:
+        unique, seen, aliases = [], {}, {}
+        for i, s in enumerate(shapes):
             x0, y0, x1, y1 = s["bbox"]
             w, h = x1 - x0, y1 - y0
             s["centro"] = [_r((x0 + x1) / 2), _r((y0 + y1) / 2)]
             s["w"], s["h"] = _r(w, 2), _r(h, 2)
             s["firma"] = "%s|%s|%s|%s" % (s["tipo"], _q(max(w, h)), _q(min(w, h)), "lleno" if s["relleno"] else "hueco")
             s["rot_deg"] = 0.0 if w >= h else 90.0
+            key = (s["tipo"], tuple(s["bbox"]), s["relleno"], s.get("puntos"))
+            if traced:
+                signature = "%s:%d:%d:%s:%s" % (digest, num, i, s["firma"], s["centro"])
+                s["id"] = sha256(signature.encode()).hexdigest()[:24]
+            if key in seen:
+                if traced:
+                    aliases.setdefault(seen[key]["id"], []).append(s["id"])
+                continue
+            seen[key] = s
+            unique.append((i, s))
         # leyenda: forma con texto a la derecha en la misma línea "COD - descripción"
         legend = {}
         legend_idx = set()
-        for i, s in enumerate(shapes):
+        for i, s in unique:
             cy = s["centro"][1]
             right = [w for w in words if w["bbox"][0] > s["centro"][0] and w["bbox"][0] - s["bbox"][2] < 30 and abs((w["bbox"][1] + w["bbox"][3]) / 2 - cy) < 5]
             if not right:
@@ -580,7 +594,7 @@ def symbols(args, paths):
         cands, amb = [], []
         unclassified = {}
         observed = []
-        for i, s in enumerate(shapes):
+        for i, s in unique:
             if i in legend_idx:
                 continue
             cx, cy = s["centro"]
@@ -591,8 +605,7 @@ def symbols(args, paths):
             entry = {"centro_pt": s["centro"], "centro_norm": fr.norm(cx, cy), "centro_in": fr.inches(cx, cy), "firma": s["firma"],
                      "tamano_pt": [s["w"], s["h"]], "rot_deg": s["rot_deg"], "rotulo": label}
             if traced:
-                signature = "%s:%d:%d:%s:%s" % (digest, num, i, s["firma"], s["centro"])
-                entry["id_simbolo"] = sha256(signature.encode()).hexdigest()[:24]
+                entry["id_simbolo"] = s["id"]
                 entry["evidencia_pdf"] = {"forma_bbox": fr._box(s["bbox"]),
                                           "rotulo_bbox": fr._box(near[0]["bbox"]) if near else None,
                                           "leyenda_bbox": fr._box(lg["fuente_bbox"]) if lg else None}
@@ -639,6 +652,14 @@ def symbols(args, paths):
             confirmed = []
             for entry in observed:
                 decision = decisions.pop(entry["id_simbolo"], None)
+                for alias in aliases.get(entry["id_simbolo"], []):
+                    previous = decisions.pop(alias, None)
+                    if previous is None:
+                        continue
+                    if decision and (decision["decision"] != previous["decision"] or
+                                     decision.get("codigo", entry.get("codigo")) != previous.get("codigo", entry.get("codigo"))):
+                        raise JobError("INVALIDO", "decisiones incompatibles para trazos superpuestos de " + entry["id_simbolo"])
+                    decision = decision or previous
                 item = dict(entry, estado="sin_revisar")
                 if decision:
                     item["estado"] = "incluido" if decision["decision"] == "incluir" else "excluido"

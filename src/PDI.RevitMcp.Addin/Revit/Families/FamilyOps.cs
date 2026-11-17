@@ -9,6 +9,7 @@ using Autodesk.Revit.DB.Mechanical;
 using Autodesk.Revit.DB.Electrical;
 using Autodesk.Revit.UI;
 using PDI.RevitMcp.Engine;
+using PDI.RevitMcp.Engine.Qa;
 using PDI.RevitMcp.Protocol;
 
 namespace PDI.RevitMcp.Addin.Revit.Families
@@ -370,9 +371,21 @@ namespace PDI.RevitMcp.Addin.Revit.Families
                         var cd = new Dictionary<string, object> { ["dominio"] = c.Domain.ToString() };
                         try { cd["origen_mm"] = P(c.Origin); } catch (Exception) { }
                         try { cd["direccion"] = D(c.CoordinateSystem.BasisZ); } catch (Exception) { }
+                        try { cd["forma"] = c.Shape.ToString(); } catch (Exception) { }
                         try { if (c.Shape == ConnectorProfileType.Round) cd["radio_mm"] = Mm(c.Radius); } catch (Exception) { }
                         try { cd["flujo"] = FlowName((int)c.Direction); } catch (Exception) { }
-                        try { if (c.Domain == Domain.DomainPiping) cd["sistema"] = c.PipeSystemType.ToString(); } catch (Exception) { }
+                        try
+                        {
+                            var system = c.Domain switch
+                            {
+                                Domain.DomainPiping => c.PipeSystemType.ToString(),
+                                Domain.DomainHvac => c.DuctSystemType.ToString(),
+                                Domain.DomainElectrical => c.ElectricalSystemType.ToString(),
+                                _ => null,
+                            };
+                            if (system != null) cd["sistema"] = system;
+                        }
+                        catch (Exception) { }
                         try { cd["clave"] = c.Description; } catch (Exception) { }
                         conns.Add(cd);
                     }
@@ -845,15 +858,28 @@ namespace PDI.RevitMcp.Addin.Revit.Families
             RequireProject(project, "fam cargar en=");
             var mode = (Arg.GetString(a, "sobrescribir") ?? "no").Trim().ToLowerInvariant();
             if (mode != "no" && mode != "valores") throw new OpFail(Status.Invalido, "sobrescribir=no (conserva valores de parámetros del proyecto) o valores");
-            var famConnectors = Connectors(famDoc).Count;
+            var connectors = Connectors(famDoc);
+            var famConnectors = connectors.Count;
+            var verifyPorts = Arg.GetBool(a, "verificar_puertos") == true;
+            var sourceType = verifyPorts ? famDoc.FamilyManager.CurrentType?.Name : null;
+            var expected = verifyPorts ? connectors.Select(c => DescribeConnector(famDoc, c, null)).ToList() : null;
             var fam = famDoc.LoadFamily(project, new LoadOptions(mode == "valores"));
             if (fam == null) throw new OpFail(Status.Error, "Revit no cargó la familia (LoadFamily devolvió null)");
             var check = ProjectFamilyInfo(project, new Dictionary<string, object> { ["id"] = Ids.ToLong(fam.Id) });
+            var checkedPorts = false;
             foreach (var t in (check["tipos"] as List<object> ?? new List<object>()).OfType<Dictionary<string, object>>())
             {
-                if (t.TryGetValue("conectores_instancia", out var c) && c is List<object> cl && cl.Count != famConnectors)
+                t.TryGetValue("conectores_instancia", out var c);
+                if (verifyPorts && famConnectors > 0 && string.Equals(sourceType, Arg.GetString(t, "tipo"), StringComparison.OrdinalIgnoreCase))
+                {
+                    checkedPorts = true;
+                    diffs.AddRange(FamilyPortAudit.Compare(expected, c as List<object>).Select(d => "tipo " + t["tipo"] + ": " + d));
+                }
+                else if (c is List<object> cl && cl.Count != famConnectors)
                     diffs.Add("tipo " + t["tipo"] + ": la instancia muestra " + cl.Count + " conectores y el RFA tiene " + famConnectors);
             }
+            if (verifyPorts && famConnectors > 0 && !checkedPorts)
+                diffs.Add("seleccione un tipo en el RFA que esté disponible en el proyecto para cotejar sus puertos");
             check["cargada_en"] = DocRegistry.Instance.IdOf(project);
             check["sobrescribir"] = mode;
             check["conectores_rfa"] = (long)famConnectors;

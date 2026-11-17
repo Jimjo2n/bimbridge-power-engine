@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+using System.Linq;
 using PDI.RevitMcp.Engine;
+using PDI.RevitMcp.Engine.Qa;
 using PDI.RevitMcp.Protocol;
 using Xunit;
 
@@ -20,6 +22,22 @@ namespace PDI.RevitMcp.Tests
             Bad("{\"op\":\"sheet_set\",\"nombre\":\"X\",\"hojas\":[\"@1\"]}");
             Bad("{\"op\":\"sheet_set\",\"nombre\":\"X\",\"hojas\":\"A1\"}");
             Assert.True(OpCatalog.ByKind["sheet_set"].Creates);
+        }
+
+        [Fact]
+        public void SavedSetAcceptsUnorderedMembershipAndRejectsSubstitutionOrDuplicate()
+        {
+            var order = Enumerable.Range(1, 26).Select(n => (long)n).Reverse().ToArray();
+            Assert.True(PrintSheetSet.MatchesMembership(order, order.Reverse()));
+            Assert.False(PrintSheetSet.MatchesMembership(order, order.Skip(1).Append(27)));
+            Assert.False(PrintSheetSet.MatchesMembership(order.Skip(1).Append(order[1]).ToArray(), order));
+            var preset = Json.ParseObject("{\"combinar\":true,\"color\":\"gris\",\"papel\":\"Default\"}");
+            var effective = PrintSheetSet.ApplyPreset(Json.ParseObject("{\"color\":\"color\"}"), preset);
+            Assert.Equal("color", effective["color"]);
+            Assert.Equal("Default", effective["papel"]);
+            Assert.Equal(true, effective["combinar"]);
+            Assert.False(PrintSheetSet.OutsidePaper(0, 0, 2.001, 1, 0, 0, 2, 1));
+            Assert.True(PrintSheetSet.OutsidePaper(0, 0, 2.01, 1, 0, 0, 2, 1));
         }
     }
 }

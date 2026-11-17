@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Autodesk.Revit.DB;
 using PDI.RevitMcp.Addin.Scripting;
 using PDI.RevitMcp.Engine;
+using PDI.RevitMcp.Engine.Qa;
 using PDI.RevitMcp.Protocol;
 
 namespace PDI.RevitMcp.Addin.Revit
@@ -24,6 +25,9 @@ namespace PDI.RevitMcp.Addin.Revit
             if (views.Length == 0 || ids.Length == 0 || views.Length > 8 || (long)views.Length * ids.Length > 100 ||
                 views.Contains(0) || ids.Contains(0))
                 return Response.Fail(request.Id, Status.Invalido, "indique IDs positivos en vistas e ids. Máximo 8 vistas y 100 pares vista-elemento.");
+            VisibilityAudit audit;
+            try { audit = new VisibilityAudit(request.Args, views, ids); }
+            catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
 
             var rows = new List<object>();
             string error = null;
@@ -92,11 +96,14 @@ namespace PDI.RevitMcp.Addin.Revit
             }, highPriority: false, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!work.Ok) return FromWork(request.Id, work);
             if (error != null) return Response.Fail(request.Id, Status.Invalido, error);
+            var differences = audit.Compare(rows);
             return new Response
             {
-                Id = request.Id, Rev = rev, Datos = new Dictionary<string, object>
+                Id = request.Id, Rev = rev, Estado = differences.Count == 0 ? Status.Ok : Status.ConDiferencias,
+                Datos = new Dictionary<string, object>
                 {
                     ["vistas"] = rows,
+                    ["diferencias"] = differences,
                     ["alcance"] = "El colector identifica candidatos de la vista. Las causas y los overrides son evidencia de configuración. Compruebe el render final para recortes y colores.",
                 },
             };

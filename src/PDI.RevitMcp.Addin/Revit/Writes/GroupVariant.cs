@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using Autodesk.Revit.DB;
 using PDI.RevitMcp.Engine;
+using PDI.RevitMcp.Engine.Qa;
 using PDI.RevitMcp.Protocol;
 
 namespace PDI.RevitMcp.Addin.Revit.Writes
@@ -87,14 +88,7 @@ namespace PDI.RevitMcp.Addin.Revit.Writes
             var current = Snapshot(group);
             var old = (Dictionary<string, object>)target["miembros"];
             var changed = (Dictionary<string, object>)target["cambios"];
-            if (!new HashSet<string>(current.Keys).SetEquals(old.Keys)) return false;
-            foreach (var item in old)
-            {
-                var expected = new Dictionary<string, object>((Dictionary<string, object>)item.Value);
-                if (changed.TryGetValue(item.Key, out var type)) expected["tipo"] = type;
-                if (OpSemantics.Canonical(expected) != OpSemantics.Canonical(current[item.Key])) return false;
-            }
-            return true;
+            return GroupMemberMap.MatchesVariant(old, current, changed);
         }
 
         private static Group CurrentGroup(Document doc, long id)

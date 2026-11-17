@@ -26,7 +26,7 @@ namespace BimBridge.PowerEngine
             "red ruta=tramos.json (proximidad ≠ continuidad ≠ conexión física). " +
             "terminales ruta= pagina= nivel= parametro_sentido= anclas=[{nombre,pdf,modelo}] items=[{ref,pt,tipo,sentido,elev}] → planes de terminales. " +
             "equipos ruta= pagina= nivel= anclas=[{nombre,pdf,modelo}] reglas=[{ambito,codigo,clase,tipo}] items=[{ref,pt,ambito,zona,codigo,elev,evidencia}] → planes de equipos. " +
-            "riser pdf= xlsx= hoja= pdf_aristas=[{id,origen,destino,pagina,evidencia}] vista= estilo= nodos=[…] trazado=[…]. riser_audit relee las fuentes y compara observado=[…]. " +
+            "riser pdf= xlsx= hoja= [columnas= fila_encabezado= fila_inicio= fila_final=] pdf_aristas=[{id,origen,destino,pagina,evidencia}] vista= estilo= nodos=[…] trazado=[…]. riser_audit relee las fuentes y compara observado=[…]. " +
             "Coordenadas de página nunca son de Revit: el flujo registra con anclas y escala ambigüedades.";
 
         private static readonly Dictionary<string, string> PdfJobs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -175,7 +175,7 @@ namespace BimBridge.PowerEngine
             var pages = declared.Select(r => Arg.GetLong(r, "pagina") ?? 0).Distinct().OrderBy(x => x).ToList();
             if (pages.Any(p => p <= 0)) return Err("cada alimentador del PDF exige una página positiva", Help);
             var workbook = new Dictionary<string, object> { ["ruta"] = Arg.GetString(args, "xlsx"), ["hoja"] = Arg.GetString(args, "hoja") };
-            foreach (var option in new[] { "columnas", "fila_encabezado" })
+            foreach (var option in new[] { "columnas", "fila_encabezado", "fila_inicio", "fila_final" })
                 if (args.TryGetValue(option, out var value)) workbook[option] = value;
             var excel = Doc(pe, folders, "xlsx_feeders", workbook);
             if (!(excel.TryGetValue("resultado", out var sheet) && sheet is Dictionary<string, object> excelResult)) return excel;

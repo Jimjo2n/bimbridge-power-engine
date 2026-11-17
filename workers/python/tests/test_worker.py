@@ -149,16 +149,20 @@ class FeederWorkbookTests(unittest.TestCase):
                     <c r="C1" t="inlineStr"><is><t>Destino</t></is></c><c r="D1" t="inlineStr"><is><t>Abierto</t></is></c></row>
                     <row r="2"><c r="A2" t="s"><v>0</v></c><c r="B2" t="inlineStr"><is><t>METER</t></is></c>
                     <c r="D2" t="b"><v>1</v></c></row>
+                    <row r="3"><c r="A3" t="inlineStr"><is><t>NOTA</t></is></c></row>
                     </sheetData></worksheet>""")
             worker = Worker()
             try:
-                response = worker.call("xlsx_feeders", {"ruta": path, "hoja": "Feeders"})
+                args = {"ruta": path, "hoja": "Feeders"}
+                self.assertEqual(worker.call("xlsx_feeders", args)["codigo"], "INVALIDO")
+                response = worker.call("xlsx_feeders", dict(args, fila_inicio=2, fila_final=2))
                 self.assertEqual(response["codigo"], "OK", response)
                 edge, = response["resultado"]["aristas"]
                 self.assertEqual(edge["id"], "XF-2")
                 self.assertIsNone(edge["destino"])
                 self.assertTrue(edge["abierto"])
                 self.assertEqual(edge["fuente"]["celdas"]["origen"], "B2")
+                self.assertEqual(worker.call("xlsx_feeders", dict(args, fila_inicio=3, fila_final=2))["codigo"], "INVALIDO")
             finally:
                 worker.close()
 
@@ -248,6 +252,33 @@ class PdfTests(unittest.TestCase):
     def test_symbols_vector(self):
         p = self._symbols_match_truth("plan_vectorial.pdf")
         self.assertEqual({l["codigo"] for l in p["leyenda"]}, {"D", "G", "S"})
+
+    def test_identical_overprints_preserve_the_first_id_and_accept_an_old_alias(self):
+        from hashlib import sha256
+
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "overprint.pdf")
+            c = fixtures.Canvas()
+            c.rect(20, 30, 10, 6)
+            c.rect(20, 30, 10, 6)
+            c.rect(21, 30, 10, 6)
+            pdf = fixtures.Pdf()
+            pdf.page(200, 100, "\n".join(c.ops))
+            pdf.write(path)
+            args = {"ruta": path, "trazabilidad": True}
+            result = self.w.call("pdf_symbols", args, rutas=[folder])["resultado"]
+            inventory = result["paginas"][0]["inventario"]
+            self.assertEqual([s["centro_pt"] for s in inventory], [[25, 33], [26, 33]])
+            raw_alias = "%s:1:1:rectangulo|10.0|6.0|hueco:[25.0, 33.0]" % result["sha256"]
+            alias = sha256(raw_alias.encode()).hexdigest()[:24]
+            alias_decision = {"id_simbolo": alias, "codigo": "LT", "decision": "incluir", "evidencia": "revisión"}
+            applied = self.w.call("pdf_symbols", dict(args, decisiones=[alias_decision]), rutas=[folder])
+            self.assertEqual(applied["codigo"], "OK", applied.get("error"))
+            confirmed = applied["resultado"]["paginas"][0]["confirmados"]
+            self.assertEqual([entry["id_simbolo"] for entry in confirmed], [inventory[0]["id_simbolo"]])
+            conflict = {"id_simbolo": inventory[0]["id_simbolo"], "decision": "excluir", "evidencia": "revisión"}
+            rejected = self.w.call("pdf_symbols", dict(args, decisiones=[alias_decision, conflict]), rutas=[folder])
+            self.assertEqual(rejected["codigo"], "INVALIDO")
 
     def test_symbols_page_rotate90_visible_space(self):
         p = self._symbols_match_truth("plan_rotado.pdf")

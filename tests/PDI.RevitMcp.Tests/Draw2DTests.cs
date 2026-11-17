@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 using System.Collections.Generic;
 using PDI.RevitMcp.Engine;
+using PDI.RevitMcp.Engine.Qa;
 using PDI.RevitMcp.Protocol;
 using Xunit;
 
@@ -9,7 +10,39 @@ namespace PDI.RevitMcp.Tests
     /// <summary>0.8.0 paquete C: geometría 2D compartida y validación de las operaciones de dibujo antes de tocar Revit.</summary>
     public class Draw2DTests
     {
+        [Fact]
+        public void ManagedCalloutDetectsAChangedTypeHeightOrAnchor()
+        {
+            var text = LightingCalloutState.Text(" LT ", 8.5);
+            Assert.Equal("LT 8'-6\"", text);
+            Assert.True(LightingCalloutState.IsCurrent(text, "typ-a", text, "typ-a", 0.002));
+            Assert.False(LightingCalloutState.IsCurrent(text, "typ-a", text, "typ-b", 0));
+            Assert.False(LightingCalloutState.IsCurrent(text, "typ-a", LightingCalloutState.Text("LT", 8.75), "typ-a", 0));
+            Assert.False(LightingCalloutState.IsCurrent(text, "typ-a", text, "typ-a", 0.004));
+        }
+
         private static List<OpSpec> Parse(string json) => OpSpec.ParseAll(Json.ParseObject("{\"ops\":[" + json + "]}"));
+
+        [Fact]
+        public void CoordinationSheetKeepsEachViewportBoundToItsPlannedView()
+        {
+            var ops = Parse("""
+                {"op":"view_create","tipo":"seccion","nombre":"L15 corte","caja":[[0,0,9],[12,0,16]],"profundidad":6},
+                {"op":"view_create","tipo":"3d","nombre":"L15 sistemas","caja":[[0,0,9],[12,8,16]]},
+                {"op":"view_create","tipo":"callout","nombre":"L15 equipo","origen":101,"caja":[[0,0,9],[4,4,9]]},
+                {"op":"sheet_create","numero":"QC-15","nombre":"Coordinación"},
+                {"op":"sheet_place","hoja":"@4","vista":"@1","punto":[1,1]},
+                {"op":"sheet_place","hoja":"@4","vista":"@2","punto":[2,1]},
+                {"op":"sheet_place","hoja":"@4","vista":"@3","punto":[1,2]}
+                """);
+            Assert.Equal(7, ops.Count);
+            for (var index = 0; index < 3; index++)
+            {
+                Assert.Equal("sheet_place", ops[index + 4].Kind);
+                Assert.Equal("@4", ops[index + 4].Args["hoja"]);
+                Assert.Equal("@" + (index + 1), ops[index + 4].Args["vista"]);
+            }
+        }
 
         [Fact]
         public void DrawingOps_ValidInputs_Parse()

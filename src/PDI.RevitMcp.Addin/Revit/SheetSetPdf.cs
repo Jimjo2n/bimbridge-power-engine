@@ -5,6 +5,7 @@ using System.Linq;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.ExtensibleStorage;
 using PDI.RevitMcp.Engine;
+using PDI.RevitMcp.Engine.Qa;
 using PDI.RevitMcp.Protocol;
 
 namespace PDI.RevitMcp.Addin.Revit
@@ -63,7 +64,6 @@ namespace PDI.RevitMcp.Addin.Revit
 
         internal static void CheckViewportBounds(Document doc, IEnumerable<ViewSheet> sheets, List<string> differences)
         {
-            const double tolerance = 1.0 / 304.8; // 1 mm de papel en unidades internas.
             foreach (var sheet in sheets)
             {
                 var paper = sheet.Outline;
@@ -72,9 +72,9 @@ namespace PDI.RevitMcp.Addin.Revit
                     differences.Add(sheet.SheetNumber + ": Revit no proporcionó un contorno de papel evaluable");
                     continue;
                 }
-                bool Outside(Outline bounds) => !bounds.IsEmpty &&
-                    (bounds.MinimumPoint.X < paper.Min.U - tolerance || bounds.MaximumPoint.X > paper.Max.U + tolerance ||
-                     bounds.MinimumPoint.Y < paper.Min.V - tolerance || bounds.MaximumPoint.Y > paper.Max.V + tolerance);
+                bool Outside(Outline bounds) => !bounds.IsEmpty && PrintSheetSet.OutsidePaper(
+                    bounds.MinimumPoint.X, bounds.MinimumPoint.Y, bounds.MaximumPoint.X, bounds.MaximumPoint.Y,
+                    paper.Min.U, paper.Min.V, paper.Max.U, paper.Max.V);
                 foreach (var id in sheet.GetAllViewports())
                 {
                     if (!(doc.GetElement(id) is Viewport viewport)) continue;

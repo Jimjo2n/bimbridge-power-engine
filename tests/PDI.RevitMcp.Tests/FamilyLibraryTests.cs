@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using PDI.RevitMcp.Engine.Families;
+using PDI.RevitMcp.Engine.Qa;
+using PDI.RevitMcp.Protocol;
 using Xunit;
 
 namespace PDI.RevitMcp.Tests
@@ -11,6 +14,25 @@ namespace PDI.RevitMcp.Tests
     /// <summary>0.8.0 paquete D: biblioteca de familias autorizada (sin Revit).</summary>
     public class FamilyLibraryTests
     {
+        [Fact]
+        public void ReloadChecksNamedPortsEvenWhenTheirTotalHasNotChanged()
+        {
+            Dictionary<string, object> Port(string key, string system, string flow, double radius) =>
+                new Dictionary<string, object> { ["clave"] = key, ["sistema"] = system, ["flujo"] = flow, ["radio_mm"] = radius };
+            var source = new List<Dictionary<string, object>>
+            {
+                Port("fria", "DomesticColdWater", "entrada", 6.5),
+                Port("caliente", "DomesticHotWater", "entrada", 6.5),
+                Port("desague", "Sanitary", "salida", 20),
+            };
+            var project = (List<object>)Json.Parse(Json.Write(source.AsEnumerable().Reverse().ToList()));
+            Assert.Empty(FamilyPortAudit.Compare(source, project));
+            project[0] = Port("desague", "DomesticColdWater", "entrada", 25);
+            Assert.Collection(FamilyPortAudit.Compare(source, project),
+                row => Assert.Contains("sistema", row), row => Assert.Contains("flujo", row), row => Assert.Contains("radio", row));
+            Assert.Contains("sin instancia", Assert.Single(FamilyPortAudit.Compare(source, null)));
+        }
+
         private static string Rfa(string dir, string name, int? version, params string[] catalogTypes)
         {
             Directory.CreateDirectory(dir);

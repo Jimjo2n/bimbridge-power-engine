@@ -8,6 +8,20 @@ namespace PDI.RevitMcp.Engine.Qa
 {
     public static class GroupMemberMap
     {
+        public static bool MatchesVariant(Dictionary<string, object> before, Dictionary<string, object> after,
+            Dictionary<string, object> changedTypes)
+        {
+            if (before.Count != after.Count) return false;
+            foreach (var member in before)
+            {
+                if (!after.TryGetValue(member.Key, out var current)) return false;
+                var expected = new Dictionary<string, object>((Dictionary<string, object>)member.Value);
+                if (changedTypes.TryGetValue(member.Key, out var type)) expected["tipo"] = type;
+                if (OpSemantics.Canonical(expected) != OpSemantics.Canonical(current)) return false;
+            }
+            return true;
+        }
+
         public static Dictionary<string, object> Compare(List<object> before, List<object> after)
         {
             static List<(long Id, string Uid, string Signature)> Read(List<object> rows)

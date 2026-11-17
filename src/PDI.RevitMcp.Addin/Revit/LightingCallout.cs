@@ -6,6 +6,7 @@ using System.Linq;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.ExtensibleStorage;
 using PDI.RevitMcp.Engine;
+using PDI.RevitMcp.Engine.Qa;
 using PDI.RevitMcp.Protocol;
 
 namespace PDI.RevitMcp.Addin.Revit
@@ -14,7 +15,6 @@ namespace PDI.RevitMcp.Addin.Revit
     {
         private static readonly Guid SchemaId = new Guid("983809a3-6fa4-4089-9f86-6b7817611984");
         private const string Field = "Origen";
-        private const double PositionTolerance = 0.001 / 0.3048;
 
         internal static Dictionary<string, object> Bind(Document doc, long id, Dictionary<string, object> args)
         {
@@ -38,10 +38,7 @@ namespace PDI.RevitMcp.Addin.Revit
             if (string.IsNullOrWhiteSpace(code)) throw new QueryException("la luminaria asociada carece de código");
             var height = LengthParameter(light, Arg.GetString(config, "altura_param") ?? "Mounting Height");
             if (Arg.GetString(config, "descontar_tipo_param") is string body) height -= LengthParameter(type, body);
-            var rounded = (long)Math.Round(Math.Abs(height) * 12, MidpointRounding.AwayFromZero);
-            var shown = (height < 0 && rounded > 0 ? "-" : "") + (rounded / 12).ToString(CultureInfo.InvariantCulture) + "'-" +
-                (rounded % 12).ToString(CultureInfo.InvariantCulture) + "\"";
-            return (code.Trim() + " " + shown, location.Point, Ids.ToLong(light.Id), type.UniqueId);
+            return (LightingCalloutState.Text(code, height), location.Point, Ids.ToLong(light.Id), type.UniqueId);
         }
 
         private static string TextParameter(Element element, string name)
@@ -90,8 +87,8 @@ namespace PDI.RevitMcp.Addin.Revit
         }
 
         internal static bool IsCurrent(TextNote note, Dictionary<string, object> config, string text, XYZ point, string typeUid) =>
-            note.Text == text && string.Equals(typeUid, Arg.GetString(config, "tipo_origen"), StringComparison.Ordinal) &&
-            point.DistanceTo(PreviousPoint(config)) <= PositionTolerance;
+            LightingCalloutState.IsCurrent(note.Text, Arg.GetString(config, "tipo_origen"), text, typeUid,
+                point.DistanceTo(PreviousPoint(config)));
 
         internal static XYZ PreviousPoint(Dictionary<string, object> config)
         {
