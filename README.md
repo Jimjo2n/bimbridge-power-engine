@@ -1,21 +1,30 @@
+<img src="docs/assets/github-cover.svg" alt="" width="1120" height="270">
+
 # BIMBRIDGE – Power Engine
 
 Local BIM automation and AI-agent integration for Autodesk Revit, built with C#/.NET, Rust and Python.
 
 BIMBRIDGE connects MCP clients to the Revit API through a local bridge and add-in. It provides declarative queries, typed modification plans, dynamic C# execution, durable recovery records and specialized geometry/document processing.
 
-**Development candidate: 0.9.0+commit. Native acceptance is partial. This repository is initially private and has no stable release.**
+**Development candidate: 0.9.0+commit. Native acceptance is partial. See [validation](docs/quality/VALIDATION.md) for current coverage.**
 
-[Español](README.es.md) · [Documentation](docs/INDEX.md) · [Build](docs/DEVELOPMENT.md) · [Security](docs/security/TRUST_MODEL.md) · [Contribute](CONTRIBUTING.md)
+[Español](README.es.md) · [Documentation](docs/INDEX.md) · [Build](docs/DEVELOPMENT.md) · [Security](docs/security/TRUST_MODEL.md) · [Contribute](CONTRIBUTING.md) · [Roadmap](docs/roadmap/BACKLOG.md)
+
+## Architecture
 
 ```mermaid
 flowchart LR
+  accTitle: BIMBRIDGE architecture
+  accDescr: Revit requests travel through the local C# bridge. AgentHost also connects to Rust and Python workers.
   Client["MCP client"] --> Bridge["C# stdio bridge"]
   Bridge -->|"local named pipe"| Addin["Revit add-in / dispatcher"]
   Addin --> Model["Revit document / transactions"]
   Host["AgentHost / workflows"] --> Bridge
   Host --> Rust["Rust geometry: FFI or IPC"]
   Host --> Python["Python document worker"]
+
+  classDef engine fill:#123748,stroke:#359687,color:#f0fbff,stroke-width:2px
+  class Bridge,Addin engine
 ```
 
 ## Capabilities
