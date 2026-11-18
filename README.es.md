@@ -6,9 +6,48 @@
 
 [English](README.md) · [Instalación](docs/getting-started/INSTALLATION.md) · [Conectar un cliente](docs/integrations/MCP.md) · [Ejemplos](examples/README.md) · [Documentación](docs/INDEX.md)
 
-## Descarga
+## Descarga BIMBRIDGE para Windows
 
-[Instalador para Windows y ZIP de actualización](https://github.com/Jimjo2n/bimbridge-power-engine/releases) para Revit 2022–2027. La versión experimental 0.9.3 pasó la validación offline. La aceptación nativa sigue aplazada. [Self-QC](docs/0.9.2/SELF_QC_PARIDAD.md)
+**[Descargar el instalador v0.9.3](https://github.com/Jimjo2n/bimbridge-power-engine/releases/download/v0.9.3/PDI.RevitMcp.Setup.exe)** · [Notas y SHA-256](https://github.com/Jimjo2n/bimbridge-power-engine/releases/tag/v0.9.3) · [Todas las versiones](https://github.com/Jimjo2n/bimbridge-power-engine/releases) · [Matriz completa de herramientas](docs/MATRIZ_CAPACIDADES.md)
+
+| Objetivos de compilación | Runtime del complemento |
+| --- | --- |
+| Revit 2022–2024 | .NET Framework 4.8 |
+| Revit 2025–2026 | .NET 8 |
+| Revit 2027 | .NET 10 |
+
+1. Cierra Revit, descarga el paquete revisado y verifica su SHA-256. Selecciona las versiones y el cliente en el instalador. Consulta la [guía de instalación](docs/getting-started/INSTALLATION.md).
+2. Conecta **Codex** o **Claude Code**, o configura el puente MCP por stdio en tu cliente. Los perfiles compacto y completo exponen contratos distintos. Consulta la [integración MCP](docs/integrations/MCP.md) y los contratos [compacto](docs/ESQUEMA_HERRAMIENTAS_compacto.json) y [completo](docs/ESQUEMA_HERRAMIENTAS_completo.json).
+3. Abre un modelo de prueba autorizado. En la herramienta de lectura del perfil compacto, usa `ctx` para identificar el documento y luego `q LF f=id,type digest=true` para obtener una huella del conjunto filtrado de luminarias. Consulta los [ejemplos](examples/README.md) y las [recetas](docs/RECETAS.md).
+
+## BIMBRIDGE de un vistazo
+
+| Flujo de trabajo | Puntos de entrada | Resultados |
+| --- | --- | --- |
+| Inspección del modelo | `ctx`, `cat`, `q`, `get`, `geo` | Identificadores de documentos, campos de elementos, conteos, geometría y huellas. |
+| Modelado y documentación | `plan`, `commit`, `fam`, `doc` | Cambios tipados, edición de familias, láminas, tablas y exportaciones PDF/IFC/CSV. |
+| Coordinación y auditoría | `chk lighting_audit`, `chk model_health`, `chk copy_monitor` | Hallazgos, inventario de vínculos y evidencia de verificación. |
+| Automatización de varios pasos | `tarea iniciar`, `tarea reanudar`, `tarea reconciliar`, `exec` | Ejecución reanudable, decisiones de recuperación y extensiones en C# dinámico. |
+| Procesamiento de entradas externas | `power cap`, `pdf_grids`, `pdf_symbols`, `docx_extract` | Descubrimiento de capacidades y datos estructurados para geometría, registro y colocación. |
+
+[Referencia de comandos y suboperaciones](docs/MATRIZ_CAPACIDADES.md) · [Recetas de trabajo](docs/RECETAS.md) · [Reproducir benchmarks](docs/performance/BENCHMARKS.md)
+
+## Novedades
+
+- **v0.9.3 experimental** incorporó Revit 2027 al instalador y a la compilación y completó 39 comprobaciones de paridad bajo criterios offline. Mejoró la colocación de luminarias, la geometría de vínculos, las anotaciones, los conjuntos de impresión y el manejo de PDF y hojas de cálculo. [Versión publicada](https://github.com/Jimjo2n/bimbridge-power-engine/releases/tag/v0.9.3)
+- **Desarrollo** reúne los cambios entregados y próximos pasos en el [historial de cambios](CHANGELOG.md) y el [roadmap](docs/roadmap/BACKLOG.md).
+
+## Evidencia verificable
+
+| Evidencia | Alcance |
+| --- | --- |
+| Validación local v0.9.3 | La versión publicada reporta 822 pruebas .NET, 13 Rust y 33 Python aprobadas, con dos omitidas, además de una instalación aislada comprobada para el objetivo 2027. |
+| Controles automáticos | [Distribución Windows](https://github.com/Jimjo2n/bimbridge-power-engine/actions/workflows/ci.yml), [contratos de workers](https://github.com/Jimjo2n/bimbridge-power-engine/actions/workflows/workers.yml) y [revisión del repositorio](https://github.com/Jimjo2n/bimbridge-power-engine/actions/workflows/repository.yml). |
+| Aceptación en Revit y rendimiento | [Registros de validación](docs/quality/VALIDATION.md), [procedimiento de aceptación nativa](docs/0.9.0/NATIVE_VALIDATION.md) y [metodología de benchmarks](docs/performance/BENCHMARKS.md). La campaña nativa de v0.9.3 sigue pendiente. |
+
+<img src="docs/assets/task-evidence.png" width="960" height="420" alt="Simulación de tareas con 990 unidades confirmadas y 10 revertidas, revisión 18">
+
+*Salida registrada de una prueba simulada de 1.000 unidades. La imagen reproduce campos seleccionados de la salida guardada.* [Consultar el JSON original](docs/evidencia/resumen_tarea_1000.json)
 
 ## Catálogo técnico
 
