@@ -6,9 +6,48 @@
 
 [Español](README.es.md) · [Installation](docs/getting-started/INSTALLATION.md) · [Connect a client](docs/integrations/MCP.md) · [Examples](examples/README.md) · [Documentation](docs/INDEX.md)
 
-## Download
+## Get BIMBRIDGE for Windows
 
-[Windows installer and update ZIP](https://github.com/Jimjo2n/bimbridge-power-engine/releases) for Revit 2022–2027. The 0.9.3 prerelease passed offline validation. Native acceptance remains pending. [Self-QC](docs/0.9.2/SELF_QC_PARIDAD.md)
+**[Download Setup for v0.9.3](https://github.com/Jimjo2n/bimbridge-power-engine/releases/download/v0.9.3/PDI.RevitMcp.Setup.exe)** · [Release notes and SHA-256](https://github.com/Jimjo2n/bimbridge-power-engine/releases/tag/v0.9.3) · [All releases](https://github.com/Jimjo2n/bimbridge-power-engine/releases) · [Full tool matrix](docs/MATRIZ_CAPACIDADES.md)
+
+| Revit build targets | Add-in runtime |
+| --- | --- |
+| 2022–2024 | .NET Framework 4.8 |
+| 2025–2026 | .NET 8 |
+| 2027 | .NET 10 |
+
+1. Close Revit, download the reviewed package and verify its SHA-256. Select your Revit releases and client in Setup. See the [installation guide](docs/getting-started/INSTALLATION.md).
+2. Connect through **Codex** or **Claude Code**, or configure the MCP stdio bridge in your client. The bridge offers compact and complete profiles with separate tool schemas. See [MCP setup](docs/integrations/MCP.md) and the [compact](docs/ESQUEMA_HERRAMIENTAS_compacto.json) and [complete](docs/ESQUEMA_HERRAMIENTAS_completo.json) contracts.
+3. Open an authorized test model. In the compact read tool, use `ctx` to identify the document, then `q LF f=id,type digest=true` to request a fingerprint of the filtered lighting fixtures. See [command examples](examples/README.md) and [workflow recipes](docs/RECETAS.md).
+
+## BIMBRIDGE at a glance
+
+| Workflow | Entry points | Results |
+| --- | --- | --- |
+| Inspect a model | `ctx`, `cat`, `q`, `get`, `geo` | Document handles, element projections, counts, geometry and digests. |
+| Model and document | `plan`, `commit`, `fam`, `doc` | Typed changes, family editing, sheets and schedules, PDF/IFC/CSV exports. |
+| Coordinate and audit | `chk lighting_audit`, `chk model_health`, `chk copy_monitor` | Findings, linked-model inventory and verification evidence. |
+| Automate multi-step work | `tarea iniciar`, `tarea reanudar`, `tarea reconciliar`, `exec` | Resumable execution, recovery decisions and dynamic C# extensions. |
+| Process external inputs | `power cap`, `pdf_grids`, `pdf_symbols`, `docx_extract` | Capability discovery and structured data for geometry, registration and placement workflows. |
+
+[Command and suboperation reference](docs/MATRIZ_CAPACIDADES.md) · [Workflow recipes](docs/RECETAS.md) · [Reproduce benchmarks](docs/performance/BENCHMARKS.md)
+
+## Release news
+
+- **v0.9.3 experimental** added the Revit 2027 build and installer target and completed the 39 parity checks under the offline criteria. It improved lighting placement, linked geometry, annotations, print sets, and PDF and workbook handling. [Published release](https://github.com/Jimjo2n/bimbridge-power-engine/releases/tag/v0.9.3)
+- **Development** tracks upcoming work and shipped changes in the [changelog](CHANGELOG.md) and [roadmap](docs/roadmap/BACKLOG.md).
+
+## Evidence you can inspect
+
+| Evidence | What it covers |
+| --- | --- |
+| v0.9.3 local validation | Published release reports 822 .NET, 13 Rust and 33 Python tests passed, with two skipped, plus isolated installation verification for the 2027 target. |
+| Automated checks | [Windows distribution](https://github.com/Jimjo2n/bimbridge-power-engine/actions/workflows/ci.yml), [worker contracts](https://github.com/Jimjo2n/bimbridge-power-engine/actions/workflows/workers.yml) and [repository checks](https://github.com/Jimjo2n/bimbridge-power-engine/actions/workflows/repository.yml). |
+| Revit acceptance and benchmarks | [Validation records](docs/quality/VALIDATION.md), [native acceptance procedure](docs/0.9.0/NATIVE_VALIDATION.md) and [benchmark methodology](docs/performance/BENCHMARKS.md). The native campaign for v0.9.3 remains pending. |
+
+<img src="docs/assets/task-evidence.png" width="960" height="420" alt="Recorded offline task simulation with 990 confirmed and 10 reverted units, revision 18, ">
+
+*Recorded output from the 1,000-unit simulated task fixture. The visual reproduces selected fields from the checked-in output.* [Inspect the original JSON](docs/evidencia/resumen_tarea_1000.json)
 
 ## Technical catalog
 
