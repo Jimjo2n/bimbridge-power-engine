@@ -134,7 +134,10 @@ namespace PDI.RevitMcp.Engine.Tasks
             }
             catch (LeaseLostException ex)
             {
-                SetState(TaskState.Interrumpida, "lease perdido (" + ex.Message + "): esta instancia dejó de ejecutar para no escribir sin autoridad; lo confirmado sigue en el registro");
+                // Sólo en memoria: si otro Revit ya tomó la tarea, su tarea.json es el bueno (lo decide el checkpoint del finally).
+                _t.State = TaskState.Interrumpida;
+                _t.Reason = "lease perdido (" + ex.Message + "): esta instancia dejó de ejecutar para no escribir sin autoridad; lo confirmado sigue en el registro";
+                _changed(_t);
             }
             catch (OperationCanceledException)
             {
@@ -147,9 +150,13 @@ namespace PDI.RevitMcp.Engine.Tasks
             finally
             {
                 _t.Preflight = null;
+                // Guardar ANTES de soltar el lease y sólo si nadie más lo tomó: un motor que perdió la tarea no pisa el tarea.json del nuevo dueño.
+                // shortcut: lectura y guardado sin el bloqueo del lease (otro Revit podría tomarlo entre ambos si el lease ya venció); pasar a un SaveIfOwner bajo WithLeaseLock si se observa.
+                var cur = _store.ReadLease(_t.Id);
+                if (cur == null || (cur.Owner == _owner && cur.Fencing == _fencing))
+                    try { Checkpoint(); } catch (CheckpointException) { }
                 if (_docLeaseId != null) DocLeases.ReleaseLease(_docLeaseId, _owner + "|" + _t.Id);
                 _store.ReleaseLease(_t.Id, _owner);
-                try { Checkpoint(); } catch (CheckpointException) { }
             }
         }
 

@@ -3,6 +3,9 @@
 ## Unreleased
 
 - perf(geometry): merge duplicate points as the Rust grid finds them, avoiding temporary neighbor lists.
+- fix(tasks): `tarea cancelar/anotar/reconciliar/olvidar` refuse with `documento_ocupado` when another Revit holds the task lease instead of reporting success while that Revit keeps writing; save-as and persist evidence no longer rewrite tasks held elsewhere.
+- fix(tasks): a runner that lost its lease no longer overwrites the new owner's `tarea.json`; the final checkpoint now happens before the lease is released.
+- fix(power-engine): the worker memory limit is enforced while the job runs (Windows has no RLIMIT_AS), and a lifetime peak over the limit always restarts the worker so the next job is not discarded.
 
 ## 0.9.3 experimental
 
