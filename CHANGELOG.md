@@ -3,6 +3,7 @@
 ## Unreleased
 
 - perf(geometry): merge duplicate points as the Rust grid finds them, avoiding temporary neighbor lists.
+- feat(diagnostics): `plan timing=true` and `commit timing=true` report the Revit dispatch breakdown (monotonic queue wait, Revit thread time, `ExternalEvent.Raise` result, visits before start) and the commit phases (load, write intent, apply/verify, finish), plus bridge IPC time. `revit_ocupado` responses from the add-in always include the dispatch data (the bridge's own read timeout does not). `revit_ms` keeps its previous boundary. Execution policy is unchanged.
 
 ## 0.9.3 experimental
 

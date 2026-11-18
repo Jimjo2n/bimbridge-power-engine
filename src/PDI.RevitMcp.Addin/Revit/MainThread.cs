@@ -55,9 +55,9 @@ namespace PDI.RevitMcp.Addin.Revit
         public async Task<WorkResult> RunAsync(Func<UIApplication, Stopwatch, int, bool> step, bool highPriority, TimeSpan busyAfter, CancellationToken ct)
         {
             if (ct.IsCancellationRequested) return WorkResult.Make(WorkResult.KindCancelled, null, null);
-            var item = new WorkItem(step, highPriority);
+            var item = new WorkItem(step, highPriority) { VisitsAtEnqueue = Interlocked.Read(ref _visits) };
             (highPriority ? _high : _normal).Enqueue(item);
-            Raise();
+            item.RaiseResult = Raise();
 
             using (var timer = CancellationTokenSource.CreateLinkedTokenSource(ct))
             {
@@ -68,20 +68,31 @@ namespace PDI.RevitMcp.Addin.Revit
                 {
                     // Si justo empezó, se deja terminar; si no, se marca para que no corra nunca.
                     if (Interlocked.CompareExchange(ref item.State, WorkItem.Cancelled, WorkItem.Waiting) == WorkItem.Waiting)
+                    {
+                        // Sin empezar: cuántas visitas hubo mientras esperaba distingue "Revit no visitó" de "visitó y no le tocó".
+                        item.VisitsBeforeStart = Interlocked.Read(ref _visits) - item.VisitsAtEnqueue;
+                        item.WaitMs = item.ElapsedMs();
                         return WorkResult.Make(ct.IsCancellationRequested ? WorkResult.KindCancelled : WorkResult.KindBusy, null, item);
+                    }
                 }
             }
             using (ct.Register(() => item.CancelRequested = true))
-                return await item.Done.Task.ConfigureAwait(false);
+            {
+                var result = await item.Done.Task.ConfigureAwait(false);
+                // Revit pudo terminarlo dentro de una visita en curso antes de que Raise() devolviera su respuesta.
+                result.RaiseResult = result.RaiseResult ?? item.RaiseResult;
+                return result;
+            }
         }
 
-        private void Raise()
+        private string Raise()
         {
             var ev = _event;
-            if (ev == null) return;
+            if (ev == null) return "sin_evento";
             var r = ev.Raise();
             if (r == ExternalEventRequest.Denied || r == ExternalEventRequest.TimedOut)
                 _log("ExternalEvent.Raise: " + r);
+            return r.ToString();
         }
 
         public void Execute(UIApplication app)
@@ -120,7 +131,8 @@ namespace PDI.RevitMcp.Addin.Revit
                 if (item.State == WorkItem.Cancelled) Interlocked.Increment(ref _cancelled);
                 return;
             }
-            item.WaitMs = (long)(DateTime.UtcNow - item.CreatedUtc).TotalMilliseconds;
+            item.WaitMs = item.ElapsedMs();
+            item.VisitsBeforeStart = _visits - item.VisitsAtEnqueue;   // la visita actual aún no se contó
             item.Started.TrySetResult(true);
             if (!Slice(app, item, sw)) _active.Add(item);
         }
@@ -209,14 +221,16 @@ namespace PDI.RevitMcp.Addin.Revit
             public const int Waiting = 0, Running = 1, Cancelled = 2;
             public readonly Func<UIApplication, Stopwatch, int, bool> Step;
             public readonly bool High;
-            public readonly DateTime CreatedUtc = DateTime.UtcNow;
+            public readonly long CreatedTs = Stopwatch.GetTimestamp();
             public readonly TaskCompletionSource<bool> Started = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             public readonly TaskCompletionSource<WorkResult> Done = new TaskCompletionSource<WorkResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             public int State;
             public volatile bool CancelRequested;
-            public long BusyMs, MaxSliceMs, WaitMs;
+            public long BusyMs, MaxSliceMs, WaitMs, VisitsAtEnqueue, VisitsBeforeStart;
             public int Slices;
+            public string RaiseResult;
             public WorkItem(Func<UIApplication, Stopwatch, int, bool> step, bool high) { Step = step; High = high; }
+            public long ElapsedMs() => (Stopwatch.GetTimestamp() - CreatedTs) * 1000 / Stopwatch.Frequency;
         }
     }
 
@@ -233,6 +247,8 @@ namespace PDI.RevitMcp.Addin.Revit
             MaxSliceMs = item?.MaxSliceMs ?? 0,
             Slices = item?.Slices ?? 0,
             WaitMs = item?.WaitMs ?? 0,
+            RaiseResult = item?.RaiseResult,
+            VisitsBeforeStart = item?.VisitsBeforeStart ?? 0,
         };
 
         public string Kind { get; private set; }
@@ -243,6 +259,17 @@ namespace PDI.RevitMcp.Addin.Revit
         public int Slices { get; private set; }
         /// <summary>Milisegundos desde que se pidió hasta que Revit lo empezó.</summary>
         public long WaitMs { get; private set; }
+        /// <summary>Respuesta de ExternalEvent.Raise al encolar (Accepted, Pending, Denied, TimedOut).</summary>
+        public string RaiseResult { get; internal set; }
+        /// <summary>Visitas de Revit que terminaron sin empezar este trabajo. 0 con espera larga = Revit no atendió el evento.</summary>
+        public long VisitsBeforeStart { get; private set; }
         public bool Ok => Kind == KindCompleted;
+
+        /// <summary>Desglose del despacho para timing=true y para las respuestas revit_ocupado.</summary>
+        public Dictionary<string, object> DispatchJson() => new Dictionary<string, object>
+        {
+            ["espera_cola_ms"] = WaitMs, ["hilo_revit_ms"] = BusyMs, ["tramos"] = (long)Slices, ["tramo_max_ms"] = MaxSliceMs,
+            ["raise"] = RaiseResult, ["visitas_antes_de_iniciar"] = VisitsBeforeStart,
+        };
     }
 }
