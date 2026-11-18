@@ -106,6 +106,7 @@ namespace PDI.RevitMcp.Bridge
             [Description("Resumen para el usuario")] string summary = null,
             [Description("Documento (dN); por defecto el activo")] string doc = null,
             [Description("Tarea autorizada (permite commit tras reconectar)")] string tarea = null,
+            [Description("true = desglose de espera y trabajo en Revit (diagnóstico)")] bool timing = false,
             CancellationToken ct = default)
         {
             List<object> parsed;
@@ -115,6 +116,7 @@ namespace PDI.RevitMcp.Bridge
             if (summary != null) a["summary"] = summary;
             if (doc != null) a[Wire.DocArg] = doc;
             if (tarea != null) a[Wire.TaskArg] = tarea;
+            if (timing) a["timing"] = true;
             return await CallText(server, Wire.OpPlan, a, ReadTimeout, ct).ConfigureAwait(false);
         }
 
@@ -128,9 +130,11 @@ namespace PDI.RevitMcp.Bridge
             [Description("Operaciones (como plan) para planificar y aplicar en un viaje, sin plan_id")] string ops = null,
             [Description("Resumen para el usuario (con ops)")] string summary = null,
             [Description("Documento dN (con ops)")] string doc = null,
+            [Description("true = desglose de espera y fases del commit (diagnóstico)")] bool timing = false,
             CancellationToken ct = default)
         {
             var a = new Dictionary<string, object>();
+            if (timing) a["timing"] = true;
             if (plan_id != null) a["plan_id"] = plan_id;
             if (ops != null)
             {
@@ -292,7 +296,11 @@ namespace PDI.RevitMcp.Bridge
             if (server?.ClientInfo?.Name is string name && name.Length > 0) _revit.ClientName = name; if (server?.ClientInfo?.Version is string clientVer && clientVer.Length > 0) _revit.ClientVersion = clientVer;
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var resp = await _revit.CallAsync(op, a, timeout, ct).ConfigureAwait(false);
-            var text = Limit(CompactText.Write(RevitTools.RenderDict(resp)));
+            var ipcMs = sw.Elapsed.TotalMilliseconds;
+            var text = CompactText.Write(RevitTools.RenderDict(resp));
+            // Lo que el add-in no ve: canal con nombre, serialización y la espera hasta que el add-in recibe la petición.
+            if (Arg.GetBool(a, "timing") == true) text = CompactText.Write(new Dictionary<string, object> { ["puente_ipc_total_ms"] = ipcMs }) + "\n" + text;
+            text = Limit(text);
             UsageMetrics.Record(_revit.ClientName, op, op, Json.Write(a).Length, text.Length, sw.ElapsedMilliseconds, resp.Estado);
             return text;
         }

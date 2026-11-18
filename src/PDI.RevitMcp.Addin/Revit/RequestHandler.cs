@@ -800,6 +800,7 @@ namespace PDI.RevitMcp.Addin.Revit
             _plans.Add(plan);
 
             var datos = plan.Describe();
+            if (Arg.GetBool(request.Args, "timing") == true) datos["tiempos_plan"] = result.DispatchJson();
             if (plan.Entries.Count == 0)
             {
                 plan.Status = PlanStatus.Descartado;
@@ -840,7 +841,7 @@ namespace PDI.RevitMcp.Addin.Revit
                 if (!string.IsNullOrWhiteSpace(Arg.GetString(request.Args, Wire.KeyArg)))
                     return Response.Fail(request.Id, Status.Invalido, "commit ops= no admite clave=: use plan y después commit plan_id=… clave=… para la idempotencia");
                 var planArgs = new Dictionary<string, object> { ["ops"] = request.Args["ops"] };
-                foreach (var k in new[] { "summary", Wire.TaskArg, Wire.DocArg }) if (request.Args.TryGetValue(k, out var v)) planArgs[k] = v;
+                foreach (var k in new[] { "summary", Wire.TaskArg, Wire.DocArg, "timing" }) if (request.Args.TryGetValue(k, out var v)) planArgs[k] = v;
                 var pr = await PlanOp(session, new Request { Id = request.Id, Op = Wire.OpPlan, Args = planArgs, DeadlineMs = request.DeadlineMs }, ct).ConfigureAwait(false);
                 var pid = pr.Datos is Dictionary<string, object> pd0 ? Arg.GetString(pd0, "plan_id") : null;
                 if (pr.Estado != Status.Ok || pid == null || (pr.Datos as Dictionary<string, object>)?.ContainsKey("job_id") == true
@@ -856,6 +857,7 @@ namespace PDI.RevitMcp.Addin.Revit
                 var pdesc = (Dictionary<string, object>)pr.Datos;
                 fusedPlan = new Dictionary<string, object> { ["plan_id"] = pid, ["elementos"] = pdesc.TryGetValue("elementos", out var pe) ? pe : null, ["cambios"] = pdesc.TryGetValue("cambios", out var pc) ? pc : null };
                 if (pdesc.TryGetValue("avisos", out var av)) fusedPlan["avisos"] = av;
+                if (pdesc.TryGetValue("tiempos_plan", out var tp)) fusedPlan["tiempos_plan"] = tp;
             }
             var committed = await CommitPlan(session, request, ct).ConfigureAwait(false);
             if (fusedPlan != null && committed.Datos is Dictionary<string, object> cd) cd["plan_en_el_mismo_viaje"] = fusedPlan;
@@ -938,6 +940,7 @@ namespace PDI.RevitMcp.Addin.Revit
             bool wasModified = false, lostModified = false;   // P0: un commit real que se revierte por fallo también puede borrar la marca
             DocWriteBlock blocked = null;
             long queueMs = 0, revitMs = 0;
+            long loadMs = 0, beginMs = 0, applyMs = 0, finishMs = 0;   // fases dentro de revit_ms (timing=true)
             plan.Status = PlanStatus.EnProceso;
             var sw = Stopwatch.StartNew();
             // El plan se aplica sobre SU documento (handle fijado al planificar), aunque el usuario haya cambiado de pestaña.
@@ -959,20 +962,41 @@ namespace PDI.RevitMcp.Addin.Revit
                 queueMs = sw.ElapsedMilliseconds;
                 wasModified = doc.IsModified;
                 // En el hilo de Revit: los commits de este proceso van en serie, y la intención queda en disco antes de abrir el grupo.
-                try { _plans.LoadPersisted(plan.DocKey); _plans.BeginWrite(plan); }
+                var t0 = sw.ElapsedMilliseconds;
+                try
+                {
+                    _plans.LoadPersisted(plan.DocKey);
+                    loadMs = sw.ElapsedMilliseconds - t0;
+                    _plans.BeginWrite(plan);
+                    beginMs = sw.ElapsedMilliseconds - t0 - loadMs;
+                }
                 catch (DocWriteBlockedException ex) { blocked = ex.Block; return true; }
                 catch (PlanStoreException ex) { error = ex.Message + "; no se escribió nada"; return true; }
                 _tracker.CurrentWriter = session.Id;
                 applyEntered = true;
+                var t1 = sw.ElapsedMilliseconds;
                 try { r = trial ? PlanOps.Trial(doc, plan, _config.SubBatchSize, session.Id) : PlanOps.Apply(doc, plan, _config.SubBatchSize, session.Id); }
                 finally { _tracker.CurrentWriter = null; }
-                revitMs = sw.ElapsedMilliseconds - queueMs;
+                applyMs = sw.ElapsedMilliseconds - t1;
+                var t2 = sw.ElapsedMilliseconds;
+                revitMs = t2 - queueMs;   // misma frontera que antes (sin Finish): comparable con la campaña A/B
                 // También aquí: el siguiente commit de la cola de Revit no debe encontrar una intención ya resuelta.
                 _plans.Finish(plan, r.Status, r.Detail);
+                finishMs = sw.ElapsedMilliseconds - t2;
                 rev = _tracker.For(doc)?.Rev ?? 0;
                 lostModified = wasModified && !doc.IsModified;
                 return true;
             }, highPriority: false, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
+
+            Dictionary<string, object> timing = null;
+            if (Arg.GetBool(request.Args, "timing") == true)
+            {
+                timing = result.DispatchJson();
+                timing["carga_ms"] = loadMs;               // LoadPersisted
+                timing["intencion_ms"] = beginMs;          // BeginWrite: bloqueo entre procesos + intención en disco
+                timing["aplicar_verificar_ms"] = applyMs;  // PlanOps.Apply/Trial
+                timing["cierre_ms"] = finishMs;            // Finish
+            }
 
             if (!result.Ok)
             {
@@ -1016,6 +1040,7 @@ namespace PDI.RevitMcp.Addin.Revit
                 td["ms"] = sw.ElapsedMilliseconds;
                 td["espera_cola_ms"] = queueMs;
                 td["revit_ms"] = revitMs;
+                if (timing != null) td["tiempos_commit"] = timing;
                 return new Response
                 {
                     Id = request.Id, Estado = ok ? PlanStatus.Ensayado : (r.Status == PlanStatus.Conflicto ? Status.Conflicto : r.Status == PlanStatus.Revertido ? Status.Revertido : Status.Desconocido),
@@ -1031,6 +1056,7 @@ namespace PDI.RevitMcp.Addin.Revit
             datos["ms"] = sw.ElapsedMilliseconds;
             datos["espera_cola_ms"] = queueMs;
             datos["revit_ms"] = revitMs;
+            if (timing != null) datos["tiempos_commit"] = timing;
             var advice = StatusAdvice(plan);
             if (lostModified)
             {
@@ -1286,8 +1312,10 @@ namespace PDI.RevitMcp.Addin.Revit
             switch (r.Kind)
             {
                 case "busy":
-                    return Response.Fail(id, Status.RevitOcupado,
+                    var busy = Response.Fail(id, Status.RevitOcupado,
                         "Revit no atendió en " + _config.BusyAfterMs / 1000 + " s: probablemente hay un diálogo abierto, un comando en curso o un modo de edición. Pida al usuario que lo cierre y reintente.");
+                    busy.Datos = new Dictionary<string, object> { ["despacho"] = r.DispatchJson() };
+                    return busy;
                 case "cancelled":
                     return Response.Fail(id, Status.TiempoAgotado,
                         r.Slices > 0
