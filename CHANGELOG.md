@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- feat(ui): redesigned installer and add-in windows on a shared design system (`Theme.cs`): calm surfaces, white header with brand mark, selectable option cards, consistent buttons with press feedback and keyboard focus rings, recolorable notices, stats, segmented filters and disclosures. Status and Queue windows answer the main question at a glance and keep details one click away (auto-opened only when something needs attention). Ribbon buttons animate briefly only when their state changes (5 frames / 180 ms, never looping). New Settings window (pause, apply mode, dynamic C# with a single confirmation shared with the ribbon, motion: automatic/reduced). All motion respects Windows "reduce animations" and the new setting. No engine or permission semantics changed; on the uninstall screen Enter now cancels.
 - perf(geometry): merge duplicate points as the Rust grid finds them, avoiding temporary neighbor lists.
 - feat(diagnostics): `plan timing=true` and `commit timing=true` report the Revit dispatch breakdown (monotonic queue wait, Revit thread time, `ExternalEvent.Raise` result, visits before start) and the commit phases (load, write intent, apply/verify, finish), plus bridge IPC time. `revit_ocupado` responses from the add-in always include the dispatch data (the bridge's own read timeout does not). `revit_ms` keeps its previous boundary. Execution policy is unchanged.
 

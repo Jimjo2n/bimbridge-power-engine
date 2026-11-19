@@ -64,6 +64,51 @@ namespace PDI.RevitMcp.Addin.Ui
             MarkDirty();
             return true;
         }
+        /// <summary>
+        /// Única confirmación para pasar de bloqueado a permitido (cinta y Ajustes). "No" por defecto. Bloquear no se confirma.
+        /// </summary>
+        public static bool ConfirmAllowDynamicCode()
+        {
+            var td = new TaskDialog(PDI.RevitMcp.Protocol.Brand.Product)
+            {
+                MainInstruction = "¿Permitir C# dinámico?",
+                MainContent = "La IA local autorizada podrá ejecutar código C# sobre la API de Revit (exec), auditado. " +
+                              "No es un sandbox: corre con los permisos de su usuario y sus efectos fuera del documento no se revierten.",
+                CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
+                DefaultButton = TaskDialogResult.No,
+            };
+            return td.Show() == TaskDialogResult.Yes;
+        }
+
+        // ---- preferencias de interfaz (sólo de este usuario, junto a los demás datos del complemento; nunca config.json) ----
+        private static string UiPrefsPath => Home.Sub("interfaz.json");
+
+        // Se lee una vez, antes del primer uso de Runtime (App.OnStartup lo llena al arrancar).
+        static Runtime()
+        {
+            try
+            {
+                if (System.IO.File.Exists(UiPrefsPath) && PDI.RevitMcp.Protocol.Json.Parse(System.IO.File.ReadAllText(UiPrefsPath)) is Dictionary<string, object> d)
+                    Theme.ReduceMotionOverride = d.TryGetValue("movimiento", out var m) && "reducido".Equals(m as string, StringComparison.Ordinal);
+            }
+            catch (Exception) { } // ilegible o dañado: movimiento automático (sigue a Windows)
+        }
+
+        /// <summary>«Movimiento: Reducido» se aplica al momento; si no se puede guardar, vale hasta cerrar Revit y devuelve el error.</summary>
+        public static bool SetReducedMotion(bool reduced, out string error)
+        {
+            error = null;
+            Theme.ReduceMotionOverride = reduced;
+            try { Home.WriteAtomic(UiPrefsPath, PDI.RevitMcp.Protocol.Json.Write(new Dictionary<string, object> { ["movimiento"] = reduced ? "reducido" : "automatico" })); }
+            catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException)
+            {
+                error = ex.Message;
+                Log("No se pudo guardar la preferencia de movimiento: " + ex.Message);
+                return false;
+            }
+            return true;
+        }
+
         public static EngineConfig Config;
         public static string RevitVersion = "";
         public static Action<string> Log = _ => { };
@@ -196,40 +241,63 @@ namespace PDI.RevitMcp.Addin.Ui
             try { UpdateRibbon(sessions, paused, hold, n); } catch (Exception ex) { Log("Ribbon: " + ex.Message); }
         }
 
+        // Último estado dibujado en cada botón: la imagen sólo se toca (y se anima) cuando el suyo cambia. null = aún sin pintar.
+        private static System.Windows.Media.Color? _shownStatus;
+        private static bool? _shownTrust, _shownPaused, _shownHold;
+        private static int? _shownHeld;
+
         private static void UpdateRibbon(int sessions, bool paused, bool hold, int held)
         {
             var writes = Config.Allows('P');
             if (StatusButton != null)
             {
                 var c = paused ? Theme.Red : sessions > 0 ? Theme.Green : Theme.Slate;
-                StatusButton.LargeImage = Icons.Status(c, 32);
-                StatusButton.Image = Icons.Status(c, 16);
+                if (_shownStatus != c)
+                {
+                    var from = _shownStatus ?? c;
+                    RibbonMotion.Play(StatusButton, "status|" + from + ">" + c, _shownStatus != null, (t, s) => Icons.Status(from, c, t, s), s => Icons.Status(c, s));
+                    _shownStatus = c;
+                }
                 StatusButton.ItemText = "Power Engine\n" + (paused ? "Estado · pausa" : sessions == 0 ? "Estado · sin IA" : "Estado · " + sessions + " IA");
             }
             if (TrustButton != null)
             {
-                TrustButton.LargeImage = Icons.Mode(BlockDynamicCode, 32);
-                TrustButton.Image = Icons.Mode(BlockDynamicCode, 16);
-                TrustButton.ItemText = BlockDynamicCode ? "C# dinámico\nbloqueado" : "Bloquear\ninyección C#";
+                var block = BlockDynamicCode;
+                if (_shownTrust != block)
+                {
+                    RibbonMotion.Play(TrustButton, "mode|" + block, _shownTrust != null, (t, s) => Icons.Mode(block, t, s), s => Icons.Mode(block, s));
+                    _shownTrust = block;
+                }
+                TrustButton.ItemText = block ? "C# dinámico\nbloqueado" : "Bloquear\ninyección C#";
             }
             if (PauseButton != null)
             {
-                PauseButton.LargeImage = Icons.Pause(paused, 32);
-                PauseButton.Image = Icons.Pause(paused, 16);
+                if (_shownPaused != paused)
+                {
+                    RibbonMotion.Play(PauseButton, "pause|" + paused, _shownPaused != null, (t, s) => Icons.Pause(paused, t, s), s => Icons.Pause(paused, s));
+                    _shownPaused = paused;
+                }
                 PauseButton.ItemText = paused ? "Reanudar\nIA" : "Pausar\nIA";
             }
             if (ModeButton != null)
             {
                 var effectiveHold = hold || !Config.Allows('W');
-                ModeButton.LargeImage = Icons.Mode(effectiveHold, 32);
-                ModeButton.Image = Icons.Mode(effectiveHold, 16);
+                if (_shownHold != effectiveHold)
+                {
+                    RibbonMotion.Play(ModeButton, "mode|" + effectiveHold, _shownHold != null, (t, s) => Icons.Mode(effectiveHold, t, s), s => Icons.Mode(effectiveHold, s));
+                    _shownHold = effectiveHold;
+                }
                 ModeButton.ItemText = effectiveHold ? "Modo\nRetener" : "Modo\nEn vivo";
                 ModeButton.Enabled = writes && Config.Allows('W');
             }
             if (QueueButton != null)
             {
-                QueueButton.LargeImage = Icons.Queue(held, 32);
-                QueueButton.Image = Icons.Queue(held, 16);
+                if (_shownHeld != held)
+                {
+                    // El globo sólo "aparece" con un número nuevo; al vaciarse la cola desaparece al momento (la salida es más rápida que la entrada).
+                    RibbonMotion.Play(QueueButton, "queue|" + held, _shownHeld != null && held > 0, (t, s) => Icons.Queue(held, t, s), s => Icons.Queue(held, s));
+                    _shownHeld = held;
+                }
                 QueueButton.ItemText = held == 0 ? "Cola\nvacía" : held == 1 ? "Cola\n1 plan" : "Cola\n" + held + " planes";
             }
         }

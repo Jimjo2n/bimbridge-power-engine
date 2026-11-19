@@ -35,23 +35,18 @@ namespace PDI.RevitMcp.Addin.Ui
             body.Children.Add(Item(Icons.Update(1, 32), "Versión / Actualizar",
                 "Cuando le pasen un instalador nuevo, déjelo en Descargas o en el Escritorio (sin abrirlo). El botón se pone verde: púlselo y se prepara para instalar al cerrar Revit, " +
                 "con sus mismas opciones; entra al reiniciar Revit. Los instaladores viejos van a la papelera y puede volver a la versión anterior."));
-            body.Children.Add(Theme.Card(Theme.Label(
-                "Qué puede hacer la IA, según los permisos que usted eligió al instalar: leer el modelo; proponer cambios tipados con su antes y después (plan); " +
+            body.Children.Add(Theme.Card(Theme.Section("Qué puede hacer la IA",
+                "Según los permisos que usted eligió al instalar: leer el modelo; proponer cambios tipados con su antes y después (plan); " +
                 "ejecutar código C# sobre la API de Revit (exec, permiso W), que queda guardado y registrado en %LOCALAPPDATA%\\PDI.RevitMcp\\scripts; " +
                 "editar familias y conectores; y guardar, sincronizar o exportar PDF (permiso D o W). Nada de esto queda oculto: cada operación se registra. " +
-                "Pausa detiene todo lo que llegue después.", 12.5, false, Theme.Muted)));
+                "Pausa detiene todo lo que llegue después.")));
             root.Children.Add(Theme.Scroll(body));
 
             var close = Theme.Button("Entendido", Theme.Kind.Primary);
             close.IsDefault = true;
             close.IsCancel = true;
             close.Click += (s, e) => win.Close();
-            var footer = new Border
-            {
-                Background = Theme.B(Theme.White), BorderBrush = Theme.B(Theme.Line), BorderThickness = new Thickness(0, 1, 0, 0),
-                Padding = new Thickness(24, 12, 24, 14),
-                Child = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Children = { close } },
-            };
+            var footer = Theme.Footer(null, close);
             DockPanel.SetDock(footer, Dock.Bottom);
             root.Children.Insert(1, footer);
             win.Content = root;
@@ -61,10 +56,11 @@ namespace PDI.RevitMcp.Addin.Ui
         private static UIElement Item(System.Windows.Media.ImageSource icon, string title, string text)
         {
             var g = new Grid();
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(52) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(48) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            g.Children.Add(new Image { Source = icon, Width = 36, Height = 36, VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left });
-            var s = new StackPanel();
+            // 32 px exactos: el icono es un mapa de bits de 32 y escalarlo lo emborrona.
+            g.Children.Add(new Image { Source = icon, Width = 32, Height = 32, VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left });
+            var s = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             s.Children.Add(Theme.Label(title, 14.5, true));
             var t = Theme.Label(text, 13, false, Theme.Muted);
             t.Margin = new Thickness(0, 3, 0, 0);
