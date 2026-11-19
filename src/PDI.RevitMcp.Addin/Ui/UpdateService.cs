@@ -32,6 +32,7 @@ namespace PDI.RevitMcp.Addin.Ui
         private static List<string> _extraFolders = new List<string>();
         private static readonly object CheckLock = new object();
         private static string _lastVisual;
+        private static int? _lastState;
 
         public static void Start(EngineConfig config)
         {
@@ -245,8 +246,12 @@ namespace PDI.RevitMcp.Addin.Ui
             var visual = state + "|" + (a?.VersionText ?? InstalledVersion ?? "");
             if (visual == _lastVisual) return;
             _lastVisual = visual;
-            Button.LargeImage = Icons.Update(state, 32);
-            Button.Image = Icons.Update(state, 16);
+            if (state != _lastState)
+            {
+                // Sólo anima cuando aparece o cambia el globo (no en la primera pintura ni al quitarlo); con movimiento reducido, Play pone el final.
+                RibbonMotion.Play(Button, "update|" + state, _lastState != null && state > 0, (t, s) => Icons.Update(state, t, s), s => Icons.Update(state, s));
+                _lastState = state;
+            }
             Button.ItemText = state == 2 ? "Reiniciar\nRevit" : state == 1 ? "Actualizar\na " + a.VersionText : "Versión\n" + Updates.Format(Running);
             Button.ToolTip = state == 2
                 ? "La versión " + InstalledVersion + " ya está instalada: cierre y abra Revit para usarla."

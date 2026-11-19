@@ -148,7 +148,7 @@ namespace PDI.RevitMcp.Addin
         private const string TabName = "BIMBRIDGE";
 
         /// <summary>
-        /// Pestaña propia "BIMBRIDGE": Conexión (Estado, Pausar IA), Cambios de la IA (Modo, Cola) y Ayuda.
+        /// Pestaña propia "BIMBRIDGE": Conexión (Estado, Pausar IA), Cambios de la IA (Modo, Cola) y Ayuda (Ajustes, Cómo funciona, Versión).
         /// Los iconos se dibujan en código y se actualizan en Idling según el estado.
         /// </summary>
         private void CreateRibbon(UIControlledApplication app)
@@ -201,10 +201,16 @@ namespace PDI.RevitMcp.Addin
                 Runtime.TrustButton = sec.AddItem(Btn("PdiMcpTrust", "Bloquear\ninyección C#", typeof(TrustCommand),
                     "Bloquear o permitir que la IA ejecute código C# dinámico (exec).",
                     "Por defecto la IA local autorizada puede ejecutar C# dinámico, auditado. Pulse para bloquearlo: toda petición nueva de exec se rechaza. " +
+                    "Para volver a permitirlo, púlselo otra vez y confirme (No por defecto). " +
                     "El cambio queda guardado en config.json. No detiene lo que ya está dentro de Revit. Las operaciones tipadas (plan/commit) siguen disponibles.",
                     Icons.Mode(false, 32), Icons.Mode(false, 16))) as PushButton;
 
                 var help = app.CreateRibbonPanel(TabName, "Ayuda");
+                help.AddItem(Btn("PdiMcpSettings", "Ajustes", typeof(SettingsCommand),
+                    "Pausa, modo de los cambios y C# dinámico en un solo lugar, con lo que implica cada uno.",
+                    "Cada cambio se aplica al momento y se ve en esta cinta. Permitir C# dinámico pide confirmación. " +
+                    "Los niveles de permiso (leer, plan, aplicar) se muestran aquí, pero sólo se cambian con el instalador.",
+                    SettingsWindow.Icon(32), SettingsWindow.Icon(16)));
                 help.AddItem(Btn("PdiMcpHelp", "Cómo\nfunciona", typeof(HelpCommand),
                     "Guía rápida de los botones.", "Qué hace cada botón y qué puede y no puede hacer la IA.",
                     Icons.Help(32), Icons.Help(16)));

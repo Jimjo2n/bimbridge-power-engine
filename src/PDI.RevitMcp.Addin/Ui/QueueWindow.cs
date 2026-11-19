@@ -58,8 +58,8 @@ namespace PDI.RevitMcp.Addin.Ui
             root.Children.Add(footer);
 
             var body = new StackPanel();
-            _bannerText = Theme.Label("", 13, true);
-            _banner = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(14, 10, 14, 11), Margin = new Thickness(0, 0, 0, 12), Child = _bannerText, Visibility = Visibility.Collapsed };
+            _banner = Theme.Notice("", Theme.Slate, out _bannerText);
+            _banner.Visibility = Visibility.Collapsed;
             body.Children.Add(_banner);
 
             if (_plans.Count == 0)
@@ -71,7 +71,7 @@ namespace PDI.RevitMcp.Addin.Ui
                 var pos = 1;
                 foreach (var p in _plans)
                 {
-                    var card = new PlanCard(p, pos++, UpdateButtons);
+                    var card = new PlanCard(p, pos++, _doc.Title, UpdateButtons);
                     _cards.Add(card);
                     body.Children.Add(card.Root);
                 }
@@ -85,33 +85,28 @@ namespace PDI.RevitMcp.Addin.Ui
 
         private UIElement EmptyState()
         {
-            var s = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 60, 0, 0), MaxWidth = 440 };
-            s.Children.Add(new Image { Source = Icons.Queue(0, 32), Width = 48, Height = 48, Margin = new Thickness(0, 0, 0, 14) });
-            s.Children.Add(new TextBlock { Text = "No hay cambios esperando", FontSize = 17, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center });
+            var s = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 64, 0, 0), MaxWidth = 400 };
+            s.Children.Add(new Image { Source = Icons.Queue(0, 32), Width = 40, Height = 40, Opacity = 0.85, Margin = new Thickness(0, 0, 0, 16) });
+            s.Children.Add(new TextBlock { Text = "No hay cambios esperando", FontSize = 17, FontWeight = FontWeights.SemiBold, Foreground = Theme.B(Theme.Ink), HorizontalAlignment = HorizontalAlignment.Center });
             s.Children.Add(new TextBlock
             {
-                Text = "Con el modo Retener activado, cada cambio que pida la IA aparece aquí antes de tocar el modelo. Usted decide cuándo aplicarlo.",
-                TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Foreground = Theme.B(Theme.Muted), Margin = new Thickness(0, 8, 0, 0),
+                Text = "Con el modo Retener activado, cada cambio de la IA espera aquí antes de tocar el modelo. Usted decide cuándo aplicarlo.",
+                FontSize = 13, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Foreground = Theme.B(Theme.Muted), Margin = new Thickness(0, 8, 0, 0),
             });
             return s;
         }
 
         private UIElement BuildFooter()
         {
-            var grid = new Grid { Margin = new Thickness(24, 12, 24, 14) };
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            var left = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            var left = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0) };
             _all = new CheckBox { Content = "Seleccionar todo", IsChecked = true, Margin = new Thickness(0, 0, 0, 4), Visibility = _plans.Count > 0 ? Visibility.Visible : Visibility.Collapsed };
             _all.Click += (s, e) => { foreach (var c in _cards.Where(c => c.Pending)) c.Selected = _all.IsChecked == true; UpdateButtons(); };
             left.Children.Add(_all);
             left.Children.Add(new TextBlock
             {
                 Text = "Cada plan se deshace con un Ctrl+Z. Aplicar no guarda ni sincroniza el modelo.",
-                FontSize = 11.5, Foreground = Theme.B(Theme.Muted), TextWrapping = TextWrapping.Wrap,
+                FontSize = 12, Foreground = Theme.B(Theme.Muted), TextWrapping = TextWrapping.Wrap,
             });
-            grid.Children.Add(left);
 
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             _discard = Theme.Button("Descartar", Theme.Kind.Danger);
@@ -125,10 +120,8 @@ namespace PDI.RevitMcp.Addin.Ui
             buttons.Children.Add(_discard);
             buttons.Children.Add(_close);
             buttons.Children.Add(_apply);
-            Grid.SetColumn(buttons, 1);
-            grid.Children.Add(buttons);
 
-            return new Border { Background = Theme.B(Theme.White), BorderBrush = Theme.B(Theme.Line), BorderThickness = new Thickness(0, 1, 0, 0), Child = grid };
+            return Theme.Footer(left, buttons);
         }
 
         private void UpdateButtons()
@@ -144,8 +137,8 @@ namespace PDI.RevitMcp.Addin.Ui
         private void UpdatePill()
         {
             var pending = _cards.Count(c => c.Pending);
-            _pillText.Text = pending == 0 ? "Sin pendientes" : pending == 1 ? "1 plan esperando" : pending + " planes esperando";
-            _pill.Background = pending == 0 ? Theme.Tint(Theme.Green, 0x90) : Theme.Tint(Theme.Amber, 0xB0);
+            Theme.SetPill(_pill, Theme.Tabular(_pillText), pending == 0 ? Theme.Green : Theme.Amber,
+                pending == 0 ? "Sin pendientes" : pending == 1 ? "1 plan esperando" : pending + " planes esperando", dot: true);
         }
 
         private void Apply()
@@ -206,11 +199,9 @@ namespace PDI.RevitMcp.Addin.Ui
         private void ShowBanner(string text, Color color)
         {
             _bannerText.Text = text;
-            _bannerText.Foreground = Theme.B(Theme.Darken(color, 0.75));
-            _banner.Background = Theme.Tint(color, 0x22);
-            _banner.BorderBrush = Theme.Tint(color, 0x55);
-            _banner.BorderThickness = new Thickness(1);
+            Theme.SetNotice(_banner, _bannerText, color);
             _banner.Visibility = Visibility.Visible;
+            Theme.Enter(_banner, 4, 200); // resultado de una acción del usuario: ocasional
         }
 
         // ------------------------------------------------------------------
@@ -228,7 +219,7 @@ namespace PDI.RevitMcp.Addin.Ui
 
             public bool Selected { get => _check.IsChecked == true; set => _check.IsChecked = value; }
 
-            public PlanCard(Plan p, int position, Action changed)
+            public PlanCard(Plan p, int position, string docTitle, Action changed)
             {
                 Plan = p;
                 var grid = new Grid();
@@ -241,31 +232,36 @@ namespace PDI.RevitMcp.Addin.Ui
                 grid.Children.Add(_check);
 
                 var main = new StackPanel();
-                var top = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
-                top.Children.Add(new TextBlock { Text = "#" + position, FontWeight = FontWeights.SemiBold, Foreground = Theme.B(Theme.Muted), Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center });
+                var top = new DockPanel { Margin = new Thickness(0, 0, 0, 8) }; // la última línea llena y recorta títulos largos
+                top.Children.Add(new TextBlock { Text = "#" + position, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Theme.B(Theme.Muted), Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center });
                 top.Children.Add(Theme.Chip(Theme.ClientName(p.Client ?? p.SessionId), Theme.ClientColor(p.Client ?? p.SessionId)));
                 top.Children.Add(new TextBlock
                 {
-                    Text = Counts(p) + " · " + Theme.Ago(p.HeldUtc ?? p.CreatedUtc),
+                    Text = Counts(p) + " · " + (string.IsNullOrWhiteSpace(p.DocTitle) ? docTitle : p.DocTitle) + " · " + Theme.Ago(p.HeldUtc ?? p.CreatedUtc),
                     Foreground = Theme.B(Theme.Muted), FontSize = 12, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
                 });
                 main.Children.Add(top);
-                main.Children.Add(new TextBlock { Text = Friendly(p), FontSize = 14.5, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+                main.Children.Add(new TextBlock { Text = Friendly(p), FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = Theme.B(Theme.Ink), TextWrapping = TextWrapping.Wrap });
 
+                // avisos de riesgo: los primeros a la vista (deciden aplicar o no); el resto dentro de "Ver cambios"
                 foreach (var w in p.Warnings.Take(4))
-                    main.Children.Add(new TextBlock { Text = "• " + w, FontSize = 12, Foreground = Theme.B(Theme.Darken(Theme.Amber, 0.75)), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0) });
+                    main.Children.Add(WarningLine(w));
 
-                _detail = new TextBlock { FontSize = 12.5, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0), Visibility = Visibility.Collapsed };
+                _detail = new TextBlock { FontSize = 12.5, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed };
                 main.Children.Add(_detail);
 
-                var exp = new Expander { Header = "Ver cambios (" + p.Entries.Count + ")", Margin = new Thickness(0, 8, 0, 0), Foreground = Theme.B(Theme.NavySoft) };
-                exp.Expanded += (s, e) => { if (exp.Content == null) exp.Content = DiffTable(p); };
-                main.Children.Add(exp);
+                // detalle técnico (tabla, ids, plan) a un clic; se construye al abrir la primera vez
+                var details = new Border();
+                var disclosure = Theme.Disclosure("Ver cambios (" + p.Entries.Count + ")", details);
+                disclosure.Margin = new Thickness(0, 10, 0, 0);
+                ((System.Windows.Controls.Primitives.ToggleButton)disclosure.Children[0]).Checked += (s, e) => { if (details.Child == null) details.Child = Details(p); };
+                main.Children.Add(disclosure);
                 Grid.SetColumn(main, 1);
                 grid.Children.Add(main);
 
                 _statusText = new TextBlock { FontSize = 11.5, FontWeight = FontWeights.SemiBold };
-                _statusChip = new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(9, 2, 9, 3), VerticalAlignment = VerticalAlignment.Top, Child = _statusText };
+                _statusChip = new Border { CornerRadius = new CornerRadius(999), Padding = new Thickness(9, 2, 9, 3), Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Top, Child = _statusText };
                 SetChip("En espera", Theme.Amber);
                 Grid.SetColumn(_statusChip, 2);
                 grid.Children.Add(_statusChip);
@@ -290,14 +286,29 @@ namespace PDI.RevitMcp.Addin.Ui
                 _detail.Text = Humanize(status, detail);
                 _detail.Foreground = Theme.B(status == PlanStatus.Aplicado ? Theme.Darken(Theme.Green, 0.8) : status == PlanStatus.Descartado ? Theme.Muted : Theme.Darken(status == PlanStatus.Conflicto ? Theme.Amber : Theme.Red, 0.8));
                 _detail.Visibility = Visibility.Visible;
+                Theme.Enter(_detail, 4, 200); // cambio de estado ocasional (aplicar/descartar), no un refresco
                 Root.Opacity = status == PlanStatus.Descartado ? 0.7 : 1;
             }
 
-            private void SetChip(string text, Color c)
+            private void SetChip(string text, Color c) => Theme.SetPill(_statusChip, _statusText, c, text);
+
+            private static TextBlock WarningLine(string w) =>
+                new TextBlock { Text = "• " + w, FontSize = 12.5, Foreground = Theme.B(Theme.Darken(Theme.Amber, 0.72)), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) };
+
+            /// <summary>Lo que va detrás de "Ver cambios": avisos restantes, tabla de cambios e identificador del plan.</summary>
+            private static UIElement Details(Plan p)
             {
-                _statusText.Text = text;
-                _statusText.Foreground = Theme.B(Theme.Darken(c, 0.78));
-                _statusChip.Background = Theme.Tint(c, 0x24);
+                var s = new StackPanel();
+                foreach (var w in p.Warnings.Skip(4))
+                    s.Children.Add(WarningLine(w));
+                var table = DiffTable(p);
+                ((FrameworkElement)table).Margin = new Thickness(0, s.Children.Count > 0 ? 8 : 0, 0, 0);
+                s.Children.Add(table);
+                var id = new TextBlock { FontSize = 11.5, Foreground = Theme.B(Theme.Muted), Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap };
+                id.Inlines.Add(new System.Windows.Documents.Run("Plan "));
+                id.Inlines.Add(new System.Windows.Documents.Run(p.Id ?? "") { FontFamily = Theme.Mono });
+                s.Children.Add(id);
+                return s;
             }
 
             private static string Humanize(string status, string detail)
@@ -362,24 +373,29 @@ namespace PDI.RevitMcp.Addin.Ui
                     HeadersVisibility = DataGridHeadersVisibility.Column,
                     GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
                     HorizontalGridLinesBrush = Theme.B(Theme.Line),
-                    BorderBrush = Theme.B(Theme.Line),
-                    Background = Theme.B(Theme.White),
-                    RowBackground = Theme.B(Theme.White),
-                    AlternatingRowBackground = Theme.B(Color.FromRgb(0xF8, 0xF9, 0xFB)),
+                    BorderThickness = new Thickness(0),
+                    Background = Theme.B(Theme.Sunken),
+                    RowBackground = Theme.B(Theme.Sunken),
+                    AlternatingRowBackground = Theme.B(Theme.Page),
+                    Foreground = Theme.B(Theme.Ink),
+                    FontFamily = Theme.Font,
                     CanUserAddRows = false,
                     MaxHeight = 260,
                     FontSize = 12,
-                    Margin = new Thickness(0, 6, 0, 0),
                     ColumnWidth = new DataGridLength(1, DataGridLengthUnitType.Star),
                 };
-                if (p.Entries.Count > 300)
+                // cabeceras y etiquetas en la fuente normal; monoespaciada sólo en ids y valores
+                grid.AutoGeneratingColumn += (s, e) =>
                 {
-                    var s = new StackPanel();
-                    s.Children.Add(grid);
-                    s.Children.Add(new TextBlock { Text = "… y " + (p.Entries.Count - 300) + " cambios más", Foreground = Theme.B(Theme.Muted), Margin = new Thickness(0, 4, 0, 0) });
-                    return s;
-                }
-                return grid;
+                    if (e.Column is DataGridTextColumn tc && (e.PropertyName == nameof(DiffRow.Elemento) || e.PropertyName == nameof(DiffRow.Antes) || e.PropertyName == nameof(DiffRow.Después)))
+                        tc.FontFamily = Theme.Mono;
+                };
+                // zona hundida de lectura: el diff se distingue del resto de la tarjeta
+                var panel = new StackPanel();
+                panel.Children.Add(grid);
+                if (p.Entries.Count > 300)
+                    panel.Children.Add(new TextBlock { Text = "… y " + (p.Entries.Count - 300) + " cambios más", FontSize = 12, Foreground = Theme.B(Theme.Muted), Margin = new Thickness(0, 8, 0, 0) });
+                return Theme.Inset(panel);
             }
 
             private static string OpName(string op) => OpCatalog.NameOf(op);

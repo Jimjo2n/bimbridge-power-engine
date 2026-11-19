@@ -79,6 +79,20 @@ namespace PDI.RevitMcp.Addin.Ui
         }
     }
 
+    /// <summary>Ajustes: Pausa, Modo y bloqueo de C# en una ventana, con su consecuencia. Mismo camino que los botones de la cinta.</summary>
+    [Transaction(TransactionMode.ReadOnly)]
+    public sealed class SettingsCommand : IExternalCommand
+    {
+        public Result Execute(ExternalCommandData data, ref string message, ElementSet elements)
+        {
+            if (!Guard.Ready()) return Result.Cancelled;
+            SettingsWindow.Show(data.Application);
+            Runtime.MarkDirty();
+            Runtime.OnIdling(data.Application);
+            return Result.Succeeded;
+        }
+    }
+
     [Transaction(TransactionMode.ReadOnly)]
     public sealed class HelpCommand : IExternalCommand
     {
@@ -193,6 +207,8 @@ namespace PDI.RevitMcp.Addin.Ui
         public Result Execute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             if (!Guard.Ready()) return Result.Cancelled;
+            // Permitir amplía lo que la IA puede hacer: la misma confirmación que Ajustes. Bloquear no pregunta.
+            if (Runtime.BlockDynamicCode && !Runtime.ConfirmAllowDynamicCode()) return Result.Cancelled;
             if (!Runtime.ToggleBlockDynamicCode(out var error))
             {
                 TaskDialog.Show(PDI.RevitMcp.Protocol.Brand.Product, "No se pudo guardar el cambio en config.json, así que no se aplicó.\n\n" + error);

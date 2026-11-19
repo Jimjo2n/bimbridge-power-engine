@@ -20,11 +20,13 @@ namespace PDI.RevitMcp.Addin.Ui
     {
         private readonly Window _win;
         private readonly StackPanel _body = new StackPanel();
-        private readonly Border _banner = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(14, 10, 14, 10), Margin = new Thickness(0, 0, 0, 10), Visibility = Visibility.Collapsed };
-        private readonly TextBlock _bannerText = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 13 };
+        // Mismo aspecto que Theme.Notice, pero con color variable (progreso, éxito, error).
+        private readonly Border _banner = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(14, 10, 14, 11), Margin = new Thickness(0, 0, 0, 12), BorderThickness = new Thickness(3, 0, 0, 0), Visibility = Visibility.Collapsed };
+        private readonly TextBlock _bannerText = new TextBlock { TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold };
         private readonly Button _recheck;
         private TextBlock _subtitle;
         private bool _busy;
+        private string _shown;
 
         public static void Show(IntPtr owner) => new UpdateWindow(owner)._win.ShowDialog();
 
@@ -42,15 +44,11 @@ namespace PDI.RevitMcp.Addin.Ui
 
             _recheck = Theme.Button("Buscar otra vez");
             _recheck.Click += async (s, e) => await Recheck();
-            var close = Theme.Button("Cerrar", Theme.Kind.Primary);
+            // La acción principal (instalar/descargar) vive en su tarjeta; cerrar es secundario.
+            var close = Theme.Button("Cerrar");
             close.IsCancel = true;
             close.Click += (s, e) => { if (!_busy) _win.Close(); };
-            var footer = new Border
-            {
-                Background = Theme.B(Theme.White), BorderBrush = Theme.B(Theme.Line), BorderThickness = new Thickness(0, 1, 0, 0),
-                Padding = new Thickness(24, 12, 24, 14),
-                Child = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Children = { _recheck, close } },
-            };
+            var footer = Theme.Footer(null, new StackPanel { Orientation = Orientation.Horizontal, Children = { _recheck, close } });
             DockPanel.SetDock(footer, Dock.Bottom);
             root.Children.Add(footer);
 
@@ -69,6 +67,9 @@ namespace PDI.RevitMcp.Addin.Ui
             _body.Children.Clear();
             var a = UpdateService.Available;
             var pending = UpdateService.PendingInstallation();
+            // Sólo entra si lo que se muestra cambió (versión encontrada, pendiente, estado en línea), no en cada redibujo.
+            var shown = pending + "|" + UpdateService.RestartPending + "|" + a?.VersionText + "|" + UpdateService.OnlineState + "|" + UpdateService.Online?.Tag + "|" + UpdateService.OnlineError;
+            if (shown != _shown) { _shown = shown; Theme.Enter(_body); }
             if (pending != null)
             {
                 _body.Children.Add(StatusCard(Theme.Amber, "Instalación pendiente", pending));
@@ -84,14 +85,12 @@ namespace PDI.RevitMcp.Addin.Ui
             else if (a != null)
             {
                 var install = Theme.Button("Instalar al cerrar Revit (" + a.VersionText + ")", Theme.Kind.Primary);
-                install.Margin = new Thickness(0, 12, 0, 0);
+                install.Margin = new Thickness(0, 14, 0, 0);
                 install.HorizontalAlignment = HorizontalAlignment.Left;
                 install.Click += async (s, e) => await Install(a, false);
-                var card = StatusCard(Theme.Green, "Hay una versión nueva: " + a.VersionText,
+                _body.Children.Add(StatusCard(Theme.Green, "Hay una versión nueva: " + a.VersionText,
                     "Encontrada en " + a.Source + "\n\nSe instala al cerrar todas las ventanas de Revit y conserva sus opciones (versiones de Revit, permisos de la IA). " +
-                    "La cola de cambios y los registros se conservan. Entra en uso la próxima vez que abra Revit.");
-                ((StackPanel)((Grid)card.Child).Children[1]).Children.Add(install);
-                _body.Children.Add(card);
+                    "La cola de cambios y los registros se conservan. Entra en uso la próxima vez que abra Revit.", install));
             }
             else
             {
@@ -103,13 +102,13 @@ namespace PDI.RevitMcp.Addin.Ui
 
             // Cómo llega una versión nueva
             var how = new StackPanel();
-            how.Children.Add(Theme.Label("Cómo recibir una versión nueva", 14, true));
-            var t = Theme.Label("Cuando le pasen un instalador nuevo (PDI.RevitMcp.Setup….zip o .exe), sólo déjelo en una de estas carpetas; no hace falta abrirlo ni descomprimirlo. " +
-                                "Este botón se pone verde solo, en unos minutos, o al pulsar Buscar otra vez. Después de instalar, los instaladores viejos se mandan a la papelera.", 12.5, false, Theme.Muted);
-            t.Margin = new Thickness(0, 4, 0, 6);
-            how.Children.Add(t);
+            how.Children.Add(Theme.Section("Cómo recibir una versión nueva",
+                "Cuando le pasen un instalador nuevo (PDI.RevitMcp.Setup….zip o .exe), sólo déjelo en una de estas carpetas; no hace falta abrirlo ni descomprimirlo. " +
+                "Este botón se pone verde solo, en unos minutos, o al pulsar Buscar otra vez. Después de instalar, los instaladores viejos se mandan a la papelera."));
+            var folders = new StackPanel();
             foreach (var f in UpdateService.Folders)
-                how.Children.Add(new TextBlock { Text = "•  " + f, FontSize = 12, Foreground = Theme.B(Theme.Ink), TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(4, 1, 0, 1) });
+                folders.Children.Add(new TextBlock { Text = "•  " + f, FontFamily = Theme.Mono, FontSize = 12, Foreground = Theme.B(Theme.Ink), TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 2, 0, 2) });
+            how.Children.Add(new Border { Background = Theme.B(Theme.Sunken), CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 8, 12, 8), Margin = new Thickness(0, 10, 0, 0), Child = folders });
             _body.Children.Add(Theme.Card(how));
 
             // Volver atrás
@@ -117,12 +116,10 @@ namespace PDI.RevitMcp.Addin.Ui
             if (prevExe != null && !UpdateService.RestartPending)
             {
                 var back = new StackPanel();
-                back.Children.Add(Theme.Label("Volver a la versión " + UpdateService.PreviousVersion, 14, true));
-                var bt = Theme.Label("Si la versión actual le da problemas, puede volver a la anterior. Se aplica al reiniciar Revit.", 12.5, false, Theme.Muted);
-                bt.Margin = new Thickness(0, 4, 0, 8);
-                back.Children.Add(bt);
+                back.Children.Add(Theme.Section("Volver a la versión " + UpdateService.PreviousVersion,
+                    "Si la versión actual le da problemas, puede volver a la anterior. Se aplica al reiniciar Revit."));
                 var btn = Theme.Button("Volver a " + UpdateService.PreviousVersion, Theme.Kind.Danger);
-                btn.Margin = new Thickness(0);
+                btn.Margin = new Thickness(0, 10, 0, 0);
                 btn.HorizontalAlignment = HorizontalAlignment.Left;
                 var prevVersion = Updates.Parse(UpdateService.PreviousVersion);
                 btn.Click += async (s, e) => await Install(new UpdateCandidate { Version = prevVersion, Exe = prevExe, Source = prevExe }, true);
@@ -138,7 +135,7 @@ namespace PDI.RevitMcp.Addin.Ui
         private UIElement OnlineCard()
         {
             var p = new StackPanel();
-            p.Children.Add(Theme.Label("Actualización en línea (GitHub)", 14, true));
+            p.Children.Add(Theme.Section("Actualización en línea (GitHub)"));
             var state = UpdateService.OnlineState;
             var r = UpdateService.Online;
             string text;
@@ -151,7 +148,7 @@ namespace PDI.RevitMcp.Addin.Ui
             else if (state == "anterior") text = "La última versión publicada (" + r.Tag + ") es anterior a la que está usando. No hay nada que actualizar.";
             else text = "Está usando la última versión publicada (" + r.Tag + (r.Commit != null ? ", commit " + r.Commit.Substring(0, 7) : "") + ").";
             var t = Theme.Label(text, 12.5, false, state == "error" ? Theme.Darken(Theme.Red, 0.8) : Theme.Muted);
-            t.Margin = new Thickness(0, 4, 0, 8);
+            t.Margin = new Thickness(0, 0, 0, 10);
             p.Children.Add(t);
             var row = new StackPanel { Orientation = Orientation.Horizontal };
             if (UpdateService.OnlineEnabled)
@@ -203,18 +200,20 @@ namespace PDI.RevitMcp.Addin.Ui
             else Banner("Se descargó y verificó, pero no se pudo instalar: " + res.text, Theme.Red);
         }
 
-        private static Border StatusCard(Color color, string title, string text)
+        private static Border StatusCard(Color color, string title, string text, UIElement action = null)
         {
             var g = new Grid();
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(52) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(48) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             var state = color == Theme.Amber ? 2 : title.StartsWith("Hay", StringComparison.Ordinal) ? 1 : 0;
-            g.Children.Add(new Image { Source = Icons.Update(state, 32), Width = 36, Height = 36, VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left });
+            // 32 px exactos: el icono es un mapa de bits de 32 y escalarlo lo emborrona.
+            g.Children.Add(new Image { Source = Icons.Update(state, 32), Width = 32, Height = 32, VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left });
             var s = new StackPanel();
             s.Children.Add(Theme.Label(title, 15, true));
             var body = Theme.Label(text, 13, false, Theme.Muted);
             body.Margin = new Thickness(0, 4, 0, 0);
             s.Children.Add(body);
+            if (action != null) s.Children.Add(action);
             Grid.SetColumn(s, 1);
             g.Children.Add(s);
             return Theme.Card(g);
@@ -253,9 +252,12 @@ namespace PDI.RevitMcp.Addin.Ui
         private void Banner(string text, Color c)
         {
             _bannerText.Text = text;
-            _bannerText.Foreground = Theme.B(Theme.Darken(c, 0.85));
-            _banner.Background = Theme.Tint(c, 0x1C);
+            _bannerText.Foreground = Theme.B(Theme.Darken(c, 0.72));
+            _banner.Background = Theme.Tint(c, 0x16);
+            _banner.BorderBrush = Theme.Tint(c, 0x80);
+            var appearing = _banner.Visibility != Visibility.Visible;
             _banner.Visibility = Visibility.Visible;
+            if (appearing) Theme.Enter(_banner); // sólo al aparecer, no en cada cambio de texto
         }
 
         private static System.Collections.Generic.IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
