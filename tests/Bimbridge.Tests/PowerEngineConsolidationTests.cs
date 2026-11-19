@@ -226,7 +226,7 @@ namespace Bimbridge.Tests
             foreach (var f in Directory.GetFiles(root, "*.*", SearchOption.AllDirectories))
             {
                 var rel = f.Substring(root.Length + 1).Replace('\\', '/');
-                if (Regex.IsMatch(rel, @"(^|/)(\.git|bin|obj|dist|target|node_modules|\.venv|__pycache__)(/|$)")) continue;
+                if (Regex.IsMatch(rel, @"(^|/)(\.git|bin|obj|dist|artifacts|target|node_modules|\.venv|__pycache__)(/|$)")) continue;
                 if (rel == "src/Bimbridge.Setup.Core/LegacyMigration.cs" || skip.Contains(Path.GetExtension(f).ToLowerInvariant())) continue;
                 var text = File.ReadAllText(f);
                 if (text.IndexOf('\0') >= 0) continue;
