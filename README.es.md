@@ -8,7 +8,7 @@
 
 ## Descarga BIMBRIDGE para Windows
 
-**[Descargar el instalador más reciente](https://github.com/Jimjo2n/bimbridge-power-engine/releases/latest)** · [Notas y SHA-256](https://github.com/Jimjo2n/bimbridge-power-engine/releases/tag/v0.9.3) · [Todas las versiones](https://github.com/Jimjo2n/bimbridge-power-engine/releases) · [Matriz completa de herramientas](docs/MATRIZ_CAPACIDADES.md)
+**[Descargar el instalador más reciente](https://github.com/Jimjo2n/bimbridge-power-engine/releases/latest)** · [Notas y SHA-256](https://github.com/Jimjo2n/bimbridge-power-engine/releases/tag/v0.9.4) · [Todas las versiones](https://github.com/Jimjo2n/bimbridge-power-engine/releases) · [Matriz completa de herramientas](docs/MATRIZ_CAPACIDADES.md)
 
 | Objetivos de compilación | Runtime del complemento |
 | --- | --- |

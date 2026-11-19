@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.4 experimental
 
 - chore(rename)!: the product, projects, namespaces, MCP server (`bimbridge`), environment variables (`BIMBRIDGE_*`) and data folders (`%LOCALAPPDATA%\Bimbridge`, `%APPDATA%\Bimbridge`) now use the BIMBRIDGE name. Environment variables also have English names: `BIMBRIDGE_PROFILE`, `BIMBRIDGE_AGENT`, `BIMBRIDGE_CONVERSATION`, `BIMBRIDGE_MODEL`, `BIMBRIDGE_REVIT_NATIVE`, `BIMBRIDGE_UPDATE_KEY` and the AgentHost test hooks `BIMBRIDGE_AH_FAULT`, `_FAULT_MODE`, `_FAULT_MARK`, `_DELAY`, `_LEASE_MS`, `_EVIDENCE`.
   - **Updating a 0.9.x install is a one-time manual step:** close Revit and double-click `Bimbridge.Setup.exe`. The ribbon Update button and update ZIPs of 0.9.x cannot find the renamed installer.
