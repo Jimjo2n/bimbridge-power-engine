@@ -136,8 +136,26 @@ namespace BimBridge.PowerEngine
                 catch (IOException ex) { readErr = "tubería rota: " + ex.Message; }
                 catch (ObjectDisposedException) { readErr = "proceso terminado"; }
             });
-            int idx;
-            try { idx = Task.WaitAny(new[] { t }, req.Limits.TimeoutMs, ct); }
+            // Windows no tiene RLIMIT_AS (worker.py lo ignora allí): el límite de memoria se vigila aquí mientras el trabajo corre.
+            var limitBytes = (long)req.Limits.MaxMemoryMb << 20;
+            var deadline = req.Limits.TimeoutMs < 0 ? long.MaxValue : req.Limits.TimeoutMs;
+            int idx = -1;
+            try
+            {
+                long left;
+                while ((left = deadline - ipc.ElapsedMilliseconds) > 0)   // una sola lectura: nunca pasa -1 (infinito) a WaitAny
+                {
+                    idx = Task.WaitAny(new[] { t }, (int)Math.Min(250, left), ct);
+                    if (idx >= 0) break;
+                    long now = 0;
+                    try { _proc.Refresh(); now = _proc.WorkingSet64; } catch (Exception) { }
+                    if (now > limitBytes)
+                    {
+                        Kill();
+                        return Response.Fail(req.Id, Codes.MemoryLimit, Name + " llegó a " + (now >> 20) + " MB (máximo " + req.Limits.MaxMemoryMb + "); se detuvo y se reiniciará en el próximo trabajo");
+                    }
+                }
+            }
             catch (OperationCanceledException) { Kill(); return Response.Fail(req.Id, Codes.Cancelled, "cancelado por el núcleo; el proceso de " + Name + " se detuvo y se reiniciará en el próximo trabajo"); }
             ipc.Stop();
             if (idx < 0) { Kill(); return Response.Fail(req.Id, Codes.Timeout, Name + " superó " + req.Limits.TimeoutMs + " ms; se detuvo y se reiniciará en el próximo trabajo"); }
@@ -157,10 +175,11 @@ namespace BimBridge.PowerEngine
             deser.Stop();
             long peak = 0;
             try { _proc.Refresh(); peak = _proc.PeakWorkingSet64 / 1024; } catch (Exception) { }
-            if (peak > (long)req.Limits.MaxMemoryMb * 1024 && r.Ok)
+            if (peak > (long)req.Limits.MaxMemoryMb * 1024)
             {
+                // PeakWorkingSet64 es el pico de toda la vida del proceso: se reinicia siempre, para que no condene al trabajo siguiente.
                 Kill();
-                return Response.Fail(req.Id, Codes.MemoryLimit, Name + " usó " + peak / 1024 + " MB (máximo " + req.Limits.MaxMemoryMb + "); resultado descartado");
+                if (r.Ok) return Response.Fail(req.Id, Codes.MemoryLimit, Name + " usó " + peak / 1024 + " MB (máximo " + req.Limits.MaxMemoryMb + "); resultado descartado");
             }
             total.Stop();
             r.Telemetry.Engine = Name;

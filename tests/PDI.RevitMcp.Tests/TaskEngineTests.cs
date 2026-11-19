@@ -192,8 +192,8 @@ namespace PDI.RevitMcp.Tests
             var mgr = Manager(root, m);
             mgr.Start(Draft("robo", 200), "// fake", "prueba");
             var t = await RunToEnd(mgr, "robo");
-            Assert.Equal(TaskState.Interrumpida, t.State);
-            Assert.Contains("lease perdido", t.Reason);
+            // La tarea es de B (lease vigente): el ejecutor viejo no escribe su "interrumpida" encima del tarea.json de B.
+            Assert.Equal(TaskState.Ejecutando, t.State);
             Assert.Equal(3, m.Visits); // ningún lote después del robo
             Assert.Equal(0, m.Duplicates);
         }
@@ -322,7 +322,7 @@ namespace PDI.RevitMcp.Tests
         {
             var m = new FakeModel();
             var mgr = Manager(TempRoot(), m);
-            m.OnVisit = v => { if (v == 4) mgr.Cancel("cancel"); };
+            m.OnVisit = v => { if (v == 4) mgr.Cancel("cancel", out _); };
             mgr.MaxWait = TimeSpan.FromSeconds(5);
             var draft = Draft("cancel", 1000, new Dictionary<string, object> { ["lote_max"] = 20L });
             mgr.Start(draft, "receta", "claude");
