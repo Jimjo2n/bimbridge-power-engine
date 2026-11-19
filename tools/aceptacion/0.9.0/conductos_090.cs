@@ -27,5 +27,5 @@ foreach (var c in new FilteredElementCollector(doc).OfCategory(BuiltInCategory.O
         ["diam"] = d, ["sistema"] = c.LookupParameter("Service Type")?.AsString(), ["con_a"] = Other(a), ["con_b"] = Other(b),
     });
 }
-var ruta = ctx.Artefacto("conductos_090.json", PDI.RevitMcp.Protocol.Json.Write(tramos));
+var ruta = ctx.Artefacto("conductos_090.json", Bimbridge.Protocol.Json.Write(tramos));
 return new { tramos = tramos.Count, ruta };

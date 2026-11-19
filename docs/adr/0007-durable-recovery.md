@@ -14,4 +14,4 @@ In-memory state alone would disappear at process exit. Blind retries after lost 
 Disk failures may block new writes. A timeout does not imply rollback or that an operation stopped.
 
 ## Evidence
-`src/PDI.RevitMcp.Engine` in the verified a291cc6 source baseline, together with the current sanitized import.
+`src/Bimbridge.Engine` in the verified a291cc6 source baseline, together with the current sanitized import.

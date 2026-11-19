@@ -12,7 +12,7 @@ Botón **Power Engine | Estado** de la cinta BIMBRIDGE. Ventana no modal. No lla
 | Rendimiento | Por operación sobre las últimas 200 solicitudes: n, mediana, p95 (sólo con 20 o más muestras) y errores |
 | Actividad | Últimas 30 entradas con hora, agente, operación, resultado, duración y documento. Distingue consultas, planes, commits, ensayos, desconocidos y C# dinámico |
 
-**Exportar:** guarda `actividad_*.jsonl`, `actividad_*.csv` y `sesiones_*.json` en `%LOCALAPPDATA%\PDI.RevitMcp\exportes`.
+**Exportar:** guarda `actividad_*.jsonl`, `actividad_*.csv` y `sesiones_*.json` en `%LOCALAPPDATA%\Bimbridge\exportes`.
 
 ## Límites de esta revisión
 

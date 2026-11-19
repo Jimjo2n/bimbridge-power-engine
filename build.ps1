@@ -11,8 +11,8 @@ function Run([string]$what) {
   Invoke-Expression $what
   if ($LASTEXITCODE -ne 0) { throw "Falló ($LASTEXITCODE): $what" }
 }
-# Reproducible (beta1): sólo desde un árbol limpio; el commit embebido es exactamente HEAD. $env:PDI_ALLOW_DIRTY=1 para desarrollo.
-if ((git status --porcelain --untracked-files=no) -and $env:PDI_ALLOW_DIRTY -ne "1") { throw "Hay cambios sin confirmar; confirme antes de armar dist\." }
+# Reproducible (beta1): sólo desde un árbol limpio; el commit embebido es exactamente HEAD. $env:BIMBRIDGE_ALLOW_DIRTY=1 para desarrollo.
+if ((git status --porcelain --untracked-files=no) -and $env:BIMBRIDGE_ALLOW_DIRTY -ne "1") { throw "Hay cambios sin confirmar; confirme antes de armar dist\." }
 $env:SourceRevisionId = (git rev-parse HEAD).Trim()
 function Clear-BuildFolder([string]$relative) {
   $root = [IO.Path]::GetFullPath($PSScriptRoot).TrimEnd('\') + '\'
@@ -36,36 +36,36 @@ Run "cargo test --locked --release --manifest-path native/power_engine/Cargo.tom
 Run "cargo build --locked --release --manifest-path native/power_engine/Cargo.toml"
 & $pythonPath -B -m unittest discover -s workers/python/tests -v
 if ($LASTEXITCODE -ne 0) { throw "Falló la suite Python" }
-Run "dotnet build src/PDI.RevitMcp.Scripting -c Release -v q"
-$roslyn = "src/PDI.RevitMcp.Scripting/bin/Release/netstandard2.0"
+Run "dotnet build src/Bimbridge.Scripting -c Release -v q"
+$roslyn = "src/Bimbridge.Scripting/bin/Release/netstandard2.0"
 foreach ($v in 2022..2027) {
   $dir = if ($RevitRoot) { Join-Path $RevitRoot "Revit $v" }
   $extra = ""
   if ($RevitRoot -and (Test-Path (Join-Path $dir "RevitAPI.dll"))) { $extra = "`"-p:RevitApiDir=$dir`"" }
-  $out = "dist/addin/$v/PDI.RevitMcp"
+  $out = "dist/addin/$v/Bimbridge"
   New-Item -ItemType Directory -Force $out | Out-Null
   if ($v -ge 2025) {
     # Revit 2025–2027: ReadyToRun (código nativo x64 + IL de respaldo) para el runtime del año.
     $r2r = "obj/r2r_$v"
     Clear-BuildFolder $r2r
-    Run "dotnet publish src/PDI.RevitMcp.Addin -c Release -p:RevitVersion=$v -r win-x64 --self-contained false -p:PublishReadyToRun=true -o $r2r -v q $extra"
-    Copy-Item "$r2r/PDI.RevitMcp.*.dll" $out
+    Run "dotnet publish src/Bimbridge.Addin -c Release -p:RevitVersion=$v -r win-x64 --self-contained false -p:PublishReadyToRun=true -o $r2r -v q $extra"
+    Copy-Item "$r2r/Bimbridge.*.dll" $out
   } else {
     # Revit 2022–2024 (.NET Framework 4.8): IL; el add-in precompila el motor en segundo plano al arrancar.
-    Run "dotnet build src/PDI.RevitMcp.Addin -c Release -p:RevitVersion=$v -v q $extra"
-    Copy-Item "src/PDI.RevitMcp.Addin/bin/Release/R$v/PDI.RevitMcp.*.dll" $out
+    Run "dotnet build src/Bimbridge.Addin -c Release -p:RevitVersion=$v -v q $extra"
+    Copy-Item "src/Bimbridge.Addin/bin/Release/R$v/Bimbridge.*.dll" $out
   }
-  Copy-Item "src/PDI.RevitMcp.Addin/PDI.RevitMcp.addin" "dist/addin/$v/"
+  Copy-Item "src/Bimbridge.Addin/Bimbridge.addin" "dist/addin/$v/"
   New-Item -ItemType Directory -Force "$out/recetas" | Out-Null
-  Copy-Item "src/PDI.RevitMcp.Addin/recetas/*.cs" "$out/recetas/"
+  Copy-Item "src/Bimbridge.Addin/recetas/*.cs" "$out/recetas/"
   New-Item -ItemType Directory -Force "$out/roslyn" | Out-Null
-  Copy-Item "$roslyn/*.dll", "$roslyn/PDI.RevitMcp.Scripting.pdb" "$out/roslyn/"
-  Remove-Item "$out/PDI.RevitMcp.Scripting.dll" -ErrorAction SilentlyContinue
+  Copy-Item "$roslyn/*.dll", "$roslyn/Bimbridge.Scripting.pdb" "$out/roslyn/"
+  Remove-Item "$out/Bimbridge.Scripting.dll" -ErrorAction SilentlyContinue
 }
 # Pruebas después de compilar los add-ins (las de exec compilan scripts contra el add-in de cada año).
-foreach ($v in 2025..2027) { Run "dotnet build src/PDI.RevitMcp.Addin -c Release -p:RevitVersion=$v -v q" }
-Run "dotnet publish src/PDI.RevitMcp.Bridge -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o dist/bridge"
-Run "dotnet publish src/PDI.RevitMcp.AgentHost -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o dist/bridge"
+foreach ($v in 2025..2027) { Run "dotnet build src/Bimbridge.Addin -c Release -p:RevitVersion=$v -v q" }
+Run "dotnet publish src/Bimbridge.Bridge -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o dist/bridge"
+Run "dotnet publish src/Bimbridge.AgentHost -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o dist/bridge"
 
 $pe = "dist/bridge/power_engine"
 New-Item -ItemType Directory -Force $pe | Out-Null
@@ -86,7 +86,7 @@ if ($LASTEXITCODE -ne 0 -or $rustHello.codigo -ne "OK" -or "components" -notin $
   throw "Falló el saludo IPC de Rust en el payload"
 }
 $required = @(
-  "bridge/PDI.RevitMcp.Bridge.exe", "bridge/PDI.RevitMcp.AgentHost.exe",
+  "bridge/Bimbridge.Bridge.exe", "bridge/Bimbridge.AgentHost.exe",
   "bridge/bimbridge_power_engine.dll", "bridge/power_engine/bimbridge-power-engine.exe",
   "bridge/power_engine/python/run_worker.py",
   "bridge/power_engine/python/bimbridge_docworker/__init__.py",
@@ -98,11 +98,11 @@ $required = @(
   "bridge/power_engine/python/vendor/charset_normalizer/__init__.py"
 )
 foreach ($v in 2022..2027) {
-  $required += "addin/$v/PDI.RevitMcp.addin"
+  $required += "addin/$v/Bimbridge.addin"
   foreach ($dll in "Addin", "Protocol", "Engine", "Setup.Core") {
-    $required += "addin/$v/PDI.RevitMcp/PDI.RevitMcp.$dll.dll"
+    $required += "addin/$v/Bimbridge/Bimbridge.$dll.dll"
   }
-  $required += "addin/$v/PDI.RevitMcp/roslyn/PDI.RevitMcp.Scripting.dll"
+  $required += "addin/$v/Bimbridge/roslyn/Bimbridge.Scripting.dll"
 }
 foreach ($file in $required) {
   if (!(Test-Path -LiteralPath "dist/$file" -PathType Leaf) -or (Get-Item -LiteralPath "dist/$file").Length -eq 0) {
@@ -110,8 +110,8 @@ foreach ($file in $required) {
   }
 }
 
-# Instalador de doble clic: payload.zip (add-in + puente) dentro de PDI.RevitMcp.Setup.exe
-$payload = "src/PDI.RevitMcp.Setup/payload.zip"
+# Instalador de doble clic: payload.zip (add-in + puente) dentro de Bimbridge.Setup.exe
+$payload = "src/Bimbridge.Setup/payload.zip"
 if (Test-Path $payload) { Remove-Item $payload }
 # manifest.json: SHA-256 de cada archivo; el instalador lo verifica antes y después de copiar (0.6.0)
 $ver = ([xml](Get-Content Directory.Build.props -Raw)).Project.PropertyGroup.Version
@@ -125,7 +125,7 @@ Pop-Location
 @{ version = $ver; commit = $env:SourceRevisionId; estado = "NATIVE_ACCEPTANCE_PENDING"; requeridos = $required; archivos = $files } | ConvertTo-Json -Depth 3 | Set-Content -Encoding UTF8 dist/manifest.json
 Compress-Archive -Path dist/addin, dist/bridge, dist/manifest.json -DestinationPath $payload
 $testFilter = if ($SkipBenchmarks) { " --filter 'FullyQualifiedName!~MeasurementTests&FullyQualifiedName!~Bench_'" } else { '' }
-Run "dotnet test tests/PDI.RevitMcp.Tests$testFilter -- RunConfiguration.MaxCpuCount=1 xUnit.MaxParallelThreads=1"
-Run "dotnet build src/PDI.RevitMcp.Setup -c Release -v q"
-Copy-Item src/PDI.RevitMcp.Setup/bin/Release/net48/PDI.RevitMcp.Setup.exe dist/
-Write-Host "Instalador: dist/PDI.RevitMcp.Setup.exe"
+Run "dotnet test tests/Bimbridge.Tests$testFilter -- RunConfiguration.MaxCpuCount=1 xUnit.MaxParallelThreads=1"
+Run "dotnet build src/Bimbridge.Setup -c Release -v q"
+Copy-Item src/Bimbridge.Setup/bin/Release/net48/Bimbridge.Setup.exe dist/
+Write-Host "Instalador: dist/Bimbridge.Setup.exe"

@@ -65,7 +65,7 @@ Degradación controlada: sin Python, los trabajos PDF devuelven `NO_DISPONIBLE` 
 
 `power cap <texto>` devuelve fichas breves; `power cap <id>` la ficha completa. Estados: `AVAILABLE`, `EXPERIMENTAL`, `REQUIRES_AUTHORIZATION`, `NATIVE_TEST_PENDING`, `DEFERRED`, `API_LIMITATION`. Algo sin implementar no se marca como imposible.
 
-## Configuración (`%APPDATA%\PDI.RevitMcp\config.json`)
+## Configuración (`%APPDATA%\Bimbridge\config.json`)
 
 ```json
 {

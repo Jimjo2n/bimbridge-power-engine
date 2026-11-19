@@ -4,11 +4,11 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using PDI.RevitMcp.Engine;
-using PDI.RevitMcp.Engine.Tasks;
+using Bimbridge.Engine;
+using Bimbridge.Engine.Tasks;
 using Xunit;
 
-namespace PDI.RevitMcp.Tests
+namespace Bimbridge.Tests
 {
     /// Reproducción de los hallazgos de la revisión sobre el código de rc2 (0222b6e). Cada prueba afirma el comportamiento CORRECTO:
     /// que falle aquí demuestra el defecto.

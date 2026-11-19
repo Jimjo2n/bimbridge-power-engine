@@ -1,6 +1,6 @@
 # Matriz de trazabilidad — BIMBRIDGE 0.8.0
 
-Generada desde `src/PDI.RevitMcp.Engine/Workflow/Traceability.cs` (una prueba comprueba que coincide). Candidato interno; aceptación nativa pendiente.
+Generada desde `src/Bimbridge.Engine/Workflow/Traceability.cs` (una prueba comprueba que coincide). Candidato interno; aceptación nativa pendiente.
 
 **Estado** es el de este build 0.8.0. Ninguna fila es TESTED_NATIVE: no hubo campaña nativa de 0.8.0 (entorno nativo de prueba no disponible). La evidencia nativa de builds anteriores está en *nativo previo* y no se cuenta como prueba de este build. Los tokens son ESTIMADOS (caracteres/4).
 

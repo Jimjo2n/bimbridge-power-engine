@@ -16,14 +16,14 @@ La política se aplica dos veces: al iniciar y al reanudar (la receta se recompi
 
 ## Integridad vs autenticidad de recetas
 - Integridad: la tarea guarda la copia exacta y su SHA-256; reanudar con una copia alterada se rechaza (desde 0.6.0).
-- Autenticidad: **no hay firma**. Cualquiera con escritura en `%LOCALAPPDATA%\PDI.RevitMcp\recetas` puede poner una receta. Mitigación 0.6.1: la política de capacidades limita qué puede hacer. Firma de recetas: ROADMAP_0.7.0.
+- Autenticidad: **no hay firma**. Cualquiera con escritura en `%LOCALAPPDATA%\Bimbridge\recetas` puede poner una receta. Mitigación 0.6.1: la política de capacidades limita qué puede hacer. Firma de recetas: ROADMAP_0.7.0.
 
 ## Puente / pipe
 - Pipe sólo para el usuario actual (ACL en 2022–2024, `CurrentUserOnly` en 2025–2026), sin red; trama máx. 16 MB (desde antes).
 - Nuevo: el cliente comprueba con `GetNamedPipeServerProcessId` que el servidor es el PID anunciado y que el ejecutable es Revit (evita que otro proceso ocupe el nombre).
 
 ## Auditoría
-`%LOCALAPPDATA%\PDI.RevitMcp\auditoria\auditoria.jsonl`: una línea por `exec_codigo` (con sha256 del código y ruta de la copia completa) y por `aplicar_cola`. Cadena `prev` = sha256 de la línea anterior. `AuditLog.Verify` detecta borrado, edición o línea cortada. No protege contra quien reescriba todo el archivo con una cadena nueva (no hay ancla externa).
+`%LOCALAPPDATA%\Bimbridge\auditoria\auditoria.jsonl`: una línea por `exec_codigo` (con sha256 del código y ruta de la copia completa) y por `aplicar_cola`. Cadena `prev` = sha256 de la línea anterior. `AuditLog.Verify` detecta borrado, edición o línea cortada. No protege contra quien reescriba todo el archivo con una cadena nueva (no hay ancla externa).
 
 ## Qué NO cambia
 Sin instalaciones silenciosas, sin ocultar nada a IT, sin red saliente desde el add-in.

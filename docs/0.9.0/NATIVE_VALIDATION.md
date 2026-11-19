@@ -6,7 +6,7 @@ Instalar, abrir Revit o conectarse a él exige autorización específica de inst
 ## Requisitos del laboratorio
 
 - Revit cerrado durante la instalación y el retorno.
-- CPython real, fuera de WindowsApps. **No se empaqueta**: es un prerrequisito. Se indica en `%APPDATA%\PDI.RevitMcp\config.json`: `"power_engine": { "python": "C:\\ruta\\python.exe" }`. Sin él, las funciones de PDF quedan no disponibles con un diagnóstico.
+- CPython real, fuera de WindowsApps. **No se empaqueta**: es un prerrequisito. Se indica en `%APPDATA%\Bimbridge\config.json`: `"power_engine": { "python": "C:\\ruta\\python.exe" }`. Sin él, las funciones de PDF quedan no disponibles con un diagnóstico.
 - Copia local desechable, no workshared.
 
 ## Bloqueo por operaciones no reconciliadas
@@ -24,16 +24,16 @@ Con evidencia pendiente, un archivo de evidencia dañado o un error al leerla, l
 ## Instalar
 
 ```
-PDI.RevitMcp.Setup.exe /quiet /revit=2024 /niveles=RPW
+Bimbridge.Setup.exe /quiet /revit=2024 /niveles=RPW
 ```
 
-Antes de copiar nada, el instalador verifica el manifiesto y guarda un respaldo en `%LOCALAPPDATA%\PDI.RevitMcp\respaldos\<id>\` si ya había una instalación. Conserva los 3 últimos.
+Antes de copiar nada, el instalador verifica el manifiesto y guarda un respaldo en `%LOCALAPPDATA%\Bimbridge\respaldos\<id>\` si ya había una instalación. Conserva los 3 últimos.
 
 ## Volver atrás
 
 ```
-PDI.RevitMcp.Setup.exe /restaurar
-PDI.RevitMcp.Setup.exe /restaurar="<carpeta del respaldo>"
+Bimbridge.Setup.exe /restaurar
+Bimbridge.Setup.exe /restaurar="<carpeta del respaldo>"
 ```
 
 - Devuelve el código 2 si Revit está abierto, y no toca nada.
@@ -41,7 +41,7 @@ PDI.RevitMcp.Setup.exe /restaurar="<carpeta del respaldo>"
 - Restaura el add-in y su `.addin` de cada versión, `bin\` (puente, AgentHost, Power Engine), `config.json`, `install.json`, la copia del instalador y `.codex\config.toml`. Lo que no existía se borra. Los add-ins ajenos, como pyRevit, no se tocan.
 - Guarda antes el estado actual e imprime cómo deshacer el retorno. Si falla a medias, intenta dejar el estado anterior.
 - `.codex\config.toml` se restaura completo: los cambios hechos en él después del respaldo se pierden.
-- Fuera del alcance: las tareas y diarios de `%LOCALAPPDATA%\PDI.RevitMcp` y los modelos.
+- Fuera del alcance: las tareas y diarios de `%LOCALAPPDATA%\Bimbridge` y los modelos.
 
 ## Prueba offline
 

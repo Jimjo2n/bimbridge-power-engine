@@ -5,10 +5,10 @@
 ## Antes de empezar (cuando haya autorización)
 
 1. Una **copia desechable LOCAL**, no workshared, de un modelo público o sintético autorizado, con ejes rectos con nombre y una luminaria `OneLevelBased` cargada. Nunca SAMPLE PROJECT ni ACC/BIM 360.
-2. Instalar 0.9.0 a mano (`PDI.RevitMcp.Setup.exe`); la instalación es una operación del usuario, separada de las pruebas automáticas.
+2. Instalar 0.9.0 a mano (`Bimbridge.Setup.exe`); la instalación es una operación del usuario, separada de las pruebas automáticas.
 3. `config.json`: niveles `RPW`, `perfil: laboratorio` con la carpeta de la copia en `laboratorio.carpetas`, `carpetas_documentos` con la carpeta del PDF de prueba.
 4. PDF de prueba: uno sintético de `workers/python/tests/fixtures.py` (o un plano público), con ejes cuyos nombres existan en la copia.
-5. `PDI.RevitMcp.AgentHost power-engine estado` → Python y Rust disponibles (o la degradación esperada, anotada).
+5. `Bimbridge.AgentHost power-engine estado` → Python y Rust disponibles (o la degradación esperada, anotada).
 
 ## Pasos
 

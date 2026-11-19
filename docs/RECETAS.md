@@ -2,7 +2,7 @@
 
 Una receta es una clase C# que hereda de `Receta`. Se registra **por archivo** (no hace falta una herramienta MCP por receta):
 
-1. `%LOCALAPPDATA%\PDI.RevitMcp\recetas\<nombre>.cs` — las del usuario o del equipo (ganan);
+1. `%LOCALAPPDATA%\Bimbridge\recetas\<nombre>.cs` — las del usuario o del equipo (ganan);
 2. `recetas\` junto al add-in — las que trae el instalador.
 
 `revit "tarea recetas"` las lista con versión y SHA-256. También se puede iniciar con `archivo=<ruta completa>` o `codigo=`.

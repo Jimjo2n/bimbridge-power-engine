@@ -50,7 +50,7 @@ public sealed class ComputeResult
 
 ## 4. IPC, fallos y cancelación
 
-- **Proceso aparte** (`pdi-compute.exe`), lanzado por el add-in bajo demanda. Un pánico de Rust no tumba Revit.
+- **Proceso aparte** (`bimbridge-compute.exe`), lanzado por el add-in bajo demanda. Un pánico de Rust no tumba Revit.
 - **Transporte:** named pipe por usuario con la misma ACL y la misma trama de 16 MB que el puente (`Frame`); el cliente verifica el PID del servidor, como en `PipeServerCheck`.
 - **Cancelación:** mensaje `cancel <RequestId>` por el mismo pipe; el worker comprueba entre bloques. El presupuesto `MaxMs` se aplica también en el lado C# (timeout + matar el proceso).
 - **Fallo del worker** → la receta usa la implementación C# de referencia (siempre presente). El resultado indica qué motor lo calculó.
@@ -70,4 +70,4 @@ public sealed class ComputeResult
 4. La medición del tiempo de extracción en el hilo de Revit (que Rust no puede acelerar) es obligatoria antes del paso 1: si domina, se optimiza la extracción y no el cálculo.
 
 ## Adenda 0.7.0-alpha1 — candidato concreto
-Kernel identificado: `TriMesh.Extent` (rayo vertical punto→malla para montaje). Banco C# en `src/PDI.RevitMcp.AgentHost/Kernels/MountKernelBench.cs`, comando `agenthost banco-kernel`. Línea base y decisión en `docs/0.7.0/RENDIMIENTO_0.7.0.md`: ~1,2 µs/punto con SIMD; Rust no justificado hasta medir en Revit real. Formato de entrada binario determinista y digest sha256 para comparar una futura implementación byte a byte.
+Kernel identificado: `TriMesh.Extent` (rayo vertical punto→malla para montaje). Banco C# en `src/Bimbridge.AgentHost/Kernels/MountKernelBench.cs`, comando `agenthost banco-kernel`. Línea base y decisión en `docs/0.7.0/RENDIMIENTO_0.7.0.md`: ~1,2 µs/punto con SIMD; Rust no justificado hasta medir en Revit real. Formato de entrada binario determinista y digest sha256 para comparar una futura implementación byte a byte.

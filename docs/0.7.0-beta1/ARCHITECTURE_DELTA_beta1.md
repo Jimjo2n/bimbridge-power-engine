@@ -8,7 +8,7 @@ No hay frameworks nuevos. Todo es C#/.NET; no hay Python ni Rust.
 | AgentHost `RevitCli.Nrt05Run` | El núcleo del arnés es testeable con un add-in falso: recibe la conexión ya abierta. |
 | AgentHost `OpState.DirectiveName` | Correspondencia de estados (ver abajo). |
 | Setup.Core `SetupCore.CopyOver` | Quita el atributo de sólo lectura antes de sobrescribir. `Platform.LastWarning` recoge los fallos no fatales. |
-| build.sh / build.ps1 | Árbol limpio obligatorio y `SourceRevisionId=HEAD`. `PDI_ALLOW_DIRTY=1` sólo para desarrollo. |
+| build.sh / build.ps1 | Árbol limpio obligatorio y `SourceRevisionId=HEAD`. `BIMBRIDGE_ALLOW_DIRTY=1` sólo para desarrollo. |
 
 ## Estados (contrato de estados de ejecución → OpState existente)
 | Decisión de diseño | OpState |

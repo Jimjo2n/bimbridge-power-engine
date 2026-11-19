@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 r"""
-Comparación cuantificable pyRevit vs PDI Revit MCP SIN volver a correr pruebas con ambos.
+Comparación cuantificable pyRevit vs BIMBRIDGE SIN volver a correr pruebas con ambos.
 
 Método ("reemplazo sobre el historial real"):
   1. Toma los runs reales de pyRevit (carpeta runs\<fecha>-<id>\response.json): tiempo, modo, error, tamaño de salida.

@@ -1,4 +1,4 @@
-# PDI Revit MCP 0.5.0: informe de entrega
+# BIMBRIDGE 0.5.0: informe de entrega
 
 **Commit:** `c87e162` (tag `v0.5.0`), sobre `9271259` (0.4.0). **Fecha:** 18/10/2026.
 **Qué está probado:** sólo sin Revit. Compila para Revit 2022–2026, pasan 114 pruebas automáticas, y el script del lavamanos compila contra la API de cada año. **Nada nuevo de 0.5.0 se ha ejecutado todavía dentro de Revit.** Los pasos para hacerlo en el equipo de prueba están en `tools/aceptacion/PROCEDIMIENTO.md`.
@@ -86,8 +86,8 @@ Dentro de Revit, la caché por hash hace que repetir un script no lo vuelva a co
 ## 6. Entrega
 
 En `/mnt/project-files/mcp-revit/0.5.0/`:
-- `PDI.RevitMcp.Setup_0.5.0.zip` contiene el instalador `PDI.RevitMcp.Setup.exe`, con add-in 2022–2026 + `roslyn\` + puente. El entorno histórico utilizaba 0.4.0 en Revit 2024; Revit 2026 estaba fuera del alcance de esa validación.
-- `PDI.RevitMcp_codigo_0.5.0_c87e162.zip` es el código fuente exacto del commit. El binario lleva `0.5.0+c87e162…`.
+- `Bimbridge.Setup_0.5.0.zip` contiene el instalador `Bimbridge.Setup.exe`, con add-in 2022–2026 + `roslyn\` + puente. El entorno histórico utilizaba 0.4.0 en Revit 2024; Revit 2026 estaba fuera del alcance de esa validación.
+- `Bimbridge_codigo_0.5.0_c87e162.zip` es el código fuente exacto del commit. El binario lleva `0.5.0+c87e162…`.
 - `MANIFIESTO_0.5.0.txt` trae el SHA-256 de los zips, del instalador y de cada archivo instalado.
 
 ## 7. Límites que quedan

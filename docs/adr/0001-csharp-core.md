@@ -14,4 +14,4 @@ A core split across C#, Python and Rust would add ownership and IPC boundaries. 
 A single transaction and recovery authority is easier to reason about. Cross-language tasks still require explicit contracts.
 
 ## Evidence
-`src/PDI.RevitMcp.Engine` in the verified a291cc6 source baseline, together with the current sanitized import.
+`src/Bimbridge.Engine` in the verified a291cc6 source baseline, together with the current sanitized import.

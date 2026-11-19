@@ -4,14 +4,14 @@
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <Company>BIMBRIDGE</Company>
-    <Product>BIMBRIDGE (PDI Revit MCP)</Product>
+    <Product>BIMBRIDGE - Power Engine</Product>
     <Version>0.9.3</Version>
     <InformationalVersion>0.9.3</InformationalVersion>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <!-- Issue #7: una tarea sin await ni supervisión pierde sus excepciones; se trata como error de compilación. -->
     <WarningsAsErrors>$(WarningsAsErrors);CS4014</WarningsAsErrors>
     <!-- sin rutas de la máquina de compilación dentro de las DLL (pdb) -->
-    <PathMap>$(MSBuildThisFileDirectory)=/pdi-revit-mcp/</PathMap>
+    <PathMap>$(MSBuildThisFileDirectory)=/bimbridge/</PathMap>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
 </Project>

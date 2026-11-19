@@ -1,6 +1,6 @@
 # Cobertura funcional de Revit — registro generado
 
-Generado por `tools/inventory/RevitApiInventory registry` desde `src/PDI.RevitMcp.Engine/Coverage/CapabilityCatalog.cs` y el inventario offline de la API (`docs/0.9.1/inventory`). No editar a mano.
+Generado por `tools/inventory/RevitApiInventory registry` desde `src/Bimbridge.Engine/Coverage/CapabilityCatalog.cs` y el inventario offline de la API (`docs/0.9.1/inventory`). No editar a mano.
 
 Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña nativa única de 0.9.1. `IMPLEMENTED_UNVERIFIED` = implementación tipada con pruebas de planificación offline; su efecto en Revit está pendiente de campaña.
 

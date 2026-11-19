@@ -1,4 +1,4 @@
-# PDI.RevitMcp 0.7.0-beta1
+# Bimbridge 0.7.0-beta1
 
 Objetivo de beta1: demostrar **NRT-05**, una escritura persistente real, autorizada, reproducible y verificable que nace en AgentHost:
 

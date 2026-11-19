@@ -23,12 +23,12 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: '3.12'
-      - run: dotnet restore tests/PDI.RevitMcp.Tests/PDI.RevitMcp.Tests.csproj
+      - run: dotnet restore tests/Bimbridge.Tests/Bimbridge.Tests.csproj
       - name: Check known NuGet vulnerabilities
         shell: bash
         run: |
           mkdir -p artifacts
-          dotnet list tests/PDI.RevitMcp.Tests/PDI.RevitMcp.Tests.csproj package --vulnerable --include-transitive --format json > artifacts/nuget-vulnerabilities.json
+          dotnet list tests/Bimbridge.Tests/Bimbridge.Tests.csproj package --vulnerable --include-transitive --format json > artifacts/nuget-vulnerabilities.json
           python tools/repository/check_nuget_audit.py artifacts/nuget-vulnerabilities.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()

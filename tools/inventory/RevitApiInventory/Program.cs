@@ -137,7 +137,7 @@ internal static class Program
     {
         Directory.CreateDirectory(outDir);
         var opts = new JsonSerializerOptions { WriteIndented = true, IncludeFields = true };
-        var catalog = PDI.RevitMcp.Engine.Coverage.CapabilityCatalog.All.Select(c => new Dictionary<string, object>
+        var catalog = Bimbridge.Engine.Coverage.CapabilityCatalog.All.Select(c => new Dictionary<string, object>
         {
             ["capability_id"] = c.Id, ["domain"] = c.Domain, ["subdomain"] = c.Subdomain, ["name"] = c.Name, ["name_en"] = c.NameEn,
             ["operation"] = c.Operation, ["expected_postconditions"] = c.Expected, ["categories"] = c.Categories, ["document_kind"] = c.DocumentKind,
@@ -161,17 +161,17 @@ internal static class Program
         }
         var commands = versions.Select(kv =>
         {
-            var domain = PDI.RevitMcp.Engine.Coverage.CommandClassifier.Classify(kv.Key, out var byRule);
-            var linked = PDI.RevitMcp.Engine.Coverage.CommandClassifier.LinkedCapabilities(kv.Key);
+            var domain = Bimbridge.Engine.Coverage.CommandClassifier.Classify(kv.Key, out var byRule);
+            var linked = Bimbridge.Engine.Coverage.CommandClassifier.LinkedCapabilities(kv.Key);
             return new Dictionary<string, object>
             {
                 // Dominio de la capacidad enlazada (análisis); el de la regla por nombre queda como referencia.
                 ["command"] = kv.Key, ["domain"] = linked.Count > 0 ? linked[0].Domain : domain, ["domain_by_name"] = domain, ["classified_by_rule"] = byRule, ["revit_versions"] = kv.Value,
                 ["capabilities"] = linked.Select(c => c.Id).ToArray(),
                 ["status"] = linked.Count == 0 ? "UNKNOWN" : linked.Select(c => c.Status).Min().ToString(),
-                ["analysis"] = linked.Count == 0 ? "sin_analizar" : linked.All(c => c.Status == PDI.RevitMcp.Engine.Coverage.CoverageStatus.UNKNOWN) ? "analizado_sin_evidencia" : "enlazado",
-                ["executor"] = linked.Count == 0 ? "UNAVAILABLE" : PDI.RevitMcp.Engine.Coverage.CapabilityIndex.ExecutorOf(linked.OrderBy(c => c.Status).First()),
-                ["pending_research"] = linked.Where(c => c.Status == PDI.RevitMcp.Engine.Coverage.CoverageStatus.UNKNOWN).Select(c => c.Limitations).FirstOrDefault(),
+                ["analysis"] = linked.Count == 0 ? "sin_analizar" : linked.All(c => c.Status == Bimbridge.Engine.Coverage.CoverageStatus.UNKNOWN) ? "analizado_sin_evidencia" : "enlazado",
+                ["executor"] = linked.Count == 0 ? "UNAVAILABLE" : Bimbridge.Engine.Coverage.CapabilityIndex.ExecutorOf(linked.OrderBy(c => c.Status).First()),
+                ["pending_research"] = linked.Where(c => c.Status == Bimbridge.Engine.Coverage.CoverageStatus.UNKNOWN).Select(c => c.Limitations).FirstOrDefault(),
             };
         }).ToList();
         File.WriteAllText(Path.Combine(outDir, "commands.json"), JsonSerializer.Serialize(commands, opts), new UTF8Encoding(false));
@@ -180,13 +180,13 @@ internal static class Program
         var sb = new StringBuilder();
         sb.AppendLine("# Cobertura funcional de Revit — registro generado");
         sb.AppendLine();
-        sb.AppendLine("Generado por `tools/inventory/RevitApiInventory registry` desde `src/PDI.RevitMcp.Engine/Coverage/CapabilityCatalog.cs` y el inventario offline de la API (`docs/0.9.1/inventory`). No editar a mano.");
+        sb.AppendLine("Generado por `tools/inventory/RevitApiInventory registry` desde `src/Bimbridge.Engine/Coverage/CapabilityCatalog.cs` y el inventario offline de la API (`docs/0.9.1/inventory`). No editar a mano.");
         sb.AppendLine();
         sb.AppendLine("Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña nativa única de 0.9.1. `IMPLEMENTED_UNVERIFIED` = implementación tipada con pruebas de planificación offline; su efecto en Revit está pendiente de campaña.");
         sb.AppendLine();
         sb.AppendLine("## Capacidades por estado");
         sb.AppendLine();
-        foreach (var g in PDI.RevitMcp.Engine.Coverage.CapabilityCatalog.All.GroupBy(c => c.Status).OrderBy(g => g.Key))
+        foreach (var g in Bimbridge.Engine.Coverage.CapabilityCatalog.All.GroupBy(c => c.Status).OrderBy(g => g.Key))
             sb.AppendLine("- `" + g.Key + "`: " + g.Count());
         sb.AppendLine();
         sb.AppendLine("## Comandos de la cinta (PostableCommand, unión 2022–2026)");
@@ -208,7 +208,7 @@ internal static class Program
         for (var f = 1; f <= 37; f++)
         {
             var d = "F" + f.ToString("00");
-            var caps = PDI.RevitMcp.Engine.Coverage.CapabilityCatalog.All.Where(c => c.Domain == d).ToList();
+            var caps = Bimbridge.Engine.Coverage.CapabilityCatalog.All.Where(c => c.Domain == d).ToList();
             var states = string.Join(", ", caps.GroupBy(c => c.Status).OrderBy(g => g.Key).Select(g => g.Key + " " + g.Count()));
             sb.AppendLine("| " + d + " | " + caps.Count + " | " + states + " | " + commands.Count(c => (string)c["domain"] == d) + " |");
         }
@@ -217,7 +217,7 @@ internal static class Program
         sb.AppendLine();
         sb.AppendLine("| ID | Capacidad | Estado | Estrategia | Limitaciones |");
         sb.AppendLine("|---|---|---|---|---|");
-        foreach (var c in PDI.RevitMcp.Engine.Coverage.CapabilityCatalog.All.OrderBy(c => c.Id, StringComparer.Ordinal))
+        foreach (var c in Bimbridge.Engine.Coverage.CapabilityCatalog.All.OrderBy(c => c.Id, StringComparer.Ordinal))
             sb.AppendLine("| " + c.Id + " | " + c.Name + " | `" + c.Status + "` | " + c.Strategy + " | " + (c.Limitations ?? "").Replace("|", "/") + " |");
         File.WriteAllText(Path.Combine(outDir, "coverage.md"), sb.ToString(), new UTF8Encoding(false));
         Console.WriteLine("capacidades " + catalog.Count + ", comandos " + commands.Count + ", UNKNOWN " + commands.Count(c => (string)c["status"] == "UNKNOWN"));

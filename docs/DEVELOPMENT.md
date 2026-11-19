@@ -11,7 +11,7 @@ In a clean interpreter/checkout, first run `python tools/repository/prepare_pyth
 cargo test --locked --release --manifest-path native/power_engine/Cargo.toml
 cargo build --locked --release --manifest-path native/power_engine/Cargo.toml
 python -B -m unittest discover -s workers/python/tests -v
-dotnet test tests/PDI.RevitMcp.Tests/PDI.RevitMcp.Tests.csproj -c Release
+dotnet test tests/Bimbridge.Tests/Bimbridge.Tests.csproj -c Release
 ```
 
 Some C# checks depend on previously compiled add-ins or native workers. `build.ps1` builds add-ins for 2022–2027, then runs the suite and packages the installer. Use `-SkipBenchmarks` to exclude the measurement cases. Pass the path to CPython.

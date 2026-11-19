@@ -1,4 +1,4 @@
-# PDI Revit MCP 0.6.0: informe de entrega (candidata)
+# BIMBRIDGE 0.6.0: informe de entrega (candidata)
 
 ## 1. Qué puede terminar 0.6.0 que 0.5.0 no podía
 
@@ -50,10 +50,10 @@ Otros límites conocidos (por la API, no por elección):
 
 ## 5. Instalación
 
-1. Descomprimir `PDI.RevitMcp.Setup_0.6.0.zip`.
+1. Descomprimir `Bimbridge.Setup_0.6.0.zip`.
 2. Comprobar el SHA-256 del `.exe` contra `MANIFIESTO_0.6.0.txt`.
 3. Ejecutarlo y marcar 2024 y/o 2026. Con Revit abierto, lo nuevo entra al reiniciar; el diagnóstico lo dice.
-4. Diagnóstico: `PDI.RevitMcp.Setup.exe /diagnostico`.
+4. Diagnóstico: `Bimbridge.Setup.exe /diagnostico`.
 5. Volver a la versión anterior: botón "Versión" de la cinta → versión anterior. Se conserva el instalador previo.
 
 Prueba corta de una tarea real: [PRUEBA_RAPIDA_OPERATOR.md](PRUEBA_RAPIDA_OPERATOR.md).
@@ -62,9 +62,9 @@ Prueba corta de una tarea real: [PRUEBA_RAPIDA_OPERATOR.md](PRUEBA_RAPIDA_OPERAT
 
 | Archivo | Qué es |
 |---|---|
-| `PDI.RevitMcp.Setup_0.6.0.zip` | instalador 2022–2026, con `manifest.json` de hashes dentro |
+| `Bimbridge.Setup_0.6.0.zip` | instalador 2022–2026, con `manifest.json` de hashes dentro |
 | `MANIFIESTO_0.6.0.txt` | SHA-256 de cada archivo de la entrega y de cada archivo del paquete |
-| `PDI.RevitMcp_codigo_0.6.0_<commit>.zip` y `codigo_0.6.0.gitbundle` | fuente completo y repositorio con historia (tag v0.6.0) |
+| `Bimbridge_codigo_0.6.0_<commit>.zip` y `codigo_0.6.0.gitbundle` | fuente completo y repositorio con historia (tag v0.6.0) |
 | `CHANGELOG_0.6.0.md` | cambios con su nivel de comprobación |
 | `PROTOCOLO_0.6.0.md`, `ESQUEMA_TAREA_0.6.0.md`, `RECETAS.md` | contrato de la operación `tarea`, esquema de checkpoint, recetas |
 | `MATRIZ_CAPACIDADES.md`, `ESTADO_REQUISITOS_0.6.0.csv` | capacidad por orden y requisito, con evidencia |

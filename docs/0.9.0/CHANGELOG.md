@@ -3,8 +3,8 @@
 ## Revisión consolidada Power Engine (2026-11-09, base b944e6e)
 
 - **C# dinámico habilitado por defecto**, con el control único y persistente «Bloquear inyección de código C#». Se eliminan «Código confiable» (4 h) y la autorización por SHA en `exec`. Ver DYNAMIC_CODE_EXECUTION_POLICY.md.
-- **Rebranding visible a «BIMBRIDGE - Power Engine»:** diálogos, ventanas, cinta («Power Engine | Estado»), add-in, servidor MCP, Aplicaciones de Windows, instalador e historial de transacciones. El prefijo heredado sigue reconociéndose. Hay una prueba que impide nuevas cadenas visibles «PDI MCP».
-- **Identidad de agentes:** alias declarado (`BIMBRIDGE_AGENTE` o `ctx agente=`), principal verificado (usuario de Windows), contadores por sesión, historial de desconectadas y atribución en el diario. Ver AGENT_IDENTITY_PROTOCOL.md.
+- **Rebranding visible a «BIMBRIDGE - Power Engine»:** diálogos, ventanas, cinta («Power Engine | Estado»), add-in, servidor MCP, Aplicaciones de Windows, instalador e historial de transacciones. El prefijo heredado sigue reconociéndose. 
+- **Identidad de agentes:** alias declarado (`BIMBRIDGE_AGENT` o `ctx agente=`), principal verificado (usuario de Windows), contadores por sesión, historial de desconectadas y atribución en el diario. Ver AGENT_IDENTITY_PROTOCOL.md.
 - **Nuevo panel Estado:** resumen, agentes, seguridad y recuperación, rendimiento (mediana y p95) y actividad atribuida, con exportación CSV y JSONL. Ver POWER_ENGINE_OBSERVABILITY.md.
 - **Rendimiento:** `commit ops=…` (plan + commit en un viaje), conteo rápido con `GetElementCount`, caché de nombres por consulta y `ctx` compacto.
 - **Pruebas:** la de extremo a extremo ya no lee el `config.json` real.

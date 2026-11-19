@@ -6,8 +6,8 @@
 |---|---|---|
 | Usuario de Windows (`principal`) | ACL de la tubería: sólo ese usuario conecta | **Sí** |
 | Aplicación cliente y versión | `clientInfo` del inicio MCP (p. ej. `claude-code 2.1`) | No (declarado por el cliente) |
-| Alias del agente | `BIMBRIDGE_AGENTE` en la configuración MCP, o `ctx agente="…"` | No (declarado) |
-| Conversación y modelo | `BIMBRIDGE_CONVERSACION`, `BIMBRIDGE_MODELO`, o `ctx conversacion= modelo=` | No (declarado) |
+| Alias del agente | `BIMBRIDGE_AGENT` en la configuración MCP, o `ctx agente="…"` | No (declarado) |
+| Conversación y modelo | `BIMBRIDGE_CONVERSATION`, `BIMBRIDGE_MODEL`, o `ctx conversacion= modelo=` | No (declarado) |
 | Título del chat | **El protocolo MCP no lo transmite.** Nunca se inventa | — |
 
 ## Flujo
@@ -28,7 +28,7 @@ Una sesión sin alias aparece como «(sin nombre) · cliente», con identidad **
 - **Exige alias:** todo lo demás. Incluye las lecturas (`query`, `sets`, `check`, `catalog`, `params`, `docs`, `geo`, `job`) y un `ctx` sin `agente=`, porque devolvería datos del modelo. También `plan`, `commit`, `exec`, `fam`, `doc`, `show`, `capture`, `tarea` y cualquier operación desconocida. Responden `rechazado` con instrucciones de registro, y el rechazo queda en el diario con su correlación (`aviso: identidad_insuficiente`).
 - **Alias duplicado:** si otra sesión activa de otro proceso cliente ya usa el alias (sin distinguir mayúsculas), `ctx agente=` responde `conflicto`, y el saludo deja la sesión sin nombre y explica el motivo. La misma instancia del puente que reconecta antes de que se cierre su sesión anterior conserva el nombre. Nunca se hereda el nombre de otra sesión.
 - **Integraciones antiguas:** `"identidad_obligatoria": false` en `config.json` las tolera. Es una decisión explícita del usuario o de IT, y cada operación anónima queda marcada en el diario (`identidad: sin_nombre_modo_heredado`).
-- **AgentHost:** sin `BIMBRIDGE_AGENTE`, se declara por configuración como `AgentHost <pid>`.
+- **AgentHost:** sin `BIMBRIDGE_AGENT`, se declara por configuración como `AgentHost <pid>`.
 
 ## Presencia
 
@@ -37,7 +37,7 @@ Una sesión sin alias aparece como «(sin nombre) · cliente», con identidad **
 ## Configuración típica (Claude Code)
 
 ```
-"env": { "BIMBRIDGE_AGENTE": "Integration client" }
+"env": { "BIMBRIDGE_AGENT": "Integration client" }
 ```
 
 ## Compatibilidad

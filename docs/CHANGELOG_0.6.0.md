@@ -33,7 +33,7 @@ Columna **comprobado**: `prueba` = prueba automática sin Revit (motor real con 
 
 | Cambio | Comprobado |
 |---|---|
-| Recetas por archivo (`%LOCALAPPDATA%\PDI.RevitMcp\recetas`, `recetas\` del add-in) con versión y SHA-256; la tarea guarda copia exacta | prueba |
+| Recetas por archivo (`%LOCALAPPDATA%\Bimbridge\recetas`, `recetas\` del add-in) con versión y SHA-256; la tarea guarda copia exacta | prueba |
 | `exec`/`commit`: `archivo=` (ruta completa, `%VARIABLES%`), `refs=`, `docs=`, `reconciliar=` llegan hasta el handler | prueba (transporte) |
 | Resumen compacto de tarea: 1 000 unidades → 996 caracteres, idéntico para otro cliente desde el disco | prueba (medición) |
 | Métricas del puente por cliente/herramienta (caracteres, no tokens) | prueba |

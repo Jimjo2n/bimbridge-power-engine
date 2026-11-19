@@ -14,4 +14,4 @@ Arbitrary background-thread Revit calls are outside the supported execution mode
 Long work may affect UI responsiveness; cancellation and batching must respect transaction boundaries.
 
 ## Evidence
-`src/PDI.RevitMcp.Addin/Revit/MainThread.cs` in the verified a291cc6 source baseline, together with the current sanitized import.
+`src/Bimbridge.Addin/Revit/MainThread.cs` in the verified a291cc6 source baseline, together with the current sanitized import.

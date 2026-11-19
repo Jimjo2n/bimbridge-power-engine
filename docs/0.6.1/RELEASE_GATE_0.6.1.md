@@ -58,7 +58,7 @@ Revit ninguna concesión validaba). No se recalcula rc2; se puntúa rc3 sobre lo
 
 ### R03 — 11/14
 - **Corregido (P0-1):** la clave se guardaba en Base64 y al reabrir se usaban los bytes del texto; ninguna concesión sobrevivía a un reinicio.
-  Ahora: formato `PDI-GRANT-KEY v1 base64` (codificación, **no** cifrado), lectura del formato rc2, creación atómica (temporal + Move sin
+  Ahora: formato `BIMBRIDGE-GRANT-KEY v1 base64` (codificación, **no** cifrado), lectura del formato rc2, creación atómica (temporal + Move sin
   sobrescribir; otro proceso que gane la carrera se respeta), clave inválida/truncada → error sin regenerar, clave ausente con concesiones
   firmadas → error sin regenerar. El add-in trata el error como "sin autoridad" (deniega escrituras).
 - **Corregido (P1-5):** la huella del documento debe ser idéntica; que falte en un lado ya no amplía el alcance.
@@ -114,7 +114,7 @@ aprobación de TI para uso corporativo.
 8. Instalación en otros PCs sin TI; workers Rust.
 
 ## F. 0.7.0 — empezado en este commit
-- Hecho (`src/PDI.RevitMcp.AgentHost`, 12 pruebas): proceso propio; IR esquema 1 versionado; validador (catálogo cerrado, campos no declarables,
+- Hecho (`src/Bimbridge.AgentHost`, 12 pruebas): proceso propio; IR esquema 1 versionado; validador (catálogo cerrado, campos no declarables,
   tipos); ids deterministas; grafo con orden determinista y ciclos; backend simulado; estado persistente (`plan.json`, `estado.json`,
   `diario.jsonl`); resumen de una línea; recuperación tras caída antes/después de aplicar, aplicación parcial bloqueada para una persona.
 - Siguiente: protección de la clave; aceptación nativa en copia de práctica cuando operator lo indique; adaptador real del AgentHost que traduzca

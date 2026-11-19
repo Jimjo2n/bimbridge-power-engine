@@ -12,7 +12,7 @@ using Autodesk.Revit.DB.Plumbing;
 
 public static class Lavamanos
 {
-    public static object Run(PDI.RevitMcp.Addin.Scripting.ScriptContext ctx)
+    public static object Run(Bimbridge.Addin.Scripting.ScriptContext ctx)
     {
         var doc = ctx.Doc;
         if (!doc.IsFamilyDocument) throw new InvalidOperationException("abra el RFA del lavamanos (act abrir familia=...) y pase doc=dN");
