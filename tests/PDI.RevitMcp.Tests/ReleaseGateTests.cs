@@ -610,7 +610,8 @@ namespace PDI.RevitMcp.Tests
                 if (v == 2) Assert.True(thief.TryLease("r06c", "OTRA", "B", TimeSpan.FromHours(3), DateTime.UtcNow.AddHours(2), out _));
             };
             var t = await Run(Mgr(root, m, new AllowAll()), Draft("r06c", 200));
-            Assert.Equal(TaskState.Interrumpida, t.State);
+            // La tarea es de B (lease vigente): el ejecutor viejo no escribe su "interrumpida" encima del tarea.json de B.
+            Assert.Equal(TaskState.Ejecutando, t.State);
             Assert.Contains("lease_perdido", m.PreflightRefusals);
             var afterSteal = m.Live.Count;
             Assert.True(afterSteal > 0 && afterSteal < 200);

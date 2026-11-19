@@ -101,6 +101,9 @@ namespace PDI.RevitMcp.Addin.Revit
             }
         }
 
+        /// <summary>La tarea la lleva otro Revit = ocupado (reintentar allí), no un argumento mal dado.</summary>
+        private string BusyOrInvalid(string id) => _taskMgr.HeldElsewhere(id) != null ? Status.DocumentoOcupado : Status.Invalido;
+
         private Response TaskResponse(Request request, TaskRecord t, bool continuation, Dictionary<string, object> extra = null)
         {
             _taskMgr.Get(t.Id, out var units);
@@ -143,8 +146,9 @@ namespace PDI.RevitMcp.Addin.Revit
                 }
                 case "cancelar":
                 {
-                    var t = _taskMgr.Cancel(id);
+                    var t = _taskMgr.Cancel(id, out var busy);
                     if (t == null) return Response.Fail(request.Id, Status.Invalido, "no existe la tarea " + id);
+                    if (busy != null) return Response.Fail(request.Id, Status.DocumentoOcupado, busy);
                     return TaskResponse(request, t, false);
                 }
                 case "reanudar":
@@ -163,7 +167,7 @@ namespace PDI.RevitMcp.Addin.Revit
                     else if (dec == "no_aplicada" || dec == "no_aplicado" || dec == "no") applied = false;
                     else return Response.Fail(request.Id, Status.Invalido, "reconciliar necesita decision=aplicada (ya está en el modelo: no se repite) o decision=no_aplicada (se ejecutará al reanudar)");
                     var err = _taskMgr.Reconcile(id, Arg.GetStringList(a, "claves"), applied, Arg.GetString(a, "nota"), who);
-                    if (err != null) return Response.Fail(request.Id, Status.Invalido, err);
+                    if (err != null) return Response.Fail(request.Id, BusyOrInvalid(id), err);
                     return TaskResponse(request, _taskMgr.Get(id, out _), false);
                 }
                 case "anotar":
@@ -171,7 +175,7 @@ namespace PDI.RevitMcp.Addin.Revit
                     var text = Arg.GetString(a, "texto");
                     if (string.IsNullOrWhiteSpace(text)) return Response.Fail(request.Id, Status.Invalido, "anotar necesita texto=");
                     var err = _taskMgr.Note(id, text, who);
-                    if (err != null) return Response.Fail(request.Id, Status.Invalido, err);
+                    if (err != null) return Response.Fail(request.Id, BusyOrInvalid(id), err);
                     return TaskResponse(request, _taskMgr.Get(id, out _), false);
                 }
                 case "unidades":
@@ -190,7 +194,7 @@ namespace PDI.RevitMcp.Addin.Revit
                 case "olvidar":
                 {
                     var err = _taskMgr.Archive(id);
-                    if (err != null) return Response.Fail(request.Id, Status.Invalido, err);
+                    if (err != null) return Response.Fail(request.Id, BusyOrInvalid(id), err);
                     return new Response { Id = request.Id, Datos = new Dictionary<string, object> { ["tarea"] = id, ["archivada"] = true } };
                 }
                 default:

@@ -94,9 +94,8 @@ namespace PDI.RevitMcp.Engine.Tasks
                 if (t == null) return new StartResult { Error = "no existe la tarea " + id + " (tarea lista)", ErrorStatus = Status.Invalido };
                 if (t.State == TaskState.Aplicada)
                     return new StartResult { Task = t };
-                var lease = _store.ReadLease(id);
-                if (lease != null && lease.Valid(DateTime.UtcNow) && lease.Instance != _instance)
-                    return new StartResult { Task = t, Error = "la tarea se está ejecutando en otro Revit (" + lease.Instance + ")", ErrorStatus = Status.DocumentoOcupado };
+                var elsewhere = HeldElsewhere(id);
+                if (elsewhere != null) return new StartResult { Task = t, Error = elsewhere, ErrorStatus = Status.DocumentoOcupado };
                 if (policy != null) foreach (var kv in policy) t.Policy[kv.Key] = kv.Value;
                 t.Client = client ?? t.Client;
                 if (client != null && !t.Clients.Contains(client)) t.Clients.Add(client);
@@ -143,9 +142,25 @@ namespace PDI.RevitMcp.Engine.Tasks
             lock (_lock) return _running.ContainsKey(id);
         }
 
-        /// <summary>Cancelación cooperativa: queda "cancelacion_solicitada" hasta que el motor la confirma entre lotes.</summary>
-        public TaskRecord Cancel(string id)
+        /// <summary>
+        /// Otro Revit tiene la tarea (lease vigente de otra instancia): su motor no lee tarea.json, así que cambiarla desde aquí
+        /// se perdería en su siguiente punto de control. null si nadie más la lleva.
+        /// </summary>
+        public string HeldElsewhere(string id)
         {
+            var lease = _store.ReadLease(id);
+            return lease != null && lease.Valid(DateTime.UtcNow) && lease.Instance != _instance
+                ? "la tarea se está ejecutando en otro Revit (" + lease.Instance + "); hágalo desde ese Revit"
+                : null;
+        }
+
+        /// <summary>
+        /// Cancelación cooperativa: queda "cancelacion_solicitada" hasta que el motor la confirma entre lotes.
+        /// <paramref name="busy"/> dice por qué no se canceló si la lleva otro Revit (la tarea vuelve sin cambios).
+        /// </summary>
+        public TaskRecord Cancel(string id, out string busy)
+        {
+            busy = null;
             lock (_lock)
             {
                 if (_running.TryGetValue(id, out var r))
@@ -158,6 +173,7 @@ namespace PDI.RevitMcp.Engine.Tasks
                 }
                 var s = _store.Load(id);
                 if (s == null) return null;
+                if ((busy = HeldElsewhere(id)) != null) return s;
                 if (!TaskState.IsFinal(s.State))
                 {
                     s.State = TaskState.Cancelada;
@@ -243,6 +259,8 @@ namespace PDI.RevitMcp.Engine.Tasks
             lock (_lock)
             {
                 if (_running.ContainsKey(id)) return "la tarea está corriendo; cancélela o espere a que se detenga antes de reconciliar";
+                var elsewhere = HeldElsewhere(id);
+                if (elsewhere != null) return elsewhere;
                 var t = _store.Load(id);
                 if (t == null) return "no existe la tarea " + id;
                 if (TaskState.IsFinal(t.State)) return "transicion_ilegal: la tarea está " + t.State + " y no se reabre; inicie una tarea nueva si hace falta";
@@ -294,7 +312,12 @@ namespace PDI.RevitMcp.Engine.Tasks
             {
                 TaskRecord t;
                 if (_running.TryGetValue(id, out var r)) t = r.Task_;
-                else t = _store.Load(id);
+                else
+                {
+                    var elsewhere = HeldElsewhere(id);
+                    if (elsewhere != null) return elsewhere;
+                    t = _store.Load(id);
+                }
                 if (t == null) return "no existe la tarea " + id;
                 lock (t) t.Decisions.Add(new Dictionary<string, object> { ["t"] = TaskTime.Now(), ["texto"] = text, ["quien"] = who });
                 if (!_running.ContainsKey(id)) { t.Rev++; _store.Save(t); }
@@ -326,7 +349,7 @@ namespace PDI.RevitMcp.Engine.Tasks
                     }
                     n++;
                 }
-                stored = _store.List().Where(t => !_running.ContainsKey(t.Id) && !TaskState.IsFinal(t.State) && t.MainDoc?.Key == docKey && t.MainDoc.Generation == generation).ToList();
+                stored = _store.List().Where(t => !_running.ContainsKey(t.Id) && !TaskState.IsFinal(t.State) && t.MainDoc?.Key == docKey && t.MainDoc.Generation == generation && HeldElsewhere(t.Id) == null).ToList();
                 foreach (var t in stored)
                 {
                     t.NotePersist(new PersistEvidence { Kind = ev.Kind, When = ev.When, Seq = t.ConfirmSeq, Generation = generation, File = ev.File, Bytes = ev.Bytes, Mtime = ev.Mtime, Sha = ev.Sha });
@@ -359,7 +382,7 @@ namespace PDI.RevitMcp.Engine.Tasks
                     changed.Add(t);
                     n++;
                 }
-                foreach (var t in _store.List().Where(x => !_running.ContainsKey(x.Id) && !TaskState.IsFinal(x.State)))
+                foreach (var t in _store.List().Where(x => !_running.ContainsKey(x.Id) && !TaskState.IsFinal(x.State) && HeldElsewhere(x.Id) == null))
                 {
                     var d = t.Docs.FirstOrDefault(x => x.Key == oldKey);
                     if (d == null) continue;
@@ -382,6 +405,8 @@ namespace PDI.RevitMcp.Engine.Tasks
             {
                 if (_running.ContainsKey(id)) return "la tarea está corriendo; cancélela antes de archivarla";
                 if (!_store.Exists(id)) return "no existe la tarea " + id;
+                var elsewhere = HeldElsewhere(id);
+                if (elsewhere != null) return elsewhere;
                 return _store.Archive(id);
             }
         }
