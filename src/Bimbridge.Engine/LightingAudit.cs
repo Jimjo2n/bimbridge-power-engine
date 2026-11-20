@@ -7,14 +7,14 @@ using Bimbridge.Engine.Qc;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Receta del lado del servidor "lighting_audit" (sección 7, herramienta check).
-    /// Lo que antes eran 5–10 idas y vueltas con scripts (inventario, tags, huérfanos, duplicados,
-    /// worksets, visibilidad por RCP) se responde en una llamada.
-    /// Aquí sólo se resume; los datos crudos los junta el adaptador de Revit.
-    /// La regla de etiquetas es un perfil de la tarea (F12, R044, A15), no algo fijo en el código:
-    ///   tags=uno      exactamente un tag por luminaria y vista, ningún tag sin luminaria (Non-Unit Lighting de SAMPLE PROJECT);
-    ///   tags=ninguno  las luminarias no llevan tags (p. ej. Unit Grouping): cualquier tag de luminaria es una diferencia;
-    ///   tags=ignorar  sólo cuenta, no juzga.
+    /// Server-side "lighting_audit" recipe (section 7, check tool).
+    /// What used to take 5–10 round trips with scripts (inventory, tags, orphans, duplicates,
+    /// worksets, visibility per RCP) is answered in one call.
+    /// This only summarizes; the Revit adapter collects the raw data.
+    /// The tag rule is a task profile (F12, R044, A15), not something hard-coded:
+    ///   tags=uno      exactly one tag per fixture and view, no tag without a fixture (SAMPLE PROJECT Non-Unit Lighting);
+    ///   tags=ninguno  fixtures carry no tags (e.g. Unit Grouping): any fixture tag is a difference;
+    ///   tags=ignorar  only counts, does not judge.
     /// </summary>
     public static class LightingAudit
     {
@@ -31,15 +31,15 @@ namespace Bimbridge.Engine
             public long Id;
             public long ViewId;
             public string ViewName;
-            /// <summary>Nivel asociado a la vista del tag (para filtrar huérfanos por nivel).</summary>
+            /// <summary>Level associated with the tag's view (to filter orphans by level).</summary>
             public string ViewLevel;
-            /// <summary>Elementos etiquetados que existen en el documento (vacío = huérfano).</summary>
+            /// <summary>Tagged elements that exist in the document (empty = orphan).</summary>
             public long[] Tagged = new long[0];
         }
 
         /// <summary>
-        /// Una vista a revisar. Sin <see cref="Visible"/> se estima por nivel asociado (sin regenerar nada en Revit);
-        /// con <see cref="Visible"/> son las luminarias realmente visibles (modo exacto, regenera la vista).
+        /// A view to check. Without <see cref="Visible"/> it is estimated by associated level (without regenerating anything in Revit);
+        /// with <see cref="Visible"/> they are the fixtures actually visible (exact mode, regenerates the view).
         /// </summary>
         public sealed class ViewCount
         {
@@ -49,9 +49,9 @@ namespace Bimbridge.Engine
             public long[] Visible;
         }
 
-        /// <summary>Máximo de vistas en modo exacto: cada una obliga a Revit a regenerarla (~2 s en SAMPLE PROJECT).</summary>
+        /// <summary>Maximum views in exact mode: each one forces Revit to regenerate it (~2 s in SAMPLE PROJECT).</summary>
         public const int MaxExactViews = 200;
-        /// <summary>Máximo de filas de vistas en la respuesta.</summary>
+        /// <summary>Maximum view rows in the response.</summary>
         public const int MaxViewRows = 60;
 
         public const int SampleSize = 20;
@@ -73,10 +73,10 @@ namespace Bimbridge.Engine
             return result;
         }
 
-        /// <summary>Devuelve el resumen y, aparte, los conjuntos que conviene guardar para la siguiente llamada.</summary>
-        /// <param name="allFixtureIds">Todas las luminarias del modelo, aunque se filtre por nivel. Sin esto, con lvl= los tags
-        /// de luminarias de otros niveles parecían huérfanos (877 falsos en LEVEL 02, prueba 0.2.2 del 2026-10-15).</param>
-        /// <param name="levels">Niveles pedidos (vacío = todos): los tags de otros niveles no cuentan.</param>
+        /// <summary>Returns the summary and, separately, the sets worth saving for the next call.</summary>
+        /// <param name="allFixtureIds">All fixtures in the model, even when filtering by level. Without this, with lvl= the tags
+        /// of fixtures on other levels looked orphaned (877 false positives on LEVEL 02, 0.2.2 test of 2026-10-15).</param>
+        /// <param name="levels">Requested levels (empty = all): tags on other levels do not count.</param>
         public static Dictionary<string, object> Summarize(
             IList<Fixture> fixtures, IList<Tag> tags, IList<ViewCount> views,
             out Dictionary<string, long[]> setsToSave,
@@ -84,7 +84,7 @@ namespace Bimbridge.Engine
         {
             tagRule = (tagRule ?? "uno").Trim().ToLowerInvariant();
             if (tagRule != "uno" && tagRule != "ninguno" && tagRule != "ignorar")
-                throw new ArgumentException("tags debe ser uno, ninguno o ignorar");
+                throw new ArgumentException("tags must be uno, ninguno or ignorar");
             setsToSave = new Dictionary<string, long[]>(StringComparer.Ordinal);
             var fixtureIds = new HashSet<long>(fixtures.Select(f => f.Id));
             var all = allFixtureIds != null ? new HashSet<long>(allFixtureIds) : fixtureIds;
@@ -94,14 +94,14 @@ namespace Bimbridge.Engine
             if (filtered)
             {
                 var lv = new HashSet<string>(levels, StringComparer.OrdinalIgnoreCase);
-                // Sólo los tags de este alcance: los que etiquetan luminarias de esos niveles, o huérfanos en vistas de esos niveles.
+                // Only the tags in this scope: those tagging fixtures on those levels, or orphans in views of those levels.
                 tags = tags.Where(t => (t.Tagged != null && t.Tagged.Any(fixtureIds.Contains)) || (IsOrphan(t) && t.ViewLevel != null && lv.Contains(t.ViewLevel))).ToList();
             }
 
-            // Tags huérfanos: no etiquetan ninguna luminaria existente en el modelo.
+            // Orphan tags: they tag no existing fixture in the model.
             var orphan = tags.Where(IsOrphan).Select(t => t.Id).ToArray();
 
-            // Tags por luminaria y vista.
+            // Tags per fixture and view.
             var perFixtureView = new Dictionary<(long fixture, long view), List<long>>();
             var tagged = new HashSet<long>();
             foreach (var t in tags)
@@ -116,7 +116,7 @@ namespace Bimbridge.Engine
                 }
             }
             var untagged = fixtures.Where(f => !tagged.Contains(f.Id)).Select(f => f.Id).ToArray();
-            // Duplicados: más de un tag de la misma luminaria en la misma vista. Se proponen los sobrantes.
+            // Duplicates: more than one tag of the same fixture in the same view. The extra ones are proposed.
             var dupGroups = perFixtureView.Where(kv => kv.Value.Count > 1).ToList();
             var extraTags = dupGroups.SelectMany(kv => kv.Value.OrderBy(x => x).Skip(1)).ToArray();
 
@@ -165,8 +165,8 @@ namespace Bimbridge.Engine
                 result["vistas"] = rows.Take(MaxViewRows).ToList();
                 if (rows.Count > MaxViewRows) result["vistas_omitidas"] = (long)(rows.Count - MaxViewRows);
                 result["vistas_metodo"] = exact
-                    ? "visible: luminarias que Revit muestra en cada vista"
-                    : "nivel: luminarias del nivel asociado a la vista (no considera recorte, rango ni filtros; use exacto=true con pocas vistas para confirmar)";
+                    ? "visible: fixtures that Revit shows in each view"
+                    : "nivel: fixtures on the level associated with the view (ignores crop, range and filters; use exacto=true with few views to confirm)";
             }
 
             result["regla_tags"] = tagRule;
@@ -179,7 +179,7 @@ namespace Bimbridge.Engine
             }
             else if (tagRule == "ninguno")
             {
-                // Las luminarias no deben llevar tags: los tags de luminarias son la diferencia; "sin tag" es lo esperado.
+                // Fixtures must not carry tags: fixture tags are the difference; "untagged" is expected.
                 var fixtureTags = tags.Where(t => t.Tagged != null && t.Tagged.Any(fixtureIds.Contains)).Select(t => t.Id).ToArray();
                 result.Remove("sin_tag");
                 result["tags_de_luminarias"] = Block(fixtureTags);
@@ -201,7 +201,7 @@ namespace Bimbridge.Engine
             var d = new SortedDictionary<string, long>(StringComparer.OrdinalIgnoreCase);
             foreach (var i in items)
             {
-                var k = key(i) ?? "(sin dato)";
+                var k = key(i) ?? "(no data)";
                 d[k] = d.TryGetValue(k, out var n) ? n + 1 : 1;
             }
             return d.ToDictionary(kv => kv.Key, kv => (object)kv.Value);

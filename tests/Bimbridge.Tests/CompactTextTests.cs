@@ -43,7 +43,7 @@ namespace Bimbridge.Tests
         public void CommandsPreserveSeparatorsAndOperatorsInsideArgumentValues()
         {
             var commands = Command.SplitLines("""
-                # comentario con corchete [
+                # comment with bracket [
                 chk tabla_audit tabla="Anda > 1?" celdas_esperadas=[
                   {"fila":0,"columna":0,"texto":"A;;B \"C\""}
                 ] ;; q LF elev>=9

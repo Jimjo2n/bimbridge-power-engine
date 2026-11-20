@@ -17,7 +17,7 @@ namespace Bimbridge.Addin.Revit
         private async Task<Response> ScheduleCheck(Request request, CancellationToken ct)
         {
             var selector = Arg.GetString(request.Args, "tabla")?.Trim();
-            if (string.IsNullOrEmpty(selector)) return Response.Fail(request.Id, Status.Invalido, "indique tabla= con el ID o nombre exacto");
+            if (string.IsNullOrEmpty(selector)) return Response.Fail(request.Id, Status.Invalido, "give tabla= with the ID or exact name");
             ScheduleAudit audit;
             try { audit = new ScheduleAudit(request.Args); }
             catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
@@ -37,10 +37,10 @@ namespace Bimbridge.Addin.Revit
                     using var collector = new FilteredElementCollector(doc);
                     var matches = collector.OfClass(typeof(ViewSchedule)).Cast<ViewSchedule>()
                         .Where(v => !v.IsTemplate && string.Equals(v.Name, selector, StringComparison.OrdinalIgnoreCase)).Take(2).ToList();
-                    if (matches.Count > 1) { error = "hay varias tablas con ese nombre; indique su ID"; return true; }
+                    if (matches.Count > 1) { error = "there are several schedules with that name; give its ID"; return true; }
                     schedule = matches.SingleOrDefault();
                 }
-                if (schedule == null || schedule.IsTemplate) { error = "no existe esa tabla en el documento destino"; return true; }
+                if (schedule == null || schedule.IsTemplate) { error = "that schedule does not exist in the target document"; return true; }
                 var definition = schedule.Definition;
                 var filters = new List<object>();
                 foreach (var filter in definition.GetFilters())
@@ -63,9 +63,9 @@ namespace Bimbridge.Addin.Revit
                 if (audit.NeedsPopulation)
                 {
                     if (definition.IncludeLinkedFiles || definition.HasEmbeddedSchedule)
-                        limitation = "La población incluye vínculos o una tabla incrustada. El recuento de elementos del anfitrión no la representa.";
+                        limitation = "The population includes links or an embedded schedule. The host element count does not represent it.";
                     else if (!FilteredElementCollector.IsViewValidForElementIteration(doc, schedule.Id))
-                        limitation = "Revit no permite enumerar la población de esta tabla.";
+                        limitation = "Revit does not allow enumerating the population of this schedule.";
                     else
                     {
                         using var collector = new FilteredElementCollector(doc, schedule.Id);

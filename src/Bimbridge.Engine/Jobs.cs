@@ -9,17 +9,17 @@ using System.Threading.Tasks;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Trabajos largos (geometría sobre cientos de elementos). La petición espera unos segundos; si no terminó,
-    /// devuelve job_id y el trabajo sigue dentro de Revit por tramos de 250 ms. Así nunca se agota el plazo del
-    /// puente (pyRevit: 4 timeouts que costaron 31,9 min) y Revit sigue respondiendo entre tramos.
+    /// Long jobs (geometry over hundreds of elements). The request waits a few seconds; if it has not finished,
+    /// it returns job_id and the job continues inside Revit in 250 ms slices. That way the bridge timeout is never
+    /// hit (pyRevit: 4 timeouts that cost 31.9 min) and Revit keeps responding between slices.
     /// </summary>
     public sealed class Job
     {
         public string Id;
         public string SessionId;
-        /// <summary>Agente con nombre que lanzó el trabajo (huella de principal + alias); null si la sesión era anónima.</summary>
+        /// <summary>Named agent that started the job (fingerprint of principal + alias); null if the session was anonymous.</summary>
         public string AgentId;
-        /// <summary>Tarea autorizada (tarea=…). Un trabajo con tarea sigue aunque se corte la conexión y otra conexión de la misma tarea puede consultarlo.</summary>
+        /// <summary>Authorized task (tarea=…). A job with a task continues even if the connection drops, and another connection with the same task can query it.</summary>
         public string Task;
         public string Kind;
         public string Status = JobStatus.EnProceso;
@@ -29,26 +29,26 @@ namespace Bimbridge.Engine
         public string Error;
         public string ErrorStatus;
         public CancellationTokenSource Cts;
-        /// <summary>Avance que actualiza el trabajo desde el hilo de Revit.</summary>
+        /// <summary>Progress the job updates from the Revit thread.</summary>
         public volatile int Done;
         public volatile int Total;
         public volatile string Phase;
-        /// <summary>Conjuntos que el trabajo guardó al terminar (se vuelven a guardar en la sesión al entregarlos).</summary>
+        /// <summary>Sets the job saved when it finished (saved again into the session when delivered).</summary>
         public Dictionary<string, long[]> Sets = new Dictionary<string, long[]>(StringComparer.OrdinalIgnoreCase);
         public bool Delivered;
-        /// <summary>Error al registrar el final (p. ej. diario no escribible): se avisa en la respuesta.</summary>
+        /// <summary>Error while recording the end (e.g. journal not writable): reported as a warning in the response.</summary>
         public volatile string FinalizeError;
-        /// <summary>Revisión del modelo con que se calculó el resultado.</summary>
+        /// <summary>Model revision the result was computed with.</summary>
         public long Rev;
-        /// <summary>La tarea que hace el trabajo (para esperar su fin sin sondear).</summary>
+        /// <summary>The Task doing the work (to wait for its end without polling).</summary>
         public System.Threading.Tasks.Task Work;
 
         public bool IsFinal => Status != JobStatus.EnProceso;
 
-        /// <summary>Estado de respuesta al terminar (ok, completado_con_diferencias, aplicado_error_resultado, parcial…).</summary>
+        /// <summary>Response status at the end (ok, completado_con_diferencias, aplicado_error_resultado, parcial…).</summary>
         public string FinalEstado;
 
-        /// <summary>Estado que ve la IA: en_proceso mientras corre; al terminar, el estado real (nunca "ok" para un fallo).</summary>
+        /// <summary>Status the AI sees: en_proceso while it runs; at the end, the real status (never "ok" for a failure).</summary>
         public string Estado => Status == JobStatus.EnProceso ? Bimbridge.Protocol.Status.EnProceso
             : Status == JobStatus.Listo ? (FinalEstado ?? Bimbridge.Protocol.Status.Ok)
             : (ErrorStatus ?? (Status == JobStatus.Cancelado ? Bimbridge.Protocol.Status.Cancelado : Bimbridge.Protocol.Status.Error));
@@ -96,7 +96,7 @@ namespace Bimbridge.Engine
                 {
                     Id = "G-" + _now().ToString("HHmmss", CultureInfo.InvariantCulture) + "-" + _counter.ToString("D3", CultureInfo.InvariantCulture),
                     SessionId = sessionId,
-                    AgentId = Correlation.Current?.AgentId,   // AUD-13: dueño nominal (sobrevive a la reconexión; la sesión no)
+                    AgentId = Correlation.Current?.AgentId,   // AUD-13: nominal owner (survives reconnection; the session does not)
                     Kind = kind,
                     CreatedUtc = _now(),
                     Cts = new CancellationTokenSource(),
@@ -119,9 +119,9 @@ namespace Bimbridge.Engine
             {
                 if (j.IsFinal) return;
                 j.Result = result;
-                // AUD-18: el estado final se decide AQUÍ, antes de avisar a nadie (respuesta, consulta posterior del job e historial ven
-                // lo mismo). Un resultado con diferencias de verificación nunca queda como "ok", aunque quien llama no pase estado
-                // o pase "ok" por descuido.
+                // AUD-18: the final status is decided HERE, before notifying anyone (the response, a later job query and the history see
+                // the same thing). A result with verification differences never ends up as "ok", even if the caller passes no status
+                // or passes "ok" by mistake.
                 j.FinalEstado = HasDifferences(result) && (estado == null || estado == Bimbridge.Protocol.Status.Ok)
                     ? Bimbridge.Protocol.Status.ConDiferencias : estado;
                 j.Status = JobStatus.Listo;
@@ -130,7 +130,7 @@ namespace Bimbridge.Engine
             FireFinal(j);
         }
 
-        /// <summary>¿El resultado declara diferencias entre lo pedido y lo verificado? (clave "diferencias" con algún elemento).</summary>
+        /// <summary>Does the result declare differences between what was requested and what was verified? ("diferencias" key with at least one element).</summary>
         public static bool HasDifferences(Dictionary<string, object> result) =>
             result != null && result.TryGetValue("diferencias", out var d) && d is System.Collections.ICollection c && c.Count > 0;
 
@@ -148,8 +148,8 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// Único punto de finalización (H02): <paramref name="handler"/> corre una vez cuando el trabajo termina de verdad
-        /// (bien, con error, cancelado o por una excepción no observada del worker). Si ya terminó, corre ahora.
+        /// Single finalization point (H02): <paramref name="handler"/> runs once when the job really ends
+        /// (successfully, with an error, cancelled or from an unobserved worker exception). If it already ended, it runs now.
         /// </summary>
         public void WhenFinal(Job j, Action<Job> handler)
         {
@@ -162,7 +162,7 @@ namespace Bimbridge.Engine
             if (now) SafeInvoke(handler, j);
         }
 
-        /// <summary>0.9.1 (Bloque I): observador de todos los finales (historial de operaciones). Corre después de los manejadores del trabajo.</summary>
+        /// <summary>0.9.1 (Block I): observer of every completion (operation history). Runs after the job's handlers.</summary>
         public Action<Job> OnAnyFinal;
 
         private void FireFinal(Job j)
@@ -174,7 +174,7 @@ namespace Bimbridge.Engine
             if (any != null) SafeInvoke(any, j);
         }
 
-        /// <summary>Errores de los manejadores finales (p. ej. el diario no se pudo escribir); se muestran en diagnóstico.</summary>
+        /// <summary>Errors from the final handlers (e.g. the journal could not be written); shown in diagnostics.</summary>
         public readonly List<string> FinalHandlerErrors = new List<string>();
 
         private void SafeInvoke(Action<Job> h, Job j)
@@ -188,10 +188,10 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// Lanza el cuerpo del trabajo y garantiza un estado final: si el cuerpo termina sin completar ni fallar el trabajo, o lanza una
-        /// excepción, el trabajo queda en error con el motivo. Nunca queda "en_proceso" para siempre.
-        /// Issue #7: devuelve void a propósito. El trabajo es supervisado (la continuación observa cualquier excepción) y quien
-        /// quiera esperarlo usa <see cref="Job.Work"/> o <see cref="WhenFinal"/>; así no hay tareas sin observar (CS4014) en los llamadores.
+        /// Starts the job body and guarantees a final status: if the body ends without completing or failing the job, or throws an
+        /// exception, the job ends in error with the reason. It never stays "en_proceso" forever.
+        /// Issue #7: returns void on purpose. The job is supervised (the continuation observes any exception) and whoever
+        /// wants to wait for it uses <see cref="Job.Work"/> or <see cref="WhenFinal"/>; that way callers have no unobserved tasks (CS4014).
         /// </summary>
         public void Run(Job j, Func<Task> body)
         {
@@ -202,11 +202,11 @@ namespace Bimbridge.Engine
                 {
                     var ex = t.Exception?.GetBaseException();
                     Fail(j, ex is OperationCanceledException ? JobStatus.Cancelado : Bimbridge.Protocol.Status.Desconocido,
-                        "el trabajo terminó por una excepción no controlada (" + (ex?.GetType().Name ?? "?") + ": " + ex?.Message +
-                        "); no se sabe qué quedó aplicado: reconcilie antes de repetir");
+                        "the job ended with an unhandled exception (" + (ex?.GetType().Name ?? "?") + ": " + ex?.Message +
+                        "); it is unknown what was applied: reconcile before repeating");
                 }
-                else if (t.IsCanceled) Fail(j, JobStatus.Cancelado, "cancelado");
-                else if (!j.IsFinal) Fail(j, Bimbridge.Protocol.Status.Desconocido, "el trabajo terminó sin registrar su resultado; reconcilie antes de repetir");
+                else if (t.IsCanceled) Fail(j, JobStatus.Cancelado, "cancelled");
+                else if (!j.IsFinal) Fail(j, Bimbridge.Protocol.Status.Desconocido, "the job ended without recording its result; reconcile before repeating");
             }, TaskScheduler.Default);
         }
 
@@ -217,11 +217,11 @@ namespace Bimbridge.Engine
             return true;
         }
 
-        /// <summary>Cancela los trabajos en curso de una sesión que se desconectó (nadie leerá el resultado).</summary>
+        /// <summary>Cancels the running jobs of a session that disconnected (nobody will read the result).</summary>
         public int CancelSession(string sessionId)
         {
             List<Job> list;
-            // Los trabajos de una tarea autorizada no se abandonan al desconectar (R023): siguen y se reclaman con job id tarea=.
+            // Jobs of an authorized task are not abandoned on disconnect (R023): they continue and are claimed with job id tarea=.
             lock (_lock) list = _jobs.Values.Where(j => j.SessionId == sessionId && !j.IsFinal && string.IsNullOrEmpty(j.Task)).ToList();
             foreach (var j in list) Cancel(j);
             return list.Count;
@@ -232,19 +232,19 @@ namespace Bimbridge.Engine
             lock (_lock) return _jobs.Values.Where(j => j.SessionId == sessionId || (task != null && j.Task == task)).OrderByDescending(j => j.CreatedUtc).ToList();
         }
 
-        /// <summary>Todos los trabajos en curso. Sólo para la persona en el panel de Revit (los agentes usan <see cref="ForOwner"/>).</summary>
+        /// <summary>All running jobs. Only for the person in the Revit panel (agents use <see cref="ForOwner"/>).</summary>
         public List<Job> AllRunning()
         {
             lock (_lock) return _jobs.Values.Where(j => !j.IsFinal).OrderBy(j => j.CreatedUtc).ToList();
         }
 
-        /// <summary>AUD-13: trabajos de la misma sesión o del mismo agente con nombre (para el historial; el nombre de tarea no cuenta).</summary>
+        /// <summary>AUD-13: jobs of the same session or the same named agent (for the history; the task name does not count).</summary>
         public List<Job> ForOwner(string sessionId, string agentId)
         {
             lock (_lock) return _jobs.Values.Where(j => j.SessionId == sessionId || (!string.IsNullOrEmpty(agentId) && j.AgentId == agentId)).OrderByDescending(j => j.CreatedUtc).ToList();
         }
 
-        /// <summary>¿Puede esta conexión ver el trabajo? La misma sesión, o la misma tarea autorizada.</summary>
+        /// <summary>Can this connection see the job? The same session, or the same authorized task.</summary>
         public static bool Visible(Job j, string sessionId, string task) =>
             j != null && (j.SessionId == sessionId || (!string.IsNullOrEmpty(task) && j.Task == task));
 
@@ -262,8 +262,8 @@ namespace Bimbridge.Engine
     }
 
     /// <summary>
-    /// Resultados ya calculados, por documento: si el modelo no cambió (misma rev) y los vínculos son los mismos,
-    /// repetir una revisión cuesta 0 ms en Revit. En pyRevit se repetían "pass 2 / verificación final" (29,5 min en reintentos).
+    /// Already computed results, per document: if the model did not change (same rev) and the links are the same,
+    /// repeating a check costs 0 ms in Revit. In pyRevit "pass 2 / final verification" was repeated (29.5 min in retries).
     /// </summary>
     public sealed class ResultCache
     {
@@ -275,7 +275,7 @@ namespace Bimbridge.Engine
         public sealed class Entry
         {
             public Dictionary<string, object> Result;
-            /// <summary>Datos crudos (filas) para volver a resumir con otra página, unidades o filtro sin recalcular.</summary>
+            /// <summary>Raw data (rows) to re-summarize with another page, units or filter without recomputing.</summary>
             public object Payload;
             public Dictionary<string, long[]> Sets;
             public long RevitMs;

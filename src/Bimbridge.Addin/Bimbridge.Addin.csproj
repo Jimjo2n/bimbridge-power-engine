@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    Add-in de Revit. Se compila una vez por versión:
+    Revit add-in. It is built once per version:
       dotnet build -c Release -p:RevitVersion=2024   (net48)
       dotnet build -c Release -p:RevitVersion=2025   (net8.0-windows)
       dotnet build -c Release -p:RevitVersion=2027   (net10.0-windows)
-    En la PC de desarrollo se puede compilar contra la instalación real:
+    On the development PC you can build against the real installation:
       -p:RevitApiDir="C:\Program Files\Autodesk\Revit 2024"
-    Sin eso se usan los paquetes de referencia Nice3point.Revit.Api (sólo para compilar; no se copian ni se distribuyen).
+    Without it, the Nice3point.Revit.Api reference packages are used (build only; they are neither copied nor distributed).
   -->
   <PropertyGroup>
     <RevitVersion Condition="'$(RevitVersion)' == ''">2024</RevitVersion>
@@ -24,7 +24,7 @@
     <OutputPath>bin\$(Configuration)\R$(RevitVersion)\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <PlatformTarget>x64</PlatformTarget>
-    <!-- versión del paquete de referencia por versión de Revit -->
+    <!-- reference package version per Revit version -->
     <RevitRefVersion Condition="'$(RevitVersion)' == '2022'">2022.1.80</RevitRefVersion>
     <RevitRefVersion Condition="'$(RevitVersion)' == '2023'">2023.1.90</RevitRefVersion>
     <RevitRefVersion Condition="'$(RevitVersion)' == '2024'">2024.3.60</RevitRefVersion>
@@ -51,20 +51,20 @@
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
   </ItemGroup>
-  <!-- WPF para las ventanas. Sin UseWPF (no hay XAML): así compila también en Linux sin el SDK de escritorio. -->
+  <!-- WPF for the windows. No UseWPF (there is no XAML): this way it also builds on Linux without the desktop SDK. -->
   <ItemGroup Condition="'$(TargetFramework)' != 'net48'">
     <FrameworkReference Include="Microsoft.WindowsDesktop.App.WPF" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- recetas\*.cs se compilan en Revit con Roslyn (tarea iniciar receta=…); no forman parte del ensamblado -->
+    <!-- recetas\*.cs (recipes) are compiled inside Revit with Roslyn (tarea iniciar receta=…); they are not part of the assembly -->
     <Compile Remove="recetas\**" />
     <None Include="recetas\*.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Bimbridge.Protocol\Bimbridge.Protocol.csproj" />
     <ProjectReference Include="..\Bimbridge.Engine\Bimbridge.Engine.csproj" />
-    <!-- Buscar instaladores nuevos y leer install.json (botón Actualizar) -->
+    <!-- Find new installers and read install.json (Update button) -->
     <ProjectReference Include="..\Bimbridge.Setup.Core\Bimbridge.Setup.Core.csproj" />
   </ItemGroup>
   <ItemGroup>

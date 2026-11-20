@@ -5,20 +5,20 @@ using System.Collections.Generic;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Registro de versiones de un documento (sección 5.3 de la arquitectura).
-    /// Cada evento DocumentChanged sube la revisión global y marca los elementos tocados.
-    /// Sirve para: respuestas con "rev", consultas "since", y detectar conflictos entre
-    /// el momento en que se planificó un cambio y el momento del commit.
+    /// Version registry of a document (architecture section 5.3).
+    /// Each DocumentChanged event bumps the global revision and marks the touched elements.
+    /// Used for: responses with "rev", "since" queries, and detecting conflicts between
+    /// the moment a change was planned and the moment of the commit.
     /// </summary>
     public sealed class VersionRegistry
     {
-        /// <summary>Autor usado cuando el cambio no lo hizo ninguna sesión del MCP (operator a mano, Undo, otro add-in).</summary>
+        /// <summary>Author used when the change was not made by any MCP session (operator by hand, Undo, another add-in).</summary>
         public const string HumanAuthor = "usuario";
 
         private readonly object _lock = new object();
         private readonly Dictionary<long, Entry> _elements = new Dictionary<long, Entry>();
         private long _rev;
-        /// <summary>Altas en orden (rev, id): permite saber qué creó una unidad sin recorrer todo el registro.</summary>
+        /// <summary>Additions in order (rev, id): lets us know what a unit created without walking the whole registry.</summary>
         private readonly List<KeyValuePair<long, long>> _added = new List<KeyValuePair<long, long>>();
 
         private struct Entry
@@ -30,7 +30,7 @@ namespace Bimbridge.Engine
 
         public long Rev { get { lock (_lock) return _rev; } }
 
-        /// <summary>Registra un cambio. Devuelve la nueva revisión global.</summary>
+        /// <summary>Records a change. Returns the new global revision.</summary>
         public long Record(IEnumerable<long> added, IEnumerable<long> modified, IEnumerable<long> deleted, string author)
         {
             lock (_lock)
@@ -44,13 +44,13 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Revisión del último cambio de un elemento (0 si no cambió desde que se abrió el documento).</summary>
+        /// <summary>Revision of an element's last change (0 if it has not changed since the document was opened).</summary>
         public long ElementRev(long id)
         {
             lock (_lock) return _elements.TryGetValue(id, out var e) ? e.Rev : 0;
         }
 
-        /// <summary>Instantánea para un plan: id → rev actual.</summary>
+        /// <summary>Snapshot for a plan: id → current rev.</summary>
         public Dictionary<long, long> Snapshot(IEnumerable<long> ids)
         {
             var d = new Dictionary<long, long>();
@@ -60,7 +60,7 @@ namespace Bimbridge.Engine
             return d;
         }
 
-        /// <summary>Elementos que cambiaron después de una instantánea. Vacío = sin conflicto.</summary>
+        /// <summary>Elements that changed after a snapshot. Empty = no conflict.</summary>
         public List<Conflict> FindConflicts(IDictionary<long, long> snapshot)
         {
             var list = new List<Conflict>();
@@ -75,7 +75,7 @@ namespace Bimbridge.Engine
             return list;
         }
 
-        /// <summary>Ids creados después de una revisión (y que no se borraron después).</summary>
+        /// <summary>Ids created after a revision (and not deleted afterwards).</summary>
         public List<long> AddedSince(long rev)
         {
             var list = new List<long>();
@@ -91,7 +91,7 @@ namespace Bimbridge.Engine
             return list;
         }
 
-        /// <summary>Cuántos elementos se tocaron después de una revisión: (cambiados, borrados).</summary>
+        /// <summary>How many elements were touched after a revision: (changed, deleted).</summary>
         public KeyValuePair<long, long> CountSince(long rev)
         {
             long ch = 0, del = 0;
@@ -101,7 +101,7 @@ namespace Bimbridge.Engine
             return new KeyValuePair<long, long>(ch, del);
         }
 
-        /// <summary>Ids cambiados después de una revisión (para consultas "since").</summary>
+        /// <summary>Ids changed after a revision (for "since" queries).</summary>
         public HashSet<long> ChangedSince(long rev, out HashSet<long> deleted)
         {
             var changed = new HashSet<long>();
@@ -117,8 +117,8 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// Invalidación general (por ejemplo, tras un Sync que trae cambios de otros usuarios
-        /// sin detalle por elemento): sube la revisión y marca todo lo conocido como tocado.
+        /// General invalidation (for example, after a Sync that brings changes from other users
+        /// with no per-element detail): bumps the revision and marks everything known as touched.
         /// </summary>
         public long BumpAll(string author)
         {
@@ -138,7 +138,7 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Si &gt; 0, cualquier instantánea anterior a esta revisión está vencida aunque el elemento no figure.</summary>
+        /// <summary>If &gt; 0, any snapshot older than this revision is stale even if the element is not listed.</summary>
         public long AllBumpedAt { get; private set; }
     }
 
@@ -154,14 +154,14 @@ namespace Bimbridge.Engine
         public long Rev { get; }
         public bool Deleted { get; }
 
-        /// <summary>Texto para la IA, sin hablar de puertos ni sesiones internas.</summary>
+        /// <summary>Text for the AI, without mentioning ports or internal sessions.</summary>
         public string Describe(string mySessionId)
         {
             string who;
-            if (Author == VersionRegistry.HumanAuthor) who = "el usuario en Revit";
-            else if (Author == mySessionId) who = "esta misma conversación";
-            else who = "otro agente";
-            return Id + (Deleted ? " fue borrado por " : " fue cambiado por ") + who;
+            if (Author == VersionRegistry.HumanAuthor) who = "the user in Revit";
+            else if (Author == mySessionId) who = "this same conversation";
+            else who = "another agent";
+            return Id + (Deleted ? " was deleted by " : " was changed by ") + who;
         }
     }
 }

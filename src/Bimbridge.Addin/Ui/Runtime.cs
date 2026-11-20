@@ -11,8 +11,8 @@ using Bimbridge.Engine;
 namespace Bimbridge.Addin.Ui
 {
     /// <summary>
-    /// Estado compartido entre el servidor (hilos de pipe) y el ribbon/ventanas (hilo de Revit).
-    /// Lo llena App.OnStartup. Si el MCP está apagado, queda vacío y los botones lo dicen.
+    /// State shared between the server (pipe threads) and the ribbon/windows (Revit thread).
+    /// App.OnStartup fills it. If the MCP is turned off, it stays empty and the buttons say so.
     /// </summary>
     public static class Runtime
     {
@@ -22,29 +22,29 @@ namespace Bimbridge.Addin.Ui
         public static SessionRegistry Sessions;
         public static DocumentTracker Tracker;
         public static Journal Journal;
-        /// <summary>Auditoría durable (0.6.1). Telemetría = Journal; autoridad = Audit.</summary>
+        /// <summary>Durable audit (0.6.1). Telemetry = Journal; authority = Audit.</summary>
         public static AuditLog Audit;
-        /// <summary>Concesiones de capacidades (R03). Sólo las crea una persona con el botón «Autorizar» de la cinta.</summary>
+        /// <summary>Capability grants (R03). Only a person creates them, with the ribbon's "Authorize" button.</summary>
         public static GrantStore Grants;
-        /// <summary>#5: estadísticas del motor C# (hilo de Revit, cachés de compilación y de consultas, trabajos). Sólo memoria; nunca la API de Revit.</summary>
+        /// <summary>#5: C# engine statistics (Revit thread, compilation and query caches, jobs). Memory only; never the Revit API.</summary>
         public static Func<System.Collections.Generic.Dictionary<string, object>> EngineDiagnostics;
-        /// <summary>#5 (0.9.1): operaciones largas en curso, historial reciente (filtro de estado y texto) y planificador. Sólo memoria.</summary>
+        /// <summary>#5 (0.9.1): long operations in progress, recent history (status and text filter) and scheduler. Memory only.</summary>
         public static Func<string, string, (List<Job> Running, List<OperationHistory.Record> Recent, Dictionary<string, object> Scheduler)> Operations;
-        /// <summary>#5 (0.9.1): cancelar un trabajo desde el panel (lo pulsa una persona).</summary>
+        /// <summary>#5 (0.9.1): cancel a job from the panel (pressed by a person).</summary>
         public static Func<string, bool> CancelOperation;
 
         /// <summary>
-        /// «Bloquear inyección de código C#» (revisión consolidada). Por defecto NO bloqueado: exec corre para los agentes locales autorizados.
-        /// Lo cambia sólo una persona en la cinta; persiste en config.json. Ninguna operación MCP lo cambia.
+        /// "Block C# code injection" (consolidated review). NOT blocked by default: exec runs for authorized local agents.
+        /// Only a person changes it, on the ribbon; it persists in config.json. No MCP operation changes it.
         /// </summary>
         public static volatile bool BlockDynamicCode;
-        /// <summary>Arranque del add-in (lo fija App.OnStartup); el panel muestra el tiempo activo desde aquí.</summary>
+        /// <summary>Add-in start time (set by App.OnStartup); the panel shows the uptime from here.</summary>
         public static DateTime StartedUtc = DateTime.UtcNow;
-        /// <summary>Compatibilidad: perfil de ejecución completo cuando el código no está bloqueado.</summary>
+        /// <summary>Compatibility: full execution profile when code is not blocked.</summary>
         public static bool TrustedExecActive => !BlockDynamicCode;
         public static PushButton TrustButton, AuthorizeButton;
 
-        /// <summary>Cambia el bloqueo y lo persiste. Si no se puede guardar, no cambia (y lo avisa).</summary>
+        /// <summary>Toggles the block and persists it. If it cannot be saved, it does not change (and says so).</summary>
         public static bool ToggleBlockDynamicCode(out string error)
         {
             error = null;
@@ -53,37 +53,37 @@ namespace Bimbridge.Addin.Ui
             catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException || ex is FormatException)
             {
                 error = ex.Message;
-                Log("No se pudo guardar el bloqueo de C#: " + ex.Message);
+                Log("Could not save the C# block: " + ex.Message);
                 return false;
             }
             BlockDynamicCode = on;
             if (Config != null) Config.BlockDynamicCode = on;
             try { Audit?.Append(VersionRegistry.HumanAuthor, "bloquear_inyeccion_csharp", on ? "bloqueado" : "permitido"); }
-            catch (JournalUnavailableException ex) { Log("AUDITORÍA no escrita (bloqueo C#): " + ex.Message); }
-            Log("Inyección de código C#: " + (on ? "BLOQUEADA" : "permitida"));
+            catch (JournalUnavailableException ex) { Log("AUDIT not written (C# block): " + ex.Message); }
+            Log("C# code injection: " + (on ? "BLOCKED" : "allowed"));
             MarkDirty();
             return true;
         }
         /// <summary>
-        /// Única confirmación para pasar de bloqueado a permitido (cinta y Ajustes). "No" por defecto. Bloquear no se confirma.
+        /// The single confirmation to go from blocked to allowed (ribbon and Settings). "No" by default. Blocking is not confirmed.
         /// </summary>
         public static bool ConfirmAllowDynamicCode()
         {
             var td = new TaskDialog(Bimbridge.Protocol.Brand.Product)
             {
-                MainInstruction = "¿Permitir C# dinámico?",
-                MainContent = "La IA local autorizada podrá ejecutar código C# sobre la API de Revit (exec), auditado. " +
-                              "No es un sandbox: corre con los permisos de su usuario y sus efectos fuera del documento no se revierten.",
+                MainInstruction = "Allow dynamic C#?",
+                MainContent = "The authorized local AI will be able to run C# code on the Revit API (exec), audited. " +
+                              "It is not a sandbox: it runs with your user's permissions and its effects outside the document are not rolled back.",
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
                 DefaultButton = TaskDialogResult.No,
             };
             return td.Show() == TaskDialogResult.Yes;
         }
 
-        // ---- preferencias de interfaz (sólo de este usuario, junto a los demás datos del complemento; nunca config.json) ----
+        // ---- UI preferences (this user only, next to the rest of the add-in's data; never config.json) ----
         private static string UiPrefsPath => Home.Sub("interfaz.json");
 
-        // Se lee una vez, antes del primer uso de Runtime (App.OnStartup lo llena al arrancar).
+        // Read once, before Runtime is first used (App.OnStartup fills it at startup).
         static Runtime()
         {
             try
@@ -91,10 +91,10 @@ namespace Bimbridge.Addin.Ui
                 if (System.IO.File.Exists(UiPrefsPath) && Bimbridge.Protocol.Json.Parse(System.IO.File.ReadAllText(UiPrefsPath)) is Dictionary<string, object> d)
                     Theme.ReduceMotionOverride = d.TryGetValue("movimiento", out var m) && "reducido".Equals(m as string, StringComparison.Ordinal);
             }
-            catch (Exception) { } // ilegible o dañado: movimiento automático (sigue a Windows)
+            catch (Exception) { } // unreadable or corrupt: automatic motion (follows Windows)
         }
 
-        /// <summary>«Movimiento: Reducido» se aplica al momento; si no se puede guardar, vale hasta cerrar Revit y devuelve el error.</summary>
+        /// <summary>"Motion: Reduced" applies immediately; if it cannot be saved, it holds until Revit closes and returns the error.</summary>
         public static bool SetReducedMotion(bool reduced, out string error)
         {
             error = null;
@@ -103,7 +103,7 @@ namespace Bimbridge.Addin.Ui
             catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException)
             {
                 error = ex.Message;
-                Log("No se pudo guardar la preferencia de movimiento: " + ex.Message);
+                Log("Could not save the motion preference: " + ex.Message);
                 return false;
             }
             return true;
@@ -113,9 +113,9 @@ namespace Bimbridge.Addin.Ui
         public static string RevitVersion = "";
         public static Action<string> Log = _ => { };
 
-        /// <summary>Título del modelo activo y planes en cola (se actualizan en Idling; los lee la ventana Estado).</summary>
+        /// <summary>Active model title and queued plans (updated on Idling; read by the Status window).</summary>
         public static volatile string ActiveDocTitle;
-        /// <summary>Clave durable del documento activo (la usa el panel para comprobar bloqueos de escritura).</summary>
+        /// <summary>Durable key of the active document (the panel uses it to check write blocks).</summary>
         public static volatile string ActiveDocKey;
         public static volatile int HeldCount;
 
@@ -133,7 +133,7 @@ namespace Bimbridge.Addin.Ui
         {
             var on = Pause.Toggle();
             Journal?.Log(VersionRegistry.HumanAuthor, "pausar", on ? "si" : "no", 0);
-            Log("Pausar IA: " + (on ? "SÍ" : "NO"));
+            Log("Pause AI: " + (on ? "YES" : "NO"));
             MarkDirty();
         }
 
@@ -141,22 +141,22 @@ namespace Bimbridge.Addin.Ui
         {
             var on = Hold.Toggle();
             Journal?.Log(VersionRegistry.HumanAuthor, "retener", on ? "si" : "no", 0);
-            Log("Retener: " + (on ? "SÍ" : "NO"));
+            Log("Hold: " + (on ? "YES" : "NO"));
             MarkDirty();
         }
 
-        /// <summary>Aplica un plan retenido. Llamar sólo en contexto válido de la API (comando o ventana modal de un comando).</summary>
+        /// <summary>Applies a held plan. Call only in a valid API context (a command or a command's modal window).</summary>
         public static PlanOps.ApplyResult ApplyHeld(Document doc, Plan p)
         {
             var sw = Stopwatch.StartNew();
-            // Fail-closed: con operaciones sin reconciliar el plan sigue en la cola y no se toca el modelo.
+            // Fail-closed: with unreconciled operations the plan stays in the queue and the model is not touched.
             var key0 = DocumentTracker.KeyOf(doc) ?? p.DocKey;
             if (p.ReceiptDocPrint != null && !string.Equals(DocRegistry.Instance.IdentityOf(doc)?.Print, p.ReceiptDocPrint, StringComparison.Ordinal))
-                return new PlanOps.ApplyResult { Status = PlanStatus.Retenido, Detail = "El documento activo no coincide con la huella del intento retenido." };
-            try { Plans.LoadPersisted(key0); } catch (Exception ex) { Log("Cola: " + ex.Message); }
+                return new PlanOps.ApplyResult { Status = PlanStatus.Retenido, Detail = "The active document does not match the fingerprint of the held attempt." };
+            try { Plans.LoadPersisted(key0); } catch (Exception ex) { Log("Queue: " + ex.Message); }
             var block0 = Plans.CheckWritable(key0);
-            if (block0.Blocked) { Log("Cola: plan " + p.Id + " NO aplicado: " + block0.Message); return new PlanOps.ApplyResult { Status = PlanStatus.Retenido, Detail = block0.Message }; }
-            // R01: intención durable ANTES de tocar el modelo (AuditGate); sin ella no se aplica nada. Resultado después.
+            if (block0.Blocked) { Log("Queue: plan " + p.Id + " NOT applied: " + block0.Message); return new PlanOps.ApplyResult { Status = PlanStatus.Retenido, Detail = block0.Message }; }
+            // R01: durable intent BEFORE touching the model (AuditGate); without it nothing is applied. Result afterwards.
             var ex0 = new Dictionary<string, object> { ["plan"] = p.Id, ["cambios"] = (long)p.Entries.Count };
             if (p.ReceiptAttempt != null)
             {
@@ -171,7 +171,7 @@ namespace Bimbridge.Addin.Ui
                 try { Plans.BeginWrite(p); }
                 catch (Exception ex) when (ex is DocWriteBlockedException || ex is PlanStoreException)
                 {
-                    Log("Cola: plan " + p.Id + " NO aplicado: " + ex.Message);
+                    Log("Queue: plan " + p.Id + " NOT applied: " + ex.Message);
                     return new PlanOps.ApplyResult { Status = PlanStatus.Retenido, Detail = ex.Message };
                 }
                 p.Status = PlanStatus.EnProceso;
@@ -180,7 +180,7 @@ namespace Bimbridge.Addin.Ui
                 try { r = PlanOps.Apply(doc, p, Config.SubBatchSize, Theme.ClientName(p.Client ?? p.SessionId)); }
                 catch (Exception ex)
                 {
-                    // Una excepción después de empezar no demuestra que se revirtió.
+                    // An exception after starting does not prove it was rolled back.
                     GroupAbort.PreserveInterrupted(p, ex.GetType().Name + ": " + ex.Message);
                     r = new PlanOps.ApplyResult { Status = Bimbridge.Protocol.Status.Desconocido, Detail = ex.Message };
                 }
@@ -191,7 +191,7 @@ namespace Bimbridge.Addin.Ui
                     var owner = Sessions?.All().FirstOrDefault(s => s.Id == p.SessionId);
                     if (owner != null) RequestHandler.SaveCreated(owner, p);
                 }
-                catch (Exception ex) { Log("Cola: no se pudieron guardar los creados: " + ex.Message); }
+                catch (Exception ex) { Log("Queue: could not save the created elements: " + ex.Message); }
                 ex0["detalle"] = r.Detail;
                 if (r.Status == PlanStatus.Aplicado && PlanVerification.Postconditions(p.Verification) != PlanVerification.Met)
                     ex0["estado_recibo"] = Bimbridge.Protocol.Status.ConDiferencias;
@@ -200,24 +200,24 @@ namespace Bimbridge.Addin.Ui
                 return r;
             }, r => r.Status, why =>
             {
-                Log("Cola: plan " + p.Id + " NO aplicado: " + why);
+                Log("Queue: plan " + p.Id + " NOT applied: " + why);
                 return new PlanOps.ApplyResult { Status = PlanStatus.Revertido, Detail = why };
             }, (r, why) =>
             {
-                // rc3: lo aplicado sigue aplicado; el plan queda marcado y el cliente lo ve como no verificado.
-                Log("AUDITORÍA: plan " + p.Id + ": " + why);
+                // rc3: what was applied stays applied; the plan is flagged and the client sees it as unverified.
+                Log("AUDIT: plan " + p.Id + ": " + why);
                 r.Warnings.Add(why);
                 r.Detail = (r.Detail != null ? r.Detail + " | " : "") + why;
                 r.AuditIncomplete = true;
-                try { Plans.Finish(p, r.Status, r.Detail); } catch (Exception ex) { Log("Cola: " + ex.Message); }
+                try { Plans.Finish(p, r.Status, r.Detail); } catch (Exception ex) { Log("Queue: " + ex.Message); }
                 return r;
             });
         }
 
-        /// <summary>Se llama en Idling (hilo de Revit). Sólo redibuja si algo visible cambió.</summary>
+        /// <summary>Called on Idling (Revit thread). Only redraws if something visible changed.</summary>
         public static void OnIdling(UIApplication app)
         {
-            try { UpdateService.RefreshButton(); } catch (Exception ex) { Log("Botón Actualizar: " + ex.Message); }
+            try { UpdateService.RefreshButton(); } catch (Exception ex) { Log("Update button: " + ex.Message); }
             if (!Ready) return;
             var doc = app.ActiveUIDocument?.Document;
             var key = DocumentTracker.KeyOf(doc);
@@ -228,7 +228,7 @@ namespace Bimbridge.Addin.Ui
             _dirty = false;
             if (key != null && key != _lastDocKey)
             {
-                try { Plans.LoadPersisted(key); } catch (Exception ex) { Log("Cola: no se pudo leer del disco: " + ex.Message); }
+                try { Plans.LoadPersisted(key); } catch (Exception ex) { Log("Queue: could not read from disk: " + ex.Message); }
             }
             _lastDocKey = key;
             ActiveDocKey = key;
@@ -241,7 +241,7 @@ namespace Bimbridge.Addin.Ui
             try { UpdateRibbon(sessions, paused, hold, n); } catch (Exception ex) { Log("Ribbon: " + ex.Message); }
         }
 
-        // Último estado dibujado en cada botón: la imagen sólo se toca (y se anima) cuando el suyo cambia. null = aún sin pintar.
+        // Last state drawn on each button: the image is only touched (and animated) when its own state changes. null = not painted yet.
         private static System.Windows.Media.Color? _shownStatus;
         private static bool? _shownTrust, _shownPaused, _shownHold;
         private static int? _shownHeld;
@@ -258,7 +258,7 @@ namespace Bimbridge.Addin.Ui
                     RibbonMotion.Play(StatusButton, "status|" + from + ">" + c, _shownStatus != null, (t, s) => Icons.Status(from, c, t, s), s => Icons.Status(c, s));
                     _shownStatus = c;
                 }
-                StatusButton.ItemText = "Power Engine\n" + (paused ? "Estado · pausa" : sessions == 0 ? "Estado · sin IA" : "Estado · " + sessions + " IA");
+                StatusButton.ItemText = "Power Engine\n" + (paused ? "Status · paused" : sessions == 0 ? "Status · no AI" : "Status · " + sessions + " AI");
             }
             if (TrustButton != null)
             {
@@ -268,7 +268,7 @@ namespace Bimbridge.Addin.Ui
                     RibbonMotion.Play(TrustButton, "mode|" + block, _shownTrust != null, (t, s) => Icons.Mode(block, t, s), s => Icons.Mode(block, s));
                     _shownTrust = block;
                 }
-                TrustButton.ItemText = block ? "C# dinámico\nbloqueado" : "Bloquear\ninyección C#";
+                TrustButton.ItemText = block ? "Dynamic C#\nblocked" : "Block\nC# injection";
             }
             if (PauseButton != null)
             {
@@ -277,7 +277,7 @@ namespace Bimbridge.Addin.Ui
                     RibbonMotion.Play(PauseButton, "pause|" + paused, _shownPaused != null, (t, s) => Icons.Pause(paused, t, s), s => Icons.Pause(paused, s));
                     _shownPaused = paused;
                 }
-                PauseButton.ItemText = paused ? "Reanudar\nIA" : "Pausar\nIA";
+                PauseButton.ItemText = paused ? "Resume\nAI" : "Pause\nAI";
             }
             if (ModeButton != null)
             {
@@ -287,18 +287,18 @@ namespace Bimbridge.Addin.Ui
                     RibbonMotion.Play(ModeButton, "mode|" + effectiveHold, _shownHold != null, (t, s) => Icons.Mode(effectiveHold, t, s), s => Icons.Mode(effectiveHold, s));
                     _shownHold = effectiveHold;
                 }
-                ModeButton.ItemText = effectiveHold ? "Modo\nRetener" : "Modo\nEn vivo";
+                ModeButton.ItemText = effectiveHold ? "Mode\nHold" : "Mode\nLive";
                 ModeButton.Enabled = writes && Config.Allows('W');
             }
             if (QueueButton != null)
             {
                 if (_shownHeld != held)
                 {
-                    // El globo sólo "aparece" con un número nuevo; al vaciarse la cola desaparece al momento (la salida es más rápida que la entrada).
+                    // The badge only "appears" with a new number; when the queue empties it disappears at once (exit is faster than entrance).
                     RibbonMotion.Play(QueueButton, "queue|" + held, _shownHeld != null && held > 0, (t, s) => Icons.Queue(held, t, s), s => Icons.Queue(held, s));
                     _shownHeld = held;
                 }
-                QueueButton.ItemText = held == 0 ? "Cola\nvacía" : held == 1 ? "Cola\n1 plan" : "Cola\n" + held + " planes";
+                QueueButton.ItemText = held == 0 ? "Queue\nempty" : held == 1 ? "Queue\n1 plan" : "Queue\n" + held + " plans";
             }
         }
     }

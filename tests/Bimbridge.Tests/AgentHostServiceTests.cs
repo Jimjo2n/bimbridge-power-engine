@@ -14,7 +14,7 @@ using Xunit.Abstractions;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Servicio de ejecución persistente (P1 §3): cola acotada, control, recuperación al arrancar y apagado ordenado.</summary>
+    /// <summary>Persistent run service (P1 §3): bounded queue, control, recovery on startup and graceful shutdown.</summary>
     public class AgentHostServiceTests
     {
         private readonly ITestOutputHelper _out;
@@ -48,7 +48,7 @@ namespace Bimbridge.Tests
                 if (cond(last)) return last;
                 Thread.Sleep(50);
             }
-            throw new TimeoutException("no se alcanzó la condición; último resumen: " + last);
+            throw new TimeoutException("condition not reached; last summary: " + last);
         }
 
         private static IHost StartHost(string root, string pipe, int cap = 16, int workers = 2, int leaseMs = 30000)
@@ -76,7 +76,7 @@ namespace Bimbridge.Tests
                 var id = Arg.GetString(s1, "plan");
                 var final = WaitFor(pipe, id, t => t.StartsWith("3/3 verificadas"));
                 _out.WriteLine(final);
-                var s2 = Submit(pipe, plan);                                   // mismo plan: no se duplica
+                var s2 = Submit(pipe, plan);                                   // same plan: not duplicated
                 Assert.True((bool)s2["ok"]); Assert.True((bool)s2["ya_existia"]);
                 Thread.Sleep(300);
                 var model = DurableSimModel.Open(Path.Combine(root, "planes", id, "modelo"));
@@ -109,7 +109,7 @@ namespace Bimbridge.Tests
                 var cfg = new Dictionary<string, object> { ["retardo_ms"] = 150L };
                 Dictionary<string, object> Sub(int i) => Submit(pipe, AH.Plan(Enumerable.Range(0, 40).Select(k => AH.Set("Cola" + i + "_" + k, (long)k, level: "L03")).ToArray()), config: cfg);
                 var r = new List<Dictionary<string, object>> { Sub(0) };
-                // esperar a que el único trabajador saque el primero de la cola (bajo carga puede tardar)
+                // wait for the only worker to take the first one off the queue (may be slow under load)
                 var until = DateTime.UtcNow.AddSeconds(20);
                 while ((long)Call(pipe, "salud")["cola"] != 0 && DateTime.UtcNow < until) System.Threading.Thread.Sleep(20);
                 r.Add(Sub(1)); r.Add(Sub(2));
@@ -135,7 +135,7 @@ namespace Bimbridge.Tests
                 Assert.True((bool)Call(pipe, "pausar", new Dictionary<string, object> { ["plan"] = id })["ok"]);
                 var paused = WaitFor(pipe, id, t => t.Contains("plan pausado") && !t.Contains("ejecutando"));
                 Thread.Sleep(300);
-                Assert.Equal(paused.Split('·')[0], Text(Call(pipe, "resumen", new Dictionary<string, object> { ["plan"] = id })).Split('·')[0]);   // no avanza en pausa
+                Assert.Equal(paused.Split('·')[0], Text(Call(pipe, "resumen", new Dictionary<string, object> { ["plan"] = id })).Split('·')[0]);   // does not advance while paused
                 Assert.True((bool)Call(pipe, "reanudar", new Dictionary<string, object> { ["plan"] = id })["ok"]);
                 WaitFor(pipe, id, t => !t.Contains("pausado") && t.Contains("ejecutando"));
                 Assert.True((bool)Call(pipe, "cancelar", new Dictionary<string, object> { ["plan"] = id })["ok"]);
@@ -164,8 +164,8 @@ namespace Bimbridge.Tests
             var mid = AH.Read(Path.Combine(root, "planes", id), out _, out _);
             var verified = mid.Ops.Count(o => o.Value.State == OpState.Verificada);
             Assert.InRange(verified, 5, 119);
-            Assert.DoesNotContain(mid.Ops.Values, o => o.State == OpState.EnEjecucion || o.State == OpState.Ejecutada);   // paró ENTRE operaciones
-            Assert.Null(PlanLease.Peek(Path.Combine(root, "planes", id)) is var l && l != null && !l.Released ? "lease sin liberar" : null);
+            Assert.DoesNotContain(mid.Ops.Values, o => o.State == OpState.EnEjecucion || o.State == OpState.Ejecutada);   // stopped BETWEEN operations
+            Assert.Null(PlanLease.Peek(Path.Combine(root, "planes", id)) is var l && l != null && !l.Released ? "lease not released" : null);
 
             var pipe2 = PipeName();
             var host2 = StartHost(root, pipe2, workers: 1);
@@ -181,7 +181,7 @@ namespace Bimbridge.Tests
             Assert.All(plan.Ops, op => Assert.Equal(1, model.TxFor(op.Id, id).Count));
         }
 
-        /// <summary>El servicio como PROCESO independiente: se mata con SIGKILL a mitad de un plan; otro proceso de servicio lo recupera.</summary>
+        /// <summary>The service as an independent PROCESS: it is killed with SIGKILL in the middle of a plan; another service process recovers it.</summary>
         [Fact]
         public void Service_ProcessKilled_NewServiceProcessRecoversWithoutDuplicates()
         {
@@ -205,7 +205,7 @@ namespace Bimbridge.Tests
             var s1 = Start(pipe);
             var id = Arg.GetString(Submit(pipe, plan, config: new Dictionary<string, object> { ["retardo_ms"] = 25L }), "plan");
             WaitFor(pipe, id, t => int.Parse(t.Split('/')[0]) >= 8);
-            s1.Kill();                      // SIGKILL: sin apagado ordenado
+            s1.Kill();                      // SIGKILL: no graceful shutdown
             s1.WaitForExit();
             var pipe2 = PipeName();
             var s2 = Start(pipe2);

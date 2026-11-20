@@ -12,8 +12,8 @@ using Xunit;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// 0.9.1 (Bloque I): historial persistente de operaciones, filtros, paginación y consejo de reintento seguro.
-    /// AUD-13: aislamiento entre sesiones y agentes (lo ajeno sólo con autorización explícita). AUD-14: con_diferencias exige revisión.
+    /// 0.9.1 (Block I): persistent operation history, filters, pagination and safe-retry advice.
+    /// AUD-13: isolation between sessions and agents (others' entries only with explicit authorization). AUD-14: con_diferencias requires review.
     /// </summary>
     public class OperationHistoryTests
     {
@@ -37,20 +37,20 @@ namespace Bimbridge.Tests
             var h = new OperationHistory(p);
             jobs.OnAnyFinal = j => h.Add(j);
             Done(jobs, "S1", null, "doc pdf");
-            Done(jobs, "S1", null, "commit", Status.Conflicto, "cambió el modelo");
-            var c = Done(jobs, "S2", null, "commit", Status.Desconocido, "se cortó");
+            Done(jobs, "S1", null, "commit", Status.Conflicto, "the model changed");
+            var c = Done(jobs, "S2", null, "commit", Status.Desconocido, "connection dropped");
             Done(jobs, "S2", null, "check", JobStatus.Cancelado, "cancelado");
             Assert.Equal(4, h.Count);
             var (commits, n) = h.Query(All, null, "commit", null, null, null);
             Assert.Equal(2, n);
-            Assert.Equal(c.Id, commits[0].JobId);                           // más reciente primero
-            Assert.Equal("reconciliar_antes", commits[0].Retry);           // incierto: nunca reintentar a ciegas
-            Assert.Equal("reintentable", commits[1].Retry);                // conflicto: no se aplicó nada
+            Assert.Equal(c.Id, commits[0].JobId);                           // most recent first
+            Assert.Equal("reconciliar_antes", commits[0].Retry);           // uncertain: never retry blindly
+            Assert.Equal("reintentable", commits[1].Retry);                // conflict: nothing was applied
             Assert.Equal("reconciliar_antes", h.Query(All, Status.Cancelado, null, null, null, null).Page[0].Retry);
             Assert.Equal(2, h.Query(All, null, null, "S2", null, null).Total);
             Assert.Equal(1, h.Query(All, null, null, null, null, "cortó").Total);
 
-            // Reinicio: se recarga desde el archivo; una línea rota se informa, no se descarta en silencio.
+            // Restart: reloaded from the file; a broken line is reported, not silently dropped.
             File.AppendAllText(p, "{roto\n");
             var again = new OperationHistory(p);
             Assert.Equal(4, again.Count);
@@ -72,7 +72,7 @@ namespace Bimbridge.Tests
         [Fact]
         public void Sessions_OnlySeeTheirOwnOperations_UnlessExplicitlyAuthorized()
         {
-            // AUD-13: dos agentes con sesiones concurrentes.
+            // AUD-13: two agents with concurrent sessions.
             var jobs = new JobStore();
             var h = new OperationHistory(null);
             jobs.OnAnyFinal = j => h.Add(j);
@@ -84,25 +84,25 @@ namespace Bimbridge.Tests
             var ana = h.Query(Me("S-ana-1", "A-ana"), null, null, null, null, null);
             Assert.Equal(2, ana.Total);
             Assert.All(ana.Page, r => Assert.Equal("A-ana", r.Agent));
-            // Los filtros no amplían el ámbito: pedir la sesión o el texto de otro no lo muestra.
+            // Filters do not widen the scope: asking for someone else's session or text does not show it.
             Assert.Equal(0, h.Query(Me("S-ana-1", "A-ana"), null, null, "S-bob-1", null, null).Total);
             Assert.Equal(0, h.Query(Me("S-ana-1", "A-ana"), null, null, null, null, "secreto").Total);
             Assert.Equal(1, h.Query(Me("S-bob-1", "A-bob"), null, null, null, null, null).Total);
-            // Una sesión anónima sólo ve su propia sesión; otra sesión anónima no ve la primera (null no es identidad compartida).
+            // An anonymous session only sees its own session; another anonymous session does not see the first (null is not a shared identity).
             Assert.Equal(1, h.Query(Me("S-anon-1"), null, null, null, null, null).Total);
             Assert.Equal(0, h.Query(Me("S-anon-2"), null, null, null, null, null).Total);
-            // Sin identidad alguna no se ve nada; el ámbito es obligatorio.
+            // With no identity at all nothing is visible; the scope is mandatory.
             Assert.Equal(0, h.Query(new OperationHistory.Scope(), null, null, null, null, null).Total);
             Assert.Throws<ArgumentNullException>(() => h.Query(null, null, null, null, null, null));
-            // Pedir «todos» sin autorización del usuario se rechaza (no se concede por pedirlo ni se degrada en silencio).
+            // Asking for "all" without user authorization is rejected (not granted just for asking, nor silently downgraded).
             Assert.Null(OperationHistory.ScopeFor("S-ana-1", "A-ana", wantAll: true, sharedAuthorized: false, out var refusal));
             Assert.Contains("historial_compartido", refusal);
-            Assert.False(new EngineConfig().SharedHistory);                 // por defecto, no autorizado
+            Assert.False(new EngineConfig().SharedHistory);                 // not authorized by default
             Assert.Equal(2, h.Query(OperationHistory.ScopeFor("S-ana-1", "A-ana", false, false, out _), null, null, null, null, null).Total);
-            Assert.Equal(2, h.Query(OperationHistory.ScopeFor("S-ana-1", "A-ana", false, true, out _), null, null, null, null, null).Total);   // autorizado pero no pedido: lo propio
-            // Con la autorización explícita (historial_compartido) y pidiéndolo, se ve todo.
+            Assert.Equal(2, h.Query(OperationHistory.ScopeFor("S-ana-1", "A-ana", false, true, out _), null, null, null, null, null).Total);   // authorized but not requested: own entries
+            // With explicit authorization (historial_compartido) and asking for it, everything is visible.
             Assert.Equal(4, h.Query(OperationHistory.ScopeFor("S-ana-1", "A-ana", true, true, out _), null, null, null, null, null).Total);
-            // En curso: mismo criterio.
+            // In progress: same rule.
             var running = jobs.Create("S-bob-1", "geo"); running.AgentId = "A-bob";
             Assert.Empty(jobs.ForOwner("S-ana-1", "A-ana").Where(j => !j.IsFinal));
             Assert.Single(jobs.ForOwner("S-bob-2", "A-bob").Where(j => !j.IsFinal));
@@ -112,7 +112,7 @@ namespace Bimbridge.Tests
         [Fact]
         public void Reconnection_SameNamedAgentKeepsItsHistory_AcrossSessionsAndRestart()
         {
-            // AUD-13: al reconectar la sesión es otra (ids únicos por instancia); el agente con nombre conserva lo suyo, también tras reiniciar.
+            // AUD-13: on reconnect the session is a different one (unique ids per instance); a named agent keeps its own entries, also after a restart.
             var p = NewPath();
             var jobs = new JobStore();
             var h = new OperationHistory(p);
@@ -158,7 +158,7 @@ namespace Bimbridge.Tests
         [Fact]
         public async Task JobFinishingWithDifferences_AfterClientSawEnProceso_IsNeverRecordedAsOk()
         {
-            // AUD-18: el cliente recibió en_proceso; el trabajo termina después con diferencias de verificación.
+            // AUD-18: the client received en_proceso; the job finishes later with verification differences.
             var jobs = new JobStore();
             var h = new OperationHistory(NewPath());
             jobs.OnAnyFinal = j => h.Add(j);
@@ -167,21 +167,21 @@ namespace Bimbridge.Tests
             jobs.Run(job, async () =>
             {
                 await release.Task;
-                // Como DocOp: resultado con la lista de diferencias, sin pasar estado.
-                jobs.Complete(job, new Dictionary<string, object> { ["archivo"] = "x.pdf", ["diferencias"] = new List<object> { "el PDF tiene 3 páginas y se pidieron 4 hojas" } });
+                // Like DocOp: result with the list of differences, without passing a status.
+                jobs.Complete(job, new Dictionary<string, object> { ["archivo"] = "x.pdf", ["diferencias"] = new List<object> { "the PDF has 3 pages and 4 sheets were requested" } });
             });
-            Assert.Equal(Status.EnProceso, job.Estado);                    // lo que vio el cliente al principio
+            Assert.Equal(Status.EnProceso, job.Estado);                    // what the client saw at first
             Assert.Equal(0, h.Count);
             release.SetResult(true);
             await job.Work;
-            Assert.Equal(Status.ConDiferencias, job.Estado);               // respuesta diferida
-            Assert.Equal(Status.ConDiferencias, jobs.Get(job.Id).Estado);  // consulta posterior del job_id
+            Assert.Equal(Status.ConDiferencias, job.Estado);               // deferred response
+            Assert.Equal(Status.ConDiferencias, jobs.Get(job.Id).Estado);  // later query of the job_id
             var rec = h.Query(All, null, null, null, null, null).Page.Single();
-            Assert.Equal(Status.ConDiferencias, rec.Estado);               // historial
-            Assert.Equal("revisar_diferencias", rec.Retry);                // exige revisión, no "no_necesario"
+            Assert.Equal(Status.ConDiferencias, rec.Estado);               // history
+            Assert.Equal("revisar_diferencias", rec.Retry);                // requires review, not "no_necesario"
             Assert.Equal(0, h.Query(All, Status.Ok, null, null, null, null).Total);
 
-            // Un "ok" explícito no enmascara diferencias; otros estados explícitos se respetan; sin diferencias sigue siendo ok.
+            // An explicit "ok" does not mask differences; other explicit statuses are respected; without differences it is still ok.
             var a = jobs.Create("S1", "doc ifc"); jobs.Complete(a, new Dictionary<string, object> { ["diferencias"] = new List<object> { "x" } }, Status.Ok);
             Assert.Equal(Status.ConDiferencias, a.Estado);
             var b = jobs.Create("S1", "exec"); jobs.Complete(b, new Dictionary<string, object> { ["diferencias"] = new List<object> { "x" } }, "parcial");
@@ -202,7 +202,7 @@ namespace Bimbridge.Tests
             await j1.Work;
             Assert.Equal(JobStatus.Cancelado, j1.Status);
             Assert.Equal(1, h.Count);
-            Assert.False(jobs.Cancel(j1));                                  // ya terminado: cancelar no hace nada
+            Assert.False(jobs.Cancel(j1));                                  // already finished: cancel does nothing
         }
     }
 }

@@ -6,8 +6,8 @@ using System.Text;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Una sesión = una conexión de un puente (Claude Code, Codex…). Es lo que el operador llamó "puerto".
-    /// La IA nunca ve este identificador; sólo lo usa el add-in para la cola, los conflictos y el diario.
+    /// A session = one bridge connection (Claude Code, Codex…). It is what the operator called a "port".
+    /// The AI never sees this identifier; only the add-in uses it for the queue, conflicts and the journal.
     /// </summary>
     public sealed class Session
     {
@@ -17,22 +17,22 @@ namespace Bimbridge.Engine
         public DateTime ConnectedUtc { get; internal set; }
         public DateTime LastSeenUtc { get; internal set; }
 
-        // ---- Identidad nominal (revisión consolidada). Ver docs/0.9.0/AGENT_IDENTITY_PROTOCOL.md ----
-        /// <summary>Alias del agente ("Integration client"). Declarado: nunca se infiere ni se hereda de otra sesión. Null = sin nombre.</summary>
+        // ---- Nominal identity (consolidated review). See docs/0.9.0/AGENT_IDENTITY_PROTOCOL.md ----
+        /// <summary>Agent alias ("Integration client"). Declared: never inferred or inherited from another session. Null = unnamed.</summary>
         public string AgentName { get; internal set; }
         public string ClientVersion { get; internal set; }
         public string Conversation { get; internal set; }
         public string Model { get; internal set; }
-        /// <summary>De dónde salió el nombre: configuracion (variable del puente), registro (ctx agente=), hello o ninguno.</summary>
+        /// <summary>Where the name came from: configuracion (bridge variable), registro (ctx agente=), hello or ninguno.</summary>
         public string IdentitySource { get; internal set; } = AgentIdentity.SourceNone;
-        /// <summary>Usuario de Windows: verificado por la ACL de la tubería (sólo ese usuario puede conectarse). El alias NO está verificado.</summary>
+        /// <summary>Windows user: verified by the pipe ACL (only that user can connect). The alias is NOT verified.</summary>
         public string Principal { get; internal set; }
-        /// <summary>Issue #3: por qué la sesión no tiene nombre (p. ej. alias en uso por otra sesión). Null si no hay nada que decir.</summary>
+        /// <summary>Issue #3: why the session has no name (e.g. alias in use by another session). Null if there is nothing to say.</summary>
         public string IdentityNote { get; internal set; }
-        /// <summary>Issue #4: huella estable del agente (principal + alias). Null sin alias.</summary>
+        /// <summary>Issue #4: stable agent fingerprint (principal + alias). Null without an alias.</summary>
         public string AgentId => Correlation.AgentIdOf(Principal, AgentName);
 
-        // ---- Contadores (los escribe PipeHost; se leen desde la ventana sin bloquear Revit) ----
+        // ---- Counters (written by PipeHost; read from the window without blocking Revit) ----
         internal long _requests, _errors, _active, _totalMs;
         public long Requests => System.Threading.Interlocked.Read(ref _requests);
         public long Errors => System.Threading.Interlocked.Read(ref _errors);
@@ -41,15 +41,15 @@ namespace Bimbridge.Engine
         public string LastOp { get; internal set; }
         public string LastDoc { get; internal set; }
 
-        public string DisplayName => AgentName ?? "(sin nombre) · " + ClientName;
+        public string DisplayName => AgentName ?? "(unnamed) · " + ClientName;
 
-        /// <summary>Conjuntos con nombre ($l5_perimetro): ids guardados por esta sesión.</summary>
+        /// <summary>Named sets ($l5_perimeter): ids saved by this session.</summary>
         public NamedSets Sets { get; } = new NamedSets();
 
         public override string ToString() => Id;
     }
 
-    /// <summary>Reglas de identidad de agentes: validación del alias y estado de presencia comprobable.</summary>
+    /// <summary>Agent identity rules: alias validation and verifiable presence state.</summary>
     public static class AgentIdentity
     {
         public const string SourceNone = "ninguno";
@@ -58,7 +58,7 @@ namespace Bimbridge.Engine
         public const string SourceHello = "hello";
         public const int MaxName = 80;
 
-        /// <summary>Alias aceptable: 1..80 caracteres imprimibles, sin saltos de línea. Devuelve null si no vale.</summary>
+        /// <summary>Acceptable alias: 1..80 printable characters, no line breaks. Returns null if invalid.</summary>
         public static string Clean(string name)
         {
             if (string.IsNullOrWhiteSpace(name)) return null;
@@ -69,15 +69,15 @@ namespace Bimbridge.Engine
             return s.Length > MaxName ? s.Substring(0, MaxName) : s;
         }
 
-        /// <summary>Estado de una sesión abierta: ejecutando, activo (petición en los últimos 60 s) o inactivo. Nunca "conectado" por inferencia.</summary>
+        /// <summary>State of an open session: ejecutando (running), activo (request in the last 60 s) or inactivo (idle). Never "connected" by inference.</summary>
         public static string Presence(Session s, DateTime now) =>
             s.Active > 0 ? "ejecutando" : (now - s.LastSeenUtc).TotalSeconds <= 60 ? "activo" : "inactivo";
     }
 
     /// <summary>
-    /// Ciclo de vida de la sesión frente al umbral de inactividad (issue #1). La sesión lógica no muere por la duración de una solicitud:
-    /// sólo expira por inactividad cuando no tiene solicitudes en curso. Una conexión rota (EOF/IOException) se cierra siempre; lo que
-    /// estuviera escribiendo conserva su propia evidencia (intención durable, estado desconocido, reconciliación) y nunca se reintenta solo.
+    /// Session lifecycle against the idle threshold (issue #1). The logical session does not die because of a request's duration:
+    /// it only expires on inactivity when it has no requests in progress. A broken connection (EOF/IOException) is always closed; whatever
+    /// was writing keeps its own evidence (durable intent, unknown state, reconciliation) and is never retried automatically.
     /// </summary>
     public static class SessionLifecycle
     {
@@ -86,7 +86,7 @@ namespace Bimbridge.Engine
 
     public enum RegisterResult { Ok, Invalid, Duplicate }
 
-    /// <summary>Sesión ya cerrada, para el historial del panel (acotado).</summary>
+    /// <summary>Session already closed, for the panel history (bounded).</summary>
     public sealed class ClosedSession
     {
         public string Id, AgentName, ClientName, IdentitySource, Reason;
@@ -106,9 +106,9 @@ namespace Bimbridge.Engine
         {
             lock (_lock)
             {
-                // Revisión PR #22: identificador único por INSTANCIA de sesión. Antes "S-cliente-pid" se reutilizaba al reconectar con el mismo
-                // pid y, como request_id = session_id#contador y el contador reinicia, dos solicitudes distintas podían compartir request_id.
-                // Se conserva el prefijo legible (cliente y pid, útil en el diario) y se añade un sufijo aleatorio de 64 bits.
+                // PR #22 review: unique identifier per session INSTANCE. Previously "S-cliente-pid" was reused when reconnecting with the same
+                // pid and, since request_id = session_id#counter and the counter restarts, two different requests could share a request_id.
+                // The readable prefix (client and pid, useful in the journal) is kept and a random 64-bit suffix is added.
                 var baseId = "S-" + Slug(clientName) + "-" + (clientPid > 0 ? clientPid.ToString() : "0");
                 string id;
                 do id = baseId + "-" + NewInstanceSuffix();
@@ -133,7 +133,7 @@ namespace Bimbridge.Engine
             lock (_lock) s.LastSeenUtc = _now();
         }
 
-        /// <summary>Datos del saludo: versión del cliente y, si el puente lo trae configurado, el alias del agente.</summary>
+        /// <summary>Hello data: client version and, if the bridge has it configured, the agent alias.</summary>
         public void Describe(Session s, string clientVersion, string agent, string conversation, string model, string source, string principal)
         {
             lock (_lock)
@@ -145,21 +145,21 @@ namespace Bimbridge.Engine
                 {
                     var holder = HolderOf(s, a);
                     if (holder == null) { s.AgentName = a; s.IdentitySource = source ?? AgentIdentity.SourceHello; s.IdentityNote = null; }
-                    else s.IdentityNote = "el alias \"" + a + "\" ya lo usa la sesión activa " + holder.Id;
+                    else s.IdentityNote = "the alias \"" + a + "\" is already used by the active session " + holder.Id;
                 }
                 s.Conversation = AgentIdentity.Clean(conversation);
                 s.Model = AgentIdentity.Clean(model);
             }
         }
 
-        /// <summary>Registro explícito (ctx agente=…). Sólo cambia ESTA sesión. Devuelve false si el alias no es válido o está en uso.</summary>
+        /// <summary>Explicit registration (ctx agente=…). Changes only THIS session. Returns false if the alias is invalid or in use.</summary>
         public bool Register(Session s, string agent, string conversation, string model) =>
             TryRegister(s, agent, conversation, model, out _) == RegisterResult.Ok;
 
         /// <summary>
-        /// Issue #3: registro con detección de duplicados. Un alias que ya usa OTRA sesión abierta de otro proceso cliente se rechaza
-        /// (evita suplantación accidental y reasignación indebida). La misma instancia del puente (mismo cliente y pid) que reconecta
-        /// mientras su sesión anterior aún no se cerró sí puede reutilizarlo.
+        /// Issue #3: registration with duplicate detection. An alias already used by ANOTHER open session of another client process is rejected
+        /// (prevents accidental impersonation and improper reassignment). The same bridge instance (same client and pid) reconnecting
+        /// while its previous session has not closed yet may reuse it.
         /// </summary>
         public RegisterResult TryRegister(Session s, string agent, string conversation, string model, out Session holder)
         {
@@ -179,7 +179,7 @@ namespace Bimbridge.Engine
             return RegisterResult.Ok;
         }
 
-        /// <summary>Desregistro (ctx desregistrar=true): la sesión vuelve a "sin nombre" y pierde lecturas y cambios hasta registrarse de nuevo.</summary>
+        /// <summary>Unregistration (ctx desregistrar=true): the session goes back to "unnamed" and loses reads and changes until it registers again.</summary>
         public void Unregister(Session s)
         {
             lock (_lock)
@@ -190,7 +190,7 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Otra sesión abierta que ya usa ese alias (ignorando mayúsculas), salvo la misma instancia del cliente que reconecta.</summary>
+        /// <summary>Another open session already using that alias (case-insensitive), except the same client instance reconnecting.</summary>
         private Session HolderOf(Session s, string alias)
         {
             foreach (var o in _sessions.Values)
@@ -235,7 +235,7 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Sesiones cerradas en esta ejecución de Revit (las más recientes al final). Un reinicio las borra: nada de agentes fantasma.</summary>
+        /// <summary>Sessions closed in this Revit run (most recent last). A restart clears them: no ghost agents.</summary>
         public List<ClosedSession> Closed()
         {
             lock (_lock) return new List<ClosedSession>(_closed);
@@ -248,7 +248,7 @@ namespace Bimbridge.Engine
 
         public int Count { get { lock (_lock) return _sessions.Count; } }
 
-        /// <summary>Ids emitidos en esta ejecución (abiertos o cerrados): nunca se vuelve a emitir uno.</summary>
+        /// <summary>Ids issued in this run (open or closed): one is never issued again.</summary>
         private readonly HashSet<string> _issued = new HashSet<string>(StringComparer.Ordinal);
 
         private static string NewInstanceSuffix()
@@ -274,8 +274,8 @@ namespace Bimbridge.Engine
     }
 
     /// <summary>
-    /// Conjuntos de ids con nombre, por sesión. Evitan reenviar cientos de ids en cada llamada.
-    /// Desde 0.5.0 cada conjunto queda atado al documento donde se calculó (handle dN): un conjunto de A nunca resuelve elementos de B.
+    /// Named id sets, per session. They avoid resending hundreds of ids on every call.
+    /// Since 0.5.0 each set is bound to the document where it was computed (handle dN): a set from A never resolves elements of B.
     /// </summary>
     public sealed class NamedSets
     {
@@ -289,25 +289,25 @@ namespace Bimbridge.Engine
         private readonly object _lock = new object();
         private readonly Dictionary<string, Entry> _sets = new Dictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Límite de conjuntos por sesión (los más antiguos no se borran solos: se avisa).</summary>
+        /// <summary>Limit of sets per session (the oldest are not deleted automatically: a warning is given).</summary>
         public const int MaxSets = 256;
 
         public static string Normalize(string name)
         {
-            if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("nombre de conjunto vacío");
+            if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("empty set name");
             var n = name.Trim();
             if (!n.StartsWith("$")) n = "$" + n;
             for (var i = 1; i < n.Length; i++)
             {
                 var c = n[i];
                 if (!(char.IsLetterOrDigit(c) || c == '_' || c == '-'))
-                    throw new ArgumentException("nombre de conjunto inválido: use letras, números, _ o -");
+                    throw new ArgumentException("invalid set name: use letters, digits, _ or -");
             }
-            if (n.Length < 2 || n.Length > 48) throw new ArgumentException("nombre de conjunto de 1 a 47 caracteres");
+            if (n.Length < 2 || n.Length > 48) throw new ArgumentException("set name of 1 to 47 characters");
             return n;
         }
 
-        /// <param name="doc">Handle del documento (dN) donde valen esos ids; null = sin documento (compatibilidad).</param>
+        /// <param name="doc">Handle of the document (dN) where those ids are valid; null = no document (compatibility).</param>
         public void Save(string name, IEnumerable<long> ids, string doc = null, string docTitle = null)
         {
             var key = Normalize(name);
@@ -315,12 +315,12 @@ namespace Bimbridge.Engine
             lock (_lock)
             {
                 if (!_sets.ContainsKey(key) && _sets.Count >= MaxSets)
-                    throw new InvalidOperationException("demasiados conjuntos (" + MaxSets + "); borre alguno con sets drop");
+                    throw new InvalidOperationException("too many sets (" + MaxSets + "); delete some with sets drop");
                 _sets[key] = new Entry { Ids = arr, Doc = doc, DocTitle = docTitle };
             }
         }
 
-        /// <summary>Sin comprobar documento (sólo para listados y compatibilidad).</summary>
+        /// <summary>Without checking the document (only for listings and compatibility).</summary>
         public bool TryGet(string name, out long[] ids)
         {
             lock (_lock)
@@ -332,7 +332,7 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// Resuelve el conjunto para el documento <paramref name="doc"/>. Si se guardó en otro documento devuelve false con el motivo.
+        /// Resolves the set for document <paramref name="doc"/>. If it was saved in another document, returns false with the reason.
         /// </summary>
         public bool TryGet(string name, string doc, out long[] ids, out string error)
         {
@@ -342,13 +342,13 @@ namespace Bimbridge.Engine
             {
                 if (!_sets.TryGetValue(Normalize(name), out var e))
                 {
-                    error = "no existe el conjunto " + name + "; use sets para ver los guardados";
+                    error = "set " + name + " does not exist; use sets to see the saved ones";
                     return false;
                 }
                 if (doc != null && e.Doc != null && !string.Equals(doc, e.Doc, StringComparison.OrdinalIgnoreCase))
                 {
-                    error = "el conjunto " + Normalize(name) + " es del documento " + e.Doc + (e.DocTitle != null ? " (" + e.DocTitle + ")" : "") +
-                            ", no de " + doc + ": sus ids no valen aquí. Vuelva a consultarlo en este documento o pase doc=" + e.Doc;
+                    error = "set " + Normalize(name) + " belongs to document " + e.Doc + (e.DocTitle != null ? " (" + e.DocTitle + ")" : "") +
+                            ", not " + doc + ": its ids are not valid here. Query it again in this document or pass doc=" + e.Doc;
                     return false;
                 }
                 ids = e.Ids;
@@ -356,7 +356,7 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Documento al que pertenece el conjunto (null si no consta).</summary>
+        /// <summary>Document the set belongs to (null if unknown).</summary>
         public string DocOf(string name)
         {
             lock (_lock) return _sets.TryGetValue(Normalize(name), out var e) ? e.Doc : null;
@@ -367,7 +367,7 @@ namespace Bimbridge.Engine
             lock (_lock) return _sets.Remove(Normalize(name));
         }
 
-        /// <summary>Borra los conjuntos de un documento que se cerró.</summary>
+        /// <summary>Deletes the sets of a document that was closed.</summary>
         public int RemoveDoc(string doc)
         {
             lock (_lock)
@@ -389,7 +389,7 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Nombre → (cantidad, documento).</summary>
+        /// <summary>Name → (count, document).</summary>
         public List<object[]> Describe()
         {
             lock (_lock)

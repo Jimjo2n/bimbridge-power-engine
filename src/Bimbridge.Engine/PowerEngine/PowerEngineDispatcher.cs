@@ -14,23 +14,23 @@ using Response = BimBridge.PowerEngine.PowerEngineContracts.Response;
 
 namespace BimBridge.PowerEngine
 {
-    /// <summary>Configuración del Power Engine (rutas de los motores opcionales y umbrales del modelo de coste).</summary>
+    /// <summary>Power Engine configuration (paths of the optional engines and cost-model thresholds).</summary>
     public sealed class PowerEngineOptions
     {
-        /// <summary>Ejecutable del Rust Geometry Engine en modo IPC (opcional; FFI se prueba siempre).</summary>
+        /// <summary>Rust Geometry Engine executable in IPC mode (optional; FFI is always probed).</summary>
         public string RustWorkerExe;
-        /// <summary>Intérprete y script del Python Worker (opcionales). Sin ellos, los trabajos documentales PDF devuelven NO_DISPONIBLE.</summary>
+        /// <summary>Python Worker interpreter and script (optional). Without them, PDF document jobs return NO_DISPONIBLE.</summary>
         public string PythonExe, PythonWorkerScript;
-        /// <summary>auto (modelo de coste) | csharp | rust_ffi | rust_ipc. Forzar sirve para benchmarks y diagnóstico.</summary>
+        /// <summary>auto (cost model) | csharp | rust_ffi | rust_ipc. Forcing is meant for benchmarks and diagnostics.</summary>
         public string Geometry = "auto";
         public Calibration Calibration = Calibration.Default();
         public bool DisableRustFfi;
     }
 
     /// <summary>
-    /// Umbrales medidos (no supuestos): a partir de cuántos elementos Rust FFI compensa su coste de llamada frente a C#, por trabajo.
-    /// Los valores por defecto salen del benchmark Power Engine (docs/0.9.0); <c>power-engine calibrar</c> los recalcula en el equipo.
-    /// int.MaxValue = C# siempre (Rust no ganó en ningún tamaño medido).
+    /// Measured (not assumed) thresholds: from how many items Rust FFI pays off its call cost compared with C#, per job.
+    /// The default values come from the Power Engine benchmark (docs/0.9.0); <c>power-engine calibrar</c> recomputes them on the machine.
+    /// int.MaxValue = always C# (Rust did not win at any measured size).
     /// </summary>
     public sealed class Calibration
     {
@@ -41,13 +41,13 @@ namespace BimBridge.PowerEngine
         {
             RustFfiFrom =
             {
-                // medido 2026-11-04 (power-engine calibrar, 3 campañas de 5–15 rondas, contenedor Linux x64 de 4 CPU): Rust FFI gana desde
-                // n=100 en nearest/match/duplicates/segment_contacts (×2,5–×11); transform3 y components no ganan en todos los tamaños → C#.
-                // En el PC de destino se recalibra con "power-engine calibrar --salida power_engine\calibracion.json".
+                // measured 2026-11-04 (power-engine calibrar, 3 campaigns of 5–15 rounds, Linux x64 4-CPU container): Rust FFI wins from
+                // n=100 in nearest/match/duplicates/segment_contacts (×2.5–×11); transform3 and components do not win at every size → C#.
+                // On the target PC, recalibrate with "power-engine calibrar --salida power_engine\calibracion.json".
                 ["transform3"] = int.MaxValue, ["nearest"] = 100, ["match"] = 100, ["duplicates"] = 100,
                 ["segment_contacts"] = 100, ["components"] = int.MaxValue,
             },
-            Source = "por_defecto (benchmark Power Engine 0.9.0, Linux x64 4 CPU; recalibrar en el equipo)",
+            Source = "por_defecto (Power Engine 0.9.0 benchmark, Linux x64 4 CPU; recalibrate on the machine)",
         };
 
         public int For(string job) => RustFfiFrom.TryGetValue(job, out var v) ? v : int.MaxValue;
@@ -68,10 +68,10 @@ namespace BimBridge.PowerEngine
     }
 
     /// <summary>
-    /// BIMBRIDGE Power Engine — despachador. C# decide qué motor ejecuta cada trabajo según disponibilidad, tamaño y mediciones;
-    /// una operación nunca pasa por los tres lenguajes: geometría = C# o Rust; documentos = Python (o .NET si es equivalente).
-    /// Los resultados de Rust y C# son idénticos por contrato (mismas reglas y desempates), así que elegir motor no cambia el resultado.
-    /// Registra métricas power_engine.* por trabajo y motor. No toca Revit ni concede permisos.
+    /// BIMBRIDGE Power Engine — dispatcher. C# decides which engine runs each job based on availability, size and measurements;
+    /// an operation never goes through all three languages: geometry = C# or Rust; documents = Python (or .NET when equivalent).
+    /// Rust and C# results are identical by contract (same rules and tie-breaks), so choosing an engine does not change the result.
+    /// Records power_engine.* metrics per job and engine. Does not touch Revit or grant permissions.
     /// </summary>
     public sealed class PowerEngineDispatcher : IDisposable
     {
@@ -92,20 +92,20 @@ namespace BimBridge.PowerEngine
         public bool RustIpcConfigured => !string.IsNullOrEmpty(Options.RustWorkerExe) && File.Exists(Options.RustWorkerExe);
         public bool PythonConfigured => !string.IsNullOrEmpty(Options.PythonExe) && !string.IsNullOrEmpty(Options.PythonWorkerScript) && File.Exists(Options.PythonWorkerScript);
 
-        /// <summary>Motor elegido para un trabajo geométrico de <paramref name="size"/> elementos (y por qué).</summary>
+        /// <summary>Engine chosen for a geometry job of <paramref name="size"/> items (and why).</summary>
         public string Choose(string job, long size, out string why)
         {
             var forced = (Options.Geometry ?? "auto").Trim().ToLowerInvariant();
-            if (forced == EngineCSharp) { why = "forzado"; return EngineCSharp; }
-            if (forced == EngineRustFfi) { why = "forzado"; return RustFfiAvailable ? EngineRustFfi : Fallback(out why, "rust_ffi no disponible: " + RustGeometryEngine.Unavailable); }
-            if (forced == EngineRustIpc) { why = "forzado"; return RustIpcConfigured ? EngineRustIpc : Fallback(out why, "rust_ipc no configurado"); }
+            if (forced == EngineCSharp) { why = "forced"; return EngineCSharp; }
+            if (forced == EngineRustFfi) { why = "forced"; return RustFfiAvailable ? EngineRustFfi : Fallback(out why, "rust_ffi unavailable: " + RustGeometryEngine.Unavailable); }
+            if (forced == EngineRustIpc) { why = "forced"; return RustIpcConfigured ? EngineRustIpc : Fallback(out why, "rust_ipc not configured"); }
             var from = Options.Calibration.For(job);
             if (RustFfiAvailable && size >= from) { why = "n=" + size + " ≥ " + from + " (" + Options.Calibration.Source + ")"; return EngineRustFfi; }
-            why = RustFfiAvailable ? "n=" + size + " < " + (from == int.MaxValue ? "∞" : from.ToString(CultureInfo.InvariantCulture)) + ": C# es más rápido sin coste de transferencia" : "Rust no disponible: " + (Options.DisableRustFfi ? "desactivado" : RustGeometryEngine.Unavailable);
+            why = RustFfiAvailable ? "n=" + size + " < " + (from == int.MaxValue ? "∞" : from.ToString(CultureInfo.InvariantCulture)) + ": C# is faster without transfer cost" : "Rust unavailable: " + (Options.DisableRustFfi ? "disabled" : RustGeometryEngine.Unavailable);
             return EngineCSharp;
         }
 
-        private static string Fallback(out string why, string reason) { why = reason + " → C# (degradación controlada)"; return EngineCSharp; }
+        private static string Fallback(out string why, string reason) { why = reason + " → C# (controlled degradation)"; return EngineCSharp; }
 
         private T Run<T>(string job, long size, Func<T> cs, Func<T> ffi, Func<T> ipc)
         {
@@ -137,7 +137,7 @@ namespace BimBridge.PowerEngine
             }
         }
 
-        // ---------------- geometría (C# o Rust; nunca Python) ----------------
+        // ---------------- geometry (C# or Rust; never Python) ----------------
 
         public double[] Transform3(double[] xyz, double[] m, CancellationToken ct = default(CancellationToken)) =>
             Run("transform3", xyz.Length / 3, () => GeometryKernels.Transform3(xyz, m, ct), () => RustGeometryEngine.Transform3(xyz, m, ct),
@@ -197,7 +197,7 @@ namespace BimBridge.PowerEngine
         internal static int[] Ints(Dictionary<string, object> d, string k) =>
             ((List<object>)d[k]).Select(x => Convert.ToInt32(x, CultureInfo.InvariantCulture)).ToArray();
 
-        // ---------------- documentos (Python; .NET donde es equivalente) ----------------
+        // ---------------- documents (Python; .NET where equivalent) ----------------
 
         private WorkerClient Python()
         {
@@ -205,15 +205,15 @@ namespace BimBridge.PowerEngine
         }
 
         /// <summary>
-        /// Trabajo documental. <paramref name="authorized"/> son las ÚNICAS rutas que el worker puede abrir en este trabajo.
-        /// docx_extract corre en .NET si Python no está (resultado equivalente medido); los PDF necesitan el Python Worker.
+        /// Document job. <paramref name="authorized"/> are the ONLY paths the worker may open in this job.
+        /// docx_extract runs in .NET if Python is absent (measured equivalent result); PDFs need the Python Worker.
         /// </summary>
         public Response Document(string job, Dictionary<string, object> args, IEnumerable<string> authorized, Limits limits = null, CancellationToken ct = default(CancellationToken), bool preferDotNet = false)
         {
             var paths = (authorized ?? Enumerable.Empty<string>()).Select(Path.GetFullPath).ToList();
             var file = Arg.GetString(args, "ruta");
             if (file != null && !PathAllowed(Path.GetFullPath(file), paths))
-                return Response.Fail(NewId(), Codes.PathDenied, "ruta no autorizada para este trabajo: " + file);
+                return Response.Fail(NewId(), Codes.PathDenied, "path not authorized for this job: " + file);
             var sw = Stopwatch.StartNew();
             Response r;
             if (job == "docx_extract" && (preferDotNet || !PythonConfigured))
@@ -222,7 +222,7 @@ namespace BimBridge.PowerEngine
                 r.Telemetry.Engine = EngineCSharp;
             }
             else if (!PythonConfigured)
-                r = Response.Fail(NewId(), Codes.Unavailable, "Python Worker no configurado: " + job + " no tiene equivalente .NET (degradación controlada; el resto de BIMBRIDGE sigue funcionando)");
+                r = Response.Fail(NewId(), Codes.Unavailable, "Python Worker not configured: " + job + " has no .NET equivalent (controlled degradation; the rest of BIMBRIDGE keeps working)");
             else
                 r = Python().Call(new Request { Job = job, Args = args, Paths = paths, Limits = limits ?? new Limits() }, ct);
             sw.Stop();
@@ -243,16 +243,16 @@ namespace BimBridge.PowerEngine
             return false;
         }
 
-        /// <summary>Saludo con cada motor configurado: qué está disponible, versión y capacidades (degradación visible, no silenciosa).</summary>
+        /// <summary>Handshake with each configured engine: what is available, version and capabilities (visible degradation, not silent).</summary>
         public Dictionary<string, object> Status()
         {
             var d = new Dictionary<string, object>
             {
                 ["csharp"] = new Dictionary<string, object> { ["disponible"] = true },
-                ["rust_ffi"] = new Dictionary<string, object> { ["disponible"] = RustFfiAvailable, ["motivo"] = RustFfiAvailable ? null : (Options.DisableRustFfi ? "desactivado" : RustGeometryEngine.Unavailable), ["version"] = RustFfiAvailable ? RustGeometryEngine.Version : null },
+                ["rust_ffi"] = new Dictionary<string, object> { ["disponible"] = RustFfiAvailable, ["motivo"] = RustFfiAvailable ? null : (Options.DisableRustFfi ? "disabled" : RustGeometryEngine.Unavailable), ["version"] = RustFfiAvailable ? RustGeometryEngine.Version : null },
             };
-            d["rust_ipc"] = Probe(RustIpcConfigured ? RustIpc() : null, "no configurado");
-            d["python"] = Probe(PythonConfigured ? Python() : null, "no configurado");
+            d["rust_ipc"] = Probe(RustIpcConfigured ? RustIpc() : null, "not configured");
+            d["python"] = Probe(PythonConfigured ? Python() : null, "not configured");
             d["calibracion"] = Options.Calibration.ToJson();
             return d;
         }
@@ -268,7 +268,7 @@ namespace BimBridge.PowerEngine
             };
         }
 
-        /// <summary>Métricas acumuladas power_engine.* por trabajo y motor.</summary>
+        /// <summary>Accumulated power_engine.* metrics per job and engine.</summary>
         public Dictionary<string, object> Metrics()
         {
             lock (_lock)

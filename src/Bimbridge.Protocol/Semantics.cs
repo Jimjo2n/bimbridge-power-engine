@@ -8,9 +8,9 @@ using System.Text;
 namespace Bimbridge.Protocol
 {
     /// <summary>
-    /// Normalizador ÚNICO de modos y acciones (0.6.0, H01). Lo usan el puente (para no redirigir escrituras a otro Revit) y el add-in
-    /// (para el diario, Retener, barreras). Antes cada lado tenía su lista: "escribir" o " ejecutar " eran escrituras para el add-in y
-    /// lecturas para el puente. Un modo desconocido es inválido; nunca se convierte en lectura.
+    /// The SINGLE normalizer of modes and actions (0.6.0, H01). Used by the bridge (so writes are not redirected to another Revit) and the add-in
+    /// (for the journal, Hold, barriers). Previously each side had its own list: "escribir" or " ejecutar " were writes for the add-in and
+    /// reads for the bridge. An unknown mode is invalid; it never becomes a read.
     /// </summary>
     public static class OpSemantics
     {
@@ -18,15 +18,15 @@ namespace Bimbridge.Protocol
 
         public const string ModeQuery = "consulta";
         public const string ModeRun = "ejecutar";
-        /// <summary>alpha3: modificación TEMPORAL dentro de un grupo que siempre se revierte. Cambia el modelo mientras corre, así que es
-        /// escritura a efectos de autorización (nivel W) y de enrutado; consulta ya no abre transacción (Revit impide cualquier cambio).</summary>
+        /// <summary>alpha3: TEMPORARY modification inside a group that is always rolled back. It changes the model while running, so it is
+        /// a write for authorization (level W) and routing; consulta no longer opens a transaction (Revit blocks any change).</summary>
         public const string ModeTrial = "ensayo";
 
         private static readonly string[] QueryModes = { "consulta", "query", "lectura", "leer", "read" };
         private static readonly string[] TrialModes = { "ensayo", "prueba", "test", "dry_run", "simular" };
         private static readonly string[] RunModes = { "ejecutar", "execute", "escribir", "write", "aplicar", "run" };
 
-        /// <summary>Modo de exec normalizado: "consulta", "ejecutar" o null si no se reconoce. Sin modo = consulta.</summary>
+        /// <summary>Normalized exec mode: "consulta", "ejecutar" or null if not recognized. No mode = consulta.</summary>
         public static string ExecMode(IDictionary<string, object> args, out string error)
         {
             error = null;
@@ -37,7 +37,7 @@ namespace Bimbridge.Protocol
             if (QueryModes.Contains(m)) return ModeQuery;
             if (RunModes.Contains(m)) return ModeRun;
             if (TrialModes.Contains(m)) return ModeTrial;
-            error = "modo '" + raw.Trim() + "' no existe: use consulta (solo lectura), ensayo (cambia y revierte) o ejecutar (aplica cambios)";
+            error = "modo '" + raw.Trim() + "' does not exist: use consulta (read-only), ensayo (changes and rolls back) or ejecutar (applies changes)";
             return null;
         }
 
@@ -48,13 +48,13 @@ namespace Bimbridge.Protocol
 
         public static readonly string[] DocVerbs = { "guardar", "guardar_como", "sync", "sincronizar", "pdf", "cerrar" };
 
-        /// <summary>Verbos de tarea: lectura (estado, esperar…) o escritura (iniciar, reanudar…).</summary>
+        /// <summary>Task verbs: read (estado, esperar…) or write (iniciar, reanudar…).</summary>
         public static readonly string[] TaskReads = { "estado", "esperar", "resumen", "lista", "unidades", "recetas" };
         public static readonly string[] TaskWrites = { "iniciar", "reanudar", "cancelar", "reconciliar", "anotar", "olvidar" };
 
         public static string TaskVerb(IDictionary<string, object> args) => Norm(Arg.GetString(args, "accion") ?? "estado");
 
-        /// <summary>Clasifica una petición. error trae el motivo cuando es Invalid.</summary>
+        /// <summary>Classifies a request. error carries the reason when it is Invalid.</summary>
         public static Kind Classify(string op, IDictionary<string, object> args, out string error)
         {
             error = null;
@@ -71,13 +71,13 @@ namespace Bimbridge.Protocol
                     var f = FamVerb(args);
                     if (FamReads.Contains(f)) return Kind.Read;
                     if (FamWrites.Contains(f)) return Kind.Write;
-                    error = "fam: acción '" + f + "' no existe (" + string.Join(", ", FamReads.Concat(FamWrites)) + ")";
+                    error = "fam: accion '" + f + "' does not exist (" + string.Join(", ", FamReads.Concat(FamWrites)) + ")";
                     return Kind.Invalid;
                 case Wire.OpTask:
                     var t = TaskVerb(args);
                     if (TaskReads.Contains(t)) return Kind.Read;
                     if (TaskWrites.Contains(t)) return Kind.Write;
-                    error = "tarea: acción '" + t + "' no existe (" + string.Join(", ", TaskReads.Concat(TaskWrites)) + ")";
+                    error = "tarea: accion '" + t + "' does not exist (" + string.Join(", ", TaskReads.Concat(TaskWrites)) + ")";
                     return Kind.Invalid;
                 default:
                     return Kind.Read;
@@ -89,8 +89,8 @@ namespace Bimbridge.Protocol
         private static string Norm(string s) => (s ?? "").Trim().ToLowerInvariant();
 
         /// <summary>
-        /// Argumentos canónicos y recursivos para huellas: claves ordenadas (ordinal), números normalizados, sin campos de control
-        /// del transporte. Mismo contenido lógico = mismo texto, venga de Codex o de Claude.
+        /// Canonical, recursive arguments for fingerprints: keys sorted (ordinal), numbers normalized, no transport control
+        /// fields. Same logical content = same text, whether it comes from Codex or Claude.
         /// </summary>
         public static string Canonical(object value)
         {
@@ -99,7 +99,7 @@ namespace Bimbridge.Protocol
             return sb.ToString();
         }
 
-        /// <summary>Campos que no forman parte del contenido lógico de una operación (control/transporte).</summary>
+        /// <summary>Fields that are not part of an operation's logical content (control/transport).</summary>
         public static readonly HashSet<string> ControlArgs = new HashSet<string>(StringComparer.Ordinal)
         {
             Wire.KeyArg, Wire.TaskArg, Wire.ToolArg, "reconciliar", "deadline_ms", "esperar", "espera_s", "page", "_cliente", "_bytes", "_traza",
@@ -107,7 +107,7 @@ namespace Bimbridge.Protocol
 
         private static void WriteCanonical(StringBuilder sb, object v, int depth)
         {
-            if (depth > 64) throw new FormatException("argumentos demasiado anidados");
+            if (depth > 64) throw new FormatException("arguments nested too deeply");
             switch (v)
             {
                 case null: sb.Append("null"); return;

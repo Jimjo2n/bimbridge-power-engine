@@ -10,9 +10,9 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// 0.9.1 (Bloque I): historial de operaciones largas terminadas, persistente y consultable (filtros, paginación) para el panel (#5)
-    /// y para los agentes. Cada final queda en un JSONL (una línea, append) y en un anillo en memoria; al arrancar se recargan las últimas
-    /// <see cref="MaxInMemory"/>. Incluye el consejo de reintento: nunca se aconseja repetir lo que pudo haber quedado aplicado.
+    /// 0.9.1 (Block I): history of finished long operations, persistent and queryable (filters, pagination) for the panel (#5)
+    /// and for agents. Each completion goes to a JSONL (one line, append) and to an in-memory ring; on startup the last
+    /// <see cref="MaxInMemory"/> are reloaded. Includes the retry advice: repeating something that may have been applied is never advised.
     /// </summary>
     public sealed class OperationHistory
     {
@@ -43,10 +43,10 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// Consejo de reintento por estado final. "reintentable": no se aplicó nada (rechazo, conflicto, validación, ocupado, vencido).
-        /// "reconciliar_antes": el resultado es incierto o pudo quedar aplicado en parte. "no_necesario": terminó bien.
-        /// "revisar_diferencias" (AUD-14): se aplicó, pero la verificación no coincide con lo pedido; hay que revisar o reconciliar las
-        /// diferencias antes de darlo por bueno, y NO repetir la operación (ya está aplicada).
+        /// Retry advice per final status. "reintentable": nothing was applied (rejection, conflict, validation, busy, expired).
+        /// "reconciliar_antes": the result is uncertain or may have been partly applied. "no_necesario": it finished fine.
+        /// "revisar_diferencias" (AUD-14): it was applied, but the verification does not match what was requested; the differences
+        /// must be reviewed or reconciled before accepting it, and the operation must NOT be repeated (it is already applied).
         /// </summary>
         public static string RetryAdvice(string estado)
         {
@@ -55,7 +55,7 @@ namespace Bimbridge.Engine
                 case Status.Ok: return "no_necesario";
                 case Status.ConDiferencias: return "revisar_diferencias";
                 case Status.Rechazado: case Status.Conflicto: case Status.Invalido: case Status.Vencido: case Status.Revertido: return "reintentable";
-                case Status.Cancelado: return "reconciliar_antes";   // pudo cancelarse a mitad
+                case Status.Cancelado: return "reconciliar_antes";   // it may have been cancelled midway
                 default: return "reconciliar_antes";
             }
         }
@@ -78,7 +78,7 @@ namespace Bimbridge.Engine
                 if (line.Trim().Length == 0) continue;
                 try { Push(Record.FromJson(Json.ParseObject(line))); }
                 catch (Exception ex) when (ex is FormatException || ex is ArgumentException || ex is InvalidOperationException)
-                { if (LoadErrors.Count < 20) LoadErrors.Add("línea " + n + ": " + ex.GetType().Name); }
+                { if (LoadErrors.Count < 20) LoadErrors.Add("line " + n + ": " + ex.GetType().Name); }
             }
         }
 
@@ -102,7 +102,7 @@ namespace Bimbridge.Engine
                 Push(r);
                 if (_path != null)
                 {
-                    // Rotación simple: al superar el tamaño, se conserva el anillo en memoria y se reescribe (las más antiguas se pierden a propósito).
+                    // Simple rotation: once over the size limit, the in-memory ring is kept and rewritten (the oldest entries are dropped on purpose).
                     if (File.Exists(_path) && new FileInfo(_path).Length > MaxFileBytes)
                         Home.WriteAtomic(_path, string.Join("\n", _ring.Reverse().Select(x => Json.Write(x.ToJson()))) + "\n");
                     else
@@ -117,10 +117,10 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// AUD-13: quién pregunta. Un registro es visible si lo lanzó la MISMA sesión o el MISMO agente con nombre (la sesión cambia al
-        /// reconectar; el agente —principal de Windows + alias— no). El nombre de tarea (tarea=) NO da visibilidad: lo declara el
-        /// cliente y otro podría adivinarlo. Ver lo de otros exige <see cref="SeeAll"/>, que sólo se activa con la autorización
-        /// explícita del usuario (config historial_compartido). Sin identidad alguna no se ve nada.
+        /// AUD-13: who is asking. A record is visible if it was started by the SAME session or the SAME named agent (the session changes on
+        /// reconnect; the agent —Windows principal + alias— does not). The task name (tarea=) does NOT grant visibility: the client
+        /// declares it and another one could guess it. Seeing others' records requires <see cref="SeeAll"/>, which is only enabled with the
+        /// user's explicit authorization (config historial_compartido). Without any identity nothing is visible.
         /// </summary>
         public sealed class Scope
         {
@@ -137,22 +137,22 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// Ámbito de una consulta. Pedir «todos» sin la autorización del usuario (<paramref name="sharedAuthorized"/>) se RECHAZA
-        /// (devuelve null y el motivo): no se degrada en silencio a «lo propio» ni se concede por pedirlo.
+        /// Scope of a query. Asking for "all" without the user's authorization (<paramref name="sharedAuthorized"/>) is REJECTED
+        /// (returns null and the reason): it is not silently downgraded to "own records" nor granted just for asking.
         /// </summary>
         public static Scope ScopeFor(string sessionId, string agentId, bool wantAll, bool sharedAuthorized, out string refusal)
         {
             refusal = null;
             if (wantAll && !sharedAuthorized)
             {
-                refusal = "ver operaciones de otras sesiones exige que el usuario lo autorice (config historial_compartido=true). Sin eso sólo se ve lo propio.";
+                refusal = "seeing operations from other sessions requires the user to authorize it (config historial_compartido=true). Without that, only your own are visible.";
                 return null;
             }
             return new Scope { SessionId = sessionId, AgentId = agentId, SeeAll = wantAll };
         }
 
-        /// <summary>Consulta con ámbito obligatorio, filtros (cualquiera puede ser null) y paginación; más reciente primero.
-        /// Los filtros sólo estrechan lo visible: pedir sesion= de otro no lo muestra.</summary>
+        /// <summary>Query with a mandatory scope, filters (any may be null) and pagination; most recent first.
+        /// Filters only narrow what is visible: asking for someone else's sesion= does not show it.</summary>
         public (List<Record> Page, int Total) Query(Scope scope, string estado, string tipo, string sesion, DateTime? desde, string texto, int page = 1, int pageSize = 20)
         {
             if (scope == null) throw new ArgumentNullException(nameof(scope));

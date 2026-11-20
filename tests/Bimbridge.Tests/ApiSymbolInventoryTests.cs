@@ -11,8 +11,8 @@ using Xunit;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// 0.9.1: el inventario completo de símbolos públicos (tools/inventory/RevitApiInventory symbols) es trazable y coherente:
-    /// el SHA-256 declarado coincide con el listado, está ordenado y sin duplicados, y contiene símbolos conocidos con su firma.
+    /// 0.9.1: the full public symbol inventory (tools/inventory/RevitApiInventory symbols) is traceable and consistent:
+    /// the declared SHA-256 matches the listing, it is sorted with no duplicates, and it contains known symbols with their signatures.
     /// </summary>
     public class ApiSymbolInventoryTests
     {

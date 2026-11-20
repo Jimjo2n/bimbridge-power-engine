@@ -9,30 +9,30 @@ using Xunit;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// Aceptación D (§7) sin Revit: fixture de práctica con grupo de unidad normal y espejado, variante con dos paneles, link
-    /// transformado (giro + traslación), luminaria casi duplicada, desviaciones conocidas y ocultación por filtro/rango. El QC debe
-    /// encontrar CADA desviación (no sólo totales) y aprobar el modelo corregido dentro de las tolerancias declaradas.
-    /// Lo que depende de la API (juntar posiciones, grupos, etiquetas, filtros) se prueba en Revit con el arnés nativo.
+    /// Acceptance D (section 7) without Revit: practice fixture with a normal and a mirrored unit group, a variant with two panels, a
+    /// transformed link (rotation + translation), a near-duplicate fixture, known deviations and hiding by filter/range. QC must
+    /// find EACH deviation (not just totals) and approve the corrected model within the declared tolerances.
+    /// What depends on the API (gathering positions, groups, tags, filters) is tested in Revit with the native harness.
     /// </summary>
     public class QcFixtureTests
     {
         private sealed class Member { public string Name, Fam, Type; public double X, Y, Z, Rot; public bool? Tag; }
 
-        // Tipo de grupo "UNIT-A": coordenadas relativas al grupo (mm).
+        // Group type "UNIT-A": coordinates relative to the group (mm).
         private static readonly Member[] UnitA =
         {
             new Member { Name = "L1", Fam = "LTG", Type = "D", X = 1000, Y = 1000, Z = 2700, Rot = 0, Tag = true },
             new Member { Name = "L2", Fam = "LTG", Type = "D", X = 3000, Y = 1000, Z = 2700, Rot = 90, Tag = true },
             new Member { Name = "P1", Fam = "PANEL", Type = "P", X = 500, Y = 4000, Z = 1500, Rot = 0 },
-            new Member { Name = "P2", Fam = "PANEL", Type = "P", X = 900, Y = 4000, Z = 1500, Rot = 0 }, // dos paneles: no se asume uno por unidad
+            new Member { Name = "P2", Fam = "PANEL", Type = "P", X = 900, Y = 4000, Z = 1500, Rot = 0 }, // two panels: one per unit is not assumed
         };
 
-        // ARCH vinculado: girado 30° y desplazado; las unidades están en coordenadas del vínculo.
+        // Linked ARCH: rotated 30 degrees and moved; the units are in link coordinates.
         private static readonly Xform Link = Xform.RotZ(30, 10000, 5000, 0);
         private static readonly Dictionary<string, Xform> Units = new Dictionary<string, Xform>
         {
             ["U101"] = Xform.Identity,
-            ["U102"] = Xform.MirrorX(6000), // unidad espejada
+            ["U102"] = Xform.MirrorX(6000), // mirrored unit
         };
 
         private static (List<ManifestQc.Expected> exp, List<ManifestQc.Actual> model) Build()
@@ -59,7 +59,7 @@ namespace Bimbridge.Tests
                     });
                 }
             }
-            // Pasillo: fuera de grupos.
+            // Corridor: outside groups.
             exp.Add(new ManifestQc.Expected { Ref = "C1", X = 20000, Y = 0, Z = 2900, Level = "L05", Types = new List<string> { "LTG: G" }, Tag = true });
             model.Add(new ManifestQc.Actual { Id = id++, X = 20000, Y = 0, Z = 2900, Level = "L05", Family = "LTG", Type = "G", Tags = 1 });
             return (exp, model);
@@ -79,13 +79,13 @@ namespace Bimbridge.Tests
             var u102 = Units["U102"].Then(Link);
             Assert.True(u102.Mirrored);
             Assert.False(Units["U101"].Then(Link).Mirrored);
-            // Ida y vuelta: anfitrión → vínculo → anfitrión
+            // Round trip: host -> link -> host
             var p = u102.Apply(1000, 1000, 2700);
             var back = u102.Inverse().Apply(p[0], p[1], p[2]);
             Assert.Equal(1000, back[0], 6);
             Assert.Equal(1000, back[1], 6);
             Assert.Equal(2700, back[2], 6);
-            // En el grupo espejado, L1 queda simétrica respecto de x=6000 antes del giro del vínculo
+            // In the mirrored group, L1 is symmetric about x=6000 before the link rotation
             var inLink = Units["U102"].Apply(1000, 1000, 0);
             Assert.Equal(11000, inLink[0], 6);
         }
@@ -104,23 +104,23 @@ namespace Bimbridge.Tests
         public void KnownDeviations_AreEachIdentified()
         {
             var (exp, model) = Build();
-            // 1) variante sin segundo panel en la unidad espejada
+            // 1) variant without a second panel in the mirrored unit
             model.Remove(At(exp, model, "U102/P2"));
-            // 2) luminaria sobrante lejos
+            // 2) extra fixture far away
             model.Add(new ManifestQc.Actual { Id = 9001, X = 40000, Y = 40000, Z = 2700, Level = "L05", Family = "LTG", Type = "D", Tags = 1 });
-            // 3) casi duplicado de U101/L1 a 20 mm
+            // 3) near-duplicate of U101/L1 at 20 mm
             var l1 = At(exp, model, "U101/L1");
             model.Add(new ManifestQc.Actual { Id = 9002, X = l1.X + 20, Y = l1.Y, Z = l1.Z, RotDeg = l1.RotDeg, Level = "L05", Family = "LTG", Type = "D", Tags = 1, Group = "U101" });
-            // 4) altura fuera de tolerancia
+            // 4) height out of tolerance
             At(exp, model, "U101/L2").Z += 100;
-            // 5) tipo equivocado
+            // 5) wrong type
             At(exp, model, "U102/L1").Type = "G";
-            // 6) etiquetas: una sin etiqueta y otra con dos
+            // 6) tags: one without a tag and another with two
             At(exp, model, "C1").Tags = 0;
             At(exp, model, "U102/L2").Tags = 2;
-            // 7) miembro en el grupo equivocado
+            // 7) member in the wrong group
             At(exp, model, "U101/P1").Group = "U102";
-            // 8) orientación (giro de 90° de más) en la unidad espejada
+            // 8) orientation (90 degrees too much rotation) in the mirrored unit
             var p1 = At(exp, model, "U102/P1");
             p1.RotDeg = (p1.RotDeg + 90) % 360;
 
@@ -131,15 +131,15 @@ namespace Bimbridge.Tests
             Assert.True(Has("faltante", "U102/P2"));
             Assert.True(Has("sobrante", id: 9001));
             Assert.True(Has("casi_duplicado", id: 9002));
-            Assert.True(Has("ambiguo", "U101/L1")); // dos candidatos a 0 y 20 mm: la cercanía no prueba cuál es
+            Assert.True(Has("ambiguo", "U101/L1")); // two candidates at 0 and 20 mm: proximity does not prove which one
             Assert.True(Has("altura", "U101/L2"));
             Assert.True(Has("tipo", "U102/L1"));
             Assert.True(Has("sin_etiqueta", "C1"));
             Assert.True(Has("etiqueta_duplicada", "U102/L2"));
             Assert.True(Has("grupo", "U101/P1"));
             Assert.True(Has("orientacion", "U102/P1"));
-            // Nada de lo desviado cuenta como correcto
-            Assert.Equal(exp.Count - 1 - 1 - 6, r.Approved); // −faltante −ambiguo −6 con desviación (sólo U101/P2 queda bien)
+            // Nothing deviated counts as correct
+            Assert.Equal(exp.Count - 1 - 1 - 6, r.Approved); // -missing -ambiguous -6 with deviation (only U101/P2 stays correct)
             Assert.Equal(6, r.WithDeviation);
             Assert.Equal("U101/P2", r.Pairs.Keys.Single(k => !r.Findings.Any(f => f.Ref == k)));
         }
@@ -150,7 +150,7 @@ namespace Bimbridge.Tests
             var (exp, model) = Build();
             model.Remove(At(exp, model, "C1"));
             model.Add(new ManifestQc.Actual { Id = 9100, X = -30000, Y = 0, Z = 2900, Level = "L05", Family = "LTG", Type = "G", Tags = 1 });
-            Assert.Equal(exp.Count, model.Count); // mismos totales
+            Assert.Equal(exp.Count, model.Count); // same totals
             var r = ManifestQc.Run(exp, model, Opt);
             Assert.False(r.Passed);
             Assert.Equal(1, r.Missing);
@@ -185,7 +185,7 @@ namespace Bimbridge.Tests
                 new ManifestQc.Actual { Id = 1, X = 40, Y = 0, Level = "L1", Family = "F", Type = "T" },
                 new ManifestQc.Actual { Id = 2, X = 115, Y = 0, Level = "L1", Family = "F", Type = "T" },
             };
-            // #1 está a 40 mm de A y a 70 mm de B (diferencia < margen), pero B tiene a #2 a 5 mm: no hay duda.
+            // #1 is 40 mm from A and 70 mm from B (difference < margin), but B has #2 at 5 mm: no doubt.
             var o = Opt;
             o.NearDuplicate = 50;
             var r = ManifestQc.Run(exp, model, o);
@@ -213,7 +213,7 @@ namespace Bimbridge.Tests
         public void RotationDifference_RespectsSymbolSymmetry(double a, double b, double sym, double expected) =>
             Assert.Equal(expected, ManifestQc.RotDiff(a, b, sym), 6);
 
-        // ---------- visibilidad ----------
+        // ---------- visibility ----------
 
         [Fact]
         public void Visibility_FilterAndRcpRange_AreExplained_WithTemplateSource()

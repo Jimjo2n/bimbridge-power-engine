@@ -8,15 +8,15 @@ using Bimbridge.Engine.Geo;
 namespace Bimbridge.Addin.Revit.Geo
 {
     /// <summary>
-    /// Geometría real de un elemento: sólidos (recorriendo instancias anidadas de familia) y su triangulación orientada
-    /// hacia afuera, en coordenadas del anfitrión. Sólo lee: no abre transacciones ni vistas.
+    /// Actual geometry of an element: solids (walking nested family instances) and their outward-oriented
+    /// triangulation, in host coordinates. Read-only: opens no transactions or views.
     /// </summary>
     internal static class Bodies
     {
-        /// <summary>Volumen mínimo (pies³) para considerar un sólido: descarta cáscaras abiertas y restos de 0 volumen.</summary>
+        /// <summary>Minimum volume (ft³) for a solid to count: discards open shells and zero-volume leftovers.</summary>
         public const double MinSolidVolume = 1e-7;
 
-        /// <summary>Nivel de detalle de la triangulación de caras curvas (las planas son exactas con cualquier valor).</summary>
+        /// <summary>Triangulation detail level for curved faces (planar faces are exact at any value).</summary>
         public const double TriangulationDetail = 0.5;
 
         public static Options NewOptions() => new Options
@@ -27,8 +27,8 @@ namespace Bimbridge.Addin.Revit.Geo
         };
 
         /// <summary>
-        /// Junta los sólidos con volumen de un GeometryElement. Las instancias de familia ya vienen en coordenadas del modelo
-        /// (GetInstanceGeometry). <paramref name="skipStyles"/>: subcategorías a excluir (p. ej. "Light Source").
+        /// Collects the solids with volume from a GeometryElement. Family instances already come in model coordinates
+        /// (GetInstanceGeometry). <paramref name="skipStyles"/>: subcategories to exclude (e.g. "Light Source").
         /// </summary>
         public static void CollectSolids(GeometryElement ge, List<Solid> into, Document doc, ICollection<string> skipStyles, ISet<string> parts = null, int depth = 0, Action onFailure = null)
         {
@@ -61,8 +61,8 @@ namespace Bimbridge.Addin.Revit.Geo
             }
         }
 
-        /// <summary>Nombre para sólidos sin subcategoría propia (heredan la de la categoría del elemento).</summary>
-        public const string NoStyle = "(categoría)";
+        /// <summary>Name for solids without their own subcategory (they inherit the element's category).</summary>
+        public const string NoStyle = "(category)";
 
         private static string StyleName(Document doc, ElementId styleId)
         {
@@ -78,13 +78,13 @@ namespace Bimbridge.Addin.Revit.Geo
             return false;
         }
 
-        /// <summary>Clave estable de las subcategorías excluidas (para saber si una malla guardada sirve).</summary>
+        /// <summary>Stable key of the excluded subcategories (to tell whether a cached mesh is still usable).</summary>
         public static string SkipKey(ICollection<string> skip) =>
             skip == null || skip.Count == 0 ? "" : string.Join("|", skip.Select(x => x.Trim().ToUpperInvariant()).OrderBy(x => x, StringComparer.Ordinal));
 
         /// <summary>
-        /// Malla de un elemento (sólo caras no verticales), en coordenadas del anfitrión. <paramref name="toHost"/> = transformación
-        /// del vínculo (null o identidad para el anfitrión). Devuelve TriMesh.Empty si no tiene sólidos.
+        /// Mesh of an element (non-vertical faces only), in host coordinates. <paramref name="toHost"/> = link
+        /// transform (null or identity for the host). Returns TriMesh.Empty if it has no solids.
         /// </summary>
         public static TriMesh MeshOf(Element e, Options opt, Transform toHost, ICollection<string> skipStyles, out int solids)
         {
@@ -102,7 +102,7 @@ namespace Bimbridge.Addin.Revit.Geo
             return b.Build();
         }
 
-        /// <summary>Triangula cada cara y orienta cada triángulo con la normal hacia afuera de la cara.</summary>
+        /// <summary>Triangulates each face and orients each triangle along the face's outward normal.</summary>
         public static void AddSolid(Solid s, TriMeshBuilder b, Transform toHost)
         {
             foreach (Face f in s.Faces)
@@ -112,12 +112,12 @@ namespace Bimbridge.Addin.Revit.Geo
                 if (m == null || m.NumTriangles == 0) continue;
 
                 XYZ planeNormal = (f as PlanarFace)?.FaceNormal;
-                // Caras planas verticales: no aportan a una vertical; se saltan sin triangular más.
+                // Vertical planar faces: they contribute nothing to a vertical ray; skipped without further triangulation.
                 if (planeNormal != null && Math.Abs(planeNormal.Z) < TriMeshBuilder.VerticalTolerance) continue;
 
                 var normals = planeNormal == null ? SafeNormals(m) : 0;
                 var dist = normals > 0 ? m.DistributionOfNormals : DistributionOfNormals.OnePerFace;
-                bool? faceFlip = null; // caras curvas sin normales en la malla: una decisión por cara
+                bool? faceFlip = null; // curved faces without mesh normals: one decision per face
 
                 for (var i = 0; i < m.NumTriangles; i++)
                 {
@@ -163,7 +163,7 @@ namespace Bimbridge.Addin.Revit.Geo
             catch (Exception) { return XYZ.Zero; }
         }
 
-        /// <summary>Cara curva sin normales en la malla: se compara el primer triángulo con la normal de la cara en su centro.</summary>
+        /// <summary>Curved face without mesh normals: the first triangle is compared with the face normal at its centroid.</summary>
         private static bool CurvedFaceFlip(Face f, XYZ a, XYZ b, XYZ c, XYZ wn)
         {
             try
@@ -177,7 +177,7 @@ namespace Bimbridge.Addin.Revit.Geo
             catch (Exception) { return false; }
         }
 
-        /// <summary>Unión de las cajas de los sólidos (más ajustada que la caja del elemento, que incluye anotaciones de familia).</summary>
+        /// <summary>Union of the solids' boxes (tighter than the element box, which includes family annotations).</summary>
         public static bool TryBox(IList<Solid> solids, out BoundingBoxXYZ box)
         {
             box = null;
@@ -200,7 +200,7 @@ namespace Bimbridge.Addin.Revit.Geo
             return true;
         }
 
-        /// <summary>Eje de un muro en planta (coordenadas del anfitrión) como polilínea [x0,y0,x1,y1,…] y su espesor.</summary>
+        /// <summary>Wall location line in plan (host coordinates) as a polyline [x0,y0,x1,y1,…] and its thickness.</summary>
         public static bool WallLine(Element e, Transform toHost, out double[] line, out double width)
         {
             line = null; width = 0;

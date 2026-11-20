@@ -9,10 +9,10 @@ using Bimbridge.Engine;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// Registro de versiones por documento (sección 5.3). Se suscribe UNA vez por sesión de Revit
-    /// a eventos baratos, en vez de 10 eventos por cada llamada como pyRevit (D2).
-    /// Atribuye cada cambio: transacciones con prefijo "BIMBRIDGE" → la sesión que escribía;
-    /// cualquier otra (operator a mano, Undo, otro add-in) → "usuario".
+    /// Per-document version registry (section 5.3). Subscribes ONCE per Revit session
+    /// to cheap events, instead of 10 events per call like pyRevit (D2).
+    /// Attributes each change: transactions with prefix "BIMBRIDGE" → the session that was writing;
+    /// any other (operator by hand, Undo, another add-in) → "usuario".
     /// </summary>
     public sealed class DocumentTracker
     {
@@ -21,15 +21,15 @@ namespace Bimbridge.Addin.Revit
         private readonly object _lock = new object();
         private readonly Dictionary<string, VersionRegistry> _docs = new Dictionary<string, VersionRegistry>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Sesión que está escribiendo ahora mismo (la fija el ejecutor de escrituras, fase 3).</summary>
+        /// <summary>Session that is writing right now (set by the write runner, phase 3).</summary>
         public volatile string CurrentWriter;
 
-        /// <summary>Prefijo de los cambios temporales que se deshacen solos (captura con resaltado): no cuentan como cambios del modelo.</summary>
+        /// <summary>Prefix of temporary changes that undo themselves (capture with highlighting): they do not count as model changes.</summary>
         public const string TemporaryPrefix = TransactionPrefix + " temporal";
 
         private int _suspended;
 
-        /// <summary>Mientras dure el bloque, los eventos de cambio se ignoran (cambios temporales que se revierten en el mismo tramo).</summary>
+        /// <summary>While the block lasts, change events are ignored (temporary changes rolled back in the same slice).</summary>
         public IDisposable Suspend()
         {
             System.Threading.Interlocked.Increment(ref _suspended);
@@ -50,11 +50,11 @@ namespace Bimbridge.Addin.Revit
         public static string KeyOf(Document doc)
         {
             if (doc == null) return null;
-            // 0.6.0: clave duradera (cloud GUID, ruta normalizada, o "nuevo:instancia#n" sin guardar). Nunca el título.
+            // 0.6.0: durable key (cloud GUID, normalized path, or "nuevo:instancia#n" when unsaved). Never the title.
             return DocRegistry.Instance.IdentityOf(doc)?.Key;
         }
 
-        /// <summary>Clave del registro de revisiones: el handle de esta apertura (sobrevive a Guardar como dentro de la misma apertura).</summary>
+        /// <summary>Revision registry key: the handle of this opening (survives Save As within the same opening).</summary>
         private static string RegKey(Document doc) => doc == null ? null : DocRegistry.Instance.IdOf(doc);
 
         public VersionRegistry For(Document doc)
@@ -86,7 +86,7 @@ namespace Bimbridge.Addin.Revit
         private void OnOpened(object sender, DocumentOpenedEventArgs e) { try { DocRegistry.Instance.Touch(e.Document); } catch (Exception) { } }
         private void OnCreated(object sender, DocumentCreatedEventArgs e) { try { DocRegistry.Instance.Touch(e.Document); } catch (Exception) { } }
 
-        /// <summary>Última vez que se guardó cada documento en esta sesión (doc guardar lo verifica con esto y con el archivo).</summary>
+        /// <summary>Last time each document was saved in this session (doc guardar verifies with this and with the file).</summary>
         public readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> LastSavedUtc =
             new System.Collections.Concurrent.ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
         public readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> LastSyncedUtc =
@@ -105,13 +105,13 @@ namespace Bimbridge.Addin.Revit
             catch (Exception) { }
         }
 
-        /// <summary>Guardar como cambió la clave duradera (anterior, nueva): el diario traslada las operaciones.</summary>
+        /// <summary>Save As changed the durable key (old, new): the journal moves the operations.</summary>
         public event Action<string, string> DocumentRekeyed;
 
-        /// <summary>Un documento se guardó (bool = Guardar como). Lo usan las tareas como evidencia de persistencia.</summary>
+        /// <summary>A document was saved (bool = Save As). Tasks use it as persistence evidence.</summary>
         public event Action<Document, bool> Saved;
 
-        /// <summary>Un documento se sincronizó con el central.</summary>
+        /// <summary>A document was synchronized with central.</summary>
         public event Action<Document> Synced;
 
         private void OnSavedAs(object sender, DocumentSavedAsEventArgs e)
@@ -147,10 +147,10 @@ namespace Bimbridge.Addin.Revit
             {
                 if (System.Threading.Volatile.Read(ref _suspended) > 0) return;
                 var doc = e.GetDocument();
-                // Desde 0.5.0 también las familias: sus cambios cuentan para conflictos y para "lo que cambió".
+                // Since 0.5.0 families too: their changes count for conflicts and for "what changed".
                 if (doc == null) return;
                 var names = e.GetTransactionNames();
-                // Cambios temporales ya revertidos (o su reversión): no tocan rev ni conjuntos.
+                // Temporary changes already rolled back (or their rollback): they do not touch rev or sets.
                 if (names != null && names.Count > 0 && names.All(Bimbridge.Protocol.Brand.IsTemporaryTransaction)) return;
                 var ours = names != null && names.Any(Bimbridge.Protocol.Brand.IsOwnTransaction);
                 var author = ours ? (CurrentWriter ?? VersionRegistry.HumanAuthor) : VersionRegistry.HumanAuthor;
@@ -162,7 +162,7 @@ namespace Bimbridge.Addin.Revit
             }
             catch (Exception)
             {
-                // Nunca dejar escapar una excepción dentro de un evento de Revit.
+                // Never let an exception escape inside a Revit event.
             }
         }
 
@@ -170,8 +170,8 @@ namespace Bimbridge.Addin.Revit
         {
             try
             {
-                // Un Sync puede traer cambios de otros usuarios sin detalle por elemento: por precaución,
-                // todo lo conocido se marca como tocado (sección 9.4).
+                // A Sync can bring changes from other users without per-element detail: as a precaution,
+                // everything known is marked as touched (section 9.4).
                 For(e.Document)?.BumpAll(VersionRegistry.HumanAuthor);
                 if (e.Status == Autodesk.Revit.DB.Events.RevitAPIEventStatus.Succeeded)
                 {
@@ -196,10 +196,10 @@ namespace Bimbridge.Addin.Revit
             catch (Exception) { }
         }
 
-        /// <summary>Para invalidar conjuntos y planes de ese documento.</summary>
+        /// <summary>To invalidate that document's sets and plans.</summary>
         public event Action<string> DocumentClosed;
 
-        /// <summary>Handle dN del documento que se cerró (para borrar sus conjuntos en todas las sesiones).</summary>
+        /// <summary>Handle dN of the document that closed (to delete its sets in all sessions).</summary>
         public event Action<string> DocumentHandleClosed;
     }
 }

@@ -16,7 +16,7 @@ namespace Bimbridge.Addin.Revit
 
         internal static Dictionary<string, object> ValidatePreset(object value)
         {
-            if (!(value is Dictionary<string, object> preset)) throw new QueryException("preset_pdf exige un objeto JSON");
+            if (!(value is Dictionary<string, object> preset)) throw new QueryException("preset_pdf requires a JSON object");
             foreach (var item in preset)
             {
                 var valid = item.Key switch
@@ -28,7 +28,7 @@ namespace Bimbridge.Addin.Revit
                     "combinar" or "raster" or "ocultar_etiquetas_sin_ref" => item.Value is bool,
                     _ => false,
                 };
-                if (!valid) throw new QueryException("preset_pdf: opción o valor inválido para " + item.Key);
+                if (!valid) throw new QueryException("preset_pdf: invalid option or value for " + item.Key);
             }
             return preset;
         }
@@ -69,7 +69,7 @@ namespace Bimbridge.Addin.Revit
                 var paper = sheet.Outline;
                 if (paper == null || paper.Max.U <= paper.Min.U || paper.Max.V <= paper.Min.V)
                 {
-                    differences.Add(sheet.SheetNumber + ": Revit no proporcionó un contorno de papel evaluable");
+                    differences.Add(sheet.SheetNumber + ": Revit did not provide an evaluable paper outline");
                     continue;
                 }
                 bool Outside(Outline bounds) => !bounds.IsEmpty && PrintSheetSet.OutsidePaper(
@@ -81,7 +81,7 @@ namespace Bimbridge.Addin.Revit
                     using var box = viewport.GetBoxOutline();
                     using var label = viewport.GetLabelOutline();
                     if (Outside(box) || Outside(label))
-                        differences.Add(sheet.SheetNumber + ": viewport " + Ids.ToLong(id) + " o su título excede el contorno de la hoja");
+                        differences.Add(sheet.SheetNumber + ": viewport " + Ids.ToLong(id) + " or its title exceeds the sheet outline");
                 }
             }
         }

@@ -10,28 +10,28 @@ using Autodesk.Revit.UI;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// Única puerta al hilo principal de Revit (sección 4 de la arquitectura).
-    /// - Un solo ExternalEvent para todo (pyRevit también usaba uno, pero una petición por visita: D3).
-    /// - En cada visita se atiende trabajo hasta agotar el presupuesto (250 ms por defecto) y se vuelve a levantar el evento si
-    ///   queda algo. Entre visitas Revit procesa la interfaz: el usuario nunca ve Revit "congelado" por el MCP (C8).
-    /// - El trabajo es reanudable: una función que avanza un tramo y dice si terminó.
-    /// - Reparto justo: lo nuevo (una consulta, el contexto) arranca en la siguiente visita aunque haya una revisión larga en
-    ///   curso; las largas se turnan entre sí. Antes, una revisión de 30 s dejaba esperando a cualquier otra petición (y a la otra IA).
-    /// - Ninguna excepción escapa hacia Revit.
-    /// - Mide cada visita: la auditoría de eficiencia usa estos números (visitas, tramo más largo, tiempo ocupado).
+    /// The only gateway to the Revit main thread (architecture section 4).
+    /// - A single ExternalEvent for everything (pyRevit also used one, but one request per visit: D3).
+    /// - Each visit serves work until the budget runs out (250 ms by default) and raises the event again if
+    ///   anything is left. Between visits Revit processes the UI: the user never sees Revit "frozen" by the MCP (C8).
+    /// - Work is resumable: a function that advances one slice and says whether it finished.
+    /// - Fair sharing: new work (a query, the context) starts on the next visit even if a long check is in
+    ///   progress; long ones take turns. Previously, a 30 s check kept any other request (and the other AI) waiting.
+    /// - No exception escapes into Revit.
+    /// - Measures each visit: the efficiency audit uses these numbers (visits, longest slice, busy time).
     /// </summary>
     public sealed class MainThread : IExternalEventHandler
     {
         private readonly ConcurrentQueue<WorkItem> _high = new ConcurrentQueue<WorkItem>();
         private readonly ConcurrentQueue<WorkItem> _normal = new ConcurrentQueue<WorkItem>();
-        /// <summary>Trabajos empezados que no terminaron en su tramo. Sólo se toca en el hilo de Revit.</summary>
+        /// <summary>Started jobs that did not finish in their slice. Only touched on the Revit thread.</summary>
         private readonly List<WorkItem> _active = new List<WorkItem>();
         private readonly Action<string> _log;
         private ExternalEvent _event;
         private readonly int _budgetMs;
         private int _rr;
 
-        // Estadísticas globales (se leen desde cualquier hilo; escribe sólo el hilo de Revit)
+        // Global statistics (read from any thread; only the Revit thread writes)
         private long _visits, _busyMs, _maxVisitMs, _overBudget, _done, _cancelled, _failed;
 
         public MainThread(int budgetMs, Action<string> log)
@@ -42,15 +42,15 @@ namespace Bimbridge.Addin.Revit
 
         public int BudgetMs => _budgetMs;
 
-        /// <summary>Debe llamarse desde OnStartup (contexto válido de la API).</summary>
+        /// <summary>Must be called from OnStartup (valid API context).</summary>
         public void Create() { _event = ExternalEvent.Create(this); }
 
         public string GetName() => "BIMBRIDGE - Power Engine";
 
         /// <summary>
-        /// Ejecuta un trabajo reanudable en el hilo de Revit. <paramref name="step"/> recibe la UIApplication, el reloj de la visita
-        /// y el tiempo que le queda; devuelve true cuando terminó. Si Revit no empieza el trabajo en <paramref name="busyAfter"/>
-        /// (diálogo abierto, comando en curso), se descarta sin correr y se informa "ocupado".
+        /// Runs a resumable job on the Revit thread. <paramref name="step"/> receives the UIApplication, the visit clock
+        /// and the time it has left; returns true when it finished. If Revit does not start the job within <paramref name="busyAfter"/>
+        /// (dialog open, command in progress), it is discarded without running and "busy" is reported.
         /// </summary>
         public async Task<WorkResult> RunAsync(Func<UIApplication, Stopwatch, int, bool> step, bool highPriority, TimeSpan busyAfter, CancellationToken ct)
         {
@@ -63,13 +63,13 @@ namespace Bimbridge.Addin.Revit
             {
                 var delay = Task.Delay(busyAfter, timer.Token);
                 var first = await Task.WhenAny(item.Started.Task, delay).ConfigureAwait(false);
-                timer.Cancel(); // no dejar el temporizador vivo
+                timer.Cancel(); // do not leave the timer alive
                 if (first != item.Started.Task)
                 {
-                    // Si justo empezó, se deja terminar; si no, se marca para que no corra nunca.
+                    // If it just started, let it finish; otherwise, mark it so it never runs.
                     if (Interlocked.CompareExchange(ref item.State, WorkItem.Cancelled, WorkItem.Waiting) == WorkItem.Waiting)
                     {
-                        // Sin empezar: cuántas visitas hubo mientras esperaba distingue "Revit no visitó" de "visitó y no le tocó".
+                        // Not started: how many visits happened while waiting distinguishes "Revit did not visit" from "visited but it was not its turn".
                         item.VisitsBeforeStart = Interlocked.Read(ref _visits) - item.VisitsAtEnqueue;
                         item.WaitMs = item.ElapsedMs();
                         return WorkResult.Make(ct.IsCancellationRequested ? WorkResult.KindCancelled : WorkResult.KindBusy, null, item);
@@ -79,7 +79,7 @@ namespace Bimbridge.Addin.Revit
             using (ct.Register(() => item.CancelRequested = true))
             {
                 var result = await item.Done.Task.ConfigureAwait(false);
-                // Revit pudo terminarlo dentro de una visita en curso antes de que Raise() devolviera su respuesta.
+                // Revit may have finished it inside an ongoing visit before Raise() returned its response.
                 result.RaiseResult = result.RaiseResult ?? item.RaiseResult;
                 return result;
             }
@@ -100,8 +100,8 @@ namespace Bimbridge.Addin.Revit
             var sw = Stopwatch.StartNew();
             try
             {
-                // 1) lo nuevo urgente (contexto, consultas), 2) lo urgente ya empezado,
-                // 3) lo nuevo normal (escrituras, revisiones), 4) lo largo ya empezado, por turnos.
+                // 1) new urgent work (context, queries), 2) urgent work already started,
+                // 3) new normal work (writes, checks), 4) long work already started, in turns.
                 while (sw.ElapsedMilliseconds < _budgetMs && _high.TryDequeue(out var h)) Start(app, h, sw);
                 RunActive(app, sw, highOnly: true);
                 while (sw.ElapsedMilliseconds < _budgetMs && _normal.TryDequeue(out var n)) Start(app, n, sw);
@@ -127,12 +127,12 @@ namespace Bimbridge.Addin.Revit
             if (item.State == WorkItem.Cancelled || item.CancelRequested) { Finish(item, WorkResult.KindCancelled, null); return; }
             if (Interlocked.CompareExchange(ref item.State, WorkItem.Running, WorkItem.Waiting) != WorkItem.Waiting)
             {
-                // Lo canceló el hilo de la petición justo ahora (pasó el plazo de "ocupado").
+                // The request thread cancelled it just now (the "busy" deadline passed).
                 if (item.State == WorkItem.Cancelled) Interlocked.Increment(ref _cancelled);
                 return;
             }
             item.WaitMs = item.ElapsedMs();
-            item.VisitsBeforeStart = _visits - item.VisitsAtEnqueue;   // la visita actual aún no se contó
+            item.VisitsBeforeStart = _visits - item.VisitsAtEnqueue;   // the current visit has not been counted yet
             item.Started.TrySetResult(true);
             if (!Slice(app, item, sw)) _active.Add(item);
         }
@@ -157,7 +157,7 @@ namespace Bimbridge.Addin.Revit
             }
         }
 
-        /// <summary>Un tramo de un trabajo. true = terminó (bien o con error).</summary>
+        /// <summary>One slice of a job. true = finished (successfully or with an error).</summary>
         private bool Slice(UIApplication app, WorkItem item, Stopwatch sw)
         {
             var t0 = sw.ElapsedMilliseconds;
@@ -193,7 +193,7 @@ namespace Bimbridge.Addin.Revit
             item.Done.TrySetResult(WorkResult.Make(kind, ex, item));
         }
 
-        /// <summary>Números del hilo de Revit desde que arrancó el complemento (para la auditoría y el estado).</summary>
+        /// <summary>Revit thread numbers since the add-in started (for the audit and the status).</summary>
         public Dictionary<string, object> Stats() => new Dictionary<string, object>
         {
             ["visitas"] = Interlocked.Read(ref _visits),
@@ -234,7 +234,7 @@ namespace Bimbridge.Addin.Revit
         }
     }
 
-    /// <summary>Cómo terminó un trabajo en el hilo de Revit y cuánto lo ocupó.</summary>
+    /// <summary>How a job ended on the Revit thread and how long it occupied it.</summary>
     public sealed class WorkResult
     {
         public const string KindCompleted = "completed", KindBusy = "busy", KindCancelled = "cancelled", KindFailed = "failed";
@@ -253,19 +253,19 @@ namespace Bimbridge.Addin.Revit
 
         public string Kind { get; private set; }
         public Exception Error { get; private set; }
-        /// <summary>Milisegundos que el trabajo ocupó el hilo de Revit (suma de tramos).</summary>
+        /// <summary>Milliseconds the job occupied the Revit thread (sum of slices).</summary>
         public long BusyMs { get; private set; }
         public long MaxSliceMs { get; private set; }
         public int Slices { get; private set; }
-        /// <summary>Milisegundos desde que se pidió hasta que Revit lo empezó.</summary>
+        /// <summary>Milliseconds from the request until Revit started it.</summary>
         public long WaitMs { get; private set; }
-        /// <summary>Respuesta de ExternalEvent.Raise al encolar (Accepted, Pending, Denied, TimedOut).</summary>
+        /// <summary>ExternalEvent.Raise response when queuing (Accepted, Pending, Denied, TimedOut).</summary>
         public string RaiseResult { get; internal set; }
-        /// <summary>Visitas de Revit que terminaron sin empezar este trabajo. 0 con espera larga = Revit no atendió el evento.</summary>
+        /// <summary>Revit visits that ended without starting this job. 0 with a long wait = Revit did not serve the event.</summary>
         public long VisitsBeforeStart { get; private set; }
         public bool Ok => Kind == KindCompleted;
 
-        /// <summary>Desglose del despacho para timing=true y para las respuestas revit_ocupado.</summary>
+        /// <summary>Dispatch breakdown for timing=true and for revit_ocupado responses.</summary>
         public Dictionary<string, object> DispatchJson() => new Dictionary<string, object>
         {
             ["espera_cola_ms"] = WaitMs, ["hilo_revit_ms"] = BusyMs, ["tramos"] = (long)Slices, ["tramo_max_ms"] = MaxSliceMs,

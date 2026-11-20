@@ -8,14 +8,14 @@ using Autodesk.Revit.UI;
 namespace Bimbridge.Addin.Ui
 {
     /// <summary>
-    /// Transición corta de un botón de la cinta cuando su estado visible cambia: 5 cuadros en 180 ms con la curva ease-out de
-    /// Theme, en el hilo de Revit. Nunca en bucle; un cambio nuevo sustituye al que está en curso (no se encola); con
-    /// movimiento reducido se pone la imagen final al momento. Sin cambios no hace nada.
+    /// Short transition of a ribbon button when its visible state changes: 5 frames in 180 ms with Theme's ease-out
+    /// curve, on the Revit thread. Never looped; a new change replaces the one in progress (it is not queued); with
+    /// reduced motion the final image is set immediately. With no change it does nothing.
     /// </summary>
     internal static class RibbonMotion
     {
         private const int Frames = 5, Ms = 180;
-        /// <summary>Progreso de cada cuadro: cubic-bezier(0.23, 1, 0.32, 1) en los tiempos (i+1)/Frames. El último es 1.</summary>
+        /// <summary>Progress of each frame: cubic-bezier(0.23, 1, 0.32, 1) at times (i+1)/Frames. The last one is 1.</summary>
         internal static readonly double[] T = Ease(0.23, 1, 0.32, 1, Frames);
 
         private sealed class Track { public ImageSource[] Large, Small; public int Next; }
@@ -24,9 +24,9 @@ namespace Bimbridge.Addin.Ui
         private static DispatcherTimer _timer;
 
         /// <summary>
-        /// Lleva <paramref name="button"/> a su imagen final. <paramref name="key"/> identifica la transición (desde→hacia) para
-        /// reutilizar los cuadros; <paramref name="frame"/>(t, tamaño) dibuja uno intermedio; <paramref name="final"/>(tamaño) el estado quieto.
-        /// <paramref name="animate"/> = false (primera pintura) pone la imagen final sin transición.
+        /// Takes <paramref name="button"/> to its final image. <paramref name="key"/> identifies the transition (from→to) so
+        /// frames are reused; <paramref name="frame"/>(t, size) draws an intermediate one; <paramref name="final"/>(size) the still state.
+        /// <paramref name="animate"/> = false (first paint) sets the final image with no transition.
         /// </summary>
         public static void Play(PushButton button, string key, bool animate, Func<double, int, ImageSource> frame, Func<int, ImageSource> final)
         {
@@ -39,8 +39,8 @@ namespace Bimbridge.Addin.Ui
                 return;
             }
             var track = new Track { Large = Get(key, 32, frame, final), Small = Get(key, 16, frame, final) };
-            _tracks[button] = track; // sustituye la transición en curso de este botón: va directo al estado más nuevo
-            Step(button, track); // primer cuadro ya, sin esperar al temporizador
+            _tracks[button] = track; // replaces this button's transition in progress: goes straight to the newest state
+            Step(button, track); // first frame right away, without waiting for the timer
             if (_tracks.Count == 0) return;
             if (_timer == null)
             {
@@ -66,7 +66,7 @@ namespace Bimbridge.Addin.Ui
             }
             catch (Exception)
             {
-                // Botón o cinta ya liberados (Revit cerrándose): se abandona la transición sin más.
+                // Button or ribbon already released (Revit closing): the transition is simply abandoned.
                 _tracks.Remove(button);
             }
         }
@@ -75,16 +75,16 @@ namespace Bimbridge.Addin.Ui
         {
             var k = key + "@" + size;
             if (_cache.TryGetValue(k, out var f)) return f;
-            // shortcut: la caché se vacía entera al pasar de 64 transiciones (la cola puede dar muchas cuentas distintas); suficiente para cuadros de pocos KB.
+            // shortcut: the cache is cleared entirely past 64 transitions (the queue can produce many distinct counts); enough for frames of a few KB.
             if (_cache.Count >= 64) _cache.Clear();
             f = new ImageSource[Frames];
             for (var i = 0; i < Frames - 1; i++) f[i] = frame(T[i], size);
-            f[Frames - 1] = final(size); // el último cuadro es exactamente el icono quieto
+            f[Frames - 1] = final(size); // the last frame is exactly the still icon
             _cache[k] = f;
             return f;
         }
 
-        /// <summary>y(x) de una curva cubic-bezier(x1,y1,x2,y2) en x = (i+1)/n, resuelta por bisección (x es monótona).</summary>
+        /// <summary>y(x) of a cubic-bezier(x1,y1,x2,y2) curve at x = (i+1)/n, solved by bisection (x is monotonic).</summary>
         private static double[] Ease(double x1, double y1, double x2, double y2, int n)
         {
             double B(double a, double b, double s) => 3 * (1 - s) * (1 - s) * s * a + 3 * (1 - s) * s * s * b + s * s * s;
@@ -97,7 +97,7 @@ namespace Bimbridge.Addin.Ui
                 r[i] = Math.Min(1, Math.Max(0, B(y1, y2, (lo + hi) / 2)));
             }
             r[n - 1] = 1;
-            System.Diagnostics.Debug.Assert(r[0] > 0 && r[0] < 1 && r[n - 2] <= 1, "curva ease-out fuera de rango");
+            System.Diagnostics.Debug.Assert(r[0] > 0 && r[0] < 1 && r[n - 2] <= 1, "ease-out curve out of range");
             return r;
         }
     }

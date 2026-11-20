@@ -9,10 +9,10 @@ using Bimbridge.Protocol;
 namespace Bimbridge.AgentHost
 {
     /// <summary>
-    /// 0.8.0 (CAP-004 / WF-13 / WF-14): checkpoint estructurado y paquete de traspaso. Se construye a partir del diario existente
-    /// (no es un segundo sistema de persistencia) y dice lo justo para que otro agente retome sin el historial de la conversación:
-    /// identidad, plan, qué está confirmado, qué es incierto, qué se verificó, qué artefactos hay y cuál es el siguiente paso SEGURO.
-    /// Un paso incierto nunca se propone como "repetir": se propone "reconciliar observando".
+    /// 0.8.0 (CAP-004 / WF-13 / WF-14): structured checkpoint and handoff package. It is built from the existing journal
+    /// (not a second persistence system) and says just enough for another agent to resume without the conversation history:
+    /// identity, plan, what is committed, what is uncertain, what was verified, which artifacts exist and the next SAFE step.
+    /// An uncertain step is never proposed as "repeat": it is proposed as "reconcile by observing".
     /// </summary>
     public static class Handoff
     {
@@ -45,14 +45,14 @@ namespace Bimbridge.AgentHost
 
             string next;
             if (uncertain.Count > 0)
-                next = "reconciliar " + ((Dictionary<string, object>)uncertain[0])["op"] + " leyendo el modelo; NO repetir la escritura";
+                next = "reconcile " + ((Dictionary<string, object>)uncertain[0])["op"] + " by reading the model; do NOT repeat the write";
             else if (failed.Count > 0 && pending.Count == 0)
-                next = "revisar fallos (" + failed.Count + ") con una persona antes de seguir";
+                next = "review failures (" + failed.Count + ") with a person before continuing";
             else if (pending.Count > 0)
-                next = "continuar con " + ((Dictionary<string, object>)pending[0])["op"] + " (mismo diario, mismo plan)";
+                next = "continue with " + ((Dictionary<string, object>)pending[0])["op"] + " (same journal, same plan)";
             else if (delivery != null && !delivery.Complete)
-                next = "entrega: falta el hito " + delivery.Next;
-            else next = "nada: plan terminado";
+                next = "delivery: milestone missing " + delivery.Next;
+            else next = "nothing: plan finished";
 
             var d = new Dictionary<string, object>
             {

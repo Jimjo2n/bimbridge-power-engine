@@ -10,33 +10,33 @@ using Bimbridge.Protocol;
 namespace Bimbridge.AgentHost
 {
     /// <summary>
-    /// BIM Task IR, esquema 2 (0.7.0-alpha1). Dos capas:
-    /// - <see cref="PlanDraft"/>/<see cref="OpDraft"/>: lo que llega de un agente, de un documento o de una prueba. Mutable y NO confiable.
-    /// - <see cref="ValidatedPlan"/>/<see cref="ValidatedOp"/>: el resultado de <see cref="IrValidator.Validate"/>. Inmutable (colecciones de
-    ///   sólo lectura, copia profunda); incluye lo que el sistema DERIVA (autorización, postcondiciones, idempotencia) y nunca acepta del agente.
-    /// El estado de ejecución vive aparte (Exec/ExecState); el plan validado no cambia mientras se ejecuta.
+    /// BIM Task IR, schema 2 (0.7.0-alpha1). Two layers:
+    /// - <see cref="PlanDraft"/>/<see cref="OpDraft"/>: what arrives from an agent, a document or a test. Mutable and NOT trusted.
+    /// - <see cref="ValidatedPlan"/>/<see cref="ValidatedOp"/>: the result of <see cref="IrValidator.Validate"/>. Immutable (read-only
+    ///   collections, deep copy); includes what the system DERIVES (authorization, postconditions, idempotency) and never accepts from the agent.
+    /// Execution state lives separately (Exec/ExecState); the validated plan does not change while it runs.
     /// </summary>
     public static class IrSchema
     {
         public const int Version = 2;
         public static readonly string[] CoordinateSystems = { "interno_revit", "proyecto", "compartidas" };
         public static readonly string[] LengthUnits = { "mm", "m", "ft", "in" };
-        /// <summary>Campos que sólo el sistema puede fijar. Si vienen en el JSON, el plan se rechaza.</summary>
+        /// <summary>Fields only the system may set. If they appear in the JSON, the plan is rejected.</summary>
         public static readonly string[] SystemOnlyOpFields = { "autorizacion", "estado", "postcondiciones", "idempotencia", "intento", "resultado" };
         public static readonly string[] SystemOnlyPlanFields = { "autorizacion", "estado", "hash" };
     }
 
-    /// <summary>Documento técnico de origen declarado por el plan (p. ej. un PDF de especificaciones), identificado por su SHA-256.</summary>
+    /// <summary>Technical source document declared by the plan (e.g. a specifications PDF), identified by its SHA-256.</summary>
     public sealed class SourceDoc
     {
         public string Id, Nombre, Sha256;
         public Dictionary<string, object> ToJson() => new Dictionary<string, object> { ["id"] = Id, ["nombre"] = Nombre, ["sha256"] = Sha256 };
     }
 
-    /// <summary>Trazabilidad de una operación hasta el requisito que la originó.</summary>
+    /// <summary>Traceability of an operation back to the requirement that produced it.</summary>
     public sealed class SourceRef
     {
-        public string Fuente;      // id de un SourceDoc del plan
+        public string Fuente;      // id of a SourceDoc of the plan
         public long? Pagina;
         public string Seccion, Requisito, Cita;
 
@@ -57,7 +57,7 @@ namespace Bimbridge.AgentHost
         };
     }
 
-    /// <summary>Operación tal como llega (no confiable).</summary>
+    /// <summary>Operation as received (not trusted).</summary>
     public sealed class OpDraft
     {
         public string Id;
@@ -70,7 +70,7 @@ namespace Bimbridge.AgentHost
         public long? Retries;
         public bool AllowEmpty;
         public SourceRef Source;
-        /// <summary>Campos de sistema encontrados al leer el JSON (se informan como error).</summary>
+        /// <summary>System fields found while reading the JSON (reported as errors).</summary>
         public List<string> Forbidden = new List<string>();
 
         public Dictionary<string, object> ToJson()
@@ -100,12 +100,12 @@ namespace Bimbridge.AgentHost
             return op;
         }
 
-        /// <summary>Id que el sistema espera para este contenido dentro de <paramref name="plan"/>.</summary>
+        /// <summary>Id the system expects for this content within <paramref name="plan"/>.</summary>
         public string ExpectedId(PlanDraft plan) =>
             IrIds.OpId(plan.DocKey, plan.DocPrint, Scope, Operation, Params, plan.SourceIdentity(Source));
     }
 
-    /// <summary>Plan tal como llega (no confiable).</summary>
+    /// <summary>Plan as received (not trusted).</summary>
     public sealed class PlanDraft
     {
         public int Ir = IrSchema.Version;
@@ -117,7 +117,7 @@ namespace Bimbridge.AgentHost
         public List<OpDraft> Ops = new List<OpDraft>();
         public List<string> Forbidden = new List<string>();
 
-        /// <summary>Identidad de la fuente de una operación para su id: sha256 del documento + requisito (+ página). Sin fuente: "".</summary>
+        /// <summary>Source identity of an operation for its id: document sha256 + requirement (+ page). No source: "".</summary>
         public string SourceIdentity(SourceRef r)
         {
             if (r == null) return "";
@@ -125,7 +125,7 @@ namespace Bimbridge.AgentHost
             return (doc?.Sha256 ?? ("?" + r.Fuente)) + "|" + (r.Requisito ?? "") + "|" + (r.Pagina?.ToString(CultureInfo.InvariantCulture) ?? "");
         }
 
-        /// <summary>Asigna a cada operación su id determinista. Las dependencias se expresan por índice con "#n" antes de llamar.</summary>
+        /// <summary>Assigns each operation its deterministic id. Dependencies are expressed by index as "#n" before calling.</summary>
         public PlanDraft AssignIds()
         {
             var ids = Ops.Select(o => o.ExpectedId(this)).ToList();
@@ -170,9 +170,9 @@ namespace Bimbridge.AgentHost
     public static class IrIds
     {
         /// <summary>
-        /// Id determinista de una operación: "op-" + 20 hex de sha256 sobre (documento: clave + huella, alcance, operación, parámetros
-        /// canónicos, identidad de la fuente). Incluir la huella evita reutilizar un id contra un modelo sustituido; incluir la fuente evita
-        /// confundir dos requisitos distintos que piden lo mismo (esos se detectan aparte como duplicados semánticos).
+        /// Deterministic id of an operation: "op-" + 20 hex of sha256 over (document: key + fingerprint, scope, operation, canonical
+        /// parameters, source identity). Including the fingerprint prevents reusing an id against a replaced model; including the source
+        /// prevents confusing two different requirements that ask for the same thing (those are detected separately as semantic duplicates).
         /// </summary>
         public static string OpId(string docKey, string docPrint, IDictionary<string, object> scope, string operation, IDictionary<string, object> parameters, string sourceIdentity) =>
             "op-" + Home.Sha256Hex(OpSemantics.Canonical(new Dictionary<string, object>
@@ -181,11 +181,11 @@ namespace Bimbridge.AgentHost
                 ["parametros"] = parameters ?? new Dictionary<string, object>(), ["fuente"] = sourceIdentity ?? "",
             }), 20);
 
-        /// <summary>Clave semántica: lo mismo sin la fuente. Dos operaciones del mismo plan con igual clave son un duplicado.</summary>
+        /// <summary>Semantic key: the same without the source. Two operations in the same plan with the same key are a duplicate.</summary>
         public static string SemanticKey(IDictionary<string, object> scope, string operation, IDictionary<string, object> parameters) =>
             Home.Sha256Hex(OpSemantics.Canonical(new Dictionary<string, object> { ["alcance"] = scope, ["operacion"] = operation, ["parametros"] = parameters }), 20);
 
-        /// <summary>Copia profunda de sólo lectura (diccionarios y listas).</summary>
+        /// <summary>Read-only deep copy (dictionaries and lists).</summary>
         public static object Freeze(object v)
         {
             switch (v)
@@ -202,7 +202,7 @@ namespace Bimbridge.AgentHost
         public static IReadOnlyDictionary<string, object> FreezeDict(IDictionary<string, object> d) =>
             (IReadOnlyDictionary<string, object>)Freeze(d ?? new Dictionary<string, object>());
 
-        /// <summary>Vuelve a una forma mutable serializable (para escribir JSON).</summary>
+        /// <summary>Converts back to a mutable serializable form (for writing JSON).</summary>
         public static object Thaw(object v)
         {
             switch (v)
@@ -216,7 +216,7 @@ namespace Bimbridge.AgentHost
         }
     }
 
-    /// <summary>Precondición del catálogo cerrado. Hoy: número de objetivos dentro de [Min, Max].</summary>
+    /// <summary>Precondition from the closed catalog. Today: number of targets within [Min, Max].</summary>
     public sealed class Precondition
     {
         public string Kind;
@@ -224,7 +224,7 @@ namespace Bimbridge.AgentHost
         public override string ToString() => Kind + "[" + (Min?.ToString(CultureInfo.InvariantCulture) ?? "") + "," + (Max?.ToString(CultureInfo.InvariantCulture) ?? "") + "]";
     }
 
-    /// <summary>Operación validada e inmutable. Lo derivado por el sistema está marcado.</summary>
+    /// <summary>Validated, immutable operation. What the system derives is marked.</summary>
     public sealed class ValidatedOp
     {
         public string Id { get; }
@@ -238,7 +238,7 @@ namespace Bimbridge.AgentHost
         public bool AllowEmpty { get; }
         public int RetryMax { get; }
         public SourceRef Source { get; }
-        // derivado por el sistema:
+        // derived by the system:
         public bool Writes => Spec.Writes;
         public string Idempotency => Spec.Idempotency;
         public IReadOnlyList<string> Authorization => Spec.Authorization;
@@ -257,7 +257,7 @@ namespace Bimbridge.AgentHost
         public string ScopeValue(string k) => Scope.TryGetValue(k, out var v) && v != null ? Convert.ToString(v, CultureInfo.InvariantCulture) : null;
     }
 
-    /// <summary>Plan validado e inmutable. <see cref="Hash"/> identifica su contenido canónico.</summary>
+    /// <summary>Validated, immutable plan. <see cref="Hash"/> identifies its canonical content.</summary>
     public sealed class ValidatedPlan
     {
         public string Hash { get; }
@@ -268,10 +268,10 @@ namespace Bimbridge.AgentHost
         public string Coordinates { get; }
         public IReadOnlyList<SourceDoc> Sources { get; }
         public IReadOnlyList<ValidatedOp> Ops { get; }
-        /// <summary>Orden topológico determinista (empates por id).</summary>
+        /// <summary>Deterministic topological order (ties broken by id).</summary>
         public IReadOnlyList<string> Order { get; }
         public IReadOnlyDictionary<string, ValidatedOp> ById { get; }
-        /// <summary>JSON canónico del borrador validado (lo que se guarda en plan.json).</summary>
+        /// <summary>Canonical JSON of the validated draft (what is saved in plan.json).</summary>
         public string CanonicalJson { get; }
 
         internal ValidatedPlan(PlanDraft d, List<ValidatedOp> ops, List<string> order)

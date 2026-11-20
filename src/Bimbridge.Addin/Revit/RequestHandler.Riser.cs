@@ -20,7 +20,7 @@ namespace Bimbridge.Addin.Revit
             if (!viewId.HasValue || viewId <= 0 || string.IsNullOrWhiteSpace(style) ||
                 !request.Args.TryGetValue("esperado_dibujo", out var value) || value is not List<object> rows ||
                 rows.Count == 0 || rows.Count > 2000 || rows.Any(r => r is not Dictionary<string, object>))
-                return Response.Fail(request.Id, Status.Invalido, "indique vista de dibujo, estilo de línea y esperado_dibujo del riser");
+                return Response.Fail(request.Id, Status.Invalido, "give the drafting view, line style and esperado_dibujo of the riser");
             var found = new List<object>();
             var missing = new List<object>();
             string error = null;
@@ -31,7 +31,7 @@ namespace Bimbridge.Addin.Revit
                 if (doc == null) return true;
                 if (!(doc.GetElement(Ids.ToId(viewId.Value)) is ViewDrafting view) || view.IsTemplate)
                 {
-                    error = "el riser debe estar en una vista de dibujo del documento destino";
+                    error = "the riser must be in a drafting view of the target document";
                     return true;
                 }
                 using var collector = new FilteredElementCollector(doc);
@@ -54,13 +54,13 @@ namespace Bimbridge.Addin.Revit
                     {
                         var id = Arg.GetString(edge, "id");
                         if (string.IsNullOrWhiteSpace(id) || !edge.TryGetValue("puntos", out var points) || !edge.TryGetValue("rotulo", out var label))
-                            throw new QueryException("cada arista exige ID, puntos y posición del rótulo");
-                        var path = OpCatalog.Points(points, "puntos del riser", 2, 2000, false);
+                            throw new QueryException("each edge requires ID, puntos and label position");
+                        var path = OpCatalog.Points(points, "riser puntos", 2, 2000, false);
                         var absentLegs = new List<object>();
                         for (var i = 1; i < path.Count; i++)
                             if (!lines.Contains(RiserLegKey(RiserPoint(path[i - 1]), RiserPoint(path[i]))))
                                 absentLegs.Add((long)i);
-                        var expected = RiserPoint(OpCatalog.Point(label, "rótulo del riser", false));
+                        var expected = RiserPoint(OpCatalog.Point(label, "riser label", false));
                         var labelTotal = notes[id].Count();
                         var labelCount = notes[id].Count(n => n.Coord.DistanceTo(expected) <= (1.0 / 304.8) * view.Scale);
                         var startExists = Present(path[0], Arg.GetString(edge, "tipo_origen"));
@@ -90,7 +90,7 @@ namespace Bimbridge.Addin.Revit
             {
                 Id = request.Id, Rev = revision, Estado = missing.Count > 0 ? Status.ConDiferencias : Status.Ok,
                 Datos = new Dictionary<string, object> { ["observado"] = found, ["diferencias"] = missing,
-                    ["alcance"] = "Comprueba tramos, rótulos y los tipos de símbolo indicados en la vista de dibujo. La conectividad MEP se comprueba en el modelo de instalaciones." },
+                    ["alcance"] = "Checks segments, labels and the given symbol types in the drafting view. MEP connectivity is checked in the MEP model." },
             };
         }
 

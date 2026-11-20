@@ -20,7 +20,7 @@ namespace Bimbridge.Addin.Revit
         {
             if (!(doc.GetElement(Ids.ToId(id)) is FamilyInstance light) ||
                 Ids.ToLong(light.Category?.Id ?? ElementId.InvalidElementId) != (long)BuiltInCategory.OST_LightingFixtures)
-                throw new QueryException("text_note: " + id + " no es una luminaria del anfitrión");
+                throw new QueryException("text_note: " + id + " is not a lighting fixture of the host");
             var config = new Dictionary<string, object> { ["uid"] = light.UniqueId };
             foreach (var key in new[] { "codigo_param", "altura_param", "descontar_tipo_param", "negrita", "subrayado" })
                 if (args.TryGetValue(key, out var value)) config[key] = value;
@@ -30,12 +30,12 @@ namespace Bimbridge.Addin.Revit
         internal static (string Text, XYZ Point, long Id, string TypeUid) Observe(Document doc, Dictionary<string, object> config)
         {
             if (!(doc.GetElement(Arg.GetString(config, "uid")) is FamilyInstance light) || light.Location is not LocationPoint location)
-                throw new QueryException("la luminaria asociada ya no está disponible con un punto de inserción");
+                throw new QueryException("the associated fixture is no longer available with an insertion point");
             var type = light.Symbol;
             var codeName = Arg.GetString(config, "codigo_param");
             var code = codeName == null ? type.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_MARK)?.AsString() : TextParameter(type, codeName);
             if (string.IsNullOrWhiteSpace(code) && codeName == null) code = type.Name;
-            if (string.IsNullOrWhiteSpace(code)) throw new QueryException("la luminaria asociada carece de código");
+            if (string.IsNullOrWhiteSpace(code)) throw new QueryException("the associated fixture has no code");
             var height = LengthParameter(light, Arg.GetString(config, "altura_param") ?? "Mounting Height");
             if (Arg.GetString(config, "descontar_tipo_param") is string body) height -= LengthParameter(type, body);
             return (LightingCalloutState.Text(code, height), location.Point, Ids.ToLong(light.Id), type.UniqueId);
@@ -44,7 +44,7 @@ namespace Bimbridge.Addin.Revit
         private static string TextParameter(Element element, string name)
         {
             var matches = element.GetParameters(name).Where(p => p.HasValue && p.StorageType == StorageType.String).ToList();
-            if (matches.Count != 1) throw new QueryException("el código necesita un parámetro de texto único: " + name);
+            if (matches.Count != 1) throw new QueryException("the code needs a single text parameter: " + name);
             return matches[0].AsString();
         }
 
@@ -52,7 +52,7 @@ namespace Bimbridge.Addin.Revit
         {
             var matches = element.GetParameters(name).Where(p => p.HasValue && p.StorageType == StorageType.Double &&
                 p.Definition.GetDataType() == SpecTypeId.Length).ToList();
-            if (matches.Count != 1) throw new QueryException("la altura necesita un parámetro de longitud único: " + name);
+            if (matches.Count != 1) throw new QueryException("the height needs a single length parameter: " + name);
             return matches[0].AsDouble();
         }
 

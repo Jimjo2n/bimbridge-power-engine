@@ -8,18 +8,18 @@ using System.Threading;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Caché de compilación de C# dinámico con "single-flight" (#9) y límites de memoria (AUD-05).
+    /// Compilation cache for dynamic C# with "single-flight" (#9) and memory limits (AUD-05).
     ///
-    /// Single-flight: si dos agentes piden a la vez el mismo código (misma huella), sólo uno compila con Roslyn y los demás esperan su
-    /// resultado. AUD-05: la compuerta por clave tiene contador de usuarios y sólo se retira cuando nadie la usa, así una clave nunca tiene
-    /// dos compuertas vivas (antes, retirarla mientras alguien esperaba permitía dos compilaciones simultáneas de la misma clave cuando la
-    /// primera fallaba). Los fallos de compilación no se guardan: el siguiente intento vuelve a compilar.
+    /// Single-flight: if two agents request the same code at once (same fingerprint), only one compiles with Roslyn and the others wait for its
+    /// result. AUD-05: the per-key gate has a user counter and is removed only when nobody uses it, so a key never has
+    /// two live gates (previously, removing it while someone was waiting allowed two simultaneous compilations of the same key when the
+    /// first one failed). Compilation failures are not stored: the next attempt compiles again.
     ///
-    /// Memoria: cada compilación distinta deja un ensamblado cargado que NO se puede descargar individualmente (.NET Framework 4.8; en
-    /// .NET 8 el add-in los carga en su propio contexto, que tampoco es recolectable). Por eso una política LRU no libera memoria: descartar
-    /// una entrada sólo provocaría recompilar y cargar OTRO ensamblado. En su lugar hay un límite de entradas distintas: al alcanzarlo se
-    /// rechazan compilaciones NUEVAS con un motivo claro (reutilizar scripts pasando datos por args, o reiniciar Revit para liberar), mientras
-    /// lo ya compilado sigue disponible. Se contabiliza por agente (o sesión) y el tamaño estimado de las imágenes cargadas.
+    /// Memory: each distinct compilation leaves a loaded assembly that CANNOT be unloaded individually (.NET Framework 4.8; on
+    /// .NET 8 the add-in loads them into its own context, which is not collectible either). That is why an LRU policy frees no memory: evicting
+    /// an entry would only cause recompiling and loading ANOTHER assembly. Instead there is a limit on distinct entries: once reached,
+    /// NEW compilations are rejected with a clear reason (reuse scripts by passing data through args, or restart Revit to free memory), while
+    /// what is already compiled stays available. Accounting is per agent (or session) plus the estimated size of the loaded images.
     /// </summary>
     public sealed class CompileCache<T> where T : class
     {
@@ -34,8 +34,8 @@ namespace Bimbridge.Engine
         private readonly Func<T, long> _sizeOf;
         private long _hits, _misses, _failures, _waits, _compileMs, _bytes, _refused, _slots;
 
-        /// <param name="maxEntries">Compilaciones distintas permitidas en este proceso (cada una deja un ensamblado cargado).</param>
-        /// <param name="sizeOf">Tamaño estimado de un resultado (p. ej. bytes de la imagen del ensamblado). Opcional.</param>
+        /// <param name="maxEntries">Distinct compilations allowed in this process (each one leaves a loaded assembly).</param>
+        /// <param name="sizeOf">Estimated size of a result (e.g. bytes of the assembly image). Optional.</param>
         public CompileCache(int maxEntries = DefaultMaxEntries, Func<T, long> sizeOf = null)
         {
             MaxEntries = Math.Max(1, maxEntries);
@@ -47,14 +47,14 @@ namespace Bimbridge.Engine
         public long Hits => Interlocked.Read(ref _hits);
         public long Misses => Interlocked.Read(ref _misses);
         public long Failures => Interlocked.Read(ref _failures);
-        /// <summary>Peticiones que esperaron a una compilación idéntica en curso (y no compilaron).</summary>
+        /// <summary>Requests that waited for an identical compilation in progress (and did not compile).</summary>
         public long CoalescedWaits => Interlocked.Read(ref _waits);
         public long TotalCompileMs => Interlocked.Read(ref _compileMs);
-        /// <summary>Bytes estimados de los ensamblados cargados (suma de imágenes). Estimación, no medición del heap.</summary>
+        /// <summary>Estimated bytes of loaded assemblies (sum of images). An estimate, not a heap measurement.</summary>
         public long LoadedBytes => Interlocked.Read(ref _bytes);
-        /// <summary>Compilaciones nuevas rechazadas por el límite de entradas.</summary>
+        /// <summary>New compilations rejected by the entry limit.</summary>
         public long Refused => Interlocked.Read(ref _refused);
-        /// <summary>Compuertas vivas (para pruebas: vuelve a 0 cuando no hay compilaciones en curso).</summary>
+        /// <summary>Live gates (for tests: returns to 0 when no compilations are in progress).</summary>
         public int LiveGates { get { lock (_gatesLock) return _gates.Count; } }
 
         public bool TryGet(string key, out T value)
@@ -63,15 +63,15 @@ namespace Bimbridge.Engine
             return false;
         }
 
-        /// <summary>Compatibilidad: sin dueño ni motivo de rechazo.</summary>
+        /// <summary>Compatibility: no owner and no refusal reason.</summary>
         public T GetOrCompile(string key, Func<Tuple<T, long>> compile, out bool fromCache) =>
             GetOrCompile(key, null, compile, out fromCache, out _);
 
         /// <summary>
-        /// Devuelve el valor de la caché o lo compila con <paramref name="compile"/> (una sola vez por clave a la vez).
-        /// <paramref name="fromCache"/> = true si no se compiló en esta llamada. compile devuelve null si falla (con su error).
-        /// Si la clave es nueva y se alcanzó <see cref="MaxEntries"/>, devuelve null sin compilar y explica el motivo en <paramref name="refusal"/>.
-        /// <paramref name="owner"/>: agente o sesión que la pidió (contabilidad por agente).
+        /// Returns the cached value or compiles it with <paramref name="compile"/> (only once per key at a time).
+        /// <paramref name="fromCache"/> = true if it was not compiled in this call. compile returns null if it fails (with its error).
+        /// If the key is new and <see cref="MaxEntries"/> was reached, returns null without compiling and explains the reason in <paramref name="refusal"/>.
+        /// <paramref name="owner"/>: agent or session that requested it (per-agent accounting).
         /// </summary>
         public T GetOrCompile(string key, string owner, Func<Tuple<T, long>> compile, out bool fromCache, out string refusal)
         {
@@ -82,13 +82,13 @@ namespace Bimbridge.Engine
             try
             {
                 if (_done.TryGetValue(key, out hit)) { Interlocked.Increment(ref _hits); return hit; }
-                // Reserva atómica de una plaza: el límite es exacto aunque compilen a la vez claves distintas.
+                // Atomic slot reservation: the limit is exact even when different keys compile at the same time.
                 if (Interlocked.Increment(ref _slots) > MaxEntries)
                 {
                     Interlocked.Decrement(ref _slots);
                     Interlocked.Increment(ref _refused);
-                    refusal = "límite de compilaciones dinámicas distintas alcanzado (" + MaxEntries + "): cada script distinto queda cargado en Revit " +
-                              "hasta reiniciarlo. Reutilice un mismo script pasando los datos por args, o reinicie Revit para liberar memoria.";
+                    refusal = "limit of distinct dynamic compilations reached (" + MaxEntries + "): each distinct script stays loaded in Revit " +
+                              "until it restarts. Reuse the same script passing the data through args, or restart Revit to free memory.";
                     return null;
                 }
                 fromCache = false;
@@ -101,7 +101,7 @@ namespace Bimbridge.Engine
                 if (_done.TryAdd(key, r.Item1))
                 {
                     if (_sizeOf != null) Interlocked.Add(ref _bytes, Math.Max(0, _sizeOf(r.Item1)));
-                    _byOwner.AddOrUpdate(string.IsNullOrEmpty(owner) ? "(sin dueño)" : owner, 1, (_, n) => n + 1);
+                    _byOwner.AddOrUpdate(string.IsNullOrEmpty(owner) ? "(no owner)" : owner, 1, (_, n) => n + 1);
                 }
                 else Interlocked.Decrement(ref _slots);
                 return r.Item1;
@@ -126,12 +126,12 @@ namespace Bimbridge.Engine
             Monitor.Exit(g);
             lock (_gatesLock)
             {
-                // Sólo se retira cuando nadie más la usa: una clave nunca tiene dos compuertas vivas a la vez.
+                // Removed only when nobody else uses it: a key never has two live gates at once.
                 if (--g.Users == 0 && _gates.TryGetValue(key, out var cur) && ReferenceEquals(cur, g)) _gates.Remove(key);
             }
         }
 
-        /// <summary>Compilaciones distintas por agente o sesión (las más numerosas primero).</summary>
+        /// <summary>Distinct compilations per agent or session (largest first).</summary>
         public List<KeyValuePair<string, long>> ByOwner(int top = 10) =>
             _byOwner.OrderByDescending(kv => kv.Value).Take(top).ToList();
 

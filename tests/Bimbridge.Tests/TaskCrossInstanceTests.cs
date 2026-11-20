@@ -12,8 +12,8 @@ using static Bimbridge.Tests.TaskEngineTests;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// Dos Revit sobre la misma carpeta de tareas: quien no tiene el lease no toca tarea.json (ni al cancelar/anotar/reconciliar/archivar,
-    /// ni el motor que perdió la tarea al detenerse); el motor que termina bien guarda ANTES de soltar el lease.
+    /// Two Revits on the same tasks folder: whoever does not hold the lease does not touch tarea.json (not on cancel/note/reconcile/archive,
+    /// nor the engine that lost the task when it stops); the engine that finishes cleanly saves BEFORE releasing the lease.
     /// </summary>
     public class TaskCrossInstanceTests
     {
@@ -32,7 +32,7 @@ namespace Bimbridge.Tests
             Authority = new AllowAll(), Delay = (d, ct) => Task.Delay(5, ct), MaxWait = TimeSpan.FromSeconds(20), BudgetMs = 200,
         };
 
-        /// <summary>Fix 4: con el lease vigente de OTRO Revit, cancelar/anotar/reconciliar/archivar desde aquí no cambia ni mueve la tarea.</summary>
+        /// <summary>Fix 4: with ANOTHER Revit's valid lease, cancel/note/reconcile/archive from here neither changes nor moves the task.</summary>
         [Fact]
         public void HeldByOtherInstance_ManagerDoesNotTouchTask()
         {
@@ -56,7 +56,7 @@ namespace Bimbridge.Tests
             Assert.Equal(before, File.ReadAllText(file));
         }
 
-        /// <summary>Fix 5: el motor que pierde el lease (otro dueño lo toma con fencing mayor y guarda su tarea.json) no pisa ese tarea.json al detenerse.</summary>
+        /// <summary>Fix 5: the engine that loses the lease (another owner takes it with a higher fencing token and saves its tarea.json) does not overwrite that tarea.json when it stops.</summary>
         [Fact]
         public async Task LeaseLost_RunnerDoesNotOverwriteNewOwnersTaskJson()
         {
@@ -71,14 +71,14 @@ namespace Bimbridge.Tests
             m.OnVisit = v =>
             {
                 if (v != 3) return;
-                // Tras vencer (now+2h) otro dueño la toma: fencing nuevo.
+                // After expiry (now+2h) another owner takes it: new fencing token.
                 Assert.True(thief.TryLease("robada", "inst:B", "B", TimeSpan.FromHours(3), DateTime.UtcNow.AddHours(2), out var l));
                 Assert.True(l.Fencing >= 2);
                 stolen = true;
             };
             var runner = Runner(store, m, t);
-            // El nuevo dueño guarda su tarea.json en el siguiente punto de autoridad (RenewLease → Now), ya pasado el checkpoint del lote 3.
-            // Fuera del lote: el Preflight por unidad también llama a Now, pero dentro de lock(m.Lock) en el mismo hilo.
+            // The new owner saves its tarea.json at the next authority point (RenewLease -> Now), after the batch 3 checkpoint.
+            // Outside the batch: the per-unit Preflight also calls Now, but inside lock(m.Lock) on the same thread.
             runner.Now = () =>
             {
                 if (stolen && !marked && !Monitor.IsEntered(m.Lock))
@@ -105,7 +105,7 @@ namespace Bimbridge.Tests
             Assert.False(lease.Released);
         }
 
-        /// <summary>Fix 5: el motor que termina bien hace el último checkpoint con el lease aún suyo (antes de soltarlo).</summary>
+        /// <summary>Fix 5: the engine that finishes cleanly takes the last checkpoint while it still holds the lease (before releasing it).</summary>
         [Fact]
         public async Task NormalFinish_LastCheckpointBeforeLeaseRelease()
         {
@@ -123,7 +123,7 @@ namespace Bimbridge.Tests
             var last = leaseAtSave.Last();
             Assert.NotNull(last);
             Assert.Equal("inst:A", last.Owner);
-            Assert.False(last.Released, "el último tarea.json se escribió después de soltar el lease");
+            Assert.False(last.Released, "the last tarea.json was written after releasing the lease");
             Assert.True(store.ReadLease("normal").Released);
             Assert.Equal(TaskState.Aplicada, store.Load("normal").State);
         }

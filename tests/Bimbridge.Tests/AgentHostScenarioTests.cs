@@ -13,9 +13,9 @@ using Xunit.Abstractions;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// Definición de Hecho de alpha1 (§11): un proceso nuevo recibe un plan estructurado, lo valida, ejecuta 1 000 unidades simuladas con
-    /// dependencias, sobrevive a terminaciones forzadas (SIGKILL) en siete puntos distintos, recarga modelo y estado desde disco en cada
-    /// proceso nuevo, continúa sin repetir nada y produce un informe completo. BIMBRIDGE_AH_EVIDENCE=&lt;carpeta&gt; guarda el registro.
+    /// alpha1 Definition of Done (§11): a new process receives a structured plan, validates it, runs 1,000 simulated units with
+    /// dependencies, survives forced terminations (SIGKILL) at seven different points, reloads model and state from disk in each
+    /// new process, continues without repeating anything and produces a complete report. BIMBRIDGE_AH_EVIDENCE=&lt;folder&gt; saves the log.
     /// </summary>
     public class AgentHostScenarioTests
     {
@@ -41,7 +41,7 @@ namespace Bimbridge.Tests
             var mark = Path.Combine(dir, "caidas.txt");
             var pf = Path.Combine(dir, "plan_entrada.json");
 
-            // elegir, en el momento de cada caída, la k-ésima escritura aún pendiente en el orden de ejecución (para repartir las caídas)
+            // pick, at the time of each crash, the k-th write still pending in run order (to spread the crashes)
             var skip = new HashSet<string>(Ids(spec, "rechazadas").Concat(Ids(spec, "transitorias_ko")).Concat(Ids(spec, "vacio_permitido")).Concat(Ids(spec, "vacio_no_permitido")).Concat(Ids(spec, "esperado_erroneo")));
             string Pending(int k)
             {
@@ -64,46 +64,46 @@ namespace Bimbridge.Tests
             foreach (var f in faults)
             {
                 var fault = f();
-                AH.ExpireDeadLease(state);   // AUD-04: caída ≠ expiración; lease largo y vencimiento adelantado del proceso muerto
+                AH.ExpireDeadLease(state);   // AUD-04: crash ≠ expiry; long lease and the dead process's expiry moved forward
                 var r = AH.Run(fault, mark, "ejecutar", processes == 0 ? pf : "-", state, "--modelo", model, "--lease-ms", "3600000", "--checkpoint", "50");
                 processes++;
                 var st = AH.Read(state, out var vplan, out var diags);
                 Assert.NotNull(st);
                 var verified = st.Ops.Where(kv => kv.Value.State == OpState.Verificada).Select(kv => kv.Key).ToHashSet();
-                Log("$ agenthost ejecutar … [BIMBRIDGE_AH_FAULT=" + fault + "] → código " + r.Code + (r.Killed ? " (SIGKILL)" : "") + "\n  " + r.Out.Trim().Replace("\n", "\n  ") +
-                    "\n  tras la caída: " + Compact.Summary(vplan, st));
-                Assert.True(r.Killed, "debía morir en " + fault + ": " + r);
-                Assert.Subset(verified, verifiedBefore);    // lo completado sigue completado
+                Log("$ agenthost ejecutar … [BIMBRIDGE_AH_FAULT=" + fault + "] → code " + r.Code + (r.Killed ? " (SIGKILL)" : "") + "\n  " + r.Out.Trim().Replace("\n", "\n  ") +
+                    "\n  after the crash: " + Compact.Summary(vplan, st));
+                Assert.True(r.Killed, "should have died at " + fault + ": " + r);
+                Assert.Subset(verified, verifiedBefore);    // what was completed stays completed
                 verifiedBefore = verified;
             }
             AH.ExpireDeadLease(state);
             var last = AH.Run(null, null, "ejecutar", "-", state, "--modelo", model, "--lease-ms", "3600000");
             processes++;
-            Log("$ agenthost ejecutar - (sin fallo, proceso " + processes + ") → código " + last.Code + "\n  " + last.Out.Trim().Replace("\n", "\n  "));
-            Assert.Equal(2, last.Code);   // terminó con las excepciones previstas
-            Log("caídas registradas:\n  " + File.ReadAllText(mark).Trim().Replace("\n", "\n  "));
-            Log("tiempo total (8 procesos): " + sw.ElapsedMilliseconds + " ms");
+            Log("$ agenthost ejecutar - (no fault, process " + processes + ") → code " + last.Code + "\n  " + last.Out.Trim().Replace("\n", "\n  "));
+            Assert.Equal(2, last.Code);   // finished with the expected exceptions
+            Log("recorded crashes:\n  " + File.ReadAllText(mark).Trim().Replace("\n", "\n  "));
+            Log("total time (8 processes): " + sw.ElapsedMilliseconds + " ms");
 
-            // ---- comprobaciones con objetos nuevos leídos de disco ----
+            // ---- checks with new objects read from disk ----
             var final = AH.Read(state, out var plan, out _);
             var fresh = DurableSimModel.Open(model);
             Assert.Equal(1000, plan.Ops.Count);
             Assert.Subset(final.Ops.Where(kv => kv.Value.State == OpState.Verificada).Select(kv => kv.Key).ToHashSet(), verifiedBefore);
-            // 1. nada repetido: cada escritura, a lo sumo una transacción; las verificadas no vacías, exactamente una
+            // 1. nothing repeated: each write has at most one transaction; non-empty verified ones, exactly one
             foreach (var op in plan.Ops.Where(o => o.Writes))
             {
                 var n = fresh.TxFor(op.Id, hash).Count;
                 Assert.InRange(n, 0, 1);
                 if (final.Ops[op.Id].State == OpState.Verificada && !Ids(spec, "vacio_permitido").Contains(op.Id)) Assert.Equal(1, n);
             }
-            // 2. dependencias respetadas: ninguna operación empezó antes de que sus dependencias quedaran verificadas
+            // 2. dependencies respected: no operation started before its dependencies were verified
             var journal = AH.Journal(state);
             var verifiedAt = new Dictionary<string, long>();
             foreach (var j in journal.Where(x => Arg.GetString(x, "a") == OpState.Verificada)) verifiedAt[Arg.GetString(j, "op")] = Arg.GetLong(j, "seq").Value;
             foreach (var j in journal.Where(x => Arg.GetString(x, "a") == OpState.EnEjecucion))
                 foreach (var d in plan.ById[Arg.GetString(j, "op")].DependsOn)
-                    Assert.True(verifiedAt.TryGetValue(d, out var vs) && vs < Arg.GetLong(j, "seq"), "dependencia " + d + " no verificada antes de empezar " + Arg.GetString(j, "op"));
-            // 3. los fallos de verificación no son éxitos
+                    Assert.True(verifiedAt.TryGetValue(d, out var vs) && vs < Arg.GetLong(j, "seq"), "dependency " + d + " not verified before starting " + Arg.GetString(j, "op"));
+            // 3. verification failures are not successes
             Assert.All(Ids(spec, "esperado_erroneo"), id => { Assert.Equal(OpState.Fallida, final.Ops[id].State); Assert.Equal(ErrorClass.Verificacion, final.Ops[id].Error); });
             Assert.Equal(OpState.Fallida, final.Ops[(string)spec["qc_desviado"]].State);
             Assert.All(Ids(spec, "rechazadas"), id => Assert.Equal(ErrorClass.Rechazo, final.Ops[id].Error));
@@ -112,7 +112,7 @@ namespace Bimbridge.Tests
             Assert.All(Ids(spec, "vacio_permitido"), id => Assert.Equal(OpState.Verificada, final.Ops[id].State));
             Assert.All(Ids(spec, "vacio_no_permitido"), id => Assert.Equal(ErrorClass.SinObjetivos, final.Ops[id].Error));
             Assert.DoesNotContain(final.Ops.Values, o => !OpState.IsFinal(o.State));
-            // 4. el informe (otro proceso) identifica todo lo no resuelto
+            // 4. the report (another process) identifies everything unresolved
             var rep = AH.Run(null, null, "estado", state, "informe");
             Log("$ agenthost estado <estado> informe\n  " + rep.Out.Trim());
             var repJ = Json.ParseObject(rep.Out.Trim().Split('\n').Last());
@@ -123,9 +123,9 @@ namespace Bimbridge.Tests
                          ((List<object>)detail["sin_resolver"]).Select(x => Arg.GetString((Dictionary<string, object>)x, "id")).OrderBy(x => x));
             var exc = AH.Run(null, null, "estado", state, "excepciones");
             Log("$ agenthost estado <estado> excepciones\n  " + exc.Out.Trim().Replace("\n", "\n  "));
-            Log("recuperaciones en el diario:\n  " + string.Join("\n  ", journal.Where(x => Arg.GetString(x, "ev") == "nota").Select(x => Arg.GetString(x, "op") + " " + Json.Write(x["datos"]))));
-            Log("dueños (fencing): " + string.Join(", ", journal.Where(x => Arg.GetString(x, "ev") == "dueno").Select(x => Arg.GetLong(x, "f"))));
-            Log("líneas del diario: " + journal.Count + " · transacciones del modelo: " + plan.Ops.Where(o => o.Writes).Sum(o => fresh.TxFor(o.Id, hash).Count));
+            Log("recoveries in the journal:\n  " + string.Join("\n  ", journal.Where(x => Arg.GetString(x, "ev") == "nota").Select(x => Arg.GetString(x, "op") + " " + Json.Write(x["datos"]))));
+            Log("owners (fencing): " + string.Join(", ", journal.Where(x => Arg.GetString(x, "ev") == "dueno").Select(x => Arg.GetLong(x, "f"))));
+            Log("journal lines: " + journal.Count + " · model transactions: " + plan.Ops.Where(o => o.Writes).Sum(o => fresh.TxFor(o.Id, hash).Count));
 
             var ev = Environment.GetEnvironmentVariable("BIMBRIDGE_AH_EVIDENCE");
             if (ev != null)
@@ -137,7 +137,7 @@ namespace Bimbridge.Tests
             }
         }
 
-        /// <summary>Medición (no prueba de aceptación): tamaño en bytes de las respuestas compactas frente al grafo completo.</summary>
+        /// <summary>Measurement (not an acceptance test): size in bytes of the compact responses versus the full graph.</summary>
         [Fact]
         public void Measure_CompactMessageSizes_Bytes()
         {
@@ -166,7 +166,7 @@ namespace Bimbridge.Tests
                     ["fallos_verificacion_bytes"] = (long)B(Compact.VerificationFailures(r.Plan, r.State)),
                     ["cambios_ultima_operacion_bytes"] = (long)B(Compact.ChangesSince(r.Plan, r.State, lastOp.Seq - 1)),
                     ["informe_referencia_bytes"] = (long)B(Json.Write(Compact.Report(state, r.Plan, r.State))),
-                    ["nota"] = "bytes UTF-8; no se midieron tokens (no hay tokenizador disponible sin red); no se afirma ahorro de tokens",
+                    ["nota"] = "UTF-8 bytes; tokens were not measured (no tokenizer available offline); no token savings are claimed",
                 };
             }
             _out.WriteLine(Json.Write(m));

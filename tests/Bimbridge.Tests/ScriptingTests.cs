@@ -10,9 +10,9 @@ using Xunit;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// Runner general (exec): el código del usuario se envuelve y se COMPILA con Roslyn contra la API real de cada año
-    /// (ensamblados de referencia de RevitAPI/RevitAPIUI) y contra el add-in compilado de ese año. No ejecuta nada en Revit:
-    /// prueba que el script es válido para esa API, no que funcione en un modelo.
+    /// General runner (exec): the user's code is wrapped and COMPILED with Roslyn against the real API of each year
+    /// (RevitAPI/RevitAPIUI reference assemblies) and against that year's compiled add-in. It runs nothing in Revit:
+    /// it proves the script is valid for that API, not that it works on a model.
     /// </summary>
     public class ScriptingTests
     {
@@ -58,7 +58,7 @@ namespace Bimbridge.Tests
                 refs.AddRange(Directory.GetFiles(Path.Combine(Nuget, pkg, RefVersion[year], "ref"), "*.dll", SearchOption.AllDirectories));
             var addin = Path.Combine(Root, "src", "Bimbridge.Addin", "bin", "Release", "R" + year);
             Assert.True(File.Exists(Path.Combine(addin, "Bimbridge.Addin.dll")),
-                "falta el add-in compilado de " + year + " (" + addin + "): build.sh compila los add-ins antes de las pruebas");
+                "missing compiled add-in for " + year + " (" + addin + "): build.sh builds the add-ins before the tests");
             refs.AddRange(Directory.GetFiles(addin, "Bimbridge.*.dll"));
             return refs.ToArray();
         }
@@ -127,7 +127,7 @@ namespace Bimbridge.Tests
             Assert.True(dll != null, year + ": " + string.Join("\n", diags));
         }
 
-        /// <summary>Las recetas que trae el instalador (src/Bimbridge.Addin/recetas) y un script que usa Bim.* compilan en los 5 años.</summary>
+        /// <summary>The recipes shipped by the installer (src/Bimbridge.Addin/recetas) and a script that uses Bim.* compile for all 5 years.</summary>
         [Theory, MemberData(nameof(Years))]
         public void BuiltInRecipesAndBimHelpers_Compile(int year)
         {
@@ -137,7 +137,7 @@ namespace Bimbridge.Tests
             foreach (var f in files)
             {
                 var code = File.ReadAllText(f);
-                Assert.True(ScriptSource.IsRecipe(code), Path.GetFileName(f) + " no se reconoce como receta");
+                Assert.True(ScriptSource.IsRecipe(code), Path.GetFileName(f) + " is not recognized as a recipe");
                 var (dll, diags) = Compile(code, year);
                 Assert.True(dll != null, year + " " + Path.GetFileName(f) + ": " + string.Join("\n", diags));
             }
@@ -162,7 +162,7 @@ namespace Bimbridge.Tests
             Assert.True(dll != null, string.Join("\n", diags));
         }
 
-        /// <summary>Medición (no prueba): BIMBRIDGE_BENCH_OUT=archivo dotnet test --filter Bench_. Compilación en frío y en caliente por año.</summary>
+        /// <summary>Measurement (not a test): BIMBRIDGE_BENCH_OUT=file dotnet test --filter Bench_. Cold and warm compilation per year.</summary>
         [Fact]
         public void Bench_CompileTimes()
         {

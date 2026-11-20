@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.8.0 paquete C: geometría 2D compartida y validación de las operaciones de dibujo antes de tocar Revit.</summary>
+    /// <summary>0.8.0 package C: shared 2D geometry and validation of drawing operations before touching Revit.</summary>
     public class Draw2DTests
     {
         [Fact]
@@ -60,15 +60,15 @@ namespace Bimbridge.Tests
         }
 
         [Theory]
-        [InlineData("{\"op\":\"detail_line\",\"view\":1,\"puntos\":[[0,0],[0.001,0]]}")]                          // tramo más corto que Revit
-        [InlineData("{\"op\":\"detail_line\",\"view\":1,\"puntos\":[[0,0],[1,0]],\"cerrado\":true}")]           // cerrado con 2 puntos
-        [InlineData("{\"op\":\"detail_rect\",\"view\":1,\"esquinas\":[[0,0],[4,0]]}")]                           // sin alto
-        [InlineData("{\"op\":\"detail_arc\",\"view\":1,\"centro\":[0,0],\"radio\":1,\"inicio\":0,\"fin\":360}")] // círculo completo
+        [InlineData("{\"op\":\"detail_line\",\"view\":1,\"puntos\":[[0,0],[0.001,0]]}")]                          // segment shorter than Revit allows
+        [InlineData("{\"op\":\"detail_line\",\"view\":1,\"puntos\":[[0,0],[1,0]],\"cerrado\":true}")]           // closed with 2 points
+        [InlineData("{\"op\":\"detail_rect\",\"view\":1,\"esquinas\":[[0,0],[4,0]]}")]                           // no height
+        [InlineData("{\"op\":\"detail_arc\",\"view\":1,\"centro\":[0,0],\"radio\":1,\"inicio\":0,\"fin\":360}")] // full circle
         [InlineData("{\"op\":\"detail_arc\",\"view\":1,\"centro\":[0,0],\"radio\":0,\"inicio\":0,\"fin\":90}")]
         [InlineData("{\"op\":\"detail_polygon\",\"view\":1,\"centro\":[0,0],\"radio\":1,\"lados\":2}")]
-        [InlineData("{\"op\":\"filled_region\",\"view\":1,\"puntos\":[[0,0],[2,2],[2,0],[0,2]]}")]              // pajarita (se cruza)
-        [InlineData("{\"op\":\"dimension\",\"view\":1,\"refs\":\"5\",\"linea\":[[0,0],[1,0]]}")]                  // 1 sola referencia
-        [InlineData("{\"op\":\"dimension\",\"view\":1,\"refs\":\"@2,@3\",\"linea\":[[0,0],[1,0]]}")]              // @n no admitido aún
+        [InlineData("{\"op\":\"filled_region\",\"view\":1,\"puntos\":[[0,0],[2,2],[2,0],[0,2]]}")]              // bow tie (self-intersecting)
+        [InlineData("{\"op\":\"dimension\",\"view\":1,\"refs\":\"5\",\"linea\":[[0,0],[1,0]]}")]                  // only 1 reference
+        [InlineData("{\"op\":\"dimension\",\"view\":1,\"refs\":\"@2,@3\",\"linea\":[[0,0],[1,0]]}")]              // @n not supported yet
         [InlineData("{\"op\":\"view_create\",\"tipo\":\"leyenda\"}")]
         public void DrawingOps_InvalidInputs_RejectedBeforeRevit(string json)
         {

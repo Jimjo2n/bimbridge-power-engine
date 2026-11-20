@@ -7,8 +7,8 @@ using System.Linq;
 namespace Bimbridge.Engine.Tasks
 {
     /// <summary>
-    /// Resúmenes compactos y deterministas (§6): lo que necesita el siguiente agente (Codex o Claude) para continuar sin reenviar código ni
-    /// referencias. No llama a ningún modelo ni incluye credenciales; se calcula con los datos del motor.
+    /// Compact, deterministic summaries (§6): what the next agent (Codex or Claude) needs to continue without resending code or
+    /// references. Calls no model and includes no credentials; computed from the engine's data.
     /// </summary>
     public static class TaskSummary
     {
@@ -19,20 +19,20 @@ namespace Bimbridge.Engine.Tasks
             var done = N(UnitState.Confirmada) + N(UnitState.Omitida);
             var parts = new List<string>
             {
-                "Tarea " + t.Id + " (" + (t.RecipeName ?? "?") + " v" + (t.RecipeVersion ?? "?") + ", doc " + (t.MainDoc?.Title ?? t.MainDoc?.Key ?? "?") + "): " + t.State + ".",
+                "Task " + t.Id + " (" + (t.RecipeName ?? "?") + " v" + (t.RecipeVersion ?? "?") + ", doc " + (t.MainDoc?.Title ?? t.MainDoc?.Key ?? "?") + "): " + t.State + ".",
             };
-            if (!string.IsNullOrEmpty(t.Objective)) parts.Add("Objetivo: " + Clip(t.Objective, 140) + ".");
-            parts.Add("Unidades: " + done + "/" + t.UnitsTotal + " hechas" +
-                      Opt(N(UnitState.Conflicto), " conflictos") + Opt(N(UnitState.Revertida), " revertidas") +
-                      Opt(N(UnitState.EnCurso) + N(UnitState.Parcial) + N(UnitState.Desconocida), " dudosas") + ".");
+            if (!string.IsNullOrEmpty(t.Objective)) parts.Add("Target: " + Clip(t.Objective, 140) + ".");
+            parts.Add("Units: " + done + "/" + t.UnitsTotal + " done" +
+                      Opt(N(UnitState.Conflicto), " conflicts") + Opt(N(UnitState.Revertida), " rolled back") +
+                      Opt(N(UnitState.EnCurso) + N(UnitState.Parcial) + N(UnitState.Desconocida), " doubtful") + ".");
             if (t.LastPersist != null)
-                parts.Add("Último guardado: " + t.LastPersist.Kind + " " + t.LastPersist.When + " tras " + t.LastPersist.Seq + " confirmadas" +
-                          (t.ConfirmSeq > t.LastPersist.Seq ? " (" + (t.ConfirmSeq - t.LastPersist.Seq) + " confirmadas sin guardar)" : "") + ".");
-            else if (t.ConfirmSeq > 0) parts.Add("Sin guardar todavía (" + t.ConfirmSeq + " confirmadas sólo en memoria de Revit).");
-            if (t.Decisions.Count > 0) parts.Add("Decisiones: " + string.Join("; ", t.Decisions.Skip(Math.Max(0, t.Decisions.Count - 3)).Select(d => Clip(Convert.ToString(d.TryGetValue("texto", out var x) ? x : "", CultureInfo.InvariantCulture), 80))) + ".");
-            if (t.Exceptions.Count > 0) parts.Add("Excepciones: " + t.Exceptions.Count + ".");
-            if (!string.IsNullOrEmpty(t.Reason)) parts.Add("Motivo: " + Clip(t.Reason, 200) + ".");
-            parts.Add("Siguiente: " + Next(t, units) + ".");
+                parts.Add("Last save: " + t.LastPersist.Kind + " " + t.LastPersist.When + " after " + t.LastPersist.Seq + " committed" +
+                          (t.ConfirmSeq > t.LastPersist.Seq ? " (" + (t.ConfirmSeq - t.LastPersist.Seq) + " committed unsaved)" : "") + ".");
+            else if (t.ConfirmSeq > 0) parts.Add("Not saved yet (" + t.ConfirmSeq + " committed only in Revit memory).");
+            if (t.Decisions.Count > 0) parts.Add("Decisions: " + string.Join("; ", t.Decisions.Skip(Math.Max(0, t.Decisions.Count - 3)).Select(d => Clip(Convert.ToString(d.TryGetValue("texto", out var x) ? x : "", CultureInfo.InvariantCulture), 80))) + ".");
+            if (t.Exceptions.Count > 0) parts.Add("Exceptions: " + t.Exceptions.Count + ".");
+            if (!string.IsNullOrEmpty(t.Reason)) parts.Add("Reason: " + Clip(t.Reason, 200) + ".");
+            parts.Add("Next: " + Next(t, units) + ".");
             return string.Join(" ", parts);
         }
 
@@ -40,26 +40,26 @@ namespace Bimbridge.Engine.Tasks
         {
             switch (t.State)
             {
-                case TaskState.Aplicada: return "nada; revisar artefactos si hace falta";
+                case TaskState.Aplicada: return "nothing; review artifacts if needed";
                 case TaskState.AplicadaConDiferencias:
                 {
-                    // Señala el estado que de verdad tiene unidades pendientes de revisar (no siempre es conflicto).
+                    // Points to the state that actually has units pending review (it is not always conflict).
                     var st = new[] { UnitState.Revertida, UnitState.Conflicto, UnitState.Parcial, UnitState.Omitida }
                         .FirstOrDefault(s => units.Units.Values.Any(u => u.State == s));
                     var which = units.Units.Values.Any(u => u.State == st) ? "tarea unidades estado=" + st.ToString().ToLowerInvariant() + ", " : "";
-                    return "revisar desviaciones (" + which + "qc_final) y decidir; tarea reanudar reintenta las revertidas";
+                    return "review deviations (" + which + "qc_final) and decide; tarea reanudar retries the rolled-back ones";
                 }
-                case TaskState.Cancelada: return "nada salvo que se quiera reanudar (tarea reanudar)";
+                case TaskState.Cancelada: return "nothing unless you want to resume (tarea reanudar)";
                 case TaskState.Interrumpida: return units.Units.Values.Any(u => u.State == UnitState.Desconocida)
-                    ? "tarea reconciliar con decision=aplicada|no_aplicada para las dudosas; luego tarea reanudar"
-                    : "tarea reanudar (verifica lo dudoso y continúa)";
-                case TaskState.Parcial: return "leer el motivo; corregir y tarea reanudar";
-                case TaskState.EsperandoContexto: return "resolver lo indicado en el motivo; la tarea sigue sola (o tarea reanudar si dejó de esperar)";
-                default: return "esperar (tarea esperar desde=" + t.Rev + ")";
+                    ? "tarea reconciliar with decision=aplicada|no_aplicada for the doubtful ones; then tarea reanudar"
+                    : "tarea reanudar (verifies what is doubtful and continues)";
+                case TaskState.Parcial: return "read the reason; fix and tarea reanudar";
+                case TaskState.EsperandoContexto: return "resolve what the reason says; the task continues on its own (or tarea reanudar if it stopped waiting)";
+                default: return "wait (tarea esperar desde=" + t.Rev + ")";
             }
         }
 
-        /// <summary>Estado compacto para la respuesta del agente: conteos, progreso, desviaciones (máx. 5), siguiente acción y artefactos.</summary>
+        /// <summary>Compact status for the agent response: counts, progress, deviations (max. 5), next action and artifacts.</summary>
         public static Dictionary<string, object> Status(TaskRecord t, UnitLog units, bool includeContinuation)
         {
             var c = units.Counts();

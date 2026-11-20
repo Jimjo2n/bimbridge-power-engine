@@ -10,13 +10,13 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Diario de operaciones (idempotencia y recuperación), resultados largos por handle, conjuntos por documento, matriz y regla de tags.</summary>
+    /// <summary>Operation journal (idempotency and recovery), long results by handle, per-document sets, matrix and tag rule.</summary>
     public class DurabilityTests
     {
         [ModuleInitializer]
         internal static void IsolateTestHome()
         {
-            // Nada de las pruebas escribe en %LOCALAPPDATA% real.
+            // Nothing in the tests writes to the real %LOCALAPPDATA%.
             Environment.SetEnvironmentVariable("BIMBRIDGE_HOME", Path.Combine(Path.GetTempPath(), "bimbridge-home-" + Guid.NewGuid().ToString("N")));
         }
 
@@ -33,12 +33,12 @@ namespace Bimbridge.Tests
             Assert.Equal(OperationJournal.BeginKind.Running, j.Begin("k1", "d1", Wire.OpCommit, h, "tareaA", "s2").Kind);
             j.Complete("k1", "d1", Status.Ok, new Dictionary<string, object> { ["cambiados"] = 3L });
 
-            // "Reinicio" de Revit: el diario se relee del disco.
+            // Revit "restart": the journal is reread from disk.
             var j2 = new OperationJournal(path);
             var again = j2.Begin("k1", "d1", Wire.OpCommit, h, "tareaA", "s3");
             Assert.Equal(OperationJournal.BeginKind.Completed, again.Kind);
             Assert.Equal(Status.Ok, again.Previous.Estado);
-            // La misma clave en otro documento es otra operación.
+            // The same key in another document is a different operation.
             Assert.Equal(OperationJournal.BeginKind.New, j2.Begin("k1", "d2", Wire.OpCommit, h, "tareaA", "s3").Kind);
         }
 
@@ -48,7 +48,7 @@ namespace Bimbridge.Tests
             var path = TempJournal();
             var j = new OperationJournal(path);
             j.Begin("k2", "d1", Wire.OpExec, "h", "t", "s1");
-            // Se corta (Revit se cierra): sin "fin". Al releer, queda interrumpida y NO se repite sola.
+            // It is cut off (Revit closes): no "fin". On reread, it stays interrupted and is NOT repeated on its own.
             var j2 = new OperationJournal(path);
             var r = j2.Begin("k2", "d1", Wire.OpExec, "h", "t", "s2");
             Assert.Equal(OperationJournal.BeginKind.Interrupted, r.Kind);
@@ -63,12 +63,12 @@ namespace Bimbridge.Tests
             var h1 = OperationJournal.HashArgs("exec", new Dictionary<string, object> { ["codigo"] = "a", [Wire.KeyArg] = "k", [Wire.TaskArg] = "t" });
             var h2 = OperationJournal.HashArgs("exec", new Dictionary<string, object> { ["codigo"] = "b", [Wire.KeyArg] = "k" });
             var h1b = OperationJournal.HashArgs("exec", new Dictionary<string, object> { ["codigo"] = "a", [Wire.KeyArg] = "otra" });
-            Assert.Equal(h1, h1b); // la clave y la tarea no cuentan en la huella
+            Assert.Equal(h1, h1b); // the key and the task do not count toward the fingerprint
             j.Begin("k", "d", "exec", h1, null, "s");
             j.Complete("k", "d", Status.Revertido, null);
             Assert.Equal(OperationJournal.BeginKind.Mismatch, j.Begin("k", "d", "exec", h2, null, "s").Kind);
-            // 0.6.0 (H03): sólo una reversión CONFIRMADA permite reintentar con el mismo contenido; un "error" a secas exige reconciliar
-            // (ver TransportRegressionTests.PartialCommitErrorMustRequireReconciliationBeforeRetry).
+            // 0.6.0 (H03): only a CONFIRMED rollback allows retrying with the same content; a bare "error" requires reconciliation
+            // (see TransportRegressionTests.PartialCommitErrorMustRequireReconciliationBeforeRetry).
             Assert.Equal(OperationJournal.BeginKind.New, j.Begin("k", "d", "exec", h1, null, "s").Kind);
         }
 
@@ -107,9 +107,9 @@ namespace Bimbridge.Tests
             var props = File.ReadAllText(Path.Combine(FindRoot(), "Directory.Build.props"));
             var version = System.Text.RegularExpressions.Regex.Match(props, "<Version>([^<]+)</Version>").Groups[1].Value;
             var doc = Path.Combine(FindRoot(), "docs", "MATRIZ_CAPACIDADES.md");
-            // Regenerar: BIMBRIDGE_GEN_MATRIZ=1 dotnet test --filter Capabilities_DocMatchesCode
+            // Regenerate: BIMBRIDGE_GEN_MATRIZ=1 dotnet test --filter Capabilities_DocMatchesCode
             if (Environment.GetEnvironmentVariable("BIMBRIDGE_GEN_MATRIZ") == "1") File.WriteAllText(doc, Capabilities.Markdown(version));
-            Assert.True(File.Exists(doc), "falta docs/MATRIZ_CAPACIDADES.md");
+            Assert.True(File.Exists(doc), "docs/MATRIZ_CAPACIDADES.md is missing");
             Assert.Equal(Capabilities.Markdown(version).Replace("\r\n", "\n"), File.ReadAllText(doc).Replace("\r\n", "\n"));
             var fam = Capabilities.ForDoc("familia", 2024).Select(r => (string)((object[])r)[0]).ToList();
             Assert.Contains("fam conector", fam);

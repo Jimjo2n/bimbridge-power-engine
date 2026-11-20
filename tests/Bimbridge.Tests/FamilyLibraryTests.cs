@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.8.0 paquete D: biblioteca de familias autorizada (sin Revit).</summary>
+    /// <summary>0.8.0 package D: authorized family library (without Revit).</summary>
     public class FamilyLibraryTests
     {
         [Fact]
@@ -55,7 +55,7 @@ namespace Bimbridge.Tests
             var root = AH.NewDir("famlib");
             Rfa(Path.Combine(root, "Lighting"), "LTG_DOWNLIGHT-SURFACE - ROUND", 2024, "G", "D");
             Rfa(Path.Combine(root, "Lighting"), "LTG_STRIP LIGHT", 2026);
-            Rfa(Path.Combine(root, "Lighting"), "LTG_STRIP LIGHT.0003", 2024);                 // copia de seguridad: no se indexa
+            Rfa(Path.Combine(root, "Lighting"), "LTG_STRIP LIGHT.0003", 2024);                 // backup copy: not indexed
             Rfa(Path.Combine(root, "Electrical", "Panels"), "EL_PANELBOARD", null);
             var cache = Path.Combine(AH.NewDir("famcache"), "indice.json");
             var lib = new FamilyLibrary(new[] { root }, cache);
@@ -68,10 +68,10 @@ namespace Bimbridge.Tests
             Assert.Equal(2024, hits[0].Entry.RevitVersion);
             Assert.Contains("G", hits[0].Entry.CatalogTypes);
             var strip = lib.Search("strip", 2024)[0];
-            Assert.False(strip.Compatible);                      // guardada en 2026, destino 2024
-            Assert.Null(lib.Search("panel", 2024).Single().Entry.RevitVersion);   // no se adivina
+            Assert.False(strip.Compatible);                      // saved in 2026, target 2024
+            Assert.Null(lib.Search("panel", 2024).Single().Entry.RevitVersion);   // not guessed
 
-            // caché: segunda instancia reutiliza sin releer
+            // cache: a second instance reuses it without rereading
             var lib2 = new FamilyLibrary(new[] { root }, cache);
             Assert.Equal(3, lib2.Refresh().cached);
         }

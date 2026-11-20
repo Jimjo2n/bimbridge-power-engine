@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Herramienta compacta "power" (Bridge) de punta a punta, sin Revit: descubrimiento, carpetas, flujo PDF→ops.</summary>
+    /// <summary>Compact "power" tool (Bridge) end to end, no Revit: discovery, folders, PDF->ops workflow.</summary>
     public class PowerCommandsTests
     {
         private static readonly string Fx = PowerEngineEnv.Fixtures;
@@ -41,8 +41,8 @@ namespace Bimbridge.Tests
                 Assert.All(ops, o => Assert.Equal("place", o["op"]));
                 Assert.Equal(72, ops.Sum(o => ((List<object>)o["puntos"]).Count));
                 Assert.Equal(30L, ((Dictionary<string, object>)r["anclas"])["comunes"]);
-                // la respuesta compacta no lleva los ítems uno a uno
-                Assert.True(Json.Write(r).Length < 20000, "respuesta " + Json.Write(r).Length);
+                // the compact response does not carry the items one by one
+                Assert.True(Json.Write(r).Length < 20000, "response " +Json.Write(r).Length);
             }
         }
 
@@ -61,8 +61,8 @@ namespace Bimbridge.Tests
             var excluded = candidates[1]["id_simbolo"];
             var review = new[]
             {
-                new Dictionary<string, object> { ["id_simbolo"] = included, ["decision"] = "incluir", ["evidencia"] = "leyenda y nota 13" },
-                new Dictionary<string, object> { ["id_simbolo"] = excluded, ["decision"] = "excluir", ["evidencia"] = "otro dispositivo en la referencia" },
+                new Dictionary<string, object> { ["id_simbolo"] = included, ["decision"] = "incluir", ["evidencia"] = "legend and note 13" },
+                new Dictionary<string, object> { ["id_simbolo"] = excluded, ["decision"] = "excluir", ["evidencia"] = "another device in the reference" },
             };
             var command = "flujo " + path + " nivel=\"LEVEL 09\" tol=0.05 reglas=" + Rules + " ejes=" + Grids();
             var audited = PowerCommands.Run(pe, folders, command + " decisiones=" + Json.Write(review));
@@ -73,7 +73,7 @@ namespace Bimbridge.Tests
             Assert.True(inventory[included].ContainsKey("xy_ft"));
             Assert.True(inventory[included].ContainsKey("id_colocacion"));
             Assert.Equal("excluido", inventory[excluded]["estado"]);
-            Assert.Equal("otro dispositivo en la referencia", inventory[excluded]["evidencia_revision"]);
+            Assert.Equal("another device in the reference", inventory[excluded]["evidencia_revision"]);
             Assert.Contains(inventory.Values, x => Equals(x["estado"], "sin_revisar"));
             review[0]["id_simbolo"] = "revision-anterior";
             var stale = PowerCommands.Run(pe, folders, command + " decisiones=" + Json.Write(review));
@@ -150,7 +150,7 @@ namespace Bimbridge.Tests
             foreach (Dictionary<string, object> row in (List<object>)r["geometria_ms_mediana"])
                 Assert.DoesNotContain(row.Keys, k => k.StartsWith("diferencia_", StringComparison.Ordinal));
             var t = (Dictionary<string, object>)r["texto"];
-            Assert.StartsWith("tokens ESTIMADOS", (string)t["metodo"]);
+            Assert.StartsWith("ESTIMATED tokens", (string)t["metodo"]);
             Assert.True(Convert.ToDouble(((Dictionary<string, object>)t["descubrimiento"])["reduccion_pct"], CultureInfo.InvariantCulture) > 50);
             Assert.True(Convert.ToDouble(((Dictionary<string, object>)t["colocacion_72"])["reduccion_chars_pct"], CultureInfo.InvariantCulture) > 50);
         }
@@ -160,7 +160,7 @@ namespace Bimbridge.Tests
         {
             var dir = Path.Combine(Path.GetTempPath(), "bb-red-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);
-            // 1–2 conectados físicamente; 2–3 se tocan sin conectar; 3–4 con hueco de 0,2 ft (sólo proximidad)
+            // 1-2 physically connected; 2-3 touch without connecting; 3-4 with a 0.2 ft gap (proximity only)
             File.WriteAllText(Path.Combine(dir, "t.json"), "[" +
                 "{\"id\":\"1\",\"a\":[0,0,10],\"b\":[10,0,10],\"diam\":0.0625,\"con_b\":\"2\"}," +
                 "{\"id\":\"2\",\"a\":[10,0,10],\"b\":[20,0,10],\"diam\":0.0625,\"con_a\":\"1\"}," +

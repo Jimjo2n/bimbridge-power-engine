@@ -19,8 +19,8 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// Enrutador de peticiones: lectura (fase 1-2) y escritura tipada plan/commit/job (fase 3). Corre en hilos de pipe; todo lo que toca
-    /// la API pasa por MainThread. Nunca lanza: los errores vuelven como estados claros.
+    /// Request router: reads (phase 1-2) and typed writes plan/commit/job (phase 3). Runs on pipe threads; everything that touches
+    /// the API goes through MainThread. Never throws: errors come back as clear statuses.
     /// </summary>
     public sealed partial class RequestHandler : IRequestHandler
     {
@@ -34,7 +34,7 @@ namespace Bimbridge.Addin.Revit
         private readonly PauseSwitch _pause;
         private readonly JobStore _jobs = new JobStore();
         private readonly ResultCache _cache = new ResultCache();
-        /// <summary>Issue #2: instantáneas de consultas paginadas (una lectura del modelo, páginas desde memoria).</summary>
+        /// <summary>Issue #2: snapshots of paged queries (one model read, pages from memory).</summary>
         private readonly QuerySnapshotStore _snapshots = new QuerySnapshotStore();
 
         public RequestHandler(MainThread main, DocumentTracker tracker, EngineConfig config, string revitVersion, string addinVersion,
@@ -49,7 +49,7 @@ namespace Bimbridge.Addin.Revit
             _config = config;
             _revitVersion = revitVersion;
             _addinVersion = addinVersion;
-            // Guardar como cambia la clave duradera: el diario y las tareas siguen al documento nuevo.
+            // Save As changes the durable key: the journal and the tasks follow the new document.
             _tracker.DocumentRekeyed += OnRekeyed;
             _tracker.DocumentHandleClosed += _snapshots.DropDocument;
             InitTasks();
@@ -69,14 +69,14 @@ namespace Bimbridge.Addin.Revit
         {
             if (_pause != null && _pause.On)
                 return Response.Fail(request.Id, Status.Rechazado,
-                    "El usuario pausó la IA desde Revit (botón Pausar IA). Deténgase y dígaselo; mientras siga en pausa no haga cambios en Revit por ningún medio. Continúe cuando la reanude.");
+                    "The user paused the AI from Revit (Pause AI button). Stop and tell them; while it stays paused do not make changes in Revit by any means. Continue when they resume it.");
             var targetError = ResolveTarget(session, request);
             if (targetError != null) return targetError;
-            // 0.8.0: permiso por clase de operación (además de los niveles R/P/W/D).
+            // 0.8.0: permission per operation class (in addition to the R/P/W/D levels).
             var permission = Permissions.Of(request.Op, request.Args, string.Equals(DocTarget.Ambient.Value?.Kind, "familia", StringComparison.OrdinalIgnoreCase));
             var denied = Permissions.Deny(permission, _config.EffectivePermissions);
             if (denied != null) return Response.Fail(request.Id, Status.Rechazado, denied);
-            // 0.9.0: política del perfil (producción / laboratorio), además de permisos y niveles.
+            // 0.9.0: profile policy (production / lab), in addition to permissions and levels.
             var profileDenied = _config.Profile.DenyRequest(request.Op, permission, DocTarget.Ambient.Value?.Key, BimBridge.PowerEngine.PowerEngineCapabilityRegistry.StateOfWire(request.Op, request.Args));
             if (profileDenied != null) return Response.Fail(request.Id, Status.Rechazado, profileDenied);
             return await WithJournal(session, request, () => Dispatch(session, request, ct)).ConfigureAwait(false);
@@ -106,34 +106,34 @@ namespace Bimbridge.Addin.Revit
                 case Wire.OpCapture: return await CaptureOp(session, request, ct).ConfigureAwait(false);
                 case Wire.OpTask: return await TaskOp(session, request, ct).ConfigureAwait(false);
                 default:
-                    return Response.Fail(request.Id, Status.Invalido, "operación desconocida: " + request.Op);
+                    return Response.Fail(request.Id, Status.Invalido, "unknown operation: " + request.Op);
             }
         }
 
         public void OnSessionClosed(Session session)
         {
-            // Nadie va a leer esos resultados: se cancelan dentro de Revit en su siguiente tramo.
+            // Nobody will read those results: they are cancelled inside Revit on their next slice.
             _jobs.CancelSession(session.Id);
             session.Sets.Clear();
             _snapshots.DropSession(session.Id);
         }
 
-        /// <summary>Estadísticas para el estado y la auditoría: hilo de Revit, caché y trabajos.</summary>
+        /// <summary>Statistics for the status and the audit: Revit thread, cache and jobs.</summary>
         public Dictionary<string, object> Diagnostics() => new Dictionary<string, object>
         {
             ["hilo_revit"] = _main.Stats(),
             ["cache"] = new Dictionary<string, object> { ["aciertos"] = (long)_cache.Hits, ["fallos"] = (long)_cache.Misses, ["guardados"] = (long)_cache.Count },
             ["trabajos_en_curso"] = (long)_jobs.Running,
-            // #9 / #5: caché de compilación C# (single-flight) e instantáneas de consulta (#2).
+            // #9 / #5: C# compilation cache (single-flight) and query snapshots (#2).
             ["compilacion_csharp"] = Scripting.ScriptHost.CacheStats(),
             ["instantaneas_consulta"] = new Dictionary<string, object>
             {
                 ["guardadas"] = (long)_snapshots.Count, ["celdas"] = _snapshots.Cells,
-                ["bytes_estimados"] = _snapshots.EstimatedBytes, ["presupuesto_bytes"] = _snapshots.MaxBytes,   // estimación, no medición del heap
+                ["bytes_estimados"] = _snapshots.EstimatedBytes, ["presupuesto_bytes"] = _snapshots.MaxBytes,   // estimate, not a heap measurement
             },
         };
 
-        // ---------------- geo (trabajos largos con espera y caché) ----------------
+        // ---------------- geo (long jobs with wait and cache) ----------------
 
         private async Task<Response> Geo(Session session, Request request, CancellationToken ct)
         {
@@ -182,11 +182,11 @@ namespace Bimbridge.Addin.Revit
                 else if (runner.CacheHit?.Payload is GeoRunner.Outcome cached)
                 {
                     datos = GeoRunner.Summarize(runner.Spec, cached, out sets);
-                    datos["reutilizado"] = "el modelo y los vínculos no cambiaron desde la revisión anterior (" + runner.CacheHit.RevitMs + " ms de Revit ahorrados)";
+                    datos["reutilizado"] = "the model and links did not change since the previous check (" + runner.CacheHit.RevitMs + " ms of Revit saved)";
                 }
                 else
                 {
-                    job.Phase = "calculando fuera de Revit";
+                    job.Phase = "computing outside Revit";
                     await Task.Run(() => runner.Compute(), job.Cts.Token).ConfigureAwait(false);
                     if (runner.NeedsExact)
                     {
@@ -199,11 +199,11 @@ namespace Bimbridge.Addin.Revit
                     var outcome = runner.ToOutcome();
                     datos = GeoRunner.Summarize(runner.Spec, outcome, out sets);
                     if (runner.ModelChanged)
-                        datos["aviso_modelo"] = "el modelo cambió mientras se revisaba: repita la revisión si esos elementos se tocaron";
+                        datos["aviso_modelo"] = "the model changed during the check: repeat the check if those elements were touched";
                     else
                         _cache.Put(runner.CacheKey, new ResultCache.Entry { Payload = outcome, RevitMs = revitMs, CreatedUtc = DateTime.UtcNow });
                     if (runner.MeshesNew > 0 || runner.MeshesReused > 0)
-                        datos["mallas"] = runner.MeshesNew + " nuevas, " + runner.MeshesReused + " reutilizadas";
+                        datos["mallas"] = runner.MeshesNew + " new, " + runner.MeshesReused + " reused";
                 }
                 foreach (var kv in sets)
                 {
@@ -217,7 +217,7 @@ namespace Bimbridge.Addin.Revit
             }
             catch (OperationCanceledException)
             {
-                _jobs.Fail(job, JobStatus.Cancelado, "cancelado antes de terminar; no se cambió nada");
+                _jobs.Fail(job, JobStatus.Cancelado, "cancelled before finishing; nothing was changed");
             }
             catch (Exception ex)
             {
@@ -229,12 +229,12 @@ namespace Bimbridge.Addin.Revit
         {
             var resp = FromWork(0, r, write);
             var st = resp.Estado;
-            // Cancelado antes de empezar = nada aplicado (se puede repetir); a mitad de una escritura = desconocido (reconciliar).
+            // Cancelled before starting = nothing applied (can be repeated); midway through a write = unknown (reconcile).
             if (r.Kind == WorkResult.KindCancelled) st = write ? (r.Slices > 0 ? Status.Desconocido : Status.Rechazado) : JobStatus.Cancelado;
             _jobs.Fail(job, st, resp.Aviso);
         }
 
-        /// <summary>Cuánto espera una petición a que termine su trabajo antes de devolver job_id (queda margen dentro del plazo del cliente).</summary>
+        /// <summary>How long a request waits for its job to finish before returning job_id (leaves margin within the client deadline).</summary>
         private static int WaitBudget(Request r) => r.DeadlineMs > 0 ? Math.Max(500, Math.Min(r.DeadlineMs - 4000, 45000)) : 25000;
 
         private static async Task<Response> AwaitJob(Request request, Job job, CancellationToken ct)
@@ -257,7 +257,7 @@ namespace Bimbridge.Addin.Revit
                     return new Response
                     {
                         Id = id, Estado = Status.EnProceso, Datos = job.Progress(),
-                        Aviso = "Sigue dentro de Revit por tramos, sin bloquearlo. Llame job con job_id=" + job.Id + " para esperar el resultado; no repita la revisión.",
+                        Aviso = "Still running inside Revit in slices, without blocking it. Call job with job_id=" + job.Id + " to wait for the result; do not repeat the check.",
                     };
                 default:
                     var f = Response.Fail(id, job.Estado, job.Error + (FinalizeNote(job) != null ? " " + FinalizeNote(job) : ""));
@@ -267,25 +267,25 @@ namespace Bimbridge.Addin.Revit
         }
 
         private static string FinalizeNote(Job job) =>
-            job.FinalizeError == null ? null : "ATENCIÓN: el diario no registró el final de este trabajo (" + job.FinalizeError + "); si repite su clave se pedirá reconciliar.";
+            job.FinalizeError == null ? null : "WARNING: the journal did not record the end of this job (" + job.FinalizeError + "); if you repeat its key you will be asked to reconcile.";
 
         // ---------------- revit_context ----------------
 
         private async Task<Response> Context(Session session, Request request, CancellationToken ct)
         {
-            // Registro de identidad (agent.register): ctx agente="Integration client" [conversacion=… modelo=…]. Sólo afecta a esta sesión.
+            // Identity registration (agent.register): ctx agente="Integration client" [conversacion=… modelo=…]. Affects only this session.
             var agentArg = Arg.GetString(request.Args, "agente");
             if (Arg.GetBool(request.Args, "desregistrar") == true) Ui.Runtime.Sessions.Unregister(session);
             else if (agentArg != null)
             {
-                // Issue #3: un alias en uso por otra sesión activa se rechaza (no se reasigna ni se comparte).
+                // Issue #3: an alias in use by another active session is rejected (not reassigned or shared).
                 switch (Ui.Runtime.Sessions.TryRegister(session, agentArg, Arg.GetString(request.Args, "conversacion"), Arg.GetString(request.Args, "modelo"), out var holder))
                 {
                     case RegisterResult.Invalid:
-                        return Response.Fail(request.Id, Status.Invalido, "agente= necesita un nombre legible de 1 a " + AgentIdentity.MaxName + " caracteres");
+                        return Response.Fail(request.Id, Status.Invalido, "agente= needs a readable name of 1 to " + AgentIdentity.MaxName + " characters");
                     case RegisterResult.Duplicate:
-                        return Response.Fail(request.Id, Status.Conflicto, "el alias \"" + AgentIdentity.Clean(agentArg) + "\" ya lo usa otra sesión activa (" +
-                            holder.ClientName + "); elija otro nombre, p. ej. añadiendo el cliente o la conversación");
+                        return Response.Fail(request.Id, Status.Conflicto, "the alias \"" + AgentIdentity.Clean(agentArg) + "\" is already used by another active session (" +
+                            holder.ClientName + "); choose another name, e.g. by adding the client or the conversation");
                 }
             }
             Dictionary<string, object> data = null;
@@ -310,7 +310,7 @@ namespace Bimbridge.Addin.Revit
 #endif
                 };
                 if (docs.Count > 1)
-                    data["documentos"] = docs.Select(i => (object)(i.Id + " " + i.Kind + " " + i.Title + (i.Active ? " (activo)" : ""))).ToList();
+                    data["documentos"] = docs.Select(i => (object)(i.Id + " " + i.Kind + " " + i.Title + (i.Active ? " (active)" : ""))).ToList();
                 if (doc == null)
                 {
                     data["documento"] = null;
@@ -321,7 +321,7 @@ namespace Bimbridge.Addin.Revit
                 data["documento"] = doc.Title;
                 data["tipo"] = DocRegistry.KindOf(doc);
                 data["ruta"] = doc.PathName;
-                // alpha3: identidad duradera para clientes tipados (AgentHost): clave y huella del registro, nunca el título.
+                // alpha3: durable identity for typed clients (AgentHost): registry key and fingerprint, never the title.
                 var ident = DocRegistry.Instance.IdentityOf(doc);
                 data["clave_doc"] = ident?.Key;
                 data["huella_doc"] = ident?.Print;
@@ -338,12 +338,12 @@ namespace Bimbridge.Addin.Revit
                     ? new Dictionary<string, object> { ["id"] = Ids.ToLong(uidoc.ActiveView.Id), ["nombre"] = uidoc.ActiveView.Name }
                     : null;
                 data["niveles_mcp"] = _config.Levels;
-                data["permite"] = (_config.Allows('R') ? "leer" : "") + (_config.Allows('P') ? ", planificar" : "") + (_config.Allows('W') ? ", cambiar" : "") +
-                                  (_config.AllowsDocOps ? ", guardar/sincronizar/pdf" : "") +
-                                  (_config.AllowsExec(true) ? ", exec ejecutar" : _config.AllowsExec(false) ? ", exec consulta" : "");
+                data["permite"] = (_config.Allows('R') ? "read" : "") + (_config.Allows('P') ? ", plan" : "") + (_config.Allows('W') ? ", change" : "") +
+                                  (_config.AllowsDocOps ? ", save/sync/pdf" : "") +
+                                  (_config.AllowsExec(true) ? ", exec run" : _config.AllowsExec(false) ? ", exec query" : "");
                 data["runner"] = ScriptHostState();
-                data["csharp_dinamico"] = Ui.Runtime.BlockDynamicCode ? "bloqueado por el usuario" : "permitido";
-                // Respuesta compacta: la tabla de capacidades (27 filas) sólo con ctx detalle=true; casi nunca cambia entre llamadas.
+                data["csharp_dinamico"] = Ui.Runtime.BlockDynamicCode ? "blocked by the user" : "allowed";
+                // Compact response: the capability table (27 rows) only with ctx detalle=true; it almost never changes between calls.
                 if (Arg.GetBool(request.Args, "detalle") == true)
                 {
                     int year;
@@ -364,8 +364,8 @@ namespace Bimbridge.Addin.Revit
             Scripting.ScriptHost.WarmInBackground(Ui.Runtime.Log);
             data["agente"] = session.AgentName;
             data["identidad"] = session.AgentName == null
-                ? "insuficiente" + (session.IdentityNote != null ? " (" + session.IdentityNote + ")" : "") + ": registre un nombre con ctx agente=\"…\"; hasta entonces no se permiten lecturas ni cambios"
-                : "declarada (" + session.IdentitySource + ")";
+                ? "insufficient" + (session.IdentityNote != null ? " (" + session.IdentityNote + ")" : "") + ": register a name with ctx agente=\"…\"; until then no reads or changes are allowed"
+                : "declared (" + session.IdentitySource + ")";
             if (session.AgentId != null) data["agent_id"] = session.AgentId;
             data["session_id"] = session.Id;
             return new Response { Id = request.Id, Rev = rev, Datos = data };
@@ -373,9 +373,9 @@ namespace Bimbridge.Addin.Revit
 
         private string ScriptHostState()
         {
-            if (_config.Runner == "apagado") return "apagado (config)";
-            if (!Scripting.ScriptHost.Present) return "falta el compilador (carpeta roslyn)";
-            return "C# (Roslyn)" + (_config.Runner == "consulta" ? ", sólo consulta" : "");
+            if (_config.Runner == "apagado") return "off (config)";
+            if (!Scripting.ScriptHost.Present) return "compiler missing (roslyn folder)";
+            return "C# (Roslyn)" + (_config.Runner == "consulta" ? ", query only" : "");
         }
 
         // ---------------- query ----------------
@@ -429,7 +429,7 @@ namespace Bimbridge.Addin.Revit
             if (runner.Error != null) return Response.Fail(request.Id, runner.RevisionChanged ? Status.Conflicto : Status.Invalido, runner.Error);
 
             var dispatchMs = sw.Elapsed.TotalMilliseconds;
-            // Filtrar, agrupar, paginar y formatear: fuera del hilo de Revit.
+            // Filter, group, paginate and format: outside the Revit thread.
             List<Dictionary<string, object>> filtered = null;
             List<long> matched = null;
             Dictionary<string, object> datos;
@@ -440,14 +440,14 @@ namespace Bimbridge.Addin.Revit
                 datos = (Dictionary<string, object>)ResultTable.Render(q, filtered, q.Page, q.PageSize);
             }
             if (runner.FastCount.HasValue) datos["total"] = runner.FastCount.Value;
-            // Issue #2: si hay más de una página, las siguientes se sirven desde esta lectura (cursor), sin volver al hilo de Revit.
-            // La lectura puede ocupar varias visitas al hilo de Revit: sólo hay cursor si la revisión no cambió durante ella.
+            // Issue #2: if there is more than one page, the following ones are served from this read (cursor), without going back to the Revit thread.
+            // The read can take several visits to the Revit thread: there is a cursor only if the revision did not change during it.
             if (ResultTable.IsPagedListing(q) && datos.ContainsKey("pages") && runner.Registry != null && runner.Registry.Rev == runner.Rev)
             {
                 var reg = runner.Registry;
                 var id = _snapshots.Put(session.Id, runner.DocId, runner.Rev, q, filtered, () => reg.Rev, out var refusal);
                 if (id != null) { datos["cursor"] = id; datos["rev_instantanea"] = runner.Rev; }
-                else if (refusal != null) datos["cursor_no_disponible"] = refusal;   // nunca se omite en silencio
+                else if (refusal != null) datos["cursor_no_disponible"] = refusal;   // never silently omitted
             }
             if (q.SaveAs != null)
             {
@@ -468,7 +468,7 @@ namespace Bimbridge.Addin.Revit
                 };
             }
             datos["ms"] = sw.ElapsedMilliseconds;
-            // 0.9.1: métricas del benchmark sólo si se piden (no engordan cada respuesta).
+            // 0.9.1: benchmark metrics only when requested (they do not bloat every response).
             if (Arg.GetBool(request.Args, "metricas") == true || Arg.GetBool(request.Args, "timing") == true)
                 datos["metricas"] = WorkflowMetrics.FromMainThread(sw.ElapsedMilliseconds, result.WaitMs, result.BusyMs, result.Slices, result.MaxSliceMs)
                     .Observe("elements_read", runner.ElementsRead).Observe("elements_written", 0).Observe("transactions", 0)
@@ -477,31 +477,31 @@ namespace Bimbridge.Addin.Revit
         }
 
         /// <summary>
-        /// Issue #2: página N de una instantánea. No toca el hilo de Revit. Se rechaza si el cursor es de otra sesión, venció,
-        /// apunta a otro documento o el documento cambió de revisión (nunca se mezclan filas de dos revisiones).
+        /// Issue #2: page N of a snapshot. Does not touch the Revit thread. Rejected if the cursor belongs to another session, expired,
+        /// points to another document or the document changed revision (rows from two revisions are never mixed).
         /// </summary>
         private Response QueryFromCursor(Session session, Request request, string cursor)
         {
             var sw = Stopwatch.StartNew();
             var page = Arg.GetLong(request.Args, "page") ?? 1;
-            if (page < 1) return Response.Fail(request.Id, Status.Invalido, "page empieza en 1");
+            if (page < 1) return Response.Fail(request.Id, Status.Invalido, "page starts at 1");
             switch (_snapshots.Get(cursor, session.Id, TargetId, out var snap))
             {
                 case SnapshotLookup.Unknown:
-                    return Response.Fail(request.Id, Status.Vencido, "cursor desconocido o vencido (duran " + (int)_snapshots.Ttl.TotalMinutes +
-                        " min sin uso y sólo valen en la sesión que los creó); repita la consulta sin cursor");
+                    return Response.Fail(request.Id, Status.Vencido, "unknown or expired cursor (they last " + (int)_snapshots.Ttl.TotalMinutes +
+                        " min without use and are only valid in the session that created them); repeat the query without cursor");
                 case SnapshotLookup.Evicted:
-                    return Response.Fail(request.Id, Status.Vencido, "el cursor se descartó (" + (_snapshots.EvictionReason(cursor, session.Id) ?? "presupuesto o vencimiento") +
-                        "); repita la consulta sin cursor");
+                    return Response.Fail(request.Id, Status.Vencido, "the cursor was discarded (" + (_snapshots.EvictionReason(cursor, session.Id) ?? "budget or expiry") +
+                        "); repeat the query without cursor");
                 case SnapshotLookup.OtherDocument:
-                    return Response.Fail(request.Id, Status.Invalido, "el cursor es de otro documento; repita la consulta en el documento destino");
+                    return Response.Fail(request.Id, Status.Invalido, "the cursor belongs to another document; repeat the query in the target document");
                 case SnapshotLookup.Stale:
-                    return Response.Fail(request.Id, Status.Conflicto, "el documento cambió desde la primera página; repita la consulta (las páginas no se mezclan entre revisiones)");
+                    return Response.Fail(request.Id, Status.Conflicto, "the document changed since the first page; repeat the query (pages are not mixed across revisions)");
             }
             var pageSize = snap.Spec.PageSize;
             var datos = (Dictionary<string, object>)ResultTable.Render(snap.Spec, snap.Rows, (int)page, pageSize);
             var pages = Math.Max(1, (snap.Rows.Count + pageSize - 1) / pageSize);
-            if (page > pages) return Response.Fail(request.Id, Status.Invalido, "page " + page + " fuera de rango (hay " + pages + ")");
+            if (page > pages) return Response.Fail(request.Id, Status.Invalido, "page " + page + " out of range (there are " + pages + ")");
             datos["page"] = page;
             datos["pages"] = (long)pages;
             datos["cursor"] = snap.Id;
@@ -529,17 +529,17 @@ namespace Bimbridge.Addin.Revit
             if (name == "riser_geometria") return await RiserDrawingCheck(request, ct).ConfigureAwait(false);
             if (name == "model_health") return await ModelHealthCheck(request, ct).ConfigureAwait(false);
             if (name != "lighting_audit")
-                return Response.Fail(request.Id, Status.Invalido, "check disponible: lighting_audit, tabla_audit, vista_audit, llamadas_audit, terminales_audit, equipos_audit, ruta_audit, grupos_audit, anotaciones_audit, riser_geometria, copy_monitor, cobertura, historial, model_health");
+                return Response.Fail(request.Id, Status.Invalido, "available checks: lighting_audit, tabla_audit, vista_audit, llamadas_audit, terminales_audit, equipos_audit, ruta_audit, grupos_audit, anotaciones_audit, riser_geometria, copy_monitor, cobertura, historial, model_health");
 
             var tagRule = Arg.GetString(request.Args, "tags") ?? "uno";
             if (tagRule != "uno" && tagRule != "ninguno" && tagRule != "ignorar")
-                return Response.Fail(request.Id, Status.Invalido, "tags debe ser uno (un tag por luminaria), ninguno (sin tags) o ignorar");
+                return Response.Fail(request.Id, Status.Invalido, "tags must be uno (one tag per fixture), ninguno (no tags) or ignorar");
             List<ManifestQc.Expected> inventory = null;
             ManifestQc.Options inventoryOptions = null;
             if (request.Args.TryGetValue("manifiesto", out var rawManifest))
             {
                 if (!(rawManifest is Dictionary<string, object> manifest))
-                    return Response.Fail(request.Id, Status.Invalido, "manifiesto exige un objeto JSON con elementos en mm");
+                    return Response.Fail(request.Id, Status.Invalido, "manifiesto requires a JSON object with elements in mm");
                 try { inventory = ManifestQc.Parse(manifest, out inventoryOptions); }
                 catch (ArgumentException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
             }
@@ -566,7 +566,7 @@ namespace Bimbridge.Addin.Revit
                 datos["conjuntos_guardados"] = new List<object>(sets.Keys);
             }
             datos["ms"] = sw.ElapsedMilliseconds;
-            // 0.9.1: métricas del benchmark sólo si se piden (no engordan cada respuesta).
+            // 0.9.1: benchmark metrics only when requested (they do not bloat every response).
             if (Arg.GetBool(request.Args, "metricas") == true || Arg.GetBool(request.Args, "timing") == true)
                 datos["metricas"] = WorkflowMetrics.FromMainThread(sw.ElapsedMilliseconds, result.WaitMs, result.BusyMs, result.Slices, result.MaxSliceMs)
                     .Observe("elements_read", runner.ElementsRead).Observe("elements_written", 0).Observe("transactions", 0)
@@ -574,14 +574,14 @@ namespace Bimbridge.Addin.Revit
             return new Response { Id = request.Id, Rev = runner.Rev, Datos = datos, Estado = state };
         }
 
-        // ---------------- plan / commit / job (fase 3) ----------------
+        // ---------------- plan / commit / job (phase 3) ----------------
 
         private async Task<Response> PlanOp(Session session, Request request, CancellationToken ct)
         {
             if (!_config.Allows('P'))
                 return Response.Fail(request.Id, Status.Rechazado,
-                    "Este conector no tiene habilitado planificar cambios en este Revit (niveles " + _config.Levels + "; lo decide el usuario en la configuración del MCP). " +
-                    "Dígaselo y proponga los cambios en texto. No es una prohibición general: si el usuario autorizó otra herramienta para esta tarea, puede usarla.");
+                    "This connector is not enabled to plan changes in this Revit (levels " + _config.Levels + "; the user decides this in the MCP configuration). " +
+                    "Tell them and propose the changes as text. This is not a general prohibition: if the user authorized another tool for this task, you may use it.");
 
             List<OpSpec> ops;
             var resolved = new List<List<long>>();
@@ -589,7 +589,7 @@ namespace Bimbridge.Addin.Revit
             try
             {
                 ops = OpSpec.ParseAll(request.Args);
-                // AUD-19: si las operaciones vienen de una fuente (origen=), el plan queda vinculado a su clave y huella de contenido.
+                // AUD-19: if the operations come from a source (origen=), the plan is bound to its key and content fingerprint.
                 sourceBound = SourceBinding.Resolve(request.Args["ops"] as List<object>);
                 foreach (var op in ops)
                 {
@@ -619,10 +619,10 @@ namespace Bimbridge.Addin.Revit
                 BoundToken = sourceBound?.Token, BoundKey = sourceBound?.Key, BoundHash = sourceBound?.Hash,
             };
 
-            // Sin geometría: se planifica en una sola visita al hilo de Revit.
+            // Without geometry: planned in a single visit to the Revit thread.
             if (!ops.Any(NeedsGeo)) return await BuildPlan(request, ops, resolved, plan, new BuildContext(), ct).ConfigureAwait(false);
 
-            // Con geometría (snap_to_surface, place con montaje): se mide por tramos como geo y, si tarda, se devuelve job_id.
+            // With geometry (snap_to_surface, place with montaje): measured in slices like geo and, if it takes long, job_id is returned.
             var job = _jobs.Create(session.Id, "plan");
             _jobs.Run(job, async () =>
             {
@@ -633,13 +633,13 @@ namespace Bimbridge.Addin.Revit
                     for (var i = 0; i < ops.Count; i++)
                     {
                         if (!NeedsGeo(ops[i])) continue;
-                        job.Phase = "midiendo la geometría de la op " + ops[i].Index + " (" + ops[i].Kind + ")";
+                        job.Phase = "measuring the geometry of op " + ops[i].Index + " (" + ops[i].Kind + ")";
                         var err = ops[i].Kind == "snap_to_surface"
                             ? await MeasureSnap(ops[i], resolved[i], ctx, job).ConfigureAwait(false)
                             : await MeasurePlace(ops[i], ctx, job).ConfigureAwait(false);
                         if (err != null) ctx.GeoErrors[ops[i].Index] = err;
                     }
-                    job.Phase = "planificando";
+                    job.Phase = "planning";
                     var resp = await BuildPlan(request, ops, resolved, plan, ctx, job.Cts.Token).ConfigureAwait(false);
                     if (resp.Estado == Status.Ok)
                     {
@@ -651,19 +651,19 @@ namespace Bimbridge.Addin.Revit
                     }
                     else _jobs.Fail(job, resp.Estado, resp.Aviso);
                 }
-                catch (OperationCanceledException) { _jobs.Fail(job, JobStatus.Cancelado, "cancelado antes de terminar; no se cambió nada"); }
+                catch (OperationCanceledException) { _jobs.Fail(job, JobStatus.Cancelado, "cancelled before finishing; nothing was changed"); }
                 catch (Exception ex) { _jobs.Fail(job, Status.Error, ex.GetType().Name + ": " + ex.Message); }
             });
             return await AwaitJob(request, job, ct).ConfigureAwait(false);
         }
 
-        /// <summary>Operaciones de plan que valen dentro de un RFA.</summary>
+        /// <summary>Plan operations that are valid inside an RFA.</summary>
         private static readonly string[] FamilyPlanOps = { "set_param", "set_values", "move", "rotate", "mirror", "copy", "delete" };
 
         private static bool NeedsGeo(OpSpec op) =>
             op.Kind == "snap_to_surface" || (op.Kind == "place" && Arg.GetString(op.Args, "montaje") != null);
 
-        /// <summary>Argumentos de geo montaje a partir de los de la operación (lado, contra, puntos, max, vinculos).</summary>
+        /// <summary>geo montaje arguments derived from the operation's (lado, contra, puntos, max, vinculos).</summary>
         private static Dictionary<string, object> MountArgs(OpSpec op, bool up)
         {
             var a = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase) { ["name"] = "montaje", ["lado"] = up ? "arriba" : "abajo" };
@@ -672,7 +672,7 @@ namespace Bimbridge.Addin.Revit
             return a;
         }
 
-        /// <summary>Corre una medición de montaje (tramos en Revit + cálculo fuera). Devuelve las filas o un error en <paramref name="error"/>.</summary>
+        /// <summary>Runs a mounting measurement (slices in Revit + computation outside). Returns the rows or an error in <paramref name="error"/>.</summary>
         private async Task<Tuple<List<Dictionary<string, object>>, string>> RunMount(GeoRunner runner, Job job, bool cache)
         {
             var busy = TimeSpan.FromMilliseconds(_config.BusyAfterMs);
@@ -702,7 +702,7 @@ namespace Bimbridge.Addin.Revit
             return null;
         }
 
-        /// <summary>place con montaje: el cuerpo de una instancia existente del tipo, llevado a cada punto, se mide contra lo de arriba (o abajo).</summary>
+        /// <summary>place with montaje: the body of an existing instance of the type, moved to each point, is measured against what is above (or below).</summary>
         private async Task<string> MeasurePlace(OpSpec op, BuildContext ctx, Job job)
         {
             var up = !string.Equals(Arg.GetString(op.Args, "montaje"), "piso", StringComparison.OrdinalIgnoreCase);
@@ -711,17 +711,17 @@ namespace Bimbridge.Addin.Revit
             var r = await RunMain((app, sw, budget) =>
             {
                 var doc = DocTarget.Resolve(app, out var docErr);
-                if (doc == null) { error = docErr ?? "no hay un modelo abierto"; return true; }
+                if (doc == null) { error = docErr ?? "there is no open model"; return true; }
                 try
                 {
                     var model = new Writes.ModelIndex(doc);
-                    var sym = model.FindType(Arg.GetString(op.Args, "type"), "place", t => t is FamilySymbol, "familias cargadas");
+                    var sym = model.FindType(Arg.GetString(op.Args, "type"), "place", t => t is FamilySymbol, "loaded families");
                     var lvl = model.FindLevel(Arg.GetString(op.Args, "level"), "place");
                     levelName = lvl.Name; levelElev = lvl.ProjectElevation;
                     var sample = new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance)).WhereElementIsNotElementType()
                         .Cast<FamilyInstance>().Where(f => f.Symbol?.Id == sym.Id && f.Location is LocationPoint)
                         .OrderBy(f => f.GroupId == ElementId.InvalidElementId ? 0 : 1).FirstOrDefault();
-                    if (sample == null) error = "place montaje: no hay ninguna instancia de " + sym.FamilyName + ": " + sym.Name + " en el modelo para medir su cuerpo; dé elev";
+                    if (sample == null) error = "place montaje: there is no instance of " + sym.FamilyName + ": " + sym.Name + " in the model to measure its body; give elev";
                     else templateId = Ids.ToLong(sample.Id);
                 }
                 catch (QueryException ex) { error = ex.Message; }
@@ -730,7 +730,7 @@ namespace Bimbridge.Addin.Revit
             if (!r.Ok) return FromWork(0, r).Aviso;
             if (error != null) return error;
 
-            // Desde muy cerca del nivel (losa) o desde 3' (piso): la primera superficie que encuentra la vertical es la que manda.
+            // From very close to the level (slab) or from 3' (floor): the first surface the vertical hits is the one that counts.
             var nominal = up ? 0.5 : 3.0;
             var a = MountArgs(op, up);
             a["ids"] = templateId.ToString(CultureInfo.InvariantCulture);
@@ -752,7 +752,7 @@ namespace Bimbridge.Addin.Revit
             return null;
         }
 
-        /// <summary>Planificar: una sola visita al hilo de Revit con un índice del modelo (tipos, niveles, vistas) compartido por todas las ops.</summary>
+        /// <summary>Plan: a single visit to the Revit thread with a model index (types, levels, views) shared by all ops.</summary>
         private async Task<Response> BuildPlan(Request request, List<OpSpec> ops, List<List<long>> resolved, Plan plan, BuildContext ctx, CancellationToken ct)
         {
             string error = null;
@@ -760,15 +760,15 @@ namespace Bimbridge.Addin.Revit
             var result = await RunMain((app, sw, budget) =>
             {
                 var doc = DocTarget.Resolve(app, out var docErr);
-                if (doc == null) { error = docErr ?? "no hay un modelo abierto"; return true; }
+                if (doc == null) { error = docErr ?? "there is no open model"; return true; }
                 if (doc.IsFamilyDocument)
                 {
-                    // En familias sólo las operaciones que no dependen de vistas, niveles, grupos ni láminas (F02/R004).
+                    // In families only the operations that do not depend on views, levels, groups or sheets (F02/R004).
                     var bad = ops.Where(o => !FamilyPlanOps.Contains(o.Kind)).Select(o => o.Kind).Distinct().ToList();
                     if (bad.Count > 0)
                     {
-                        error = Status.NoSoportado + ": en un documento de familia plan admite " + string.Join(", ", FamilyPlanOps) + "; no " + string.Join(", ", bad) +
-                                ". Para conectores y parámetros use fam conector / fam param; para lo demás, exec.";
+                        error = Status.NoSoportado + ": in a family document plan accepts " + string.Join(", ", FamilyPlanOps) + "; not " + string.Join(", ", bad) +
+                                ". For connectors and parameters use fam conector / fam param; for everything else, exec.";
                         return true;
                     }
                 }
@@ -804,17 +804,17 @@ namespace Bimbridge.Addin.Revit
             if (plan.Entries.Count == 0)
             {
                 plan.Status = PlanStatus.Descartado;
-                plan.StatusDetail = "no hay nada que cambiar";
+                plan.StatusDetail = "nothing to change";
                 datos["estado_plan"] = plan.Status;
-                return new Response { Id = request.Id, Rev = rev, Datos = datos, Aviso = "No hay nada que cambiar; revise los avisos." };
+                return new Response { Id = request.Id, Rev = rev, Datos = datos, Aviso = "Nothing to change; review the warnings." };
             }
             var holdNow = WillHold(plan.DocKey);
-            datos["siguiente"] = "commit plan_id=" + plan.Id + " (si el usuario ya autorizó la tarea, aplíquelo sin pedir confirmación; si pidió revisar, muéstrele el diff antes)" +
-                                 (holdNow ? ". Quedará en la cola de Revit hasta que el usuario pulse Aplicar cola." : ".");
+            datos["siguiente"] = "commit plan_id=" + plan.Id + " (if the user already authorized the task, apply it without asking for confirmation; if they asked to review, show them the diff first)" +
+                                 (holdNow ? ". It will stay in the Revit queue until the user presses Apply queue." : ".");
             return new Response { Id = request.Id, Rev = rev, Datos = datos };
         }
 
-        /// <summary>Lo creado queda en $creados (todo) y $creados_n (por operación) para usarlo en la siguiente llamada sin repetir ids.</summary>
+        /// <summary>What was created is stored in $creados (all) and $creados_n (per operation) for use in the next call without repeating ids.</summary>
         public static List<string> SaveCreated(Session session, Plan plan)
         {
             var saved = new List<string>();
@@ -832,14 +832,14 @@ namespace Bimbridge.Addin.Revit
 
         private async Task<Response> Commit(Session session, Request request, CancellationToken ct)
         {
-            // Revisión consolidada: commit ops=… sin plan_id = plan + commit en UN viaje (mismo motor, mismo diff, mismas verificaciones).
-            // Un plan con geometría que devuelve job_id no se fusiona: se devuelve el plan y el agente hace commit después.
+            // Consolidated check: commit ops=… without plan_id = plan + commit in ONE round trip (same engine, same diff, same verifications).
+            // A plan with geometry that returns job_id is not fused: the plan is returned and the agent commits afterwards.
             Dictionary<string, object> fusedPlan = null;
             if (string.IsNullOrEmpty(Arg.GetString(request.Args, "plan_id")) && request.Args.ContainsKey("ops"))
             {
-                // clave= promete "aplicado una sola vez"; si el plan acabara sin commit (geometría en job), el diario la daría por cumplida.
+                // clave= promises "applied only once"; if the plan ended without commit (geometry in a job), the journal would consider it fulfilled.
                 if (!string.IsNullOrWhiteSpace(Arg.GetString(request.Args, Wire.KeyArg)))
-                    return Response.Fail(request.Id, Status.Invalido, "commit ops= no admite clave=: use plan y después commit plan_id=… clave=… para la idempotencia");
+                    return Response.Fail(request.Id, Status.Invalido, "commit ops= does not accept clave=: use plan and then commit plan_id=… clave=… for idempotency");
                 var planArgs = new Dictionary<string, object> { ["ops"] = request.Args["ops"] };
                 foreach (var k in new[] { "summary", Wire.TaskArg, Wire.DocArg, "timing" }) if (request.Args.TryGetValue(k, out var v)) planArgs[k] = v;
                 var pr = await PlanOp(session, new Request { Id = request.Id, Op = Wire.OpPlan, Args = planArgs, DeadlineMs = request.DeadlineMs }, ct).ConfigureAwait(false);
@@ -847,9 +847,9 @@ namespace Bimbridge.Addin.Revit
                 if (pr.Estado != Status.Ok || pid == null || (pr.Datos as Dictionary<string, object>)?.ContainsKey("job_id") == true
                     || _plans.Get(pid)?.Status != PlanStatus.Listo)
                 {
-                    // Siempre se dice que NO se aplicó nada, también cuando el plan sigue como job (geometría) o falló.
-                    pr.Aviso = (pr.Aviso == null ? "" : pr.Aviso + " ") + "commit NO ejecutado en este viaje: no se cambió el modelo." +
-                               (pid != null ? " Cuando el plan esté listo, haga commit plan_id=" + pid + "." : "");
+                    // Always say that NOTHING was applied, also when the plan continues as a job (geometry) or failed.
+                    pr.Aviso = (pr.Aviso == null ? "" : pr.Aviso + " ") + "commit NOT run in this round trip: the model was not changed." +
+                               (pid != null ? " When the plan is ready, run commit plan_id=" + pid + "." : "");
                     if (pr.Datos is Dictionary<string, object> pdx) pdx["commit_ejecutado"] = false;
                     return pr;
                 }
@@ -869,18 +869,18 @@ namespace Bimbridge.Addin.Revit
             var plan = _plans.Get(Arg.GetString(request.Args, "plan_id"));
             var task = Arg.GetString(request.Args, Wire.TaskArg);
             if (plan == null || (plan.SessionId != session.Id && (string.IsNullOrEmpty(task) || plan.Task != task)))
-                return Response.Fail(request.Id, Status.Invalido, "no existe ese plan_id en esta conversación (ni en la tarea indicada); llame plan primero");
+                return Response.Fail(request.Id, Status.Invalido, "that plan_id does not exist in this conversation (nor in the given task); call plan first");
             _plans.ExpireOld(TimeSpan.FromMinutes(_config.PlanExpiryMinutes));
             if (plan.Status != PlanStatus.Listo)
                 return new Response { Id = request.Id, Estado = MapStatus(plan.Status), Datos = plan.Describe(5), Aviso = StatusAdvice(plan) };
 
-            // alpha3: modo=ensayo aplica con el mismo motor, verifica y revierte el grupo. Nunca se retiene ni cuenta como aplicado.
+            // alpha3: modo=ensayo applies with the same engine, verifies and rolls back the group. It is never held nor counted as applied.
             var trialRaw = (Arg.GetString(request.Args, "modo") ?? "").Trim().ToLowerInvariant();
             if (trialRaw.Length > 0 && trialRaw != "ensayo" && trialRaw != "aplicar")
-                return Response.Fail(request.Id, Status.Invalido, "commit modo debe ser aplicar (por defecto) o ensayo");
+                return Response.Fail(request.Id, Status.Invalido, "commit modo must be aplicar (default) or ensayo");
             var trial = trialRaw == "ensayo";
 
-            // Cola: el usuario la aplica cuando quiera desde la cinta. Si ya hay cola, también se retiene para respetar el orden.
+            // Queue: the user applies it whenever they want from the ribbon. If there is already a queue, it is also held to keep the order.
             if (!trial && WillHold(plan.DocKey))
             {
                 if (Guid.TryParseExact(request.AttemptId, "N", out _))
@@ -900,13 +900,13 @@ namespace Bimbridge.Addin.Revit
                 return new Response
                 {
                     Id = request.Id, Estado = Status.Retenido, Datos = d,
-                    Aviso = "Quedó en la cola de Revit (posición " + pos + "). El usuario lo aplicará con 'Aplicar cola' en la cinta BIMBRIDGE. " +
-                            "No lo repita; consulte job con plan_id=" + plan.Id + " más tarde. Puede seguir planificando: los planes nuevos se encadenan sobre la cola.",
+                    Aviso = "It is in the Revit queue (position " + pos + "). The user will apply it with 'Apply queue' on the BIMBRIDGE ribbon. " +
+                            "Do not repeat it; check job with plan_id=" + plan.Id + " later. You can keep planning: new plans chain on top of the queue.",
                 };
             }
 
-            // 0.8.0 (pendiente H2 de rc1): un commit persistente deja intención y resultado en la auditoría encadenada.
-            // Sin auditoría no se escribe (fail-closed, igual que exec): una escritura sin registro no se puede reconciliar.
+            // 0.8.0 (rc1 pending item H2): a persistent commit leaves intent and outcome in the chained audit.
+            // Without audit nothing is written (fail-closed, same as exec): an unrecorded write cannot be reconciled.
             string auditIntent = null;
             var originalTarget = DocTarget.Ambient.Value;
             if (!trial)
@@ -914,7 +914,7 @@ namespace Bimbridge.Addin.Revit
                 if (Ui.Runtime.Audit == null)
                 {
                     plan.Status = PlanStatus.Listo;
-                    return Response.Fail(request.Id, Status.Rechazado, "auditoría no disponible: el commit persistente se rechaza sin cambiar nada");
+                    return Response.Fail(request.Id, Status.Rechazado, "audit unavailable: the persistent commit is rejected without changing anything");
                 }
                 try
                 {
@@ -929,7 +929,7 @@ namespace Bimbridge.Addin.Revit
                 catch (Exception aex) when (aex is IOException || aex is UnauthorizedAccessException || aex is InvalidOperationException)
                 {
                     plan.Status = PlanStatus.Listo;
-                    return Response.Fail(request.Id, Status.Rechazado, "no se pudo registrar la intención en la auditoría (" + aex.Message + "); no se escribió nada");
+                    return Response.Fail(request.Id, Status.Rechazado, "could not record the intent in the audit (" + aex.Message + "); nothing was written");
                 }
             }
 
@@ -937,13 +937,13 @@ namespace Bimbridge.Addin.Revit
             PlanOps.ApplyResult r = null;
             long rev = 0;
             bool applyEntered = false;
-            bool wasModified = false, lostModified = false;   // P0: un commit real que se revierte por fallo también puede borrar la marca
+            bool wasModified = false, lostModified = false;   // P0: a real commit rolled back by a failure can also clear the flag
             DocWriteBlock blocked = null;
             long queueMs = 0, revitMs = 0;
-            long loadMs = 0, beginMs = 0, applyMs = 0, finishMs = 0;   // fases dentro de revit_ms (timing=true)
+            long loadMs = 0, beginMs = 0, applyMs = 0, finishMs = 0;   // phases within revit_ms (timing=true)
             plan.Status = PlanStatus.EnProceso;
             var sw = Stopwatch.StartNew();
-            // El plan se aplica sobre SU documento (handle fijado al planificar), aunque el usuario haya cambiado de pestaña.
+            // The plan is applied to ITS document (handle pinned when planning), even if the user switched tabs.
             var planTarget = new DocTarget { Id = plan.DocId, Key = plan.DocKey, Title = plan.DocTitle, Explicit = true };
             DocTarget.Ambient.Value = plan.DocId != null ? planTarget : DocTarget.Ambient.Value;
             var result = await RunMain((app, watch, budget) =>
@@ -954,14 +954,14 @@ namespace Bimbridge.Addin.Revit
                 {
                     doc = app.ActiveUIDocument?.Document;
                     if (doc == null || !string.Equals(DocumentTracker.KeyOf(doc), plan.DocKey, StringComparison.OrdinalIgnoreCase)) doc = null;
-                    if (doc == null) error = "el modelo activo ya no es " + plan.DocTitle + "; pida al usuario que lo active o vuelva a planificar";
+                    if (doc == null) error = "the active model is no longer " + plan.DocTitle + "; ask the user to activate it or plan again";
                 }
                 if (doc == null) return true;
-                // P0 (Codex): comprobado en el hilo de Revit justo antes de abrir el grupo; vale para cualquier cliente MCP.
+                // P0 (Codex): checked on the Revit thread right before opening the group; applies to any MCP client.
                 if (trial) { error = Engine.TrialGuard.Refuse(doc.IsModified, "commit modo=ensayo"); if (error != null) return true; }
                 queueMs = sw.ElapsedMilliseconds;
                 wasModified = doc.IsModified;
-                // En el hilo de Revit: los commits de este proceso van en serie, y la intención queda en disco antes de abrir el grupo.
+                // On the Revit thread: this process's commits run serially, and the intent is on disk before opening the group.
                 var t0 = sw.ElapsedMilliseconds;
                 try
                 {
@@ -971,7 +971,7 @@ namespace Bimbridge.Addin.Revit
                     beginMs = sw.ElapsedMilliseconds - t0 - loadMs;
                 }
                 catch (DocWriteBlockedException ex) { blocked = ex.Block; return true; }
-                catch (PlanStoreException ex) { error = ex.Message + "; no se escribió nada"; return true; }
+                catch (PlanStoreException ex) { error = ex.Message + "; nothing was written"; return true; }
                 _tracker.CurrentWriter = session.Id;
                 applyEntered = true;
                 var t1 = sw.ElapsedMilliseconds;
@@ -979,8 +979,8 @@ namespace Bimbridge.Addin.Revit
                 finally { _tracker.CurrentWriter = null; }
                 applyMs = sw.ElapsedMilliseconds - t1;
                 var t2 = sw.ElapsedMilliseconds;
-                revitMs = t2 - queueMs;   // misma frontera que antes (sin Finish): comparable con la campaña A/B
-                // También aquí: el siguiente commit de la cola de Revit no debe encontrar una intención ya resuelta.
+                revitMs = t2 - queueMs;   // same boundary as before (without Finish): comparable with the A/B campaign
+                // Here too: the next commit in the Revit queue must not find an already resolved intent.
                 _plans.Finish(plan, r.Status, r.Detail);
                 finishMs = sw.ElapsedMilliseconds - t2;
                 rev = _tracker.For(doc)?.Rev ?? 0;
@@ -993,7 +993,7 @@ namespace Bimbridge.Addin.Revit
             {
                 timing = result.DispatchJson();
                 timing["carga_ms"] = loadMs;               // LoadPersisted
-                timing["intencion_ms"] = beginMs;          // BeginWrite: bloqueo entre procesos + intención en disco
+                timing["intencion_ms"] = beginMs;          // BeginWrite: cross-process lock + intent on disk
                 timing["aplicar_verificar_ms"] = applyMs;  // PlanOps.Apply/Trial
                 timing["cierre_ms"] = finishMs;            // Finish
             }
@@ -1002,8 +1002,8 @@ namespace Bimbridge.Addin.Revit
             {
                 if (applyEntered)
                 {
-                    // Ya entró a escribir: repetirlo podría duplicar. Queda terminal, con evidencia durable, y no vuelve a Listo.
-                    var detail = (trial ? "El ensayo empezó" : "El commit empezó") + " y no entregó una confirmación de resultado (" + result.Kind + "). Reconcilie el documento antes de repetir.";
+                    // It already started writing: repeating it could duplicate. It stays terminal, with durable evidence, and does not go back to Listo.
+                    var detail = (trial ? "The trial started" : "The commit started") + " and did not deliver a result confirmation (" + result.Kind + "). Reconcile the document before repeating.";
                     Engine.GroupAbort.PreserveInterrupted(plan, detail);
                     _plans.Finish(plan, Status.Desconocido, detail);
                     AuditOutcome(session, auditIntent, Status.Desconocido, rev);
@@ -1029,8 +1029,8 @@ namespace Bimbridge.Addin.Revit
             }
             if (trial)
             {
-                // Un ensayo incierto queda terminal y conserva su estado para job.
-                // Ensayo correcto: el plan vuelve a listo sólo si la intención salió del disco.
+                // An uncertain trial stays terminal and keeps its status for job.
+                // Successful trial: the plan goes back to ready only if the intent was removed from disk.
                 var ok = r.Status == PlanStatus.Ensayado && _plans.Finish(plan, r.Status, r.Detail);
                 if (ok) { plan.Status = PlanStatus.Listo; plan.FinishedUtc = null; }
                 else if (r.Status != PlanStatus.Ensayado) _plans.Finish(plan, r.Status, r.Detail);
@@ -1045,7 +1045,7 @@ namespace Bimbridge.Addin.Revit
                 {
                     Id = request.Id, Estado = ok ? PlanStatus.Ensayado : (r.Status == PlanStatus.Conflicto ? Status.Conflicto : r.Status == PlanStatus.Revertido ? Status.Revertido : Status.Desconocido),
                     Rev = rev, Datos = td,
-                    Aviso = ok ? "Ensayo revertido: el modelo quedó como estaba. Esto NO es un commit; para aplicar de verdad, commit sin modo."
+                    Aviso = ok ? "Trial rolled back: the model is as it was. This is NOT a commit; to really apply, commit without modo."
                                : r.Detail,
                 };
             }
@@ -1060,21 +1060,21 @@ namespace Bimbridge.Addin.Revit
             var advice = StatusAdvice(plan);
             if (lostModified)
             {
-                // No se manipula IsModified: se informa. El documento tenía cambios sin guardar y, tras revertir, Revit lo marca como no modificado.
+                // IsModified is not manipulated: it is reported. The document had unsaved changes and, after rolling back, Revit marks it as not modified.
                 datos["marca_cambios_sin_guardar_perdida"] = true;
-                advice = "ATENCIÓN: el documento tenía cambios sin guardar y, al revertir, Revit dejó de marcarlo como modificado; esos cambios siguen sin guardar. " + advice;
+                advice = "WARNING: the document had unsaved changes and, on rollback, Revit stopped marking it as modified; those changes are still unsaved. " + advice;
             }
             var estado = MapStatus(plan.Status);
             if (plan.Status == PlanStatus.Aplicado)
             {
-                // AUD-09: commit confirmado ≠ postcondiciones cumplidas.
+                // AUD-09: commit committed ≠ postconditions met.
                 var post = PlanVerification.Postconditions(plan.Verification);
                 datos["commit"] = "confirmado";
                 datos["postcondiciones"] = post;
                 if (post != PlanVerification.Met)
                 {
                     estado = Status.ConDiferencias;
-                    advice = "Se aplicó (commit confirmado), pero la relectura no coincide con lo pedido o no se pudo verificar: revise 'verificacion'. " + advice;
+                    advice = "It was applied (commit committed), but the re-read does not match what was requested or could not be verified: check 'verificacion'. " + advice;
                 }
             }
             var auditSaved = AuditOutcome(session, auditIntent, plan.Status, rev, estado);
@@ -1092,7 +1092,7 @@ namespace Bimbridge.Addin.Revit
             ["intento_id"] = plan.ReceiptAttempt, ["plan_id"] = plan.Id, ["doc"] = plan.DocKey, ["estado"] = Status.Retenido,
         };
 
-        /// <summary>Cierra la intención de auditoría. Si falla, la intención queda pendiente y PendingIntents la reporta para reconciliar.</summary>
+        /// <summary>Closes the audit intent. If it fails, the intent stays pending and PendingIntents reports it for reconciliation.</summary>
         private static bool AuditOutcome(Session session, string intent, string estado, long rev, string receiptState = null)
         {
             var audit = Ui.Runtime.Audit;
@@ -1100,7 +1100,7 @@ namespace Bimbridge.Addin.Revit
             var extra = new Dictionary<string, object> { ["rev"] = rev };
             if (receiptState != null) extra["estado_recibo"] = receiptState;
             try { audit.Outcome(session.Id, "commit", intent, estado, extra); return true; }
-            catch (Exception) { return false; } // La intención queda visible en PendingIntents.
+            catch (Exception) { return false; } // The intent stays visible in PendingIntents.
         }
 
         private static Response BlockedResponse(long id, DocWriteBlock block)
@@ -1110,7 +1110,7 @@ namespace Bimbridge.Addin.Revit
             return fail;
         }
 
-        /// <summary>Barrera común de escrituras: vuelve a leer el disco y, ante cualquier duda, no deja pasar.</summary>
+        /// <summary>Common write barrier: re-reads the disk and, when in any doubt, does not let it through.</summary>
         private Response WriteBarrier(long id, IEnumerable<string> docs)
         {
             foreach (var d in docs)
@@ -1123,26 +1123,26 @@ namespace Bimbridge.Addin.Revit
         }
 
         /// <summary>
-        /// job op=pendientes: bloqueo del documento. job op=reconciliar plan_id=…: compara la evidencia con el modelo y libera sólo si queda
-        /// demostrado que todo se revirtió o se aplicó. Lee el modelo, no lo cambia, y sirve desde cualquier conversación porque el plan pudo
-        /// quedar de una sesión anterior a un reinicio.
+        /// job op=pendientes: document lock. job op=reconciliar plan_id=…: compares the evidence with the model and releases only if it is
+        /// proven that everything was rolled back or applied. Reads the model, does not change it, and works from any conversation because the plan may
+        /// be left over from a session before a restart.
         /// </summary>
         private async Task<Response> ReconcileJob(Session session, Request request, string jop, CancellationToken ct)
         {
             var key = DocTarget.Ambient.Value?.Key;
-            if (key == null) return Response.Fail(request.Id, Status.DestinoNoDisponible, "indique el documento con doc= o actívelo en Revit");
+            if (key == null) return Response.Fail(request.Id, Status.DestinoNoDisponible, "specify the document with doc= or activate it in Revit");
             try { _plans.LoadPersisted(key); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { /* CheckWritable decide */ }
             if (jop == "pendientes") return new Response { Id = request.Id, Datos = _plans.CheckWritable(key).ToJson() };
-            if (!_config.Allows('W')) return Response.Fail(request.Id, Status.Rechazado, "reconciliar exige permiso de escritura (W)");
+            if (!_config.Allows('W')) return Response.Fail(request.Id, Status.Rechazado, "reconciliar requires write permission (W)");
             var plan = _plans.Get(Arg.GetString(request.Args, "plan_id"));
             if (plan == null || plan.Status == PlanStatus.Reconciliado || !string.Equals(plan.DocKey, key, StringComparison.OrdinalIgnoreCase))
-                return Response.Fail(request.Id, Status.Invalido, "no hay un plan pendiente con ese plan_id en este documento (job op=pendientes)");
+                return Response.Fail(request.Id, Status.Invalido, "there is no pending plan with that plan_id in this document (job op=pendientes)");
             ReconcileCheck check = null;
             string error = null;
             var result = await RunMain((app, watch, budget) =>
             {
                 var doc = DocTarget.Resolve(app, out var docErr);
-                if (doc == null) { error = docErr ?? "no hay un modelo abierto"; return true; }
+                if (doc == null) { error = docErr ?? "there is no open model"; return true; }
                 var reader = new Writes.PlanApplier(doc, plan, 1, "reconciliar");
                 check = ReconcileEvaluator.Evaluate(plan, reader.Current, id => doc.GetElement(Ids.ToId(id)) != null);
                 return true;
@@ -1153,7 +1153,7 @@ namespace Bimbridge.Addin.Revit
             try { released = _plans.Reconcile(plan, check, session.Id); }
             catch (PlanStoreException ex) { return Response.Fail(request.Id, Status.Rechazado, ex.Message); }
             try { Ui.Runtime.Audit?.Outcome(session.Id, "reconciliar", plan.Id, check.Verdict, check.ToJson()); }
-            catch (Exception ex) { check.Reasons.Add("auditoría: " + ex.Message); }
+            catch (Exception ex) { check.Reasons.Add("audit: " + ex.Message); }
             var datos = check.ToJson();
             datos["plan_id"] = plan.Id;
             datos["liberado"] = released;
@@ -1161,8 +1161,8 @@ namespace Bimbridge.Addin.Revit
             return new Response
             {
                 Id = request.Id, Estado = released ? Status.Ok : Status.Desconocido, Datos = datos,
-                Aviso = released ? "Reconciliado y registrado. Este plan no se repite; planifique de nuevo si hace falta." :
-                    "No se pudo demostrar el resultado: el documento sigue bloqueado. Revise el modelo; si hace falta, una persona debe resolverlo con AgentHost plan-store con Revit cerrado.",
+                Aviso = released ? "Reconciled and recorded. This plan is not repeated; plan again if needed." :
+                    "The result could not be proven: the document stays locked. Review the model; if needed, a person must resolve it with AgentHost plan-store with Revit closed.",
             };
         }
 
@@ -1173,7 +1173,7 @@ namespace Bimbridge.Addin.Revit
             {
                 if (!Guid.TryParseExact(attempt, "N", out _) || request.Args.ContainsKey("plan_id") || request.Args.ContainsKey("job_id")
                     || !string.Equals(Arg.GetString(request.Args, "op") ?? "status", "status", StringComparison.OrdinalIgnoreCase))
-                    return Response.Fail(request.Id, Status.Invalido, "job intento_id sólo admite una consulta de estado.");
+                    return Response.Fail(request.Id, Status.Invalido, "job intento_id only accepts a status query.");
                 return ReadWriteReceipt(session, request.Id, attempt);
             }
             var jop = (Arg.GetString(request.Args, "op") ?? "status").Trim().ToLowerInvariant();
@@ -1183,7 +1183,7 @@ namespace Bimbridge.Addin.Revit
             {
                 var job = _jobs.Get(jobId);
                 if (!JobStore.Visible(job, session.Id, Arg.GetString(request.Args, Wire.TaskArg)))
-                    return Response.Fail(request.Id, Status.Invalido, "no existe ese job_id en esta conversación ni en la tarea indicada (tarea=…)");
+                    return Response.Fail(request.Id, Status.Invalido, "that job_id does not exist in this conversation nor in the given task (tarea=…)");
                 if (jop == "cancel" || jop == "drop")
                 {
                     if (_jobs.Cancel(job) && job.Work != null)
@@ -1194,7 +1194,7 @@ namespace Bimbridge.Addin.Revit
                     return JobResponse(request.Id, job);
                 }
                 if (jop != "status" && jop != "wait")
-                    return Response.Fail(request.Id, Status.Invalido, "op de job con job_id: status/wait (por defecto, espera el resultado) o cancel");
+                    return Response.Fail(request.Id, Status.Invalido, "job op with job_id: status/wait (default, waits for the result) or cancel");
                 return await AwaitJob(request, job, ct).ConfigureAwait(false);
             }
 
@@ -1204,19 +1204,19 @@ namespace Bimbridge.Addin.Revit
                 var plan = _plans.Get(id);
                 var ptask = Arg.GetString(request.Args, Wire.TaskArg);
                 if (plan == null || (plan.SessionId != session.Id && (string.IsNullOrEmpty(ptask) || plan.Task != ptask)))
-                    return Response.Fail(request.Id, Status.Invalido, "no existe ese plan_id en esta conversación ni en la tarea indicada");
+                    return Response.Fail(request.Id, Status.Invalido, "that plan_id does not exist in this conversation nor in the given task");
                 if (jop == "drop")
                 {
                     if (plan.Status == PlanStatus.Retenido)
                         return Response.Fail(request.Id, Status.Rechazado,
-                            "Ese plan ya está en la cola del usuario; sólo él puede descartarlo desde Cola en la cinta BIMBRIDGE. Dígaselo.");
+                            "That plan is already in the user's queue; only they can discard it from Queue on the BIMBRIDGE ribbon. Tell them.");
                     if (plan.Status != PlanStatus.Listo)
-                        return new Response { Id = request.Id, Estado = MapStatus(plan.Status), Datos = plan.Describe(0), Aviso = "No hay nada que descartar: " + StatusAdvice(plan) };
-                    _plans.Finish(plan, PlanStatus.Descartado, "descartado por la IA antes de aplicarlo");
+                        return new Response { Id = request.Id, Estado = MapStatus(plan.Status), Datos = plan.Describe(0), Aviso = "Nothing to discard: " + StatusAdvice(plan) };
+                    _plans.Finish(plan, PlanStatus.Descartado, "discarded by the AI before applying it");
                     return new Response { Id = request.Id, Datos = new Dictionary<string, object> { ["plan_id"] = plan.Id, ["descartado"] = true } };
                 }
                 if (jop != "status")
-                    return Response.Fail(request.Id, Status.Invalido, "op de job: status (por defecto) o drop");
+                    return Response.Fail(request.Id, Status.Invalido, "job op: status (default) or drop");
                 return new Response { Id = request.Id, Estado = MapStatus(plan.Status), Datos = plan.Describe(10), Aviso = StatusAdvice(plan) };
             }
             var rows = _plans.ForSession(session.Id).Select(p => (object)new object[]
@@ -1261,12 +1261,12 @@ namespace Bimbridge.Addin.Revit
             switch (p.Status)
             {
                 case PlanStatus.Aplicado: return null;
-                case PlanStatus.Listo: return "Plan listo; llame commit para aplicarlo.";
-                case PlanStatus.Retenido: return "Sigue en la cola de Revit esperando que el usuario pulse Aplicar cola. No lo repita.";
-                case PlanStatus.Conflicto: return "Algo cambió desde que se planificó y no se aplicó nada: " + p.StatusDetail;
-                case PlanStatus.Revertido: return "Revit lo rechazó y se revirtió entero: " + p.StatusDetail;
-                case PlanStatus.Vencido: return "El plan venció sin commit; vuelva a planificar.";
-                case PlanStatus.Descartado: return "Descartado: " + p.StatusDetail + ". No lo repita sin preguntar al usuario.";
+                case PlanStatus.Listo: return "Plan ready; call commit to apply it.";
+                case PlanStatus.Retenido: return "Still in the Revit queue waiting for the user to press Apply queue. Do not repeat it.";
+                case PlanStatus.Conflicto: return "Something changed since it was planned and nothing was applied: " + p.StatusDetail;
+                case PlanStatus.Revertido: return "Revit rejected it and it was rolled back entirely: " + p.StatusDetail;
+                case PlanStatus.Vencido: return "The plan expired without commit; plan again.";
+                case PlanStatus.Descartado: return "Discarded: " + p.StatusDetail + ". Do not repeat it without asking the user.";
                 default: return p.StatusDetail;
             }
         }
@@ -1295,7 +1295,7 @@ namespace Bimbridge.Addin.Revit
                         var removed = session.Sets.Remove(name);
                         return new Response { Id = request.Id, Datos = new Dictionary<string, object> { ["borrado"] = removed } };
                     default:
-                        return Response.Fail(request.Id, Status.Invalido, "op debe ser list o drop");
+                        return Response.Fail(request.Id, Status.Invalido, "op must be list or drop");
                 }
             }
             catch (ArgumentException ex)
@@ -1308,22 +1308,22 @@ namespace Bimbridge.Addin.Revit
         {
             if (r.Kind == WorkResult.KindCancelled && r.Slices > 0 && write)
                 return Response.Fail(id, Status.Desconocido,
-                    "Se canceló cuando ya había empezado a escribir (" + r.Slices + " tramos en Revit): puede haber quedado aplicado en parte. Lea el modelo y reconcilie antes de repetir.");
+                    "It was cancelled after it had already started writing (" + r.Slices + " slices in Revit): it may have been partially applied. Read the model and reconcile before repeating.");
             switch (r.Kind)
             {
                 case "busy":
                     var busy = Response.Fail(id, Status.RevitOcupado,
-                        "Revit no atendió en " + _config.BusyAfterMs / 1000 + " s: probablemente hay un diálogo abierto, un comando en curso o un modo de edición. Pida al usuario que lo cierre y reintente.");
+                        "Revit did not respond within " + _config.BusyAfterMs / 1000 + " s: probably a dialog is open, a command is in progress or an edit mode is active. Ask the user to close it and retry.");
                     busy.Datos = new Dictionary<string, object> { ["despacho"] = r.DispatchJson() };
                     return busy;
                 case "cancelled":
                     return Response.Fail(id, Status.TiempoAgotado,
                         r.Slices > 0
-                            ? "Se agotó el tiempo y la lectura se canceló a mitad (no escribe nada). Acote la petición (menos niveles, vistas o ids) antes de repetirla."
-                            : "Se agotó el tiempo y la operación se canceló antes de empezar en Revit, sin cambiar nada. Acote la petición antes de repetirla.");
+                            ? "Time ran out and the read was cancelled midway (it writes nothing). Narrow the request (fewer levels, views or ids) before repeating it."
+                            : "Time ran out and the operation was cancelled before starting in Revit, without changing anything. Narrow the request before repeating it.");
                 default:
                     var ex = r.Error;
-                    return Response.Fail(id, Status.Error, ex == null ? "error desconocido" : ex.GetType().Name + ": " + ex.Message);
+                    return Response.Fail(id, Status.Error, ex == null ? "unknown error" : ex.GetType().Name + ": " + ex.Message);
             }
         }
     }

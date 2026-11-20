@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.8.0 paquete A: requisitos con procedencia, verificación independiente y estados de entrega (sin Revit).</summary>
+    /// <summary>0.8.0 package A: requirements with provenance, independent verification and delivery stages (no Revit).</summary>
     public class WorkflowTests
     {
         private static Requirement R(string id, string kind, string src, string key, string value, string scope = "*", string rev = null, params string[] supersedes)
@@ -17,7 +17,7 @@ namespace Bimbridge.Tests
         {
             var s = new RequirementSet();
             Assert.NotNull(s.Add(new Requirement { Id = "r1", Key = "altura" }));
-            Assert.NotNull(s.Add(R("r2", SourceKinds.Inferencia, "agente", "altura", "10'")));   // inferencia + OBSERVED
+            Assert.NotNull(s.Add(R("r2", SourceKinds.Inferencia, "agente", "altura", "10'")));   // inference + OBSERVED
             var inf = R("r3", SourceKinds.Inferencia, "agente", "altura", "10'"); inf.Confidence = Confidence.Inferred;
             Assert.Null(s.Add(inf));
         }
@@ -30,7 +30,7 @@ namespace Bimbridge.Tests
             Assert.Null(s.Add(R("b", SourceKinds.Plano, "E-1.3.02", "codigo", "D", "nivel=L02")));
             Assert.Null(s.Add(R("c", SourceKinds.Usuario, "operator-2026-10-13", "workset", "EMERGENCY", "nivel=L02", null, "a")));
             Assert.Equal("EMERGENCY", s.Resolve("nivel=L02", "workset").Winner.Value);
-            Assert.Equal("D", s.Resolve("nivel=L02", "codigo").Winner.Value);   // intacto
+            Assert.Equal("D", s.Resolve("nivel=L02", "codigo").Winner.Value);   // intact
         }
 
         [Fact]
@@ -39,10 +39,10 @@ namespace Bimbridge.Tests
             var s = new RequirementSet();
             Assert.Null(s.Add(R("t", SourceKinds.Transcripcion, "reunion-0930", "diametro", "3/4\"")));
             Assert.Null(s.Add(R("p", SourceKinds.Plano, "E-6.1", "diametro", "1\"")));
-            Assert.Equal("1\"", s.Resolve("*", "diametro").Winner.Value);         // plano > transcripción
+            Assert.Equal("1\"", s.Resolve("*", "diametro").Winner.Value);         // drawing > transcription
             Assert.Null(s.Add(R("p2", SourceKinds.Plano, "E-6.1", "diametro", "1-1/4\"", "*", "CCD8")));
             Assert.Null(s.Add(R("p1", SourceKinds.Plano, "E-6.1", "dummy", "x", "*", "CCD7")));
-            // misma fuente: p (sin revisión) y p2 (CCD8) → gana la revisión posterior
+            // same source: p (no revision) and p2 (CCD8) -> the later revision wins
             Assert.Equal("1-1/4\"", s.Resolve("*", "diametro").Winner.Value);
             Assert.Null(s.Add(R("x", SourceKinds.Pdf, "ARQ-A1.7", "diametro", "2\"")));
             var res = s.Resolve("*", "diametro");
@@ -85,14 +85,14 @@ namespace Bimbridge.Tests
                 RequiredRevision = "R3", CompareAttrs = new[] { "codigo" },
                 Expected = { E("F1", "4#500"), E("F2", "4#4/0"), E("F3", "4#2"), E("F9", "x") },
                 Observed = { O("F1", 10, "4#500"), O("F2", 11, "4#1/0"), O("F2", 12, "4#4/0"), O("F7", 13) },
-                Exceptions = { ["F9"] = "extremo abierto respaldado por la fuente (hoja 2, fila 14)" },
+                Exceptions = { ["F9"] = "open end backed by the source (sheet 2, row 14)" },
             };
             var r = IndependentVerifier.Verify(input);
             Assert.Equal("diferencias", r.Estado);
             Assert.Contains("F3", r.Missing);
             Assert.Contains(13L, r.Extra);
             Assert.Single(r.Duplicates);
-            Assert.Single(r.Mismatches);                 // F2 #11 con código distinto
+            Assert.Single(r.Mismatches);                 // F2 #11 with a different code
             Assert.Single(r.JustifiedExceptions);
             Assert.DoesNotContain("F9", r.Missing);
         }
@@ -128,7 +128,7 @@ namespace Bimbridge.Tests
         private static DeliveryReceipt Rc(string stage, string doc, string rev, params (string, object)[] data)
         {
             var r = new DeliveryReceipt { Stage = stage, DocKey = doc, Revision = rev };
-            // 0.9.0: procedencia por defecto de un recibo observado por BIMBRIDGE
+            // 0.9.0: default provenance of a receipt observed by BIMBRIDGE
             r.Data["origen"] = "bimbridge:prueba"; r.Data["evidencia"] = Confidence.Comprobado;
             foreach (var (k, v) in data) r.Data[k] = v;
             return r;
@@ -138,15 +138,15 @@ namespace Bimbridge.Tests
         public void Delivery_CannotSkip_CannotUseOtherDocument_NorStalePdf()
         {
             var t = new DeliveryTrack("set-riser", "doc-A", new[] { DeliveryStages.CommitConfirmado, DeliveryStages.Sincronizado, DeliveryStages.SetPersistido, DeliveryStages.Exportado, DeliveryStages.ArtefactoVerificado });
-            Assert.NotNull(t.Record(Rc(DeliveryStages.Exportado, "doc-A", "7", ("archivo", "x.pdf"), ("sha256", "aa"))));          // salto
+            Assert.NotNull(t.Record(Rc(DeliveryStages.Exportado, "doc-A", "7", ("archivo", "x.pdf"), ("sha256", "aa"))));          // skipped stage
             Assert.Null(t.Record(Rc(DeliveryStages.CommitConfirmado, "doc-A", "7", ("plan_id", "P1"), ("rev", 7L))));
-            Assert.NotNull(t.Record(Rc(DeliveryStages.Sincronizado, "doc-B", "7", ("central", "c"), ("huella_central", "h"))));   // otro documento
+            Assert.NotNull(t.Record(Rc(DeliveryStages.Sincronizado, "doc-B", "7", ("central", "c"), ("huella_central", "h"))));   // another document
             Assert.Null(t.Record(Rc(DeliveryStages.Sincronizado, "doc-A", "7", ("central", "c"), ("huella_central", "h"))));
             Assert.Null(t.Record(Rc(DeliveryStages.SetPersistido, "doc-A", "7", ("set", "NON-UNIT LIGHTING"), ("laminas", 12L))));
-            Assert.NotNull(t.Record(Rc(DeliveryStages.Exportado, "doc-A", "5", ("archivo", "viejo.pdf"), ("sha256", "bb"))));     // revisión anterior
+            Assert.NotNull(t.Record(Rc(DeliveryStages.Exportado, "doc-A", "5", ("archivo", "viejo.pdf"), ("sha256", "bb"))));     // earlier revision
             Assert.Null(t.Record(Rc(DeliveryStages.Exportado, "doc-A", "7", ("archivo", "x.pdf"), ("sha256", "aa"))));
-            Assert.NotNull(t.Record(Rc(DeliveryStages.ArtefactoVerificado, "doc-A", "7", ("archivo", "x.pdf"), ("sha256", "cc"), ("paginas", 12L))));  // otro archivo
-            Assert.NotNull(t.Record(Rc(DeliveryStages.ArtefactoVerificado, "doc-A", "7", ("archivo", "x.pdf"), ("sha256", "aa"), ("paginas", 11L))));  // páginas
+            Assert.NotNull(t.Record(Rc(DeliveryStages.ArtefactoVerificado, "doc-A", "7", ("archivo", "x.pdf"), ("sha256", "cc"), ("paginas", 12L))));  // another file
+            Assert.NotNull(t.Record(Rc(DeliveryStages.ArtefactoVerificado, "doc-A", "7", ("archivo", "x.pdf"), ("sha256", "aa"), ("paginas", 11L))));  // pages
             Assert.Null(t.Record(Rc(DeliveryStages.ArtefactoVerificado, "doc-A", "7", ("archivo", "x.pdf"), ("sha256", "aa"), ("paginas", 12L))));
             Assert.True(t.Complete);
         }

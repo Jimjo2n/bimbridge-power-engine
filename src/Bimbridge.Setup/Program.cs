@@ -9,27 +9,27 @@ namespace Bimbridge.Setup
 {
     /// <summary>
     /// Bimbridge.Setup.exe
-    ///   (sin argumentos)          ventana de instalación
-    ///   /uninstall                ventana de desinstalación (la usa "Aplicaciones" de Windows)
-    ///   /quiet                    sin ventana, para despliegue por IT. Con:
-    ///       /revit=2024,2025      versiones (por defecto: todas las detectadas)
-    ///       /niveles=R|RP|RPW     permisos de la IA (por defecto R)
-    ///       /claude /codex        conectar esas IAs
+    ///   (no arguments)            install window
+    ///   /uninstall                uninstall window (used by Windows "Apps")
+    ///   /quiet                    no window, for IT deployment. With:
+    ///       /revit=2024,2025      versions (default: all detected)
+    ///       /niveles=R|RP|RPW     AI permissions (default R)
+    ///       /claude /codex        connect those AIs
     ///   /quiet /uninstall [/borrardatos]
-    ///   /restaurar[=carpeta]      vuelve al último respaldo de instalación (o al indicado). Exige Revit cerrado. Código 2 si está abierto.
-    ///   /actualizar [/permitir-anterior]   lo usa el botón Actualizar de la cinta: mismas opciones que la
-    ///                             instalación anterior, sin ventana, al cerrar todas las instancias de Revit
-    ///   /aplicar-pendiente        0.8.0 "Actualizar desde ZIP": espera a que el USUARIO cierre Revit (nunca lo cierra),
-    ///                             instala la actualización preparada, la verifica y, si falla, vuelve a la anterior
-    ///   /reemplazar               /quiet sobre una instalación existente (crea respaldo). Sin él, código 5.
-    /// Código de salida: 0 bien, 1 error, 2 Revit abierto, 3 sin instalación previa, 4 ya está al día, 5 conflicto con una instalación existente.
+    ///   /restaurar[=folder]       goes back to the latest install backup (or the given one). Requires Revit closed. Code 2 if it is open.
+    ///   /actualizar [/permitir-anterior]   used by the ribbon Update button: same options as the
+    ///                             previous install, no window, once all Revit instances are closed
+    ///   /aplicar-pendiente        0.8.0 "Update from ZIP": waits for the USER to close Revit (never closes it),
+    ///                             installs the prepared update, verifies it and, if it fails, goes back to the previous one
+    ///   /reemplazar               /quiet over an existing install (creates a backup). Without it, code 5.
+    /// Exit code: 0 ok, 1 error, 2 Revit open, 3 no previous install, 4 already up to date, 5 conflict with an existing install.
     /// </summary>
     public static class Program
     {
         [STAThread]
         public static int Main(string[] args)
         {
-            // Las DLL propias viajan dentro del .exe: un solo archivo para el usuario.
+            // Our own DLLs travel inside the .exe: a single file for the user.
             AppDomain.CurrentDomain.AssemblyResolve += (s, e) =>
             {
                 var name = "lib." + new AssemblyName(e.Name).Name + ".dll";

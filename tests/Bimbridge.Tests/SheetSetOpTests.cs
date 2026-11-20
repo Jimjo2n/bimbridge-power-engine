@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.8.0: sheet_set (conjunto de impresión persistente). Validación sin Revit; la creación real es de la campaña nativa.</summary>
+    /// <summary>0.8.0: sheet_set (persistent sheet set). Validation without Revit; real creation belongs to the native campaign.</summary>
     public class SheetSetOpTests
     {
         private static void Bad(string op) => Assert.Throws<QueryException>(() => OpSpec.ParseAll(Json.ParseObject("{\"ops\":[" + op + "]}")));

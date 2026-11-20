@@ -10,7 +10,7 @@ using Bimbridge.Protocol;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Utilidades de las pruebas del AgentHost 0.7.0-alpha1: planes, modelos y procesos hijos REALES.</summary>
+    /// <summary>Helpers for the AgentHost 0.7.0-alpha1 tests: plans, models and REAL child processes.</summary>
     internal static class AH
     {
         public const string Doc = "archivo:c:\\practica.rvt";
@@ -43,7 +43,7 @@ namespace Bimbridge.Tests
             return p.AssignIds();
         }
 
-        /// <summary>Plan base de AH-01: consultar → fijar Mounting Height (espera 5 elementos y 5 cambios) → QC.</summary>
+        /// <summary>AH-01 base plan: query → set Mounting Height (expects 5 elements and 5 changes) → QC.</summary>
         public static PlanDraft BasePlan(long expect = 5) => Plan(Query(), Set("Mounting Height", 2700L, expectElems: expect, expectChanged: expect, level: "L03", deps: new[] { "#0" }), Qc("#1"));
 
         public static string WritePlan(string dir, PlanDraft p) { var f = Path.Combine(dir, "plan_entrada.json"); File.WriteAllText(f, Json.Write(p.ToJson())); return f; }
@@ -59,10 +59,10 @@ namespace Bimbridge.Tests
 
         public sealed class ChildResult { public int Code; public string Out; public string Err; public bool Killed => Code == 137 || Code == -1 || Code == 134; public override string ToString() => "code=" + Code + "\n" + Out + Err; }
 
-        /// <summary>Lanza el AgentHost como PROCESO INDEPENDIENTE (dotnet …AgentHost.dll). <paramref name="fault"/>: BIMBRIDGE_AH_FAULT.</summary>
+        /// <summary>Launches the AgentHost as an INDEPENDENT PROCESS (dotnet …AgentHost.dll). <paramref name="fault"/>: BIMBRIDGE_AH_FAULT.</summary>
         public static ChildResult Run(string fault, string markFile, params string[] args) => Start(fault, markFile, args).Wait();
 
-        /// <summary>Como <see cref="Run"/> con variables de entorno adicionales (p. ej. BIMBRIDGE_AH_DELAY para un retraso controlado).</summary>
+        /// <summary>Like <see cref="Run"/> with extra environment variables (e.g. BIMBRIDGE_AH_DELAY for a controlled delay).</summary>
         public static ChildResult RunWithEnv(IDictionary<string, string> env, string fault, string markFile, params string[] args)
         {
             ExtraEnv = env;
@@ -73,9 +73,9 @@ namespace Bimbridge.Tests
         [ThreadStatic] private static IDictionary<string, string> ExtraEnv;
 
         /// <summary>
-        /// AUD-04: separa la inyección de caídas de la expiración. Tras una caída, el proceso muerto no libera su lease; en vez de esperar a que
-        /// venza (lo que obliga a usar TTL muy cortos que la carga de la máquina puede agotar antes del punto de caída), se adelanta el
-        /// vencimiento en el fixture de disco. Sólo es válido con el dueño ya terminado: se comprueba que el lease no esté liberado.
+        /// AUD-04: separates crash injection from expiry. After a crash, the dead process does not release its lease; instead of waiting for it to
+        /// expire (which forces very short TTLs that machine load can exhaust before the crash point), the expiry is moved forward
+        /// in the on-disk fixture. Only valid once the owner has exited: it checks that the lease is not released.
         /// </summary>
         public static void ExpireDeadLease(string stateDir)
         {
@@ -92,7 +92,7 @@ namespace Bimbridge.Tests
             public Process P; public StringBuilder Out = new StringBuilder(), Err = new StringBuilder();
             public ChildResult Wait(int ms = 120000)
             {
-                if (!P.WaitForExit(ms)) { try { P.Kill(true); } catch (InvalidOperationException) { } throw new TimeoutException("el proceso hijo no terminó: " + Out); }
+                if (!P.WaitForExit(ms)) { try { P.Kill(true); } catch (InvalidOperationException) { } throw new TimeoutException("the child process did not exit: " + Out); }
                 P.WaitForExit();
                 return new ChildResult { Code = P.ExitCode, Out = Out.ToString(), Err = Err.ToString() };
             }
@@ -127,7 +127,7 @@ namespace Bimbridge.Tests
         public static List<Dictionary<string, object>> Notes(string stateDir, string op) =>
             Journal(stateDir).Where(r => Arg.GetString(r, "ev") == "nota" && Arg.GetString(r, "op") == op).ToList();
 
-        /// <summary>Recupera el estado desde disco en un objeto nuevo (sólo lectura).</summary>
+        /// <summary>Recovers the state from disk into a new object (read only).</summary>
         public static ExecJournal Read(string stateDir, out ValidatedPlan plan, out List<Diagnostic> diags)
         {
             diags = new List<Diagnostic>();
@@ -137,10 +137,10 @@ namespace Bimbridge.Tests
 
         public static string StateOf(string stateDir, string op) => Read(stateDir, out _, out _).Ops[op].State;
 
-        /// <summary>Transacciones confirmadas de la operación en el modelo, leídas por un modelo recién abierto desde disco.</summary>
+        /// <summary>Committed transactions of the operation in the model, read by a model freshly opened from disk.</summary>
         public static long TxCount(string modelDir, string planHash, string op) => DurableSimModel.Open(modelDir).TxFor(op, planHash).Count;
 
-        /// <summary>Un proceso muerto no libera su lease: el siguiente sólo puede tomar el plan cuando vence (AH-04). Espera a ese momento.</summary>
+        /// <summary>A dead process does not release its lease: the next one can only take the plan when it expires (AH-04). Waits until then.</summary>
         public static void WaitLeaseExpiry(string stateDir)
         {
             if (!Directory.Exists(stateDir)) return;

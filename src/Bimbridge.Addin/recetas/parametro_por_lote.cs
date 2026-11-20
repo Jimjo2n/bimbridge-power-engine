@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Receta incluida en BIMBRIDGE - Power Engine (desde 0.6.0). Fija un parámetro de INSTANCIA a un valor en una lista de elementos, uno por unidad:
-// reanudable, sin duplicar (si ya tiene el valor se omite) y con verificación tras una caída.
-// args: ids (lista de ElementId) o conjunto ("$nombre" de un conjunto guardado), parametro (nombre visible), valor (texto; en
-// parámetros de longitud se usa como en la interfaz, p. ej. "2400 mm"), guardar_al_final (si/no, por defecto no).
+// Recipe shipped with BIMBRIDGE - Power Engine (since 0.6.0). Sets an INSTANCE parameter to a value on a list of elements, one per unit:
+// resumable, without duplicates (skipped if it already has the value) and with verification after a crash.
+// args: ids (list of ElementId) or conjunto ("$name" of a saved set), parametro (visible name), valor (text; for
+// length parameters it is used as in the UI, e.g. "2400 mm"), guardar_al_final (si/no, default no).
 public class ParametroPorLote : Receta
 {
     public override string Version => "1";
-    public override string Descripcion => "Fija un parámetro de instancia en una lista de elementos (una unidad por elemento, verificable)";
+    public override string Descripcion => "Sets an instance parameter on a list of elements (one unit per element, verifiable)";
     public override IEnumerable<string> Entradas => new[] { "parametro", "valor" };
 
     public override void Preparar(ScriptContext ctx)
     {
         base.Preparar(ctx);
-        if (!ctx.Args.ContainsKey("ids") && !ctx.Args.ContainsKey("conjunto")) throw new ArgumentException("faltan ids o conjunto");
+        if (!ctx.Args.ContainsKey("ids") && !ctx.Args.ContainsKey("conjunto")) throw new ArgumentException("missing ids or conjunto");
     }
 
     private static IEnumerable<long> Ids(ScriptContext ctx)
@@ -26,7 +26,7 @@ public class ParametroPorLote : Receta
         foreach (var id in Ids(ctx).Distinct().OrderBy(x => x))
         {
             var e = ctx.E(id);
-            if (e == null) { ctx.Excepcion("no existe el elemento", id); continue; }
+            if (e == null) { ctx.Excepcion("the element does not exist", id); continue; }
             yield return new Unidad("e:" + e.UniqueId, new Dictionary<string, object> { ["id"] = id }, new[] { id });
         }
         if (string.Equals(Convert.ToString(ctx.Args.TryGetValue("guardar_al_final", out var g) ? g : "no"), "si", StringComparison.OrdinalIgnoreCase))
@@ -47,9 +47,9 @@ public class ParametroPorLote : Receta
         var e = ctx.E(Convert.ToInt64(u.D("id")));
         var valor = Convert.ToString(ctx.Args["valor"]);
         var p = P(ctx, e);
-        if (p == null) { ctx.Excepcion("el elemento no tiene el parámetro", ctx.Long(e.Id)); ctx.Omitir("sin parámetro"); }
-        if (p.IsReadOnly) { ctx.Excepcion("parámetro de solo lectura", ctx.Long(e.Id)); ctx.Omitir("solo lectura"); }
-        if (Igual(p, valor)) ctx.Omitir("ya tenía el valor");
+        if (p == null) { ctx.Excepcion("the element does not have the parameter", ctx.Long(e.Id)); ctx.Omitir("no parameter"); }
+        if (p.IsReadOnly) { ctx.Excepcion("read-only parameter", ctx.Long(e.Id)); ctx.Omitir("read-only"); }
+        if (Igual(p, valor)) ctx.Omitir("it already had the value");
         var antes = p.StorageType == StorageType.String ? p.AsString() : p.AsValueString();
         bool ok;
         switch (p.StorageType)
@@ -60,7 +60,7 @@ public class ParametroPorLote : Receta
             case StorageType.ElementId: ok = p.Set(ctx.Id(long.Parse(valor))); break;
             default: ok = false; break;
         }
-        if (!ok) throw new InvalidOperationException("Revit no aceptó el valor '" + valor + "'");
+        if (!ok) throw new InvalidOperationException("Revit did not accept the value '" + valor + "'");
         return new Dictionary<string, object> { ["id"] = ctx.Long(e.Id), ["antes"] = antes };
     }
 
@@ -77,6 +77,6 @@ public class ParametroPorLote : Receta
         var valor = Convert.ToString(ctx.Args["valor"]);
         var mal = Ids(ctx).Select(i => ctx.E(i)).Where(e => e != null).Where(e => { var p = P(ctx, e); return p != null && !p.IsReadOnly && !Igual(p, valor); })
             .Select(e => ctx.Long(e.Id)).ToList();
-        return new Dictionary<string, object> { ["revisados"] = Ids(ctx).Count(), ["desviaciones"] = mal.Select(i => (object)("sin el valor: " + i)).ToList() };
+        return new Dictionary<string, object> { ["revisados"] = Ids(ctx).Count(), ["desviaciones"] = mal.Select(i => (object)("missing the value: " + i)).ToList() };
     }
 }

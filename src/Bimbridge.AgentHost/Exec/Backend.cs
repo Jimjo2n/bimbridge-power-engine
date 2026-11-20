@@ -6,7 +6,7 @@ using Bimbridge.Protocol;
 
 namespace Bimbridge.AgentHost
 {
-    /// <summary>Contexto que el ejecutor pasa al backend en cada llamada: plan, fencing del dueño actual e intento.</summary>
+    /// <summary>Context the executor passes to the backend on every call: plan, fencing of the current owner, and attempt.</summary>
     public sealed class ExecContext
     {
         public string PlanHash;
@@ -15,8 +15,8 @@ namespace Bimbridge.AgentHost
     }
 
     /// <summary>
-    /// Resultado de <see cref="IExecutionBackend.Execute"/>. Contrato: <c>Ok=false</c> significa que NADA se confirmó en el modelo
-    /// (el backend deshizo o no empezó). Un backend que no pueda garantizarlo debe lanzar, no devolver Ok=false.
+    /// Result of <see cref="IExecutionBackend.Execute"/>. Contract: <c>Ok=false</c> means NOTHING was committed to the model
+    /// (the backend undid it or never started). A backend that cannot guarantee this must throw, not return Ok=false.
     /// </summary>
     public sealed class ExecResult
     {
@@ -28,34 +28,34 @@ namespace Bimbridge.AgentHost
         public static ExecResult Fail(string cls, string msg) => new ExecResult { Ok = false, ErrorClass = cls, Error = msg };
     }
 
-    /// <summary>Qué se observa en el modelo sobre una operación que quedó a medias (AH-01).</summary>
+    /// <summary>What is observed in the model about an operation left half done (AH-01).</summary>
     public enum Effect
     {
-        /// <summary>El efecto completo de esta operación está confirmado en el modelo.</summary>
+        /// <summary>The full effect of this operation is committed in the model.</summary>
         Observado,
-        /// <summary>No hay ningún efecto de esta operación en el modelo: se puede ejecutar sin duplicar.</summary>
+        /// <summary>There is no effect of this operation in the model: it can run without duplicating.</summary>
         NoObservado,
-        /// <summary>Hay efecto, pero no cubre lo que la operación pide ahora (p. ej. los objetivos cambiaron).</summary>
+        /// <summary>There is an effect, but it does not cover what the operation asks for now (e.g. the targets changed).</summary>
         Parcial,
-        /// <summary>No se puede saber (almacén ilegible, efecto aplicado más de una vez…).</summary>
+        /// <summary>Cannot be known (unreadable store, effect applied more than once…).</summary>
         Incierto,
-        /// <summary>No hay efecto y tampoco hay objetivos: la operación seleccionaría un conjunto vacío.</summary>
+        /// <summary>There is no effect and no targets either: the operation would select an empty set.</summary>
         SinObjetivos,
     }
 
     public sealed class Observation
     {
         public Effect Effect;
-        /// <summary>Transacciones confirmadas atribuidas a la operación.</summary>
+        /// <summary>Committed transactions attributed to the operation.</summary>
         public long Transactions;
-        /// <summary>Resultado reconstruido desde evidencia del modelo, o null si la evidencia no basta (no se inventa).</summary>
+        /// <summary>Result reconstructed from model evidence, or null if the evidence is not enough (nothing is invented).</summary>
         public Dictionary<string, object> Reconstructed;
         public string Detail;
     }
 
     public enum PostState { Satisfechas, NoSatisfechas, NoEvaluables }
 
-    /// <summary>Comprobación de postcondiciones contra el estado AUTORITATIVO del modelo (no contra lo que dijo el ejecutor).</summary>
+    /// <summary>Postcondition check against the AUTHORITATIVE model state (not against what the executor said).</summary>
     public sealed class PostcheckResult
     {
         public PostState State;
@@ -63,36 +63,36 @@ namespace Bimbridge.AgentHost
         public Dictionary<string, object> Evidence = new Dictionary<string, object>(StringComparer.Ordinal);
     }
 
-    /// <summary>Preparación de solo lectura: cuántos objetivos seleccionaría la operación ahora.</summary>
+    /// <summary>Read-only preparation: how many targets the operation would select now.</summary>
     public sealed class Preflight
     {
         public int Targets;
-        public string Error;   // si no se puede evaluar
+        public string Error;   // if it cannot be evaluated
     }
 
     /// <summary>
-    /// Contrato de ejecución del AgentHost (0.7.0). El simulado (<see cref="SimulatedBackend"/>) es el único que escribe en alpha1; el
-    /// adaptador de Revit (<see cref="RevitTaskAdapter"/>) define la frontera pero rechaza escrituras.
+    /// AgentHost execution contract (0.7.0). The simulated one (<see cref="SimulatedBackend"/>) is the only one that writes in alpha1; the
+    /// Revit adapter (<see cref="RevitTaskAdapter"/>) defines the boundary but rejects writes.
     /// </summary>
     public interface IExecutionBackend
     {
         string Name { get; }
-        /// <summary>true si el backend puede escribir en un modelo real. El AgentHost alpha1 rechaza planes con escrituras en ese caso.</summary>
+        /// <summary>true if the backend can write to a real model. The alpha1 AgentHost rejects plans with writes in that case.</summary>
         bool TouchesRealModel { get; }
         string DocKey { get; }
         string DocPrint { get; }
         Preflight Prepare(ValidatedOp op);
         ExecResult Execute(ValidatedOp op, ExecContext ctx);
-        /// <summary>Para una operación interrumpida: ¿qué efecto tiene en el modelo? Nunca modifica el modelo.</summary>
+        /// <summary>For an interrupted operation: what effect does it have in the model? Never modifies the model.</summary>
         Observation Observe(ValidatedOp op, ExecContext ctx);
-        /// <summary>Postcondiciones contra el estado actual del modelo. Nunca modifica el modelo.</summary>
+        /// <summary>Postconditions against the current model state. Never modifies the model.</summary>
         PostcheckResult CheckPostconditions(ValidatedOp op, ExecContext ctx);
-        /// <summary>alpha3: "simulado", "ensayo" (escritura real temporal, siempre revertida) o "persistente".</summary>
+        /// <summary>alpha3: "simulado", "ensayo" (temporary real write, always rolled back) or "persistente".</summary>
         string WriteMode => "simulado";
     }
 
-    /// <summary>alpha3: el backend no puede saber si su escritura se confirmó (timeout, conexión perdida a mitad). El ejecutor no la repite:
-    /// observa el modelo y decide (AH-01).</summary>
+    /// <summary>alpha3: the backend cannot know whether its write was committed (timeout, connection lost midway). The executor does not repeat it:
+    /// it observes the model and decides (AH-01).</summary>
     public sealed class UncertainEffectException : Exception
     {
         public UncertainEffectException(string message) : base(message) { }
@@ -100,7 +100,7 @@ namespace Bimbridge.AgentHost
 
     public static class Values
     {
-        /// <summary>Igualdad por forma canónica (2700 == 2700.0; "a" != "A").</summary>
+        /// <summary>Equality by canonical form (2700 == 2700.0; "a" != "A").</summary>
         public static bool Same(object a, object b) => OpSemantics.Canonical(a) == OpSemantics.Canonical(b);
         public static string Show(object v) => v == null ? "null" : Convert.ToString(v, CultureInfo.InvariantCulture);
     }

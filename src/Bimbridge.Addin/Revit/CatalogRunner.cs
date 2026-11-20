@@ -12,10 +12,10 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// Catálogo del modelo en una llamada (lo que en pyRevit son varios scripts o recorrer el navegador a mano):
+    /// Model catalog in one call (what in pyRevit takes several scripts or browsing by hand):
     /// resumen, categorias, tipos, familias, niveles, vistas, plantillas, laminas, worksets, vinculos, filtros.
-    /// Los conteos usan filtros rápidos de Revit (GetElementCount no abre los elementos) y se reparten en tramos,
-    /// así un modelo grande no congela Revit. Sólo lee.
+    /// Counts use Revit quick filters (GetElementCount does not open the elements) and are split into slices,
+    /// so a large model does not freeze Revit. Read-only.
     /// </summary>
     public sealed class CatalogRunner
     {
@@ -61,9 +61,9 @@ namespace Bimbridge.Addin.Revit
             _page = (int)(Arg.GetLong(a, "page") ?? 1);
             _pageSize = (int)(Arg.GetLong(a, "page_size") ?? DefaultPageSize);
             _mm = string.Equals(Arg.GetString(a, "units"), "mm", StringComparison.OrdinalIgnoreCase);
-            if (_page < 1) Error = "page empieza en 1";
-            else if (_pageSize < 1 || _pageSize > MaxPageSize) Error = "page_size entre 1 y " + MaxPageSize;
-            else if (_extra.Count > 6) Error = "f admite hasta 6 parámetros extra";
+            if (_page < 1) Error = "page starts at 1";
+            else if (_pageSize < 1 || _pageSize > MaxPageSize) Error = "page_size between 1 and " + MaxPageSize;
+            else if (_extra.Count > 6) Error = "f accepts up to 6 extra parameters";
         }
 
         public bool Step(UIApplication app, Stopwatch sw, int budgetMs, DocumentTracker tracker)
@@ -81,7 +81,7 @@ namespace Bimbridge.Addin.Revit
             }
             else if (!ReferenceEquals(doc, _doc) && doc.Title != _doc.Title)
             {
-                Error = "El documento activo cambió durante la consulta; repítala.";
+                Error = "The active document changed during the query; repeat it.";
                 return true;
             }
             var deadline = sw.ElapsedMilliseconds + budgetMs;
@@ -94,7 +94,7 @@ namespace Bimbridge.Addin.Revit
             return true;
         }
 
-        /// <summary>Filtrar por texto, ordenar y paginar: fuera del hilo de Revit.</summary>
+        /// <summary>Filter by text, sort and paginate: outside the Revit thread.</summary>
         public Dictionary<string, object> Finish()
         {
             var d = new Dictionary<string, object> { ["que"] = _que };
@@ -103,7 +103,7 @@ namespace Bimbridge.Addin.Revit
                 foreach (var kv in _summary) d[kv.Key] = kv.Value;
                 d["categorias_top"] = _catCounts.OrderByDescending(k => k.Value).Take(25)
                     .ToDictionary(k => k.Key, k => (object)k.Value);
-                d["sugerencia"] = "catalog que=categorias|tipos|vistas|laminas… para el detalle; query cat=… para elementos";
+                d["sugerencia"] = "catalog que=categorias|tipos|vistas|laminas… for detail; query cat=… for elements";
                 return d;
             }
             IEnumerable<object[]> rows = _rows;
@@ -124,7 +124,7 @@ namespace Bimbridge.Addin.Revit
             return d;
         }
 
-        // ---------------- planificación por tipo ----------------
+        // ---------------- planning by kind ----------------
 
         private void Plan()
         {
@@ -174,7 +174,7 @@ namespace Bimbridge.Addin.Revit
             _sort = (a, b) => ((long)b[3]).CompareTo((long)a[3]);
         }
 
-        /// <summary>Un tramo por cada ~40 categorías: GetElementCount usa el índice de categorías y no abre los elementos.</summary>
+        /// <summary>One slice per ~40 categories: GetElementCount uses the category index and does not open the elements.</summary>
         private void EnqueueCategoryCounts(Func<Category, bool> include, Action<Category, long> row)
         {
             var doc = _doc;
@@ -211,7 +211,7 @@ namespace Bimbridge.Addin.Revit
             types = bics.Count > 0 ? types.WherePasses(new ElementMulticategoryFilter(bics)) : types.OfClass(typeof(FamilySymbol));
             var typeIds = types.ToElementIds().ToList();
             var counts = new Dictionary<long, long>();
-            // Conteo de instancias por tipo: GetTypeId es barato; con categoría se recorre sólo esa categoría.
+            // Instance count per type: GetTypeId is cheap; with a category only that category is scanned.
             FilteredElementCollector inst = new FilteredElementCollector(doc).WhereElementIsNotElementType();
             inst = bics.Count > 0 ? inst.WherePasses(new ElementMulticategoryFilter(bics)) : inst.OfClass(typeof(FamilyInstance));
             var instIds = inst.ToElementIds().ToList();
@@ -286,7 +286,7 @@ namespace Bimbridge.Addin.Revit
                     _rows.Add(new object[] { Ids.ToLong(l.Id), l.Name, Len(l.Elevation), Lengths.FeetInches16(l.Elevation), Len(l.ProjectElevation) });
             });
             _sort = (a, b) => Convert.ToDouble(a[4], CultureInfo.InvariantCulture).CompareTo(Convert.ToDouble(b[4], CultureInfo.InvariantCulture));
-            _summary["nota"] = "elev = cota mostrada en Revit; z = cota interna (la que usan x,y,z de query y geo)";
+            _summary["nota"] = "elev = elevation shown in Revit; z = internal elevation (the one used by x,y,z in query and geo)";
         }
 
         private void PlanViews()
@@ -299,7 +299,7 @@ namespace Bimbridge.Addin.Revit
             if (!string.IsNullOrWhiteSpace(_tipoVista))
             {
                 only = ParseViewType(_tipoVista);
-                if (only == null) { Error = "tipo: plano, rcp, seccion, alzado, 3d, detalle, dibujo, leyenda, tabla, area o estructural"; return; }
+                if (only == null) { Error = "tipo: plano, rcp, seccion, alzado, 3d, detalle, dibujo, leyenda, tabla, area or estructural"; return; }
             }
             Dictionary<long, string> sheetOf = null;
             Dictionary<long, string> names = null;
@@ -392,7 +392,7 @@ namespace Bimbridge.Addin.Revit
         private void PlanWorksets()
         {
             var doc = _doc;
-            if (!doc.IsWorkshared) { Error = "el modelo no usa worksets"; return; }
+            if (!doc.IsWorkshared) { Error = "the model does not use worksets"; return; }
             _cols = new[] { "id", "nombre", "abierto", "visible", "editable", "propietario", "elementos" };
             var worksets = new FilteredWorksetCollector(doc).OfKind(WorksetKind.UserWorkset).ToWorksets().ToList();
             for (var i = 0; i < worksets.Count; i += 8)
@@ -476,14 +476,14 @@ namespace Bimbridge.Addin.Revit
             _sort = (a, b) => string.Compare(a[1] as string, b[1] as string, StringComparison.OrdinalIgnoreCase);
         }
 
-        // ---------------- utilidades ----------------
+        // ---------------- utilities ----------------
 
         private List<BuiltInCategory> Categories()
         {
             var list = new List<BuiltInCategory>();
             foreach (var name in _cats)
             {
-                if (!QueryRunner.TryCategory(name, out var bic)) { Error = "categoría desconocida: " + name + " (use nombres como LightingFixtures, ElectricalFixtures)"; return list; }
+                if (!QueryRunner.TryCategory(name, out var bic)) { Error = "unknown category: " + name + " (use names like LightingFixtures, ElectricalFixtures)"; return list; }
                 list.Add(bic);
             }
             return list;
@@ -491,7 +491,7 @@ namespace Bimbridge.Addin.Revit
 
         private object Len(double ft) => _mm ? Math.Round(ft * 304.8, 1) : Math.Round(ft, 4);
 
-        /// <summary>Nombre que acepta cat= en las otras herramientas (LightingFixtures), no el nombre traducido de la interfaz.</summary>
+        /// <summary>Name that cat= accepts in the other tools (LightingFixtures), not the localized UI name.</summary>
         public static string BicName(Category c)
         {
             BuiltInCategory bic;
@@ -574,7 +574,7 @@ namespace Bimbridge.Addin.Revit
             return n;
         }
 
-        /// <summary>Vista → número de la hoja donde está (viewports y tablas colocadas).</summary>
+        /// <summary>View → number of the sheet it is on (viewports and placed schedules).</summary>
         public static Dictionary<long, string> SheetNumbers(Document doc)
         {
             var map = new Dictionary<long, string>();

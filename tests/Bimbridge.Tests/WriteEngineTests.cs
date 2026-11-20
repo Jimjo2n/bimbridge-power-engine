@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Piezas del motor de escritura 0.3.0 que no necesitan Revit: comparación tolerante, @n, catálogo y cuerpos movidos.</summary>
+    /// <summary>Pieces of the 0.3.0 write engine that do not need Revit: tolerant comparison, @n, catalog and moved bodies.</summary>
     public class WriteEngineTests
     {
         [Fact]
@@ -49,15 +49,15 @@ namespace Bimbridge.Tests
             Assert.Equal(new List<int> { 1 }, ok[1].RefOps);
             Assert.Equal(new List<int> { 1 }, ok[2].RefOps);
 
-            // @2 apunta a una op que no crea nada; @3 apunta hacia adelante.
+            // @2 points to an op that creates nothing; @3 points forward.
             Assert.Throws<QueryException>(() => OpSpec.ParseAll(Json.ParseObject(
                 "{\"ops\":[{\"op\":\"set_elevation\",\"ids\":\"1\",\"ft\":9},{\"op\":\"move\",\"ids\":\"5\",\"dx\":1},{\"op\":\"tag\",\"ids\":\"@2\",\"view\":1}]}")));
             Assert.Throws<QueryException>(() => OpSpec.ParseAll(Json.ParseObject(
                 "{\"ops\":[{\"op\":\"tag\",\"ids\":\"@2\",\"view\":1},{\"op\":\"copy\",\"ids\":\"5\",\"dx\":1}]}")));
-            // snap_to_surface mide lo que existe: no admite @n.
+            // snap_to_surface measures what exists: it does not accept @n.
             Assert.Throws<QueryException>(() => OpSpec.ParseAll(Json.ParseObject(
                 "{\"ops\":[{\"op\":\"copy\",\"ids\":\"5\",\"dx\":1},{\"op\":\"snap_to_surface\",\"ids\":\"@1\"}]}")));
-            // view=@n cuenta como referencia.
+            // view=@n counts as a reference.
             var v = OpSpec.ParseAll(Json.ParseObject(
                 "{\"ops\":[{\"op\":\"view_create\",\"tipo\":\"rcp\",\"nivel\":\"LEVEL 09\"},{\"op\":\"view_hide\",\"view\":\"@1\",\"cats\":\"LightingDevices\"}]}"));
             Assert.Equal(new List<int> { 1 }, v[1].RefOps);
@@ -88,8 +88,8 @@ namespace Bimbridge.Tests
             foreach (var i in OpCatalog.All)
             {
                 Assert.Contains("- " + i.Kind + " (", guide);
-                Assert.NotNull(Json.Parse(i.Example)); // cada ejemplo es JSON válido
-                OpSpec.Parse(Json.ParseObject(i.Example.Replace("\"@2\"", "\"10\"").Replace("\"@1\"", "\"11\""))); // y pasa la validación
+                Assert.NotNull(Json.Parse(i.Example)); // each example is valid JSON
+                OpSpec.Parse(Json.ParseObject(i.Example.Replace("\"@2\"", "\"10\"").Replace("\"@1\"", "\"11\""))); // and passes validation
             }
             Assert.Equal("Colocar", OpCatalog.NameOf("place"));
         }
@@ -100,7 +100,7 @@ namespace Bimbridge.Tests
             var b = new TriMeshBuilder();
             MeshTests.Box(b, 0, 0, 0, 2, 1, 0.5); // 2' x 1' x 6"
             var sc = new RayScratch();
-            // 90° alrededor de (0,0) y luego a (10, 20, 9): la caja queda en x∈[9,10], y∈[20,22], z∈[9,9.5].
+            // 90 degrees around (0,0) and then to (10, 20, 9): the box ends up at x in [9,10], y in [20,22], z in [9,9.5].
             var m = b.BuildMoved(0, 0, 0, 1, 10, 20, 9);
             Assert.Equal(9, m.Bounds.MinX, 9);
             Assert.Equal(10, m.Bounds.MaxX, 9);
@@ -110,7 +110,7 @@ namespace Bimbridge.Tests
             Assert.Equal(9, bot, 9);
             Assert.Equal(9.5, top, 9);
             Assert.NotEqual(RayResult.Ok, m.Extent(5, 21.5, sc, out _, out _));
-            // La original no cambia.
+            // The original does not change.
             var o = b.Build();
             Assert.Equal(0, o.Bounds.MinX, 9);
             Assert.Equal(2, o.Bounds.MaxX, 9);

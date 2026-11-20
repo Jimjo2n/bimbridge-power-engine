@@ -9,12 +9,12 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine.Tasks
 {
     /// <summary>
-    /// Persistencia de tareas en disco (no depende de la conversación ni del objeto Session): tareas\&lt;id&gt;\
-    ///   tarea.json      memoria de la tarea (escritura atómica en cada checkpoint);
-    ///   receta.cs       copia exacta del código con que empezó (reanudar usa ESTA copia, nunca el archivo modificado después);
-    ///   unidades.jsonl  inicio/fin/verificación de cada unidad (durable, sólo-anexar);
-    ///   lease.json      quién la está corriendo (instancia + vencimiento) para que dos Revit o dos clientes no la corran a la vez;
-    ///   artefactos\     informes y salidas con su hash.
+    /// Task persistence on disk (does not depend on the conversation or the Session object): tareas\&lt;id&gt;\
+    ///   tarea.json      task memory (atomic write at each checkpoint);
+    ///   receta.cs       exact copy of the code it started with (resume uses THIS copy, never the file modified later);
+    ///   unidades.jsonl  start/end/verification of each unit (durable, append-only);
+    ///   lease.json      who is running it (instance + expiry) so that two Revits or two clients do not run it at the same time;
+    ///   artefactos\     reports and outputs with their hash.
     /// </summary>
     public sealed class TaskStore
     {
@@ -30,12 +30,12 @@ namespace Bimbridge.Engine.Tasks
 
         public static string SafeId(string id)
         {
-            if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("tarea: falta el identificador");
+            if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("task: identifier missing");
             var t = id.Trim();
-            if (t.Length > 64) throw new ArgumentException("tarea: identificador de hasta 64 caracteres");
+            if (t.Length > 64) throw new ArgumentException("task: identifier of up to 64 characters");
             foreach (var c in t)
-                if (!(char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '.')) throw new ArgumentException("tarea: el identificador admite letras, números, _ - .");
-            if (t.Contains("..")) throw new ArgumentException("tarea: identificador inválido");
+                if (!(char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '.')) throw new ArgumentException("task: the identifier accepts letters, digits, _ - .");
+            if (t.Contains("..")) throw new ArgumentException("task: invalid identifier");
             return t;
         }
 
@@ -47,14 +47,14 @@ namespace Bimbridge.Engine.Tasks
         public void Create(TaskRecord r, string recipeCode)
         {
             var dir = Dir(r.Id);
-            if (Exists(r.Id)) throw new InvalidOperationException("la tarea " + r.Id + " ya existe");
+            if (Exists(r.Id)) throw new InvalidOperationException("task " + r.Id + " already exists");
             Directory.CreateDirectory(dir);
             Directory.CreateDirectory(ArtifactsDir(r.Id));
             if (recipeCode != null) Home.WriteAtomic(Path.Combine(dir, "receta.cs"), recipeCode);
             Save(r);
         }
 
-        /// <summary>Sólo pruebas: inyección de fallos antes de escribir tarea.json (R07).</summary>
+        /// <summary>Tests only: fault injection before writing tarea.json (R07).</summary>
         public Action<string> FaultBeforeSave;
 
         public void Save(TaskRecord r)
@@ -106,14 +106,14 @@ namespace Bimbridge.Engine.Tasks
             }
         }
 
-        /// <summary>Anexa un evento de unidad (durable). Lanza JournalUnavailableException si no puede escribir.</summary>
+        /// <summary>Appends a unit event (durable). Throws JournalUnavailableException if it cannot write.</summary>
         public void AppendUnitEvent(string id, Dictionary<string, object> ev)
         {
             var others = new List<Dictionary<string, object>>();
             Log(id).Append(ev, others);
         }
 
-        /// <summary>Estado de todas las unidades conocidas, en el orden en que aparecieron.</summary>
+        /// <summary>State of all known units, in the order they appeared.</summary>
         public UnitLog LoadUnits(string id)
         {
             var log = new UnitLog();
@@ -125,7 +125,7 @@ namespace Bimbridge.Engine.Tasks
             return log;
         }
 
-        /// <summary>Mueve la carpeta de la tarea a _archivo\ (no borra). null = bien; si no, el motivo.</summary>
+        /// <summary>Moves the task folder to _archivo\ (does not delete). null = fine; otherwise the reason.</summary>
         public string Archive(string id)
         {
             try
@@ -135,7 +135,7 @@ namespace Bimbridge.Engine.Tasks
                 Directory.Move(Dir(id), dest);
                 return null;
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return "no se pudo archivar: " + ex.Message; }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return "could not archive: " + ex.Message; }
         }
 
         public string ArtifactPath(string id, string name) => Path.Combine(ArtifactsDir(id), name);
@@ -147,7 +147,7 @@ namespace Bimbridge.Engine.Tasks
             public string Owner;
             public string Instance;
             public string Expires;
-            /// <summary>Token de cercado monotónico: sube en cada adquisición nueva (otro dueño, vencida o liberada). 0 = lease.json antiguo sin campo.</summary>
+            /// <summary>Monotonic fencing token: goes up on each new acquisition (another owner, expired or released). 0 = old lease.json without the field.</summary>
             public long Fencing;
             public bool Released;
 
@@ -155,7 +155,7 @@ namespace Bimbridge.Engine.Tasks
                 !Released && DateTime.TryParse(Expires, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var e) && e > now;
         }
 
-        /// <summary>Error explícito del almacén de leases (bloqueo no obtenido, archivo ilegible o no escribible). Nunca se interpreta como "libre".</summary>
+        /// <summary>Explicit lease store error (lock not obtained, file unreadable or not writable). Never interpreted as "free".</summary>
         public sealed class LeaseStoreException : Exception
         {
             public LeaseStoreException(string m, Exception inner = null) : base(m, inner) { }
@@ -168,7 +168,7 @@ namespace Bimbridge.Engine.Tasks
             try { return ReadLeaseStrict(id); } catch (LeaseStoreException) { return null; }
         }
 
-        /// <summary>Lee lease.json; null si no existe; excepción si existe pero está corrupto o es ilegible (fail-safe).</summary>
+        /// <summary>Reads lease.json; null if it does not exist; exception if it exists but is corrupt or unreadable (fail-safe).</summary>
         private Lease ReadLeaseStrict(string id)
         {
             var p = Path.Combine(Dir(id), "lease.json");
@@ -182,7 +182,7 @@ namespace Bimbridge.Engine.Tasks
                 return new Lease { Owner = Arg.GetString(o, "dueno"), Instance = Arg.GetString(o, "instancia"), Expires = Arg.GetString(o, "vence"), Fencing = f, Released = rel };
             }
             catch (Exception ex) when (ex is IOException || ex is FormatException || ex is UnauthorizedAccessException || ex is InvalidCastException || ex is OverflowException)
-            { throw new LeaseStoreException("lease.json ilegible: " + ex.Message, ex); }
+            { throw new LeaseStoreException("lease.json unreadable: " + ex.Message, ex); }
         }
 
         private void WriteLease(string id, Lease l)
@@ -193,10 +193,10 @@ namespace Bimbridge.Engine.Tasks
                 { ["dueno"] = l.Owner, ["instancia"] = l.Instance, ["vence"] = l.Expires, ["fencing"] = l.Fencing, ["liberada"] = l.Released }));
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-            { throw new LeaseStoreException("lease.json no escribible: " + ex.Message, ex); }
+            { throw new LeaseStoreException("lease.json not writable: " + ex.Message, ex); }
         }
 
-        /// <summary>Exclusión entre procesos de la misma máquina: archivo lease.lock abierto con FileShare.None durante leer-comprobar-escribir.</summary>
+        /// <summary>Exclusion between processes on the same machine: lease.lock file opened with FileShare.None during read-check-write.</summary>
         private T WithLeaseLock<T>(string id, Func<T> body)
         {
             lock (_lock)
@@ -214,17 +214,17 @@ namespace Bimbridge.Engine.Tasks
                     }
                     catch (IOException ex)
                     {
-                        if (sw.Elapsed > LeaseLockTimeout) throw new LeaseStoreException("bloqueo de lease no obtenido en " + LeaseLockTimeout.TotalSeconds + " s", ex);
+                        if (sw.Elapsed > LeaseLockTimeout) throw new LeaseStoreException("lease lock not obtained within " + LeaseLockTimeout.TotalSeconds + " s", ex);
                         System.Threading.Thread.Sleep(5 + rnd.Next(20));
                     }
-                    catch (UnauthorizedAccessException ex) { throw new LeaseStoreException("bloqueo de lease sin permiso: " + ex.Message, ex); }
+                    catch (UnauthorizedAccessException ex) { throw new LeaseStoreException("lease lock without permission: " + ex.Message, ex); }
                 }
                 using (fs) return body();
             }
         }
 
-        /// <summary>Toma o renueva. Renovación del mismo dueño vigente conserva el fencing; cualquier otra adquisición lo sube.
-        /// false + titular si otro dueño la tiene vigente. LeaseStoreException si el almacén no es fiable.</summary>
+        /// <summary>Takes or renews. Renewal by the same valid owner keeps the fencing; any other acquisition increments it.
+        /// false + holder if another owner holds it validly. LeaseStoreException if the store is not reliable.</summary>
         public bool TryLease(string id, string owner, string instance, TimeSpan ttl, DateTime now, out Lease holder)
         {
             Lease h = null;
@@ -247,7 +247,7 @@ namespace Bimbridge.Engine.Tasks
             return ok;
         }
 
-        /// <summary>Renueva sólo si sigue siendo dueño con el mismo fencing y vigente. Nunca re-adquiere.</summary>
+        /// <summary>Renews only if still the owner with the same fencing and valid. Never re-acquires.</summary>
         public bool RenewLease(string id, string owner, long fencing, TimeSpan ttl, DateTime now)
         {
             return WithLeaseLock(id, () =>
@@ -260,7 +260,7 @@ namespace Bimbridge.Engine.Tasks
             });
         }
 
-        /// <summary>Punto de autoridad: ¿puede este dueño con este fencing escribir ahora? Ante error del almacén, false.</summary>
+        /// <summary>Authority point: may this owner with this fencing write now? On store error, false.</summary>
         public bool ValidateOwnership(string id, string owner, long fencing, DateTime now)
         {
             try
@@ -276,7 +276,7 @@ namespace Bimbridge.Engine.Tasks
 
         public Lease GetCurrentLease(string id) => WithLeaseLock(id, () => ReadLeaseStrict(id));
 
-        /// <summary>Libera sin borrar el archivo, para que el fencing siga siendo monotónico.</summary>
+        /// <summary>Releases without deleting the file, so the fencing stays monotonic.</summary>
         public void ReleaseLease(string id, string owner)
         {
             try
@@ -292,13 +292,13 @@ namespace Bimbridge.Engine.Tasks
         }
     }
 
-    /// <summary>Unidades reconstruidas desde unidades.jsonl.</summary>
+    /// <summary>Units rebuilt from unidades.jsonl.</summary>
     public sealed class UnitLog
     {
         public readonly Dictionary<string, UnitRecord> Units = new Dictionary<string, UnitRecord>(StringComparer.Ordinal);
         public readonly List<string> Order = new List<string>();
         public int CorruptLines;
-        /// <summary>Eventos de transición ilegal ignorados al reconstruir (R05).</summary>
+        /// <summary>Illegal transition events ignored when rebuilding (R05).</summary>
         public int IllegalEvents;
 
         public UnitRecord Get(string key) => Units.TryGetValue(key, out var u) ? u : null;
@@ -344,7 +344,7 @@ namespace Bimbridge.Engine.Tasks
                     var key = Arg.GetString(ev, "clave");
                     if (key == null) break;
                     var u = Ensure(key);
-                    // R05, defensa en profundidad: aunque alguien escriba el evento a mano, una reconciliación no devuelve a pendiente lo confirmado.
+                    // R05, defense in depth: even if someone writes the event by hand, a reconciliation does not return committed units to pending.
                     if (kind == "reconciliada" && UnitState.IsDone(u.State) && Arg.GetString(ev, "estado") == UnitState.Pendiente) { IllegalEvents++; break; }
                     u.State = Arg.GetString(ev, "estado") ?? u.State;
                     u.Error = Arg.GetString(ev, "error");

@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>P0 de Codex (2026-10-28): ningún ensayo revierte un grupo sobre un documento con cambios sin guardar.</summary>
+    /// <summary>Codex P0 (2026-10-28): no trial rolls back a group on a document with unsaved changes.</summary>
     public class TrialGuardTests
     {
         [Theory]
@@ -81,8 +81,8 @@ namespace Bimbridge.Tests
             return File.ReadAllText(Path.Combine(d.FullName, "src", "Bimbridge.Addin", "Revit", rel));
         }
 
-        // Las rutas del add-in no se pueden ejecutar sin Revit: se comprueba en el código que la guardia va ANTES del grupo,
-        // dentro del hilo de Revit (RunMain/OnRevit), y que no se toca IsModified. La prueba nativa NRT-04N lo confirma en Revit.
+        // The add-in paths cannot run without Revit: the code is checked to place the guard BEFORE the group,
+        // inside the Revit thread (RunMain/OnRevit), and that IsModified is not touched. Native test NRT-04N confirms it in Revit.
         [Fact]
         public void CommitTrial_GuardRunsBeforePlanOpsTrial()
         {

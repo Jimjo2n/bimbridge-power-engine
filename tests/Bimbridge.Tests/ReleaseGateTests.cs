@@ -16,8 +16,8 @@ using FakeBackend = Bimbridge.Tests.TaskEngineTests.FakeBackend;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// Pruebas de la puerta de salida 0.6.1 (RELEASE_GATE_0.6.1.md). Cada prueba nombra el requisito (Rnn) y el subcriterio que demuestra.
-    /// Diseñadas para refutar: cada una intenta el camino que NO debe ocurrir y comprueba que el punto de ejecución lo impide.
+    /// Tests for the 0.6.1 release gate (RELEASE_GATE_0.6.1.md). Each test names the requirement (Rnn) and the sub-criterion it proves.
+    /// Designed to refute: each one attempts the path that must NOT happen and checks that the enforcement point prevents it.
     /// </summary>
     public class ReleaseGateTests
     {
@@ -60,13 +60,13 @@ namespace Bimbridge.Tests
 
         private sealed class AllowAll : ITaskAuthority { public string Check(TaskRecord t, string c, DateTime n) => null; }
 
-        // =========================== R01 auditoría previa ===========================
+        // =========================== R01 audit first ===========================
 
         [Fact]
         public async Task R01_IntentFails_NoBatchRuns_ModelUntouched()
         {
             var root = TempRoot();
-            var audit = new AuditLog(Path.Combine(root, "aud", "a.jsonl")) { FaultBeforeWrite = op => { if (op == "tarea_lote") throw new IOException("disco lleno (simulado)"); } };
+            var audit = new AuditLog(Path.Combine(root, "aud", "a.jsonl")) { FaultBeforeWrite = op => { if (op == "tarea_lote") throw new IOException("disk full (simulated)"); } };
             var m = new FakeModel();
             var t = await Run(Mgr(root, m, new AllowAll(), audit), Draft("r01a", 20));
             Assert.Equal(TaskState.Parcial, t.State);
@@ -82,8 +82,8 @@ namespace Bimbridge.Tests
             var path = Path.Combine(root, "aud", "a.jsonl");
             var writes = 0;
             var audit = new AuditLog(path);
-            // falla exactamente el primer "resultado" de un lote: la intención ya está, la escritura ocurre, el resultado no llega.
-            audit.FaultBeforeWrite = op => { if (op == "tarea_lote" && ++writes == 2) throw new IOException("disco lleno (simulado)"); };
+            // exactly the first "result" of a batch fails: the intent is already there, the write happens, the result never arrives.
+            audit.FaultBeforeWrite = op => { if (op == "tarea_lote" && ++writes == 2) throw new IOException("disk full (simulated)"); };
             var m = new FakeModel();
             var mgr = Mgr(root, m, new AllowAll(), audit);
             var t = await Run(mgr, Draft("r01b", 30));
@@ -92,9 +92,9 @@ namespace Bimbridge.Tests
             var pending = AuditLog.PendingIntents(path);
             Assert.Single(pending);
             var done = m.Live.Count;
-            Assert.True(done > 0, "el lote sí se ejecutó antes del fallo de auditoría");
+            Assert.True(done > 0, "the batch did run before the audit failure");
             mgr.Get("r01b", out var units);
-            Assert.Equal(done, units.Units.Values.Count(u => u.State == UnitState.Confirmada)); // está en unidades.jsonl: recuperable
+            Assert.Equal(done, units.Units.Values.Count(u => u.State == UnitState.Confirmada)); // it is in unidades.jsonl: recoverable
             audit.FaultBeforeWrite = null;
             t = await Resume(mgr, "r01b");
             Assert.Equal(TaskState.Aplicada, t.State);
@@ -122,25 +122,25 @@ namespace Bimbridge.Tests
         public void R01_AuditGate_RefusesToApply_WhenIntentCannotBePersisted()
         {
             var root = TempRoot();
-            var audit = new AuditLog(Path.Combine(root, "a.jsonl")) { FaultBeforeWrite = _ => throw new IOException("sin espacio") };
+            var audit = new AuditLog(Path.Combine(root, "a.jsonl")) { FaultBeforeWrite = _ => throw new IOException("out of space") };
             var applied = 0;
             var r = AuditGate.Apply(audit, "s", "aplicar_cola", "doc", new Dictionary<string, object>(), () => { applied++; return "aplicado"; }, x => x, why => why, (x, why) => why);
             Assert.Equal(0, applied);
             Assert.StartsWith("auditoria_no_disponible", r);
             Assert.Equal(0, AuditGate.Apply<string>(null, "s", "op", "doc", null, () => { applied++; return "x"; }, x => x, why => "rechazado", (x, why) => why) == "rechazado" ? applied : -1);
 
-            // resultado que falla: se aplicó una vez, la intención queda pendiente
+            // failing result: applied once, the intent stays pending
             var path2 = Path.Combine(root, "b.jsonl");
             var a2 = new AuditLog(path2);
             var n = 0;
-            a2.FaultBeforeWrite = _ => { if (++n == 2) throw new IOException("se cortó"); };
+            a2.FaultBeforeWrite = _ => { if (++n == 2) throw new IOException("connection dropped"); };
             var r2 = AuditGate.Apply(a2, "s", "aplicar_cola", "doc", new Dictionary<string, object>(), () => { applied++; return "aplicado"; }, x => x, why => why, (x, why) => x + "|" + why);
-            Assert.StartsWith("aplicado|" + AuditGate.Incompleta, r2); // rc3: nunca se devuelve como resultado normal
+            Assert.StartsWith("aplicado|" + AuditGate.Incompleta, r2); // rc3: never returned as a normal result
             Assert.Equal(1, applied);
             Assert.Single(AuditLog.PendingIntents(path2));
         }
 
-        // =========================== R02 integridad y concurrencia ===========================
+        // =========================== R02 integrity and concurrency ===========================
 
         [Fact]
         public void R02_InvalidChainAtInit_IsQuarantined_NewChainStartsClean()
@@ -149,7 +149,7 @@ namespace Bimbridge.Tests
             var p = Path.Combine(root, "a.jsonl");
             var a = new AuditLog(p);
             for (var i = 0; i < 3; i++) a.Append("s", "op" + i, "ok");
-            File.WriteAllText(p, File.ReadAllText(p).Replace("\"op1\"", "\"opX\"")); // alteración
+            File.WriteAllText(p, File.ReadAllText(p).Replace("\"op1\"", "\"opX\"")); // tampering
             var b = new AuditLog(p);
             Assert.Single(b.Quarantined);
             Assert.True(File.Exists(b.Quarantined[0]));
@@ -164,19 +164,19 @@ namespace Bimbridge.Tests
         [Fact]
         public void R02_TruncatedTailFromAnotherWriter_IsSetAsideWithEvidence_NotQuarantined()
         {
-            // AUD-01: un fragmento sin salto de línea más allá de la cabeza es una escritura interrumpida (nunca confirmada), no corrupción.
+            // AUD-01: a fragment without a newline beyond the head is an interrupted write (never committed), not corruption.
             var root = TempRoot(); Directory.CreateDirectory(root);
             var p = Path.Combine(root, "a.jsonl");
             var a = new AuditLog(p);
             a.Append("s", "op", "ok");
-            File.AppendAllText(p, "{\"seq\":2,\"t\":\"cort"); // otro proceso murió a mitad de línea
+            File.AppendAllText(p, "{\"seq\":2,\"t\":\"cort"); // another process died mid-line
             a.Append("s", "op2", "ok");
             Assert.Empty(a.Quarantined);
             Assert.Single(a.Repaired);
-            Assert.Equal("{\"seq\":2,\"t\":\"cort", File.ReadAllText(a.Repaired[0]));   // el fragmento se conserva íntegro como evidencia
+            Assert.Equal("{\"seq\":2,\"t\":\"cort", File.ReadAllText(a.Repaired[0]));   // the fragment is kept intact as evidence
             var v = AuditLog.Verify(p);
             Assert.True(v.Ok, string.Join("; ", v.Errors));
-            Assert.Equal(3, v.Lines);                                                     // op, recuperación documentada, op2
+            Assert.Equal(3, v.Lines);                                                     // op, documented recovery, op2
             Assert.Contains("recuperacion_cola", File.ReadAllText(p));
         }
 
@@ -187,7 +187,7 @@ namespace Bimbridge.Tests
             var p = Path.Combine(root, "a.jsonl");
             var a = new AuditLog(p);
             a.Append("s", "op", "ok");
-            a.FaultBeforeWrite = _ => throw new IOException("disco lleno");
+            a.FaultBeforeWrite = _ => throw new IOException("disk full");
             Assert.Throws<JournalUnavailableException>(() => a.Append("s", "op", "ok"));
             Assert.Equal(1, a.Failures);
             a.FaultBeforeWrite = null;
@@ -204,18 +204,18 @@ namespace Bimbridge.Tests
             var p = Path.Combine(root, "a.jsonl");
             new AuditLog(p).Append("s", "genesis", "ok");
             var start = DateTime.UtcNow.AddSeconds(4).Ticks.ToString();
-            // #27: supervisión acotada de procesos reales. Drenado de stdout/stderr desde el arranque, un plazo de reloj para todos, terminación
-            // del árbol si vence, liberación en finally, y la cadena se verifica AUNQUE algún hijo falle (el diagnóstico no oculta un append roto).
+            // #27: bounded supervision of real processes. stdout/stderr drained from start, one wall-clock deadline for all, tree termination
+            // if it expires, release in finally, and the chain is verified EVEN IF a child fails (the diagnostics do not hide a broken append).
             var runs = ProbeRun.StartAll(8, i => new[] { p, "50", "proc" + i, "audit", start }, TimeSpan.FromSeconds(180));
             try
             {
                 var report = string.Join(" | ", runs.Select(r => r.Describe()));
                 var v = AuditLog.Verify(p);
-                Assert.True(v.Ok, "cadena: " + string.Join("; ", v.Errors.Take(5)) + " || " + report);
+                Assert.True(v.Ok, "chain: " +string.Join("; ", v.Errors.Take(5)) + " || " + report);
                 Assert.All(runs, r => Assert.True(r.Exited && r.ExitCode == 0 && r.Stdout.Trim() == "APPENDED 50", report));
                 Assert.Equal(1 + 8 * 50, v.Lines);
                 Assert.Empty(Directory.GetFiles(root, "*.cuarentena-*"));
-                // Ni pérdidas ni duplicados: exactamente 50 líneas por proceso, seq sin huecos (Verify) y cid único donde existe.
+                // No losses or duplicates: exactly 50 lines per process, seq without gaps (Verify) and unique cid where present.
                 var lines = File.ReadAllLines(p).Where(l => l.Length > 0).Select(Json.ParseObject).ToList();
                 for (var i = 0; i < 8; i++) Assert.Equal(50, lines.Count(l => Arg.GetString(l, "autor") == "proc" + i));
                 var cids = lines.Select(l => Arg.GetString(l, "cid")).Where(c => c != null).ToList();
@@ -230,8 +230,8 @@ namespace Bimbridge.Tests
         }
 
         /// <summary>
-        /// Proceso auxiliar supervisado (#27): pid, inicio y fin, código de salida, stdout/stderr acotados, terminación del árbol al vencer el plazo,
-        /// y liberación garantizada. Un fallo de arranque queda registrado como tal (no como salida vacía).
+        /// Supervised helper process (#27): pid, start and end, exit code, bounded stdout/stderr, tree termination when the deadline expires,
+        /// and guaranteed release. A start failure is recorded as such (not as empty output).
         /// </summary>
         private sealed class ProbeRun : IDisposable
         {
@@ -254,7 +254,7 @@ namespace Bimbridge.Tests
                     {
                         r.Proc = LeaseFencingTests.StartProbe(args(i));
                         r.Pid = r.Proc.Id;
-                        r._out = r.Proc.StandardOutput.ReadToEndAsync();   // drenado desde el arranque: un hijo nunca se bloquea por un buffer lleno
+                        r._out = r.Proc.StandardOutput.ReadToEndAsync();   // drained from start: a child never blocks on a full buffer
                         r._err = r.Proc.StandardError.ReadToEndAsync();
                     }
                     catch (Exception ex) { r.StartError = ex.GetType().Name + ": " + ex.Message; }
@@ -272,7 +272,7 @@ namespace Bimbridge.Tests
                     }
                     r.EndedUtc = DateTime.UtcNow;
                     if (r.Exited) r.ExitCode = r.Proc.ExitCode;
-                    // Lectura acotada: si un nieto conserva el stream abierto, no se espera indefinidamente.
+                    // Bounded read: if a grandchild keeps the stream open, it does not wait forever.
                     r.Stdout = Bounded(r._out); r.Stderr = Bounded(r._err);
                 }
                 return runs;
@@ -281,26 +281,26 @@ namespace Bimbridge.Tests
             private static string Bounded(Task<string> t)
             {
                 if (t == null) return "";
-                if (!t.Wait(5000)) return "<stream sin cerrar tras 5 s>";
+                if (!t.Wait(5000)) return "<stream not closed after 5 s>";
                 var s = t.Result ?? "";
                 return s.Length > MaxChars ? s.Substring(0, MaxChars) + "…" : s;
             }
 
             public string Describe() =>
                 StartError != null ? "arranque fallido: " + StartError
-                : "pid=" + Pid + " exit=" + (Exited ? ExitCode.ToString() : "sin salir") + (Killed ? " (terminado por plazo)" : "") +
+                : "pid=" + Pid + " exit=" + (Exited ? ExitCode.ToString() : "not exited") + (Killed ? " (killed on deadline)" : "") +
                   " t=" + (EndedUtc - StartedUtc).TotalSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "s" +
                   " out='" + Stdout.Trim() + "' err='" + Stderr.Trim() + "'";
 
             public void Dispose()
             {
                 if (Proc == null) return;
-                try { if (!Proc.HasExited) Proc.Kill(entireProcessTree: true); } catch (Exception) { }   // sin huérfanos
+                try { if (!Proc.HasExited) Proc.Kill(entireProcessTree: true); } catch (Exception) { }   // no orphans
                 Proc.Dispose();
             }
         }
 
-        // =========================== R03 autoridad independiente ===========================
+        // =========================== R03 independent authority ===========================
 
         private static (GrantStore store, GrantAuthority auth) Grants(string root)
         {
@@ -313,7 +313,7 @@ namespace Bimbridge.Tests
         {
             var root = TempRoot();
             var (g, auth) = Grants(root);
-            // el agente "pide" capacidades: queda como solicitud y como política solicitada, no como permiso
+            // the agent "asks for" capabilities: recorded as a request and as a requested policy, not as a permission
             g.Request("r03a", DocKey, null, "practica", new[] { Capability.Modificar }, "agente", "x", DateTime.UtcNow);
             var m = new FakeModel();
             var t = await Run(Mgr(root, m, auth), Draft("r03a", 10, policy: new Dictionary<string, object>
@@ -368,9 +368,9 @@ namespace Bimbridge.Tests
             var t = await Run(mgr, Draft("r03d", 200));
             Assert.Equal(TaskState.Interrumpida, t.State);
             Assert.Contains("revocada", t.Reason);
-            // la caché de autoridad del último punto seguro dura ≤2 s: como mucho se termina la visita en curso
+            // the last-safe-point authority cache lasts <=2 s: at most the current visit finishes
             Assert.True(m.Live.Count < 200);
-            Assert.True(m.Visits <= 3, "visitas tras revocar: " + m.Visits);
+            Assert.True(m.Visits <= 3, "visits after revoking: " + m.Visits);
         }
 
         [Fact]
@@ -395,7 +395,7 @@ namespace Bimbridge.Tests
             var f = Path.Combine(g.Dir, "c_" + ok.Id + ".json");
             File.WriteAllText(f, File.ReadAllText(f).Replace("\"revit_modificar\"", "\"revit_sync\""));
             Assert.NotNull(g.Check("t", DocKey, null, Capability.Sync, DateTime.UtcNow));
-            Assert.NotNull(g.Check("t", DocKey, null, Capability.Modificar, DateTime.UtcNow)); // alterada → ignorada entera
+            Assert.NotNull(g.Check("t", DocKey, null, Capability.Modificar, DateTime.UtcNow)); // tampered -> ignored entirely
             File.WriteAllText(Path.Combine(g.Dir, "c_falsa.json"), "{\"id\":\"falsa\",\"tarea\":\"t\",\"doc\":\"" + DocKey.Replace("\\", "\\\\") + "\",\"capacidades\":[\"revit_modificar\"],\"vence\":\"2099-01-01T00:00:00Z\",\"firma\":\"00\"}");
             Assert.NotNull(g.Check("t", DocKey, null, Capability.Modificar, DateTime.UtcNow));
             Assert.Throws<ArgumentException>(() => g.Approve("t", DocKey, null, new[] { "proceso" }, TimeSpan.FromHours(1), "x", DateTime.UtcNow));
@@ -406,13 +406,13 @@ namespace Bimbridge.Tests
         {
             var root = TempRoot();
             var (g, auth) = Grants(root);
-            g.Approve("r03g", DocKey, null, new[] { Capability.Modificar }, TimeSpan.FromHours(1), "persona", DateTime.UtcNow); // sin revit_exportar
+            g.Approve("r03g", DocKey, null, new[] { Capability.Modificar }, TimeSpan.FromHours(1), "persona", DateTime.UtcNow); // without revit_exportar
             var m = new FakeModel();
             var t = await Run(Mgr(root, m, auth), Draft("r03g", 10, new Dictionary<string, object> { ["barrera_en"] = 5L }));
             Assert.Equal(TaskState.Interrumpida, t.State);
             Assert.Contains(Capability.Exportar, t.Reason);
             Assert.Equal(0, m.Barriers);
-            Assert.Equal(5, m.Live.Count); // lo anterior a la barrera sí (autorizado), la barrera y lo posterior no
+            Assert.Equal(5, m.Live.Count); // what comes before the barrier yes (authorized), the barrier and what follows no
         }
 
         [Fact]
@@ -423,7 +423,7 @@ namespace Bimbridge.Tests
             Assert.Equal(TaskState.Aplicada, t.State);
         }
 
-        // =========================== R04 Roslyn y DLL ===========================
+        // =========================== R04 Roslyn and DLL ===========================
 
         [Fact]
         public void R04_ExecBoundary_WritesNeedTrustedSession_QueriesAreRestricted()
@@ -443,16 +443,16 @@ namespace Bimbridge.Tests
             var root = TempRoot(); Directory.CreateDirectory(root);
             var addin = Path.Combine(root, "addin"); Directory.CreateDirectory(addin);
             var inside = Path.Combine(addin, "Ayuda.dll"); File.WriteAllText(inside, "x");
-            var outside = Path.Combine(root, "Extraña.dll"); File.WriteAllText(outside, "contenido-malicioso");
+            var outside = Path.Combine(root, "Foreign.dll"); File.WriteAllText(outside, "malicious-content");
             var known = Path.Combine(root, "Conocida.dll"); File.WriteAllText(known, "contenido-conocido");
             Func<string, string> sha = f => Home.FileSha256(f);
             var trusted = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { Home.FileSha256(known) };
             Assert.Empty(ReferencePolicy.Denied(ExecutionProfile.RestrictedAutonomous, new[] { inside, known }, sha, trusted, addin));
             var d = ReferencePolicy.Denied(ExecutionProfile.RestrictedAutonomous, new[] { outside }, sha, trusted, addin);
             Assert.Single(d);
-            // traversal: una ruta que empieza como la carpeta del add-in pero sale de ella
-            Assert.Single(ReferencePolicy.Denied(ExecutionProfile.RestrictedAutonomous, new[] { Path.Combine(addin, "..", "Extraña.dll") }, sha, trusted, addin));
-            // misma ruta, contenido cambiado → ya no es la de confianza
+            // traversal: a path that starts like the add-in folder but leaves it
+            Assert.Single(ReferencePolicy.Denied(ExecutionProfile.RestrictedAutonomous, new[] { Path.Combine(addin, "..", "Foreign.dll") }, sha, trusted, addin));
+            // same path, changed content -> no longer the trusted one
             File.WriteAllText(known, "contenido-cambiado");
             Assert.Single(ReferencePolicy.Denied(ExecutionProfile.RestrictedAutonomous, new[] { known }, sha, trusted, addin));
             Assert.Empty(ReferencePolicy.Denied(ExecutionProfile.TrustedInteractive, new[] { outside }, sha, trusted, addin));
@@ -475,7 +475,7 @@ namespace Bimbridge.Tests
             foreach (var c in cases)
             {
                 var caps = ScriptingTests.CapsOf(c, year);
-                Assert.True(CapabilityPolicy.Denied(ExecutionProfile.RestrictedAutonomous, caps).Count > 0, "no detectado: " + c);
+                Assert.True(CapabilityPolicy.Denied(ExecutionProfile.RestrictedAutonomous, caps).Count > 0, "not detected: " + c);
             }
         }
 
@@ -486,7 +486,7 @@ namespace Bimbridge.Tests
             var (g, auth) = Grants(root);
             var m = new FakeModel();
             var mgr = Mgr(root, m, auth);
-            // lo que el add-in escribe en la política para codigo= en línea de sólo lectura
+            // what the add-in writes in the policy for read-only inline codigo=
             var t = await Run(mgr, Draft("r04x", 5, policy: new Dictionary<string, object> { ["requiere"] = new List<object> { Capability.RecetaExterna } }));
             Assert.Equal(TaskState.Interrumpida, t.State);
             Assert.Contains(Capability.RecetaExterna, t.Reason);
@@ -496,7 +496,7 @@ namespace Bimbridge.Tests
             Assert.Equal(TaskState.Aplicada, t.State);
         }
 
-        // =========================== R05 reconciliación ===========================
+        // =========================== R05 reconciliation ===========================
 
         [Fact]
         public async Task R05_ConfirmedUnits_CannotBeReconciledBackToPending()
@@ -506,7 +506,7 @@ namespace Bimbridge.Tests
             m.Unverifiable.Add("u0003");
             var mgr = Mgr(root, m, new AllowAll());
             var t = await Run(mgr, Draft("r05a", 6));
-            mgr = Mgr(root, m, new AllowAll()); // "Revit se cayó": otro motor
+            mgr = Mgr(root, m, new AllowAll()); // "Revit crashed": another engine
             t = await Resume(mgr, "r05a");
             mgr.Get("r05a", out var units);
             Assert.Equal(UnitState.Desconocida, units.Get("u0003").State);
@@ -532,10 +532,10 @@ namespace Bimbridge.Tests
             mgr = Mgr(root, m, auth);
             var t = await Resume(mgr, "r05b");
             Assert.True(t.State == TaskState.Interrumpida && t.Reason.Contains("no se pudieron verificar"), t.State + ": " + t.Reason);
-            Assert.StartsWith("autorizacion_requerida", mgr.Reconcile("r05b", null, applied: false, note: "no está en el modelo (consulta id 123)", who: "agente"));
+            Assert.StartsWith("autorizacion_requerida", mgr.Reconcile("r05b", null, applied: false, note: "not in the model (query id 123)", who: "agente"));
             g.Approve("r05b", DocKey, null, new[] { Capability.ReconciliarNoAplicada }, TimeSpan.FromHours(1), "persona", DateTime.UtcNow);
-            m.Live.Remove("u0002"); // la persona comprobó que no quedó
-            Assert.Null(mgr.Reconcile("r05b", null, applied: false, note: "no está en el modelo (consulta id 123)", who: "agente"));
+            m.Live.Remove("u0002"); // the person checked that it was not left
+            Assert.Null(mgr.Reconcile("r05b", null, applied: false, note: "not in the model (query id 123)", who: "agente"));
             m.Unverifiable.Clear();
             t = await Resume(mgr, "r05b");
             Assert.Equal(TaskState.Aplicada, t.State);
@@ -567,7 +567,7 @@ namespace Bimbridge.Tests
             Assert.Equal(1, log.IllegalEvents);
         }
 
-        // =========================== R06 autoridad y documento ===========================
+        // =========================== R06 authority and document ===========================
 
         [Fact]
         public async Task R06_TwoTasksSameDocument_SecondDoesNotRun()
@@ -581,8 +581,8 @@ namespace Bimbridge.Tests
             var a = await Run(mgrA, Draft("r06a", 100));
             Assert.Equal(TaskState.Aplicada, a.State);
             Assert.NotNull(second);
-            Assert.Contains("documento lo está modificando", second.Reason);
-            // al terminar la primera, la segunda puede seguir
+            Assert.Contains("the document is being modified by task", second.Reason);
+            // once the first finishes, the second can continue
             var b = await Resume(mgrB, "r06b");
             Assert.Equal(TaskState.Aplicada, b.State);
         }
@@ -606,11 +606,11 @@ namespace Bimbridge.Tests
             var thief = new TaskStore(root);
             m.OnVisit = v =>
             {
-                // la visita ya entró al "hilo de Revit" (lote validado), pero antes de la primera transacción otro proceso toma la tarea
+                // the visit already entered the "Revit thread" (batch validated), but before the first transaction another process takes the task
                 if (v == 2) Assert.True(thief.TryLease("r06c", "OTRA", "B", TimeSpan.FromHours(3), DateTime.UtcNow.AddHours(2), out _));
             };
             var t = await Run(Mgr(root, m, new AllowAll()), Draft("r06c", 200));
-            // La tarea es de B (lease vigente): el ejecutor viejo no escribe su "interrumpida" encima del tarea.json de B.
+            // The task belongs to B (valid lease): the old runner does not write its "interrumpida" over B's tarea.json.
             Assert.Equal(TaskState.Ejecutando, t.State);
             Assert.Contains("lease_perdido", m.PreflightRefusals);
             var afterSteal = m.Live.Count;
@@ -628,13 +628,13 @@ namespace Bimbridge.Tests
             var store = new TaskStore(root);
             var saves = 0;
             var failing = true;
-            store.FaultBeforeSave = id => { if (failing && ++saves == 6) throw new IOException("sin espacio (simulado)"); };
+            store.FaultBeforeSave = id => { if (failing && ++saves == 6) throw new IOException("out of space (simulated)"); };
             var mgr = new TaskManager(store, "A", t => new FakeBackend(m)) { Delay = (d, ct) => Task.Delay(5, ct), Authority = new AllowAll(), BudgetMs = 200 };
             mgr.Start(Draft("r07", 300), "// r", "p");
             await mgr.Completion("r07");
             var mem = mgr.Get("r07", out _);
             Assert.NotEqual(TaskState.Aplicada, mem.State);
-            Assert.True(m.Live.Count < 300, "el motor no siguió después de un checkpoint fallido");
+            Assert.True(m.Live.Count < 300, "the engine did not continue after a failed checkpoint");
             var executed = m.Live.Count;
             failing = false;
             var mgr2 = new TaskManager(new TaskStore(root), "B", t => new FakeBackend(m)) { Delay = (d, ct) => Task.Delay(5, ct), Authority = new AllowAll(), BudgetMs = 200 };

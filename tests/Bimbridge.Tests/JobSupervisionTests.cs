@@ -8,14 +8,14 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Issue #7: los trabajos lanzados sin await están supervisados; ninguno queda en_proceso ni pierde su excepción.</summary>
+    /// <summary>Issue #7: jobs started without await are supervised; none stays en_proceso or loses its exception.</summary>
     public class JobSupervisionTests
     {
         private static Job Finish(JobStore store, Func<Job, Func<Task>> body)
         {
             var j = store.Create("s1", "prueba");
             store.Run(j, body(j));
-            Assert.True(j.Work.Wait(TimeSpan.FromSeconds(10)), "el supervisor no terminó");
+            Assert.True(j.Work.Wait(TimeSpan.FromSeconds(10)), "the supervisor did not finish");
             return j;
         }
 
@@ -23,7 +23,7 @@ namespace Bimbridge.Tests
         public void ThrowingBody_EndsUnknown_WithReason()
         {
             var store = new JobStore();
-            var j = Finish(store, _ => async () => { await Task.Yield(); throw new InvalidOperationException("fallo a mitad"); });
+            var j = Finish(store, _ => async () => { await Task.Yield(); throw new InvalidOperationException("failure halfway"); });
             Assert.True(j.IsFinal);
             Assert.Equal(Status.Desconocido, j.Estado);
             Assert.Contains("InvalidOperationException", j.Error);

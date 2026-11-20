@@ -9,13 +9,13 @@ using Bimbridge.Protocol;
 namespace Bimbridge.AgentHost
 {
     /// <summary>
-    /// Escenario simulado completo (§9): N operaciones (1 000 por defecto) sobre un modelo de 10 niveles con dependencias en cadena,
-    /// fallos deliberados y puntos de interrupción. Escribe en &lt;dir&gt;: plan_entrada.json, modelo/ y escenario.json (qué se espera de
-    /// cada operación especial, para que la prueba lo compruebe sin depender de este código).
-    /// Estructura: 2 consultas · 10 niveles × K parámetros (cadenas de 5: cada una depende de la anterior; la primera, de la consulta) ·
-    /// 10 QC (uno por nivel, dependen del final de 5 cadenas) · 8 escrituras sobre un nivel inexistente (4 con permitir_vacio).
-    /// Fallos deliberados: rechazos del backend (bloquean su cadena), transitorios recuperables y no recuperables, resultados esperados
-    /// erróneos, un QC con desviaciones y conjuntos vacíos no permitidos.
+    /// Full simulated scenario (§9): N operations (1,000 by default) on a 10-level model with chained dependencies,
+    /// deliberate failures and interruption points. Writes to &lt;dir&gt;: plan_entrada.json, modelo/ and escenario.json (what is expected of
+    /// each special operation, so the test can check it without depending on this code).
+    /// Structure: 2 queries · 10 levels × K parameters (chains of 5: each depends on the previous one; the first, on the query) ·
+    /// 10 QC (one per level, depending on the end of 5 chains) · 8 writes on a nonexistent level (4 with permitir_vacio).
+    /// Deliberate failures: backend rejections (block their chain), recoverable and unrecoverable transient errors, wrong expected
+    /// results, a QC with deviations and disallowed empty sets.
     /// </summary>
     public static class Scenario
     {
@@ -25,7 +25,7 @@ namespace Bimbridge.AgentHost
         {
             Directory.CreateDirectory(dir);
             var k = Math.Max(Chain, (n - 2 - Levels - 8) / Levels);
-            var plan = new PlanDraft { Objective = "Escenario 1000: parámetros por nivel con cadenas, QC y fallos deliberados", DocKey = "archivo:c:\\escenario.rvt", DocPrint = "huella-escenario-0001", LengthUnit = "mm", Coordinates = "interno_revit" };
+            var plan = new PlanDraft { Objective = "Scenario 1000: per-level parameters with chains, QC and deliberate failures", DocKey = "archivo:c:\\escenario.rvt", DocPrint = "huella-escenario-0001", LengthUnit = "mm", Coordinates = "interno_revit" };
             plan.Sources.Add(new SourceDoc { Id = "doc-1", Nombre = "escenario_1000.txt", Sha256 = new string('e', 64) });
             OpDraft Q(string cat) { var o = new OpDraft { Operation = "consultar" }; o.Params["categoria"] = cat; return o; }
             plan.Ops.Add(Q("OST_LightingFixtures"));
@@ -65,10 +65,10 @@ namespace Bimbridge.AgentHost
                 empty.Add(plan.Ops.Count);
                 plan.Ops.Add(o);
             }
-            // fallos deliberados (índices dentro de cadenas concretas)
-            var rejected = new[] { byLevel[2][1], byLevel[5][7], byLevel[9][12] };                                // bloquean el resto de su cadena
-            var transientOk = new[] { byLevel[1][3], byLevel[3][4], byLevel[4][10], byLevel[6][2], byLevel[8][9] }; // 1 rechazo, reintentos=1 → ok
-            var transientKo = new[] { byLevel[7][5], byLevel[10][15] };                                           // 3 rechazos, reintentos=1 → fallida
+            // deliberate failures (indices within specific chains)
+            var rejected = new[] { byLevel[2][1], byLevel[5][7], byLevel[9][12] };                                // block the rest of their chain
+            var transientOk = new[] { byLevel[1][3], byLevel[3][4], byLevel[4][10], byLevel[6][2], byLevel[8][9] }; // 1 rejection, retries=1 → ok
+            var transientKo = new[] { byLevel[7][5], byLevel[10][15] };                                           // 3 rejections, retries=1 → fallida
             var wrongExpect = new[] { byLevel[1][20], byLevel[3][30], byLevel[6][40], byLevel[8][50], byLevel[10][60] };
             foreach (var i in transientOk.Concat(transientKo)) plan.Ops[i].Retries = 1;
             foreach (var i in wrongExpect) plan.Ops[i].Expected["elementos"] = (long)(PerLevel + 1);
@@ -76,7 +76,7 @@ namespace Bimbridge.AgentHost
             string Id(int i) => plan.Ops[i].Id;
 
             var errs = IrValidator.Validate(plan, out var vp);
-            if (errs.Count > 0) throw new InvalidOperationException("escenario inválido: " + string.Join("; ", errs.Take(5)));
+            if (errs.Count > 0) throw new InvalidOperationException("invalid scenario: " + string.Join("; ", errs.Take(5)));
             File.WriteAllText(Path.Combine(dir, "plan_entrada.json"), Json.Write(plan.ToJson()));
             var qcBad = qc[3];
             var elements = Enumerable.Range(1, Levels).Select(l => "OST_LightingFixtures=" + PerLevel + "@L" + l.ToString("00", CultureInfo.InvariantCulture))
@@ -101,7 +101,7 @@ namespace Bimbridge.AgentHost
                 ["qc"] = qc.Select(i => (object)Id(i)).ToList(),
             };
             File.WriteAllText(Path.Combine(dir, "escenario.json"), Json.Write(spec));
-            return "escenario " + vp.Hash + " · " + plan.Ops.Count + " operaciones · " + vp.Ops.Count(o => o.Writes) + " escrituras · " + vp.Ops.Sum(o => o.DependsOn.Count) + " dependencias";
+            return "scenario " + vp.Hash + " · " + plan.Ops.Count + " operations · " + vp.Ops.Count(o => o.Writes) + " writes · " + vp.Ops.Sum(o => o.DependsOn.Count) + " dependencies";
         }
     }
 }

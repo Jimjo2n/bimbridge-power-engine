@@ -14,8 +14,8 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Bridge
 {
     /// <summary>
-    /// 0.9.0: herramienta "power" del perfil compacto. BIMBRIDGE Power Engine fuera de Revit (C# núcleo, Python sólo documentos,
-    /// Rust sólo geometría). No cambia el modelo: lo que habría que escribir sale como ops para plan→commit.
+    /// 0.9.0: "power" tool of the compact profile. BIMBRIDGE Power Engine outside Revit (C# core, Python for documents only,
+    /// Rust for geometry only). It does not change the model: anything to be written comes out as ops for plan→commit.
     /// </summary>
     [McpServerToolType]
     public sealed class PowerTools : IDisposable
@@ -28,12 +28,12 @@ namespace Bimbridge.Bridge
 
         [McpServerTool(Name = "power", ReadOnly = true, Idempotent = true, OpenWorld = false)]
         [Description(PowerCommands.Help)]
-        public Task<CallToolResult> Power([Description("Órdenes, p. ej. \"cap pdf\" o \"pdf symbols ruta=… paginas=1\"")] string c, CancellationToken ct = default)
+        public Task<CallToolResult> Power([Description("Commands, e.g. \"cap pdf\" or \"pdf symbols ruta=… paginas=1\"")] string c, CancellationToken ct = default)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var lines = Command.SplitLines(c);
             var res = new CallToolResult { Content = new List<ContentBlock>() };
-            if (lines.Count == 0 || lines.Count > 8) { res.IsError = true; res.Content.Add(new TextContentBlock { Text = "1–8 órdenes. " + PowerCommands.Help }); return Task.FromResult(res); }
+            if (lines.Count == 0 || lines.Count > 8) { res.IsError = true; res.Content.Add(new TextContentBlock { Text = "1–8 commands. " + PowerCommands.Help }); return Task.FromResult(res); }
             var (pe, folders) = _engine.Value;
             var outs = new List<string>();
             var err = false;

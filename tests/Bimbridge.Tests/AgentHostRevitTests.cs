@@ -14,8 +14,8 @@ using Xunit;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// alpha3: AgentHost → RevitLink (conexión del puente) → pipe → add-in FALSO. Prueba la lógica del adaptador real (identidad, alcance,
-    /// autorización del operador, ensayo, incertidumbre). NO es validación nativa: la nativa es NRT-04 en Revit.
+    /// alpha3: AgentHost → RevitLink (bridge connection) → pipe → FAKE add-in. Tests the real adapter logic (identity, scope,
+    /// operator authorization, trial, uncertainty). This is NOT native validation: the native one is NRT-04 in Revit.
     /// </summary>
     public class AgentHostRevitTests
     {
@@ -28,18 +28,18 @@ namespace Bimbridge.Tests
             public int Pid = 4242;
             public string Levels = "RPW";
             public int CommitDelayMs;
-            /// <summary>beta1 NRT-05: archivo en disco que representa el .rvt (guardar le añade bytes; verificar_disco lee DiskComments).</summary>
+            /// <summary>beta1 NRT-05: on-disk file that stands for the .rvt (save appends bytes to it; verificar_disco reads DiskComments).</summary>
             public string DiskFile;
             public Dictionary<long, string> DiskComments = new Dictionary<long, string>();
             public bool SaveDoesNothing;
             // rc1
-            public int ForcePage;                 // >0: el "add-in" pagina la consulta con este tamaño
-            public bool TotalChangesOnPage2;      // simula un modelo que cambia entre páginas
-            public string OmitContextFlag;        // flag del context que el "add-in" no informa
-            public bool CommitNoop;               // commit responde ok pero no aplica (falso éxito)
-            public long[] QcCounts = { 0, 0, 0 }; // sin_tag, huérfanos, duplicados sobrantes
+            public int ForcePage;                 // >0: the "add-in" pages the query with this size
+            public bool TotalChangesOnPage2;      // simulates a model that changes between pages
+            public string OmitContextFlag;        // context flag that the "add-in" does not report
+            public bool CommitNoop;               // commit answers ok but does not apply (false success)
+            public long[] QcCounts = { 0, 0, 0 }; // sin_tag, orphans, surplus duplicates
             public int QueryCalls, CheckCalls;
-            public int BusyReads;                 // las próximas N lecturas responden revit_ocupado (Revit en reposo lento)
+            public int BusyReads;                 // the next N reads answer revit_ocupado (slow idle Revit)
             public void Seed(int n) { lock (Comments) for (var i = 0; i < n; i++) Comments[1000 + i] = null; }
             public int Saves;
             public int Commits, TrialCommits;
@@ -53,7 +53,7 @@ namespace Bimbridge.Tests
             public async Task<Response> HandleAsync(Session s, Request r, CancellationToken ct)
             {
                 if ((r.Op == Wire.OpQuery || r.Op == Wire.OpCheck) && Interlocked.Decrement(ref BusyReads) >= 0)
-                    return Response.Fail(r.Id, Status.RevitOcupado, "simulado: Revit no atendió");
+                    return Response.Fail(r.Id, Status.RevitOcupado, "simulated: Revit did not respond");
                 switch (r.Op)
                 {
                     case Wire.OpContext:
@@ -79,7 +79,7 @@ namespace Bimbridge.Tests
                         lock (Comments)
                         {
                             var ps = Arg.GetLong(r.Args, "page_size") ?? 50;
-                            if (ps < 1 || ps > 200) return new Response { Id = r.Id, Estado = Status.Invalido, Aviso = "page_size entre 1 y 200" };   // igual que CatalogRunner
+                            if (ps < 1 || ps > 200) return new Response { Id = r.Id, Estado = Status.Invalido, Aviso = "page_size between 1 and 200" };   // same as CatalogRunner
                             var ids = Arg.GetStringList(r.Args, "ids").Select(long.Parse).ToList();
                             var sel = (ids.Count > 0 ? ids.Where(Comments.ContainsKey) : Comments.Keys.Where(k => k < 900)).ToList();
                             if (Arg.GetBool(r.Args, "count") == true) return new Response { Id = r.Id, Datos = new Dictionary<string, object> { ["total"] = (long)sel.Count } };
@@ -118,7 +118,7 @@ namespace Bimbridge.Tests
                     {
                         var p = _plans[(string)r.Args["plan_id"]];
                         var trial = Arg.GetString(r.Args, "modo") == "ensayo";
-                        if (trial && Engine.TrialGuard.Refuse(Modified, "commit modo=ensayo") is string refuse)   // igual que el add-in (P0)
+                        if (trial && Engine.TrialGuard.Refuse(Modified, "commit modo=ensayo") is string refuse)   // same as the add-in (P0)
                             return Response.Fail(r.Id, Status.Rechazado, refuse);
                         if (trial)
                         {
@@ -156,7 +156,7 @@ namespace Bimbridge.Tests
                         }
                         if (verb == "verificar_disco")
                         {
-                            if (Modified) return Response.Fail(r.Id, Status.NecesitaUsuario, "cambios sin guardar");
+                            if (Modified) return Response.Fail(r.Id, Status.NecesitaUsuario, "unsaved changes");
                             var ids = Arg.GetStringList(r.Args, "ids").Select(long.Parse).ToList();
                             return new Response { Id = r.Id, Datos = new Dictionary<string, object>
                             {
@@ -280,7 +280,7 @@ namespace Bimbridge.Tests
                 r.Run();
                 var w = r.State.Ops[r.Plan.Ops[1].Id];
                 Assert.Equal(OpState.RequiereReconciliar, w.State);
-                Assert.Equal(1, fake.TrialCommits);   // no se repitió
+                Assert.Equal(1, fake.TrialCommits);   // not repeated
             }
         }
 
@@ -315,7 +315,7 @@ namespace Bimbridge.Tests
                 {
                     r.Run();
                     var w = r.State.Ops[r.Plan.Ops[1].Id];
-                    Assert.Equal(1, fake.Commits);   // un timeout no es "no aplicado": no se repite
+                    Assert.Equal(1, fake.Commits);   // a timeout is not "not applied": it is not repeated
                     Assert.True(w.State == OpState.Verificada || w.State == OpState.RequiereVerificacion, w.State + " " + w.Note);
                     Assert.Contains("efecto_incierto", System.IO.File.ReadAllText(r.State.JournalPath));
                 }
@@ -324,16 +324,16 @@ namespace Bimbridge.Tests
         }
 
         /// <summary>
-        /// NRT-03 preparado (sin Revit): el AgentHost cae en cada punto crítico de una escritura persistente y otro AgentHost
-        /// retoma el mismo diario. Nunca se repite un commit cuyo efecto pudo ocurrir; el resultado final se verifica observando el modelo.
-        /// Sólo cae el AgentHost (excepción simulada); el "Revit" (FakeBim) sigue vivo, para verificar la recuperación independiente del cliente.
+        /// NRT-03 prepared (without Revit): the AgentHost crashes at each critical point of a persistent write and another AgentHost
+        /// resumes the same journal. A commit whose effect may have happened is never repeated; the final result is verified by observing the model.
+        /// Only the AgentHost crashes (simulated exception); the "Revit" (FakeBim) stays alive, to verify recovery independent of the client.
         /// </summary>
         [Theory]
-        [InlineData("backend.antes_enviar", 1)]     // antes de enviar: no hubo efecto, se puede enviar al reanudar
-        [InlineData("backend.tras_commit", 1)]      // tras un posible commit: se observa, no se repite
-        [InlineData("runner.tras_ejecutar", 1)]     // aplicado pero sin registrar el resultado
-        [InlineData("runner.en_verificacion", 1)]   // durante la verificación
-        [InlineData("runner.tras_verificar", 1)]    // verificado pero sin registrar
+        [InlineData("backend.antes_enviar", 1)]     // before sending: no effect happened, it can be sent on resume
+        [InlineData("backend.tras_commit", 1)]      // after a possible commit: observed, not repeated
+        [InlineData("runner.tras_ejecutar", 1)]     // applied but the result was not recorded
+        [InlineData("runner.en_verificacion", 1)]   // during verification
+        [InlineData("runner.tras_verificar", 1)]    // verified but not recorded
         public void Nrt03_AgentHostCrash_AtEachPoint_ResumesWithoutDuplicateCommit(string point, int expectedCommits)
         {
             var fake = new FakeBim();
@@ -353,7 +353,7 @@ namespace Bimbridge.Tests
                         Assert.Throws<CrashException>(() => r1.Run());
                     }
                 }
-                System.Threading.Thread.Sleep(1700);   // vence el lease del AgentHost caído
+                System.Threading.Thread.Sleep(1700);   // the crashed AgentHost's lease expires
                 using (var b2 = Backend(pipe, fake, "persistente", out var e2))
                 using (var r2 = PlanRunner.Open(dir, null, b2, new RunnerOptions { RealWrites = "persistente", LeaseTtl = TimeSpan.FromSeconds(30) }, out var d2))
                 {
@@ -381,7 +381,7 @@ namespace Bimbridge.Tests
                 Assert.Null(err);
                 r.Run();
                 var w = r.State.Ops[r.Plan.Ops[1].Id];
-                Assert.Equal(OpState.Fallida, w.State);                      // rechazo previo: no incierto, no reconciliar
+                Assert.Equal(OpState.Fallida, w.State);                      // refused up front: not uncertain, not reconcile
                 Assert.Contains(Engine.TrialGuard.Code, (w.Note ?? "") + " " + (w.Error ?? ""));
                 Assert.Equal(0, fake.TrialCommits);
                 Assert.True(fake.Modified);
@@ -412,7 +412,7 @@ namespace Bimbridge.Tests
             return f;
         }
 
-        /// <summary>beta1 NRT-05 contra el add-in falso: commit persistente, guardado, SHA distinto, verificación en disco y sin commit duplicado.</summary>
+        /// <summary>beta1 NRT-05 against the fake add-in: persistent commit, save, different SHA, on-disk verification and no duplicate commit.</summary>
         [Fact]
         public void Nrt05_PersistentWrite_SavedAndVerifiedOnDisk_NoDuplicateCommit()
         {
@@ -440,7 +440,7 @@ namespace Bimbridge.Tests
             var dir = AH.NewDir("nrt05-nosave");
             using (host)
             using (var link = RevitLink.ForTestPipe(pipe, fake.Pid))
-                Assert.Equal(2, RevitCli.Nrt05Run(link, Nrt05Opts(fake, dir)));   // hash igual = no persistió: nunca APROBADA
+                Assert.Equal(2, RevitCli.Nrt05Run(link, Nrt05Opts(fake, dir)));   // same hash = not persisted: never APPROVED
         }
 
         [Theory]
@@ -525,9 +525,9 @@ namespace Bimbridge.Tests
         }
 
         /// <summary>
-        /// 0.8.0 B0 (informe §9): 586 luminarias, leer y cambiar un parámetro de cada una. Uno a uno (1 lectura + 1 escritura por elemento,
-        /// como en la hipótesis del informe) frente a un plan de BIMBRIDGE (3 lotes de ≤200). Add-in FALSO por la tubería real:
-        /// las cifras son MEDIDO_SIMULADO y los tokens ESTIMADOS (caracteres/4). Con BIMBRIDGE_BENCH_OUT=&lt;carpeta&gt; escribe B0_586.json.
+        /// 0.8.0 B0 (report §9): 586 lighting fixtures, read and change one parameter on each. One by one (1 read + 1 write per element,
+        /// as in the report's hypothesis) versus a BIMBRIDGE plan (3 batches of ≤200). FAKE add-in over the real pipe:
+        /// the figures are MEDIDO_SIMULADO and the tokens are ESTIMATED (characters/4). With BIMBRIDGE_BENCH_OUT=&lt;folder&gt; it writes B0_586.json.
         /// </summary>
         [Fact]
         public void Bench_B0_586_OneByOne_vs_Plan()
@@ -535,7 +535,7 @@ namespace Bimbridge.Tests
             const int N = 586;
             var values = Enumerable.Range(0, N).ToDictionary(i => 1000L + i, i => "LT-" + (i % 7));
 
-            // A · uno a uno
+            // A · one by one
             var fa = new FakeBim(); fa.Seed(N);
             var (ha, pa) = Host(fa);
             Dictionary<string, object> wireA; long agentCharsA = 0; long msA;
@@ -553,7 +553,7 @@ namespace Bimbridge.Tests
                     var pr = link.Call(Wire.OpPlan, pl, false);
                     var cm = new Dictionary<string, object> { [Wire.DocArg] = doc, ["plan_id"] = ((Dictionary<string, object>)pr.Datos)["plan_id"] };
                     var cr = link.Call(Wire.OpCommit, cm, true);
-                    // lo que el agente escribe y lee en esas dos llamadas de herramienta (lectura; escritura = plan+commit)
+                    // what the agent writes and reads in those two tool calls (read; write = plan+commit)
                     agentCharsA += Json.Write(q).Length + Json.Write(qr.ToJson()).Length + Json.Write(pl).Length + Json.Write(pr.ToJson()).Length + Json.Write(cr.ToJson()).Length;
                 }
                 msA = sw.ElapsedMilliseconds;
@@ -562,7 +562,7 @@ namespace Bimbridge.Tests
             Assert.Equal(N, fa.Commits);
             Assert.True(values.All(kv => fa.Comments[kv.Key] == kv.Value));
 
-            // B · plan BIMBRIDGE: 3 operaciones de lote (≤200 objetivos cada una)
+            // B · BIMBRIDGE plan: 3 batch operations (≤200 targets each)
             var fb = new FakeBim(); fb.Seed(N);
             var (hb, pb) = Host(fb);
             Dictionary<string, object> wireB; long agentCharsB; long msB; int ops;
@@ -592,7 +592,7 @@ namespace Bimbridge.Tests
                         msB = sw.ElapsedMilliseconds;
                         Assert.All(r.Plan.Ops, o => Assert.Equal(OpState.Verificada, r.State.Ops[o.Id].State));
                         var report = Json.Write(Handoff.Build(r));
-                        // agente: envía el plan (validar), lo ejecuta (resumen) y pide el informe de verificación/handoff
+                        // agent: sends the plan (validate), runs it (summary) and asks for the verification/handoff report
                         agentCharsB = planJson.Length + summary.Length + report.Length;
                     }
                     wireB = Benchmarks.Wire(link.Calls);
@@ -602,14 +602,14 @@ namespace Bimbridge.Tests
             Assert.Equal(3, fb.Commits);
             Assert.True(values.All(kv => fb.Comments[kv.Key] == kv.Value));
 
-            var agentCallsA = 2L * N;   // hipótesis del informe: una lectura y una escritura por elemento
-            const long agentCallsB = 3; // validar · ejecutar · informe
+            var agentCallsA = 2L * N;   // report hypothesis: one read and one write per element
+            const long agentCallsB = 3; // validate · run · report
             Assert.True((long)wireB["llamadas_cable"] < (long)wireA["llamadas_cable"] / 50);
 
             var result = new Dictionary<string, object>
             {
                 ["id"] = "B0", ["estado"] = Benchmarks.Simulated, ["elementos"] = (long)N,
-                ["nota"] = "add-in falso por la tubería real (sin Revit); los tiempos no representan Revit; tokens " + TokenEstimate.Method,
+                ["nota"] = "fake add-in over the real pipe (no Revit); timings do not represent Revit; tokens " + TokenEstimate.Method,
                 ["uno_a_uno"] = new Dictionary<string, object> { ["llamadas_agente"] = agentCallsA, ["chars_agente"] = agentCharsA, ["tokens_estimados_agente"] = TokenEstimate.FromChars(agentCharsA), ["ms"] = msA, ["commits"] = (long)fa.Commits, ["cable"] = wireA },
                 ["plan_bimbridge"] = new Dictionary<string, object> { ["llamadas_agente"] = agentCallsB, ["operaciones"] = (long)ops, ["chars_agente"] = agentCharsB, ["tokens_estimados_agente"] = TokenEstimate.FromChars(agentCharsB), ["ms"] = msB, ["commits"] = (long)fb.Commits, ["cable"] = wireB },
                 ["reduccion_llamadas_agente"] = Math.Round(100.0 * (agentCallsA - agentCallsB) / agentCallsA, 2),
@@ -643,17 +643,17 @@ namespace Bimbridge.Tests
             {
                 Assert.Null(err);
                 var exp = new Dictionary<string, object> { ["F1"] = "-", ["F2"] = "-", ["F3"] = "-" };
-                using (var r = PlanRunner.Open(AH.NewDir("v080-ind"), IndependentPlan(exp, "markup-riser", new Dictionary<string, object> { ["F9"] = "fuente hoja 2" }), b, new RunnerOptions(), out var diags))
+                using (var r = PlanRunner.Open(AH.NewDir("v080-ind"), IndependentPlan(exp, "markup-riser", new Dictionary<string, object> { ["F9"] = "source sheet 2" }), b, new RunnerOptions(), out var diags))
                 {
                     Assert.True(r != null, string.Join("; ", diags));
                     r.Run();
                     var rec = r.State.Ops[r.Plan.Ops[0].Id];
-                    Assert.NotEqual(OpState.Verificada, rec.State);            // hay diferencias: no se certifica
+                    Assert.NotEqual(OpState.Verificada, rec.State);            // there are differences: not certified
                     var j = System.IO.File.ReadAllText(r.State.JournalPath);
-                    Assert.Contains("F3", j);                                  // omitido
-                    Assert.Contains("103", j);                                 // adicional (F7)
+                    Assert.Contains("F3", j);                                  // omitted
+                    Assert.Contains("103", j);                                 // extra (F7)
                 }
-                // misma fuente que la construcción → no independiente, no se certifica
+                // same source as the build → not independent, not certified
                 using (var r2 = PlanRunner.Open(AH.NewDir("v080-ind2"), IndependentPlan(new Dictionary<string, object> { ["F1"] = "-" }, "E-1.3.02"), b, new RunnerOptions(), out _))
                 {
                     r2.Run();
@@ -744,7 +744,7 @@ namespace Bimbridge.Tests
                 r.Run();
                 var w = r.State.Ops[r.Plan.Ops[1].Id];
                 Assert.NotEqual(OpState.Verificada, w.State);
-                Assert.Equal(1, fake.Commits);   // no se reintenta a ciegas
+                Assert.Equal(1, fake.Commits);   // not retried blindly
             }
         }
 
@@ -771,7 +771,7 @@ namespace Bimbridge.Tests
                     r.Run();
                     Assert.NotEqual(OpState.Verificada, r.State.Ops[r.Plan.Ops[1].Id].State);
                 }
-                Assert.Equal(commits, fake.Commits);   // el cambio entre páginas se detecta ANTES de escribir
+                Assert.Equal(commits, fake.Commits);   // the change between pages is detected BEFORE writing
             }
         }
 
@@ -832,7 +832,7 @@ namespace Bimbridge.Tests
             var r = Engine.StableFile.CopyAndHash(src, System.IO.Path.Combine(dir, "c1.rvt"), chunk: 65536);
             Assert.Equal(Engine.StableFile.HashFile(src), r.Sha256);
             Assert.Throws<System.IO.IOException>(() => Engine.StableFile.CopyAndHash(src, System.IO.Path.Combine(dir, "c2.rvt"),
-                afterChunk: i => { if (i == 0) System.IO.File.AppendAllText(src, "otro proceso escribe"); }, chunk: 65536));
+                afterChunk: i => { if (i == 0) System.IO.File.AppendAllText(src, "another process writes"); }, chunk: 65536));
         }
 
         [Fact]
@@ -902,16 +902,16 @@ namespace Bimbridge.Tests
             Assert.Equal(0, fake.Commits);
         }
 
-        /// <summary>rc1 P1: banco de lotes contra el add-in falso por tubería real (IPC). Escribe resultados si BIMBRIDGE_BENCH_OUT está definido.</summary>
+        /// <summary>rc1 P1: batch benchmark against the fake add-in over the real pipe (IPC). Writes results if BIMBRIDGE_BENCH_OUT is set.</summary>
         [Fact]
         public void Rc1_Bench_BatchSizes_CallsBytesAndLatency()
         {
-            var lines = new List<string> { "tamaño;modo;llamadas;commits;bytes;ms" };
+            var lines = new List<string> { "size;mode;calls;commits;bytes;ms" };
             foreach (var n in new[] { 1, 10, 50, 200 })
             {
                 foreach (var batch in new[] { true, false })
                 {
-                    if (!batch && n > 50) continue;   // N planes de 1 elemento: sólo como referencia
+                    if (!batch && n > 50) continue;   // N plans of 1 element: reference only
                     var fake = new FakeBim(); fake.Seed(n);
                     var (host, pipe) = Host(fake);
                     var ids = Enumerable.Range(1000, n).Select(x => (long)x).ToList();
@@ -932,7 +932,7 @@ namespace Bimbridge.Tests
                         }
                         sw.Stop();
                         var bytes = b.Link.Calls.Sum(c => Convert.ToInt64(c["bytes_peticion"]) + Convert.ToInt64(c["bytes_respuesta"]));
-                        lines.Add(n + ";" + (batch ? "lote" : "uno_a_uno") + ";" + b.Link.Calls.Count + ";" + fake.Commits + ";" + bytes + ";" + sw.ElapsedMilliseconds);
+                        lines.Add(n + ";" + (batch ? "batch" : "one_by_one") + ";" + b.Link.Calls.Count + ";" + fake.Commits + ";" + bytes + ";" + sw.ElapsedMilliseconds);
                         Assert.Equal(batch ? 1 : n, fake.Commits);
                     }
                 }

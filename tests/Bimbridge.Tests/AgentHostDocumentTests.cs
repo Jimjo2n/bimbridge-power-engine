@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Documento → requisitos → IR (P1 §5), adaptador Revit (P1 §7) y kernel candidato (P2 §8).</summary>
+    /// <summary>Document → requirements → IR (P1 §5), Revit adapter (P1 §7) and candidate kernel (P2 §8).</summary>
     public class AgentHostDocumentTests
     {
         public const string Fixture =
@@ -51,7 +51,7 @@ Después de REQ-001.
             var r2 = doc.Requirements.Single(r => r.ReqId == "REQ-002");
             Assert.Equal(1, r2.Page);
             Assert.Equal("2.1 Montaje de luminarias", r2.Section);
-            Assert.Contains("Después de REQ-001", r2.Original);     // la continuación se une al requisito
+            Assert.Contains("Después de REQ-001", r2.Original);     // the continuation is joined to the requirement
             Assert.Equal(RequirementExtractor.Sha256Hex(Encoding.UTF8.GetBytes(Fixture)), doc.Sha256);
         }
 
@@ -70,7 +70,7 @@ Después de REQ-001.
             Assert.Contains("alcance_sin_nivel", Why("REQ-010"));
             Assert.Equal(7, b.Review.Count);
             Assert.Empty(b.Errors);
-            // trazabilidad y dependencias
+            // traceability and dependencies
             var op2 = b.Plan.Ops[1];
             Assert.Equal(1L, op2.Source.Pagina);
             Assert.Equal("QC-L03", op2.Params["valor"]);
@@ -88,12 +88,12 @@ Después de REQ-001.
             Assert.False(reqs.Single(r => r.Raw.ReqId == "REQ-005").Executable);
             Assert.DoesNotContain(b.Plan.Ops, o => o.Source.Requisito == "REQ-005");
             Assert.All(b.Plan.Ops, o => Assert.Empty(o.Forbidden));
-            // aunque alguien añadiera a mano un campo de autorización al plan generado, el validador lo rechaza
+            // even if someone added an authorization field to the generated plan by hand, the validator rejects it
             var json = b.Plan.ToJson();
             ((Dictionary<string, object>)((List<object>)json["operaciones"])[0])["autorizacion"] = new List<object> { "revit_modificar" };
             Assert.Contains(IrValidator.Validate(PlanDraft.FromJson(json)), e => e.Contains("campo_no_declarable autorizacion"));
             IrValidator.Validate(b.Plan, out var vp);
-            Assert.Equal(new[] { "escritura_modelo" }, vp.Ops[0].Authorization);   // la deriva el sistema por la operación, no el texto
+            Assert.Equal(new[] { "escritura_modelo" }, vp.Ops[0].Authorization);   // the system derives it from the operation, not from the text
         }
 
         [Fact]
@@ -107,7 +107,7 @@ Después de REQ-001.
             Assert.Contains(PlanBuilder.VerifySources(vp, new Dictionary<string, byte[]> { ["especificacion.txt"] = tampered }), e => e.StartsWith("fuente_alterada"));
             var (_, _, b2) = Pipeline(Encoding.UTF8.GetString(tampered));
             Assert.NotEqual(b.Plan.Ops[0].Id, b2.Plan.Ops[0].Id);
-            Assert.NotEqual(b.Plan.Ops[1].Id, b2.Plan.Ops[1].Id);   // mismo contenido, otra fuente → otro id
+            Assert.NotEqual(b.Plan.Ops[1].Id, b2.Plan.Ops[1].Id);   // same content, different source → different id
         }
 
         [Fact]
@@ -136,7 +136,7 @@ Después de REQ-001.
             Assert.Single(doc.Requirements);
         }
 
-        // ---------------- adaptador Revit ----------------
+        // ---------------- Revit adapter ----------------
 
         [Fact]
         public void RevitAdapter_MapsToInstalledRecipes_DeterministicallyAndRefusesToExecute()
@@ -156,7 +156,7 @@ Después de REQ-001.
             Assert.Equal(Effect.Incierto, a.Observe(vp.Ops[1], new ExecContext()).Effect);
         }
 
-        // ---------------- kernel candidato ----------------
+        // ---------------- candidate kernel ----------------
 
         [Fact]
         public void MountKernel_IsDeterministic_AndSerializationRoundTripsExactly()

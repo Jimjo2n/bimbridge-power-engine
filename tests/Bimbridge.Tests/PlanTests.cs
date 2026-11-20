@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Planes y cola retenida (inyección asíncrona), sin Revit.</summary>
+    /// <summary>Plans and held queue (asynchronous injection), no Revit.</summary>
     public class PlanTests : IDisposable
     {
         private readonly string _root = Path.Combine(Path.GetTempPath(), "bimbridge-cola-" + Guid.NewGuid().ToString("N").Substring(0, 8));
@@ -57,13 +57,13 @@ namespace Bimbridge.Tests
             var s = NewStore();
             var a = NewPlan(s, "S-claude", (1, "10", "11"));
             var b = NewPlan(s, "S-codex", (2, "10", "12"));
-            s.Hold(b);           // llega primero b
+            s.Hold(b);           // b arrives first
             _now = _now.AddSeconds(5);
             s.Hold(a);
 
-            // "Reinicio de Revit": almacén nuevo que lee el disco.
+            // "Revit restart": new store that reads the disk.
             var s2 = NewStore();
-            Assert.Equal(2, s2.LoadPersisted("c:\\MODELOS\\tampa.rvt")); // la ruta no distingue mayúsculas
+            Assert.Equal(2, s2.LoadPersisted("c:\\MODELOS\\tampa.rvt")); // the path is case-insensitive
             var held = s2.Held("C:\\modelos\\Tampa.rvt");
             Assert.Equal(new[] { b.Id, a.Id }, held.Select(p => p.Id).ToArray());
             Assert.Equal("11", held[1].Entries[0].After);
@@ -94,7 +94,7 @@ namespace Bimbridge.Tests
             var p = NewPlan(s, "S", (1, "10", "11"), (2, "10", "12"));
             var model = new Dictionary<long, string> { [1] = "10", [2] = "10" };
             Assert.Empty(p.FindConflicts(e => model[e.Id]));
-            model[2] = "9.5"; // el usuario movió la luminaria 2 mientras el plan esperaba
+            model[2] = "9.5"; // the user moved fixture 2 while the plan was waiting
             var c = p.FindConflicts(e => model[e.Id]);
             Assert.Single(c);
             Assert.Equal(2, c[0].Id);

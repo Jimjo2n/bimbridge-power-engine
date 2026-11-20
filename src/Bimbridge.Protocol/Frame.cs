@@ -8,12 +8,12 @@ using System.Threading.Tasks;
 namespace Bimbridge.Protocol
 {
     /// <summary>
-    /// Tramas del pipe: 4 bytes de longitud (little-endian) + JSON en UTF-8.
-    /// Así un mensaje nunca se corta a la mitad ni se mezcla con el siguiente.
+    /// Pipe frames: 4-byte length (little-endian) + UTF-8 JSON.
+    /// A message is never cut in half or mixed with the next one.
     /// </summary>
     public static class Frame
     {
-        /// <summary>Tamaño máximo de una trama (16 MB). Protege contra datos corruptos.</summary>
+        /// <summary>Maximum frame size (16 MB). Guards against corrupt data.</summary>
         public const int MaxBytes = 16 * 1024 * 1024;
 
         private static readonly UTF8Encoding Utf8 = new UTF8Encoding(false);
@@ -21,7 +21,7 @@ namespace Bimbridge.Protocol
         public static async Task WriteAsync(Stream stream, string json, CancellationToken ct)
         {
             var body = Utf8.GetBytes(json);
-            if (body.Length > MaxBytes) throw new InvalidOperationException("Trama demasiado grande: " + body.Length + " bytes");
+            if (body.Length > MaxBytes) throw new InvalidOperationException("Frame too large: " + body.Length + " bytes");
             var buffer = new byte[4 + body.Length];
             buffer[0] = (byte)body.Length;
             buffer[1] = (byte)(body.Length >> 8);
@@ -32,18 +32,18 @@ namespace Bimbridge.Protocol
             await stream.FlushAsync(ct).ConfigureAwait(false);
         }
 
-        /// <summary>Devuelve null si el otro lado cerró la conexión de forma limpia.</summary>
+        /// <summary>Returns null if the other side closed the connection cleanly.</summary>
         public static async Task<string> ReadAsync(Stream stream, CancellationToken ct)
         {
             var header = new byte[4];
             var got = await ReadExactAsync(stream, header, 4, ct).ConfigureAwait(false);
             if (got == 0) return null;
-            if (got < 4) throw new EndOfStreamException("Cabecera de trama incompleta");
+            if (got < 4) throw new EndOfStreamException("Incomplete frame header");
             var length = header[0] | (header[1] << 8) | (header[2] << 16) | (header[3] << 24);
-            if (length < 0 || length > MaxBytes) throw new InvalidDataException("Longitud de trama inválida: " + length);
+            if (length < 0 || length > MaxBytes) throw new InvalidDataException("Invalid frame length: " + length);
             var body = new byte[length];
             if (await ReadExactAsync(stream, body, length, ct).ConfigureAwait(false) < length)
-                throw new EndOfStreamException("Trama incompleta");
+                throw new EndOfStreamException("Incomplete frame");
             return Utf8.GetString(body);
         }
 

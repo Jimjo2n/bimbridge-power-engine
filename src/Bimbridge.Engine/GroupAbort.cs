@@ -7,15 +7,15 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Decisión de reversión de un grupo de transacciones, sin depender de la API de Revit para poder probarla ejecutándola.
-    /// Regla: sólo el estado literal RolledBack autoriza a olvidar lo creado; cualquier otro resultado conserva la evidencia.
+    /// Rollback decision for a transaction group, independent of the Revit API so it can be tested by running it.
+    /// Rule: only the literal RolledBack status authorizes forgetting what was created; any other result keeps the evidence.
     /// </summary>
     public static class GroupAbort
     {
         public const string RolledBack = "RolledBack";
         public const string NotObserved = "NoObservado";
 
-        /// <summary>Intenta revertir y devuelve el estado literal. Una excepción nunca se interpreta como reversión.</summary>
+        /// <summary>Attempts the rollback and returns the literal status. An exception is never interpreted as a rollback.</summary>
         public static string Attempt(Func<bool> hasStarted, Func<string> rollBack, Func<string> status, out string error)
         {
             error = null;
@@ -27,7 +27,7 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Evidencia que el aplicador tenía al abortar.</summary>
+        /// <summary>Evidence the applier had when aborting.</summary>
         public sealed class Evidence
         {
             public IEnumerable<long> Deleted = Enumerable.Empty<long>();
@@ -36,7 +36,7 @@ namespace Bimbridge.Engine
             public IEnumerable<string> Warnings = Enumerable.Empty<string>();
         }
 
-        /// <summary>Conserva íntegra la evidencia para reconciliar. No recorta IDs.</summary>
+        /// <summary>Keeps the evidence intact for reconciliation. Does not truncate IDs.</summary>
         public static void Preserve(Plan plan, string state, string error, Evidence e)
         {
             plan.Reconciliation = new Dictionary<string, object>
@@ -56,7 +56,7 @@ namespace Bimbridge.Engine
             };
         }
 
-        /// <summary>Plan interrumpido sin datos del aplicador: sólo se sabe que pudo haber empezado.</summary>
+        /// <summary>Interrupted plan without applier data: all that is known is that it may have started.</summary>
         public static void PreserveInterrupted(Plan plan, string reason)
         {
             if (plan.Reconciliation != null) return;
@@ -64,16 +64,16 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// Excepción de Dispose después de conocer el resultado. Un estado confirmado por Revit se mantiene y se avisa;
-        /// sin resultado, o con un resultado que no estaba confirmado, queda desconocido.
+        /// Dispose exception after the result is known. A status confirmed by Revit is kept and a warning is raised;
+        /// without a result, or with a result that was not confirmed, it stays unknown.
         /// </summary>
         public static string StatusAfterDisposeError(string status) =>
             status == PlanStatus.Aplicado || status == PlanStatus.Revertido || status == PlanStatus.Ensayado || status == PlanStatus.Conflicto
                 ? status : Status.Desconocido;
 
         /// <summary>
-        /// Fallo funcional del ensayo: elementos creados que luego borró el mismo plan no deben contarse como ausentes.
-        /// Devuelve cuántas creaciones deben seguir existiendo durante la verificación temporal.
+        /// Functional trial failure: elements created and later deleted by the same plan must not be counted as missing.
+        /// Returns how many creations must still exist during the temporary verification.
         /// </summary>
         public static int ExpectedSurvivingCreations(int plannedCreations, IEnumerable<long> created, IEnumerable<long> deleted)
         {

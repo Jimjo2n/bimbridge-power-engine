@@ -6,26 +6,26 @@ using Autodesk.Revit.DB;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// Lee sólo los campos pedidos de un elemento (problema D10 de pyRevit: leía todos los parámetros).
-    /// Longitudes en pies decimales (unidad interna de Revit), redondeadas a 1/10000 ft.
-    /// Parámetros que no son longitudes se devuelven con su texto de visualización.
+    /// Reads only the requested fields of an element (pyRevit problem D10: it read all parameters).
+    /// Lengths in decimal feet (Revit internal unit), rounded to 1/10000 ft.
+    /// Non-length parameters are returned with their display text.
     /// </summary>
     public static class ElementFields
     {
         /// <summary>
-        /// Nombres de tipo, familia y nivel ya resueltos en ESTA consulta (por id). Vive sólo lo que dura una consulta, en el hilo de Revit:
-        /// nunca sobrevive a un cambio del modelo ni pasa a otro documento. Miles de luminarias comparten unas decenas de tipos.
+        /// Type, family and level names already resolved in THIS query (by id). Lives only as long as a query, on the Revit thread:
+        /// never survives a model change nor carries over to another document. Thousands of fixtures share a few dozen types.
         /// </summary>
         public sealed class NameCache
         {
             internal readonly Dictionary<long, string> Type = new Dictionary<long, string>(), Family = new Dictionary<long, string>(), Level = new Dictionary<long, string>();
-            /// <summary>0.9.1: elemento de tipo por id (la búsqueda de un parámetro de tipo ya no hace doc.GetElement por instancia).</summary>
+            /// <summary>0.9.1: type element by id (looking up a type parameter no longer does doc.GetElement per instance).</summary>
             internal readonly Dictionary<long, Element> TypeElem = new Dictionary<long, Element>();
-            /// <summary>0.9.1: nombre del elemento al que apunta un parámetro ElementId (materiales, niveles, fases…), por id.</summary>
+            /// <summary>0.9.1: name of the element an ElementId parameter points to (materials, levels, phases…), by id.</summary>
             internal readonly Dictionary<long, object> Target = new Dictionary<long, object>();
-            /// <summary>0.9.1: clase de dato (longitud / sí-no) por definición de parámetro: GetDataType() una vez por parámetro, no por valor.</summary>
+            /// <summary>0.9.1: data class (length / yes-no) per parameter definition: GetDataType() once per parameter, not per value.</summary>
             internal readonly Dictionary<Definition, (bool Length, bool YesNo)> Spec = new Dictionary<Definition, (bool, bool)>();
-            /// <summary>Aciertos y fallos (observados) de la caché: entran en las métricas de la consulta.</summary>
+            /// <summary>Cache hits and misses (observed): they go into the query metrics.</summary>
             public long Hits, Misses;
         }
 
@@ -51,7 +51,7 @@ namespace Bimbridge.Addin.Revit
             return v;
         }
 
-        /// <summary>Elemento de tipo de <paramref name="e"/>, con caché por id de tipo si la hay.</summary>
+        /// <summary>Type element of <paramref name="e"/>, cached by type id if a cache is given.</summary>
         public static Element TypeOf(Document doc, Element e, NameCache cache)
         {
             var tid = e.GetTypeId();
@@ -88,7 +88,7 @@ namespace Bimbridge.Addin.Revit
                 {
                     if (cache == null) return LevelName(doc, e);
                     var lid = e.LevelId;
-                    // Sólo se cachea el camino directo (LevelId); los parámetros alternativos se resuelven como siempre.
+                    // Only the direct path (LevelId) is cached; the alternative parameters are resolved as usual.
                     return lid != null && lid != ElementId.InvalidElementId ? Cached(cache.Level, lid, () => doc.GetElement(lid)?.Name, cache) : LevelName(doc, e);
                 }
                 case "ws":
@@ -103,7 +103,7 @@ namespace Bimbridge.Addin.Revit
                 case "y": return Coord(e, 1);
                 case "z": return Coord(e, 2);
             }
-            // Parámetro por nombre: primero de instancia, luego de tipo.
+            // Parameter by name: instance first, then type.
             var p = e.LookupParameter(field);
             if (p == null) p = TypeOf(doc, e, cache)?.LookupParameter(field);
             return ParamValue(doc, p, false, cache);
@@ -155,8 +155,8 @@ namespace Bimbridge.Addin.Revit
             return s;
         }
 
-        /// <summary>Valor simple de un parámetro: longitudes en pies (o mm), sí/no como bool, ids como nombre del elemento.</summary>
-        /// <param name="cache">0.9.1: caché de la consulta (clase de dato por definición y nombres de destino por id); null = sin caché.</param>
+        /// <summary>Simple value of a parameter: lengths in feet (or mm), yes/no as bool, ids as the element name.</summary>
+        /// <param name="cache">0.9.1: query cache (data class per definition and target names by id); null = no cache.</param>
         public static object ParamValue(Document doc, Parameter p, bool mm, NameCache cache)
         {
             if (p == null || !p.HasValue) return null;

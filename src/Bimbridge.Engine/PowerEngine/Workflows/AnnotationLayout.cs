@@ -6,23 +6,23 @@ using System.Linq;
 
 namespace BimBridge.PowerEngine.Workflows
 {
-    public sealed class TagRequest { public string Id; public double X, Y; public double W = 0.6, H = 0.15; }   // ancla y tamaño, en PULGADAS de papel
+    public sealed class TagRequest { public string Id; public double X, Y; public double W = 0.6, H = 0.15; }   // anchor and size, in paper INCHES
     public sealed class Box { public string Id; public double X0, Y0, X1, Y1; public bool Overlaps(Box b, double gap = 0) => X0 < b.X1 + gap && b.X0 < X1 + gap && Y0 < b.Y1 + gap && b.Y0 < Y1 + gap; }
 
     /// <summary>
-    /// Distribución de etiquetas a la escala de la vista (todo en pulgadas de papel): para cada ancla prueba 8 posiciones alrededor
-    /// y luego posiciones más lejanas (con leader), y elige la de menor coste: sin colisión con obstáculos (geometría, otras
-    /// etiquetas), cerca del ancla, alineada con las vecinas. Comprueba legibilidad (altura de texto en papel). Es una PROPUESTA:
-    /// la colocación nativa de tags sigue la operación "tag"/"tag_move" con su verificación.
+    /// Tag layout at the view scale (everything in paper inches): for each anchor it tries 8 positions around it
+    /// and then farther positions (with leader), and picks the lowest-cost one: no collision with obstacles (geometry, other
+    /// tags), close to the anchor, aligned with its neighbors. Checks legibility (text height on paper). It is a PROPOSAL:
+    /// native tag placement follows the "tag"/"tag_move" operation with its verification.
     /// </summary>
     public static class AnnotationLayout
     {
-        public const double MinTextHeightIn = 3.0 / 32.0;   // 3/32" en papel
+        public const double MinTextHeightIn = 3.0 / 32.0;   // 3/32" on paper
 
         public static Dictionary<string, object> Layout(IList<TagRequest> tags, IList<Box> obstacles, double textHeightIn = 3.0 / 32.0, double offsetIn = 0.12, double leaderFromIn = 0.35, double gapIn = 0.02, int repairPasses = 4)
         {
             var obs = (obstacles ?? new List<Box>()).ToList();
-            // orden estable: de arriba abajo y de izquierda a derecha (las alineaciones se propagan)
+            // stable order: top to bottom and left to right (alignments propagate)
             var order = tags.OrderByDescending(t => Math.Round(t.Y, 2)).ThenBy(t => t.X).ThenBy(t => t.Id, StringComparer.Ordinal).ToList();
             var pos = new Box[order.Count];
             var lead = new bool[order.Count];
@@ -60,7 +60,7 @@ namespace BimBridge.PowerEngine.Workflows
             }
             bool Collides(int i) => obs.Any(o => o.Overlaps(pos[i], gapIn)) || Enumerable.Range(0, pos.Length).Any(j => j != i && pos[j] != null && pos[j].Overlaps(pos[i], gapIn));
             for (var i = 0; i < order.Count; i++) Place(i);
-            // reparación: las que chocan se recolocan viendo a todas las demás (búsqueda local determinista)
+            // repair: colliding tags are re-placed considering all the others (deterministic local search)
             for (var pass = 0; pass < repairPasses; pass++)
             {
                 var bad = Enumerable.Range(0, order.Count).Where(Collides).ToList();
@@ -87,7 +87,7 @@ namespace BimBridge.PowerEngine.Workflows
                 ["etiquetas"] = outTags, ["colisiones"] = (long)collisions, ["con_leader"] = (long)leaders,
                 ["legible"] = textHeightIn + 1e-9 >= MinTextHeightIn,
                 ["altura_texto_in"] = R(textHeightIn),
-                ["nota"] = "Propuesta en pulgadas de papel (offset = lo que usa tag/tag_move). Colocar y verificar en Revit sigue NATIVE_TEST_PENDING.",
+                ["nota"] = "Proposal in paper inches (offset = what tag/tag_move uses). Placing and verifying in Revit remains NATIVE_TEST_PENDING.",
             };
         }
 

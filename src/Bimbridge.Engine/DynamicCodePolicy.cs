@@ -7,25 +7,25 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Ejecución dinámica de C# (exec), desde la revisión consolidada: HABILITADA por defecto para los agentes locales que ya pueden usar
-    /// BIMBRIDGE (tubería con ACL del usuario de Windows + niveles de config.json). Un único control de usuario la bloquea:
-    /// «Bloquear inyección de código C#» = config.json "bloquear_inyeccion_csharp": true. Persiste entre reinicios.
-    /// Sustituye al «Código confiable» de 4 horas y a la autorización por SHA-256 (codigo_autorizado).
-    /// No es un sandbox: el código corre en el proceso de Revit con los permisos del usuario; sus efectos fuera del documento no se revierten.
+    /// Dynamic C# execution (exec), since the consolidated review: ENABLED by default for local agents that can already use
+    /// BIMBRIDGE (pipe with the Windows user's ACL + config.json levels). A single user control blocks it:
+    /// "Block C# code injection" = config.json "bloquear_inyeccion_csharp": true. Persists across restarts.
+    /// Replaces the 4-hour "Trusted code" and the SHA-256 authorization (codigo_autorizado).
+    /// It is not a sandbox: the code runs in the Revit process with the user's permissions; its effects outside the document are not rolled back.
     /// </summary>
     public static class DynamicCodePolicy
     {
         public const string ConfigKey = "bloquear_inyeccion_csharp";
         public const string BlockedCode = "inyeccion_csharp_bloqueada";
 
-        /// <summary>null = puede ejecutarse; texto = rechazo (nada se compiló ni se ejecutó).</summary>
+        /// <summary>null = may run; text = refusal (nothing was compiled or run).</summary>
         public static string Decide(bool blocked) =>
             blocked
-                ? BlockedCode + ": el usuario activó «Bloquear inyección de código C#» en la cinta BIMBRIDGE. No se ejecutó nada. " +
-                  "Use operaciones tipadas (plan/commit) o pídale que lo desactive."
+                ? BlockedCode + ": the user enabled \"Block C# code injection\" on the BIMBRIDGE ribbon. Nothing was run. " +
+                  "Use typed operations (plan/commit) or ask the user to turn it off."
                 : null;
 
-        /// <summary>Lee el valor persistido. Si el archivo no se puede leer, bloquea (fail-closed).</summary>
+        /// <summary>Reads the persisted value. If the file cannot be read, blocks (fail-closed).</summary>
         public static bool LoadBlocked(string path)
         {
             try
@@ -37,7 +37,7 @@ namespace Bimbridge.Engine
             catch (Exception) { return true; }
         }
 
-        /// <summary>Guarda el valor conservando el resto de config.json. Lanza si no puede: el cambio no quedaría persistido.</summary>
+        /// <summary>Saves the value keeping the rest of config.json. Throws if it cannot: the change would not be persisted.</summary>
         public static void SaveBlocked(string path, bool blocked)
         {
             var o = File.Exists(path) ? Json.ParseObject(File.ReadAllText(path)) : new Dictionary<string, object>();

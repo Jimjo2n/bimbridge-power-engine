@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Receta incluida en BIMBRIDGE - Power Engine (desde 0.6.0). QC uno a uno de un manifiesto (lista esperada de posiciones, tipos, alturas, etiquetas)
-// contra los elementos del modelo. Sólo lectura. Deja un CSV con todas las desviaciones como artefacto de la tarea.
-// args: manifiesto (JSON en texto, o ruta a un .json), categoria (BuiltInCategory, por defecto OST_LightingFixtures),
-// nivel (opcional: sólo ese nivel), vista_etiquetas (opcional: id de la vista donde contar etiquetas).
-// Formato del manifiesto: {"tolerancias":{"xy":150,"z":25,"giro":2},"elementos":[{"ref":"L-001","x":..,"y":..,"z":..,"tipos":["D"],"etiqueta":true}]}
+// Recipe shipped with BIMBRIDGE - Power Engine (since 0.6.0). One-to-one QC of a manifest (expected list of positions, types, heights, tags)
+// against the model elements. Read-only. Leaves a CSV with all deviations as a task artifact.
+// args: manifiesto (JSON text, or path to a .json), categoria (BuiltInCategory, default OST_LightingFixtures),
+// nivel (optional: only that level), vista_etiquetas (optional: id of the view where tags are counted).
+// Manifest format: {"tolerancias":{"xy":150,"z":25,"giro":2},"elementos":[{"ref":"L-001","x":..,"y":..,"z":..,"tipos":["D"],"etiqueta":true}]}
 public class QcManifiesto : Receta
 {
     public override string Version => "1";
-    public override string Descripcion => "QC uno a uno contra un manifiesto JSON (posición, altura, giro, tipo, nivel, etiquetas); sólo lectura";
+    public override string Descripcion => "One-to-one QC against a JSON manifest (position, height, rotation, type, level, tags); read-only";
     public override PoliticaTx Transaccion => PoliticaTx.Lectura;
     public override IEnumerable<string> Entradas => new[] { "manifiesto" };
 
@@ -38,7 +38,7 @@ public class QcManifiesto : Receta
         foreach (var f in res.Findings) csv.Append(string.Join(";", f.Row().Select(x => Convert.ToString(x).Replace(";", ","))) ).Append('\n');
         ctx.Artefacto("qc_manifiesto.csv", csv.ToString());
         foreach (var f in res.Findings.Take(200)) ctx.Excepcion(f.Code, f.Ref + " " + f.Detail);
-        ctx.Decision(res.Passed ? "manifiesto aprobado" : "manifiesto con desviaciones: ver qc_manifiesto.csv");
+        ctx.Decision(res.Passed ? "manifest passed" : "manifest with deviations: see qc_manifiesto.csv");
         return res.ToJson(20);
     }
 }

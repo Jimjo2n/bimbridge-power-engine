@@ -6,9 +6,9 @@ using System.Text.RegularExpressions;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Longitudes escritas como las escribe una persona: 10'-9", 10' 9 1/2", 1/2", 3277 mm, 3.2 m, 12 in, 0.5 ft.
-    /// Un número sin unidad se toma en pies. Así la IA no tiene que convertir a mano (fuente de errores en pyRevit:
-    /// valores en mm escritos donde Revit esperaba pies).
+    /// Lengths written the way a person writes them: 10'-9", 10' 9 1/2", 1/2", 3277 mm, 3.2 m, 12 in, 0.5 ft.
+    /// A number without a unit is taken as feet. That way the AI does not have to convert by hand (a source of errors in pyRevit:
+    /// values in mm written where Revit expected feet).
     /// </summary>
     public static class Lengths
     {
@@ -21,7 +21,7 @@ namespace Bimbridge.Engine
         private static readonly Regex WithUnit = new Regex(
             @"^(?<v>[-+]?\d+(?:[.,]\d+)?)\s*(?<u>mm|cm|m|ft|pies|in|pulg)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        /// <summary>Convierte a pies. Acepta double/long (ya en pies) o texto con unidad.</summary>
+        /// <summary>Converts to feet. Accepts double/long (already in feet) or text with a unit.</summary>
         public static bool TryFeet(object value, out double feet, out string error)
         {
             feet = 0; error = null;
@@ -31,8 +31,8 @@ namespace Bimbridge.Engine
                 case long l: feet = l; return true;
                 case int i: feet = i; return true;
                 case string s: return TryParse(s, out feet, out error);
-                case null: error = "falta el valor"; return false;
-                default: error = "no es una longitud: " + value; return false;
+                case null: error = "value is missing"; return false;
+                default: error = "not a length: " + value; return false;
             }
         }
 
@@ -40,7 +40,7 @@ namespace Bimbridge.Engine
         {
             feet = 0; error = null;
             var s = (text ?? "").Trim().Replace("″", "\"").Replace("′", "'").Replace("’", "'").Replace("”", "\"");
-            if (s.Length == 0) { error = "longitud vacía"; return false; }
+            if (s.Length == 0) { error = "empty length"; return false; }
 
             if (double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var plain))
             {
@@ -64,16 +64,16 @@ namespace Bimbridge.Engine
                 return Finite(feet, out error);
             }
 
-            // Pies y pulgadas: exige al menos ' o " para no confundir "10 9" con otra cosa.
+            // Feet and inches: requires at least ' or " so that "10 9" is not mistaken for something else.
             if (s.IndexOf('\'') < 0 && s.IndexOf('"') < 0)
             {
-                error = "longitud '" + text + "' no reconocida: use 10'-9\", 3277 mm, 3.2 m, 12 in o pies decimales";
+                error = "length '" + text + "' not recognized: use 10'-9\", 3277 mm, 3.2 m, 12 in or decimal feet";
                 return false;
             }
             var f = FeetInches.Match(s);
             if (!f.Success || (f.Groups["ft"].Value.Length == 0 && f.Groups["in"].Value.Length == 0 && f.Groups["num"].Value.Length == 0))
             {
-                error = "longitud '" + text + "' no reconocida: use 10'-9\", 10' 9 1/2\", 1/2\" o 3277 mm";
+                error = "length '" + text + "' not recognized: use 10'-9\", 10' 9 1/2\", 1/2\" or 3277 mm";
                 return false;
             }
             double ft = 0, inches = 0;
@@ -82,7 +82,7 @@ namespace Bimbridge.Engine
             if (f.Groups["num"].Success && f.Groups["num"].Value.Length > 0)
             {
                 var den = double.Parse(f.Groups["den"].Value, CultureInfo.InvariantCulture);
-                if (den == 0) { error = "fracción con denominador 0"; return false; }
+                if (den == 0) { error = "fraction with denominator 0"; return false; }
                 inches += double.Parse(f.Groups["num"].Value, CultureInfo.InvariantCulture) / den;
             }
             feet = ft + inches / 12.0;
@@ -93,12 +93,12 @@ namespace Bimbridge.Engine
         private static bool Finite(double v, out string error)
         {
             error = null;
-            if (double.IsNaN(v) || double.IsInfinity(v)) { error = "longitud no finita"; return false; }
-            if (Math.Abs(v) > 100000) { error = "longitud fuera de rango (más de 100 000 pies)"; return false; }
+            if (double.IsNaN(v) || double.IsInfinity(v)) { error = "non-finite length"; return false; }
+            if (Math.Abs(v) > 100000) { error = "length out of range (more than 100,000 feet)"; return false; }
             return true;
         }
 
-        /// <summary>10.5 → 10'-6"; redondeado a 1/16".</summary>
+        /// <summary>10.5 → 10'-6"; rounded to 1/16".</summary>
         public static string FeetInches16(double ft)
         {
             if (double.IsNaN(ft)) return "";
@@ -118,7 +118,7 @@ namespace Bimbridge.Engine
             return sign + feet + "'-" + inches + fracText + "\"";
         }
 
-        /// <summary>Pulgadas con signo y 1/16 de resolución, para holguras: 0.0156 ft → "3/16\"".</summary>
+        /// <summary>Signed inches with 1/16 resolution, for clearances: 0.0156 ft → "3/16\"".</summary>
         public static string Inches16(double ft)
         {
             if (double.IsNaN(ft)) return "";

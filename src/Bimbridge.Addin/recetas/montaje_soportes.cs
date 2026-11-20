@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Receta incluida en BIMBRIDGE - Power Engine (desde 0.6.0). Clasifica el montaje de cada elemento contra su soporte real (también en vínculos):
-// al_ras, empotrado, separado o sin_referencia, con la holgura en mm. Sólo lectura: no mueve nada.
-// args: categoria (por defecto OST_LightingFixtures), nivel (opcional), direccion (arriba|abajo, por defecto arriba),
-// tol_mm (3), max_mm (3000), lote (elementos por unidad, 50).
+// Recipe shipped with BIMBRIDGE - Power Engine (since 0.6.0). Classifies the mounting of each element against its real support (also in links):
+// al_ras, empotrado, separado or sin_referencia, with the clearance in mm. Read-only: moves nothing.
+// args: categoria (default OST_LightingFixtures), nivel (optional), direccion (arriba|abajo, default arriba),
+// tol_mm (3), max_mm (3000), lote (elements per unit, 50).
 public class MontajeSoportes : Receta
 {
     public override string Version => "1";
-    public override string Descripcion => "Clasifica el montaje contra el soporte real (rayo vertical, incluye vínculos); sólo lectura";
+    public override string Descripcion => "Classifies mounting against the real support (vertical ray, includes links); read-only";
     public override PoliticaTx Transaccion => PoliticaTx.Lectura;
 
     private static string A(ScriptContext ctx, string k, string def) => ctx.Args.TryGetValue(k, out var v) && v != null ? Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture) : def;
@@ -22,7 +22,7 @@ public class MontajeSoportes : Receta
         for (var i = 0; i < els.Count; i += lote)
         {
             var part = els.Skip(i).Take(lote).ToList();
-            // Clave estable: primer y último UniqueId del tramo (mismo modelo → mismas claves).
+            // Stable key: first and last UniqueId of the chunk (same model → same keys).
             yield return new Unidad("tramo:" + part[0].UniqueId + ".." + part[part.Count - 1].UniqueId,
                 new Dictionary<string, object> { ["uids"] = part.Select(e => (object)e.UniqueId).ToList() }, part.Select(e => ctx.Long(e.Id)));
         }

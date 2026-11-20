@@ -17,7 +17,7 @@ namespace Bimbridge.Addin.Revit
             List<long> ids;
             try { ids = RouteIds(request.Args, "ids"); }
             catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
-            if (ids.Count == 0 || ids.Count > 100) return Response.Fail(request.Id, Status.Invalido, "indique de 1 a 100 IDs de cotas o etiquetas");
+            if (ids.Count == 0 || ids.Count > 100) return Response.Fail(request.Id, Status.Invalido, "give 1 to 100 dimension or tag IDs");
             var rows = new List<object>();
             var differences = false;
             string error = null;

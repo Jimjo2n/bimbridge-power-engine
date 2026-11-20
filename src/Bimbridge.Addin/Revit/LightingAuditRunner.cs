@@ -13,8 +13,8 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// Junta los datos crudos de "lighting_audit" por tramos: luminarias, tags y, si se piden, conteos por vista.
-    /// Sólo lectura. El resumen lo hace LightingAudit fuera del hilo de Revit.
+    /// Gathers the raw data for "lighting_audit" in slices: fixtures, tags and, if requested, per-view counts.
+    /// Read-only. The summary is done by LightingAudit outside the Revit thread.
     /// </summary>
     public sealed class LightingAuditRunner
     {
@@ -30,22 +30,22 @@ namespace Bimbridge.Addin.Revit
         public readonly List<LightingAudit.Tag> Tags = new List<LightingAudit.Tag>();
         public readonly List<LightingAudit.ViewCount> Views = new List<LightingAudit.ViewCount>();
         public readonly List<ManifestQc.Actual> Inventory = new List<ManifestQc.Actual>();
-        /// <summary>Todas las luminarias del modelo (también fuera del filtro de nivel), para no confundir tags de otros niveles con huérfanos.</summary>
+        /// <summary>All fixtures in the model (also outside the level filter), so tags on other levels are not mistaken for orphans.</summary>
         public readonly HashSet<long> AllFixtureIds = new HashSet<long>();
         public List<string> Levels => _levels;
         public long Rev;
         public string Error;
         public bool Stale;
-        /// <summary>0.9.1: caché de nombres de la auditoría (aciertos y fallos observados para las métricas).</summary>
+        /// <summary>0.9.1: audit name cache (observed hits and misses for the metrics).</summary>
         public readonly ElementFields.NameCache Names = new ElementFields.NameCache();
-        /// <summary>Luminarias y etiquetas abiertas (observado).</summary>
+        /// <summary>Fixtures and tags opened (observed).</summary>
         public long ElementsRead;
 
-        /// <param name="levels">Filtrar luminarias por nivel (vacío = todas).</param>
-        /// <param name="views">null = sin conteo por vista; "rcp" = planos de techo con tags de luminarias; "rcp_todos" = todos los
-        /// planos de techo; o ids separados por coma. Con <paramref name="levels"/> sólo las vistas de esos niveles.</param>
-        /// <param name="exact">true = luminarias realmente visibles (regenera cada vista; máximo LightingAudit.MaxExactViews).
-        /// false = estimación por nivel asociado, sin regenerar nada.</param>
+        /// <param name="levels">Filter fixtures by level (empty = all).</param>
+        /// <param name="views">null = no per-view count; "rcp" = ceiling plans with fixture tags; "rcp_todos" = all
+        /// ceiling plans; or comma-separated ids. With <paramref name="levels"/> only the views of those levels.</param>
+        /// <param name="exact">true = fixtures actually visible (regenerates each view; at most LightingAudit.MaxExactViews).
+        /// false = estimate by associated level, without regenerating anything.</param>
         public LightingAuditRunner(List<string> levels, string views, bool exact, bool readInventory = false)
         {
             _levels = levels ?? new List<string>();
@@ -58,12 +58,12 @@ namespace Bimbridge.Addin.Revit
         {
             var doc = DocTarget.Resolve(app, out var docError);
             if (doc == null) { Error = docError; return true; }
-            if (doc.IsFamilyDocument) { Error = Status.NoSoportado + ": lighting_audit revisa proyectos; el destino " + DocTarget.Current?.Describe() + " es una familia. Use fam info o exec"; return true; }
+            if (doc.IsFamilyDocument) { Error = Status.NoSoportado + ": lighting_audit checks projects; the target " + DocTarget.Current?.Describe() + " is a family. Use fam info or exec"; return true; }
             var deadline = sw.ElapsedMilliseconds + budgetMs;
             if (_readInventory && _phase != 0 && (tracker.For(doc)?.Rev ?? 0) != Rev)
             {
                 Stale = true;
-                Error = "el documento cambió durante la lectura de luminarias, etiquetas y vistas; repita la auditoría";
+                Error = "the document changed while reading fixtures, tags and views; repeat the audit";
                 return true;
             }
 
@@ -71,8 +71,8 @@ namespace Bimbridge.Addin.Revit
             {
                 Rev = tracker.For(doc)?.Rev ?? 0;
                 var ws = doc.IsWorkshared ? doc.GetWorksetTable() : null;
-                // 0.9.1: una sola lista de campos y cachés por auditoría (nivel por id de nivel, workset por id): miles de luminarias
-                // comparten unas pocas decenas de niveles y worksets.
+                // 0.9.1: a single field list and caches per audit (level by level id, workset by id): thousands of fixtures
+                // share a few dozen levels and worksets.
                 var lvlField = new List<string> { "lvl" };
                 var wsNames = new Dictionary<int, string>();
                 foreach (var e in new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_LightingFixtures).WhereElementIsNotElementType())
@@ -98,7 +98,7 @@ namespace Bimbridge.Addin.Revit
 
             if (_phase == 1)
             {
-                // 0.9.1: nombre y nivel de la vista una vez por vista, no por etiqueta (cientos de etiquetas por vista).
+                // 0.9.1: view name and level once per view, not per tag (hundreds of tags per view).
                 var viewInfo = new Dictionary<long, (string Name, string Level)>();
                 foreach (var e in new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_LightingFixtureTags).WhereElementIsNotElementType())
                 {
@@ -127,22 +127,22 @@ namespace Bimbridge.Addin.Revit
                 if (Error != null) return true;
                 if (!_exact)
                 {
-                    // Estimación por nivel: sólo lee nombres y nivel de cada vista. No regenera nada.
+                    // Estimate by level: only reads each view's name and level. Regenerates nothing.
                     foreach (var id in _viewIds)
                         if (doc.GetElement(id) is View v) Views.Add(Describe(v, null));
                     return true;
                 }
                 if (_viewIds.Count > LightingAudit.MaxExactViews)
                 {
-                    Error = "exacto=true regenera cada vista en Revit (unos 2 s por vista) y aquí hay " + _viewIds.Count +
-                            "; máximo " + LightingAudit.MaxExactViews + ". Acote con lvl= o views=<ids>, o use el modo por nivel (sin exacto).";
+                    Error = "exacto=true regenerates each view in Revit (about 2 s per view) and there are " + _viewIds.Count +
+                            " here; maximum " + LightingAudit.MaxExactViews + ". Narrow with lvl= or views=<ids>, or use the by-level mode (without exacto).";
                     return true;
                 }
                 if (sw.ElapsedMilliseconds >= deadline) return false;
             }
 
-            // Fase 2 (sólo exacto): luminarias visibles por vista, una vista por visita como mucho
-            // para que Revit siga respondiendo y la cancelación por plazo actúe entre vistas.
+            // Phase 2 (exact only): visible fixtures per view, at most one view per visit
+            // so Revit stays responsive and deadline cancellation acts between views.
             if (_nextView < _viewIds.Count)
             {
                 var v = doc.GetElement(_viewIds[_nextView++]) as View;
@@ -160,7 +160,7 @@ namespace Bimbridge.Addin.Revit
         {
             try
             {
-                // Sólo elementos del propio documento (no de vínculos). Existe desde Revit 2022.
+                // Only elements of the document itself (not from links). Exists since Revit 2022.
                 return tag.GetTaggedLocalElementIds()
                           .Where(id => id != null && id != ElementId.InvalidElementId)
                           .Select(Ids.ToLong).ToArray();
@@ -181,9 +181,9 @@ namespace Bimbridge.Addin.Revit
             var all = string.Equals(_viewsArg, "rcp_todos", StringComparison.OrdinalIgnoreCase);
             if (all || string.Equals(_viewsArg, "rcp", StringComparison.OrdinalIgnoreCase))
             {
-                // Antes "rcp" eran TODOS los planos de techo (261 en SAMPLE PROJECT: distribución, alarma, cotas…) contados
-                // con un colector por vista, que obliga a regenerarlas: Revit quedó ocupado ~10 min. Ahora "rcp" son
-                // sólo los planos de techo que ya tienen tags de luminarias (las vistas de iluminación).
+                // Previously "rcp" meant ALL ceiling plans (261 in SAMPLE PROJECT: layout, alarm, dimensions…) counted
+                // with one collector per view, which forces regenerating them: Revit stayed busy ~10 min. Now "rcp" means
+                // only the ceiling plans that already have fixture tags (the lighting views).
                 var withTags = new HashSet<long>(Tags.Select(t => t.ViewId));
                 return new FilteredElementCollector(doc).OfClass(typeof(ViewPlan)).Cast<ViewPlan>()
                     .Where(v => !v.IsTemplate && v.ViewType == ViewType.CeilingPlan)
@@ -195,8 +195,8 @@ namespace Bimbridge.Addin.Revit
             var list = new List<ElementId>();
             foreach (var part in _viewsArg.Split(','))
             {
-                if (!long.TryParse(part.Trim(), out var id)) { Error = "views: use rcp, rcp_todos o ids de vista separados por coma"; return null; }
-                if (!(doc.GetElement(Ids.ToId(id)) is View)) { Error = "views: " + id + " no es una vista del modelo activo"; return null; }
+                if (!long.TryParse(part.Trim(), out var id)) { Error = "views: use rcp, rcp_todos or comma-separated view ids"; return null; }
+                if (!(doc.GetElement(Ids.ToId(id)) is View)) { Error = "views: " + id + " is not a view of the active model"; return null; }
                 list.Add(Ids.ToId(id));
             }
             return list;

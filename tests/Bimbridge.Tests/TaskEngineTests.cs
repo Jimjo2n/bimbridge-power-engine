@@ -12,12 +12,12 @@ using Xunit;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// Motor de tareas con un modelo FALSO (no es Revit): prueba orden, lotes, checkpoints, reanudación, barreras, cancelación y la
-    /// ventana commit→diario con inyección de fallos. La aceptación dentro de Revit está en tools/aceptacion (pendiente de ejecutar).
+    /// Task engine with a FAKE model (not Revit): tests ordering, batches, checkpoints, resume, barriers, cancellation and the
+    /// commit->journal window with fault injection. Acceptance inside Revit is in tools/aceptacion (not yet run).
     /// </summary>
     public class TaskEngineTests
     {
-        /// <summary>Modelo falso: lo "aplicado" en memoria de Revit, lo guardado en el archivo, generación de apertura y fallos inyectados.</summary>
+        /// <summary>Fake model: what is "applied" in Revit memory, what is saved in the file, open generation and injected faults.</summary>
         public sealed class FakeModel
         {
             public readonly object Lock = new object();
@@ -38,14 +38,14 @@ namespace Bimbridge.Tests
             public int Count;
             public List<string> PreflightRefusals = new List<string>();
 
-            /// <summary>Revit se cae y se vuelve a abrir el archivo: se pierde lo no guardado y cambia la generación.</summary>
+            /// <summary>Revit crashes and the file is reopened: unsaved work is lost and the generation changes.</summary>
             public void RestartRevit()
             {
                 lock (Lock) { Live = new Dictionary<string, string>(Saved); Generation++; }
             }
         }
 
-        public sealed class CrashException : Exception { public CrashException() : base("Revit murió (simulado)") { } }
+        public sealed class CrashException : Exception { public CrashException() : base("Revit died (simulated)") { } }
 
         public sealed class FakeBackend : ITaskBackend
         {
@@ -54,8 +54,8 @@ namespace Bimbridge.Tests
 
             public BackendResult<bool> CheckContext(TaskRecord task)
             {
-                if (_m.Paused) return BackendResult<bool>.Waiting("el usuario pausó la IA", "pulsar Reanudar IA en Revit");
-                if (_m.DocClosed) return BackendResult<bool>.Waiting("el documento está cerrado", "abrir el documento");
+                if (_m.Paused) return BackendResult<bool>.Waiting("the user paused the AI", "press Resume AI in Revit");
+                if (_m.DocClosed) return BackendResult<bool>.Waiting("the document is closed", "open the document");
                 return BackendResult<bool>.Ok(true);
             }
 
@@ -75,15 +75,15 @@ namespace Bimbridge.Tests
                 {
                     _m.Visits++;
                     _m.OnVisit?.Invoke(_m.Visits);
-                    if (_m.Paused) return Task.FromResult(BackendResult<List<UnitOutcome>>.Waiting("el usuario pausó la IA"));
+                    if (_m.Paused) return Task.FromResult(BackendResult<List<UnitOutcome>>.Waiting("the user paused the AI"));
                     long spent = 0;
                     foreach (var u in units)
                     {
-                        if (spent + _m.MsPerUnit > budgetMs && outs.Count > 0) break; // presupuesto de la visita
-                        if (task.Preflight?.Invoke() is string pf) { _m.PreflightRefusals.Add(pf); break; } // último punto seguro (R06)
+                        if (spent + _m.MsPerUnit > budgetMs && outs.Count > 0) break; // visit budget
+                        if (task.Preflight?.Invoke() is string pf) { _m.PreflightRefusals.Add(pf); break; } // last safe point (R06)
                         spent += _m.MsPerUnit;
-                        if (_m.ConflictUnits.Contains(u.Key)) { outs.Add(new UnitOutcome { Key = u.Key, State = UnitState.Conflicto, Error = "otro usuario cambió el elemento", Ms = _m.MsPerUnit }); continue; }
-                        if (_m.FailUnits.Contains(u.Key)) { outs.Add(new UnitOutcome { Key = u.Key, State = UnitState.Revertida, Error = "Revit rechazó el cambio", Ms = _m.MsPerUnit }); continue; }
+                        if (_m.ConflictUnits.Contains(u.Key)) { outs.Add(new UnitOutcome { Key = u.Key, State = UnitState.Conflicto, Error = "another user changed the element", Ms = _m.MsPerUnit }); continue; }
+                        if (_m.FailUnits.Contains(u.Key)) { outs.Add(new UnitOutcome { Key = u.Key, State = UnitState.Revertida, Error = "Revit rejected the change", Ms = _m.MsPerUnit }); continue; }
                         if (_m.Live.ContainsKey(u.Key)) _m.Duplicates++;
                         var uid = "uid-" + u.Key + "-" + (++_m.Count);
                         _m.Live[u.Key] = uid;
@@ -117,8 +117,8 @@ namespace Bimbridge.Tests
             {
                 lock (_m.Lock)
                 {
-                    var outs = units.Select(u => _m.Unverifiable.Contains(u.Key) ? UnitOutcome.Of(u.Key, UnitState.Desconocida, "no se puede comprobar")
-                        : _m.Live.ContainsKey(u.Key) ? UnitOutcome.Of(u.Key, UnitState.Confirmada) : UnitOutcome.Of(u.Key, UnitState.Pendiente, "no está en el modelo")).ToList();
+                    var outs = units.Select(u => _m.Unverifiable.Contains(u.Key) ? UnitOutcome.Of(u.Key, UnitState.Desconocida, "cannot be checked")
+                        : _m.Live.ContainsKey(u.Key) ? UnitOutcome.Of(u.Key, UnitState.Confirmada) : UnitOutcome.Of(u.Key, UnitState.Pendiente, "not in the model")).ToList();
                     return Task.FromResult(BackendResult<List<UnitOutcome>>.Ok(outs));
                 }
             }
@@ -172,7 +172,7 @@ namespace Bimbridge.Tests
             return mgr.Get(id, out _);
         }
 
-        /// <summary>INV-001/002 (0.6.1): si otra instancia toma la tarea (fencing nuevo), el ejecutor anterior no ejecuta ni un lote más.</summary>
+        /// <summary>INV-001/002 (0.6.1): if another instance takes the task (new fencing token), the previous runner does not run a single batch more.</summary>
         [Fact]
         public async Task LeaseStolen_MidRun_OldRunnerStopsBeforeNextBatch()
         {
@@ -192,9 +192,9 @@ namespace Bimbridge.Tests
             var mgr = Manager(root, m);
             mgr.Start(Draft("robo", 200), "// fake", "prueba");
             var t = await RunToEnd(mgr, "robo");
-            // La tarea es de B (lease vigente): el ejecutor viejo no escribe su "interrumpida" encima del tarea.json de B.
+            // The task belongs to B (valid lease): the old runner does not write its "interrumpida" over B's tarea.json.
             Assert.Equal(TaskState.Ejecutando, t.State);
-            Assert.Equal(3, m.Visits); // ningún lote después del robo
+            Assert.Equal(3, m.Visits); // no batch after the takeover
             Assert.Equal(0, m.Duplicates);
         }
 
@@ -210,16 +210,16 @@ namespace Bimbridge.Tests
             Assert.Equal(TaskState.Aplicada, t.State);
             Assert.Equal(1000, m.Live.Count);
             Assert.Equal(0, m.Duplicates);
-            Assert.True(m.Visits > 5, "debe ceder el hilo entre visitas: " + m.Visits);
-            Assert.True(m.Visits < 200, "el lote debe crecer con la medición: " + m.Visits);
+            Assert.True(m.Visits > 5, "must yield the thread between visits: " + m.Visits);
+            Assert.True(m.Visits < 200, "the batch must grow with the measurement: " + m.Visits);
             Assert.True(t.Metric("checkpoints") >= m.Visits);
             Assert.Equal(1000, units.Units.Values.Count(u => u.State == UnitState.Confirmada));
             Assert.Contains("1000/1000", t.Summary);
         }
 
         /// <summary>
-        /// Medición (además de prueba): cuánto texto ve la IA para seguir y recuperar una tarea de 1000 unidades, con fallos y excepciones.
-        /// Es la salida real de TaskSummary sobre el motor real con el modelo FALSO; no mide Revit. BIMBRIDGE_BENCH_OUT=archivo la guarda.
+        /// Measurement (as well as a test): how much text the AI sees to follow and recover a 1000-unit task, with failures and exceptions.
+        /// It is the real TaskSummary output over the real engine with the FAKE model; it does not measure Revit. BIMBRIDGE_BENCH_OUT=file saves it.
         /// </summary>
         [Fact]
         public async Task Bench_CompactSummary_StaysSmall_ForThousandUnits()
@@ -233,11 +233,11 @@ namespace Bimbridge.Tests
             mgr.Get("tb", out var units);
             var status = Bimbridge.Protocol.Json.Write(TaskSummary.Status(t, units, true));
             var compact = CompactText.Write(TaskSummary.Status(t, units, true));
-            // Otro cliente: abre el almacén desde cero (como tras perder el chat) y pide el resumen.
+            // Another client: opens the store from scratch (as after losing the chat) and asks for the summary.
             var other = Manager(root, m);
             var t2 = other.Get("tb", out var units2);
             var recovered = CompactText.Write(TaskSummary.Status(t2, units2, true));
-            Assert.True(units.Units.Count == units2.Units.Count, "otro cliente ve " + units2.Units.Count + " unidades y el primero " + units.Units.Count + " estado " + t.State + " " + t.Summary);
+            Assert.True(units.Units.Count == units2.Units.Count, "another client sees " + units2.Units.Count + " units and the first " + units.Units.Count + " state " + t.State + " " + t.Summary);
             Assert.True(compact.Length < 3000, "resumen compacto demasiado grande: " + compact.Length);
             Assert.Equal(compact, recovered);
             var outFile = Environment.GetEnvironmentVariable("BIMBRIDGE_BENCH_OUT");
@@ -260,9 +260,9 @@ namespace Bimbridge.Tests
             var t = await RunToEnd(mgr, "crash");
             mgr.Get("crash", out var units);
             Assert.Equal(TaskState.Interrumpida, t.State);
-            Assert.Equal(UnitState.EnCurso, units.Get("u0500").State); // el commit ocurrió, el "fin" no se escribió
+            Assert.Equal(UnitState.EnCurso, units.Get("u0500").State); // the commit happened, the "end" was not written
 
-            // Otro proceso / otro cliente (Codex) retoma por id, sin la sesión anterior.
+            // Another process / another client (Codex) resumes by id, without the previous session.
             var mgr2 = Manager(root, m, "B");
             var r = mgr2.Resume("crash", "codex", null);
             Assert.Null(r.Error);
@@ -286,7 +286,7 @@ namespace Bimbridge.Tests
             Assert.NotNull(t.LastPersist);
             var savedSeq = t.LastPersist.Seq;
             Assert.True(savedSeq >= 300 && savedSeq < 450);
-            // Revit se cierra sin guardar: el archivo sólo tiene lo guardado por la barrera.
+            // Revit closes without saving: the file only has what the barrier saved.
             m.RestartRevit();
             Assert.Equal((int)savedSeq, m.Live.Count);
             var mgr2 = Manager(root, m, "B");
@@ -331,7 +331,7 @@ namespace Bimbridge.Tests
             Assert.Equal(TaskState.Cancelada, t.State);
             var confirmed = units.Units.Values.Count(u => u.State == UnitState.Confirmada);
             Assert.True(confirmed > 0 && confirmed < 1000);
-            Assert.Equal(confirmed, m.Live.Count); // lo confirmado es exactamente lo que está en el modelo
+            Assert.Equal(confirmed, m.Live.Count); // what is committed is exactly what is in the model
             Assert.Contains("sigue aplicado", t.Reason);
         }
 
@@ -345,7 +345,7 @@ namespace Bimbridge.Tests
             Assert.Equal(TaskState.Parcial, t.State);
             Assert.Contains("barrera pdf no se ejecuta", t.Reason);
             Assert.Equal(0, m.Barriers);
-            // Corregido el fallo, reanudar reintenta la revertida y ahora sí exporta, con artefacto registrado.
+            // With the fault fixed, resume retries the rolled-back unit and now exports, with the artifact recorded.
             m.FailUnits.Clear();
             mgr.Resume("barrera", "claude", null);
             t = await RunToEnd(mgr, "barrera");
@@ -434,7 +434,7 @@ namespace Bimbridge.Tests
             m.OnVisit = v =>
             {
                 if (v != 2) return;
-                // El registro de unidades se vuelve imposible de escribir (disco, permisos…): se sustituye por una carpeta.
+                // The units log becomes impossible to write (disk, permissions...): it is replaced by a folder.
                 var p = Path.Combine(root, "roto", "unidades.jsonl");
                 File.Delete(p);
                 Directory.CreateDirectory(p);
@@ -467,12 +467,12 @@ namespace Bimbridge.Tests
         {
             var l = new DocLocks();
             Assert.True(l.TryAcquire(new[] { "b", "a" }, "tarea:1", "tarea", "1", out _));
-            Assert.True(l.TryAcquire(new[] { "a" }, "tarea:1", "tarea", "1", out _)); // reentrante
+            Assert.True(l.TryAcquire(new[] { "a" }, "tarea:1", "tarea", "1", out _)); // reentrant
             Assert.False(l.TryAcquire(new[] { "c", "a" }, "otro", "barrera", null, out var h));
             Assert.Equal("tarea:1", h.Owner);
-            Assert.Null(l.HeldByOther("c", "x")); // no tomó "c" a medias
+            Assert.Null(l.HeldByOther("c", "x")); // did not take "c" halfway
             l.Release(new[] { "a" }, "tarea:1");
-            Assert.NotNull(l.HeldByOther("a", "otro")); // sigue tomado (profundidad 2 → 1)
+            Assert.NotNull(l.HeldByOther("a", "otro")); // still held (depth 2 -> 1)
             l.Release(new[] { "a", "b" }, "tarea:1");
             Assert.True(l.TryAcquire(new[] { "a", "b", "c" }, "otro", "barrera", null, out _));
         }

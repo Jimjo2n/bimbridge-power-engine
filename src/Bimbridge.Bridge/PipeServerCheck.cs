@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 
 namespace Bimbridge.Bridge
 {
-    /// <summary>Comprueba que el proceso servidor del pipe es el Revit esperado (PID anunciado y ejecutable Revit). null = correcto.</summary>
+    /// <summary>Checks that the pipe server process is the expected Revit (announced PID and Revit executable). null = correct.</summary>
     public static class PipeServerCheck
     {
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -14,17 +14,17 @@ namespace Bimbridge.Bridge
 
         public static string Verify(NamedPipeClientStream pipe, int expectedPid)
         {
-            if (!OperatingSystem.IsWindows() || expectedPid <= 0) return null; // en pruebas sin Windows no aplica
+            if (!OperatingSystem.IsWindows() || expectedPid <= 0) return null; // does not apply in tests without Windows
             if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle.DangerousGetHandle(), out var pid))
-                return "no se pudo identificar el servidor del pipe (error " + Marshal.GetLastWin32Error() + ")";
+                return "could not identify the pipe server (error " + Marshal.GetLastWin32Error() + ")";
             return Judge((int)pid, expectedPid, ProcessName((int)pid));
         }
 
-        /// <summary>Regla pura (probada sin Windows).</summary>
+        /// <summary>Pure rule (tested without Windows).</summary>
         public static string Judge(int actualPid, int expectedPid, string processName)
         {
-            if (actualPid != expectedPid) return "el pipe lo sirve el proceso " + actualPid + ", no el Revit anunciado (" + expectedPid + "): conexión rechazada";
-            if (!string.Equals(processName, "Revit", StringComparison.OrdinalIgnoreCase)) return "el servidor del pipe no es Revit (" + processName + "): conexión rechazada";
+            if (actualPid != expectedPid) return "the pipe is served by process " + actualPid + ", not the announced Revit (" + expectedPid + "): connection rejected";
+            if (!string.Equals(processName, "Revit", StringComparison.OrdinalIgnoreCase)) return "the pipe server is not Revit (" + processName + "): connection rejected";
             return null;
         }
 

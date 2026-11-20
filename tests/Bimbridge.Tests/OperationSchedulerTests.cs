@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.9.1 (Bloque I): planificador de operaciones largas. Deterministas: cada operación espera una señal explícita.</summary>
+    /// <summary>0.9.1 (Block I): long-operation scheduler. Deterministic: each operation waits for an explicit signal.</summary>
     public class OperationSchedulerTests
     {
         private sealed class Op
@@ -44,7 +44,7 @@ namespace Bimbridge.Tests
             var a2 = Start(s, "ana", null, "a2", order);
             var a3 = Start(s, "ana", null, "a3", order);
             var b1 = Start(s, "bob", null, "b1", order);
-            await a1.Started.Task; await b1.Started.Task;                 // bob entra aunque ana llegó antes con tres
+            await a1.Started.Task; await b1.Started.Task;                 // bob gets in even though ana arrived first with three
             Assert.False(a2.Started.Task.IsCompleted);
             Assert.Equal(2L, Stat(s, "en_curso")); Assert.Equal(2L, Stat(s, "en_cola"));
             await Finish(a1);
@@ -64,7 +64,7 @@ namespace Bimbridge.Tests
             var y = Start(s, "bob", "doc-1", "y", order);
             var z = Start(s, "bob", "doc-2", "z", order);
             await x.Started.Task; await z.Started.Task;
-            Assert.False(y.Started.Task.IsCompleted);                     // mismo documento: espera
+            Assert.False(y.Started.Task.IsCompleted);                     // same document: waits
             await Finish(x);
             await y.Started.Task;
             await Finish(y); await Finish(z);
@@ -84,7 +84,7 @@ namespace Bimbridge.Tests
                 await Assert.ThrowsAsync<SchedulerBusyException>(() => s.Run("zoe", null, () => Task.FromResult(1), CancellationToken.None));
                 cts.Cancel();
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queued.Task);
-                Assert.False(queued.Started.Task.IsCompleted);            // nunca empezó: nada que reconciliar
+                Assert.False(queued.Started.Task.IsCompleted);            // never started: nothing to reconcile
                 await Finish(running);
                 await other.Started.Task; await Finish(other);
             }
@@ -128,7 +128,7 @@ namespace Bimbridge.Tests
             var results = await Task.WhenAll(tasks);
             Assert.Equal(Enumerable.Range(0, 120), results.OrderBy(x => x));
             Assert.True(peak <= 3, "pico global " + peak);
-            Assert.True(ownerPeak <= 2, "pico por agente " + ownerPeak);
+            Assert.True(ownerPeak <= 2, "peak per agent " + ownerPeak);
             Assert.Equal(1, sameDocPeak);
             Assert.Equal(120L, Stat(s, "iniciadas"));
         }

@@ -7,9 +7,9 @@ using Autodesk.Revit.DB;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// Fallos de Revit durante una transacción (R058, F18): cada aviso se clasifica por FailureDefinitionId y se asocia a sus elementos,
-    /// en vez de borrarlo sin dejar rastro. Los avisos se quitan del diálogo (no bloquean un trabajo desatendido) pero vuelven en la respuesta.
-    /// Errores: la transacción se revierte entera y se informan.
+    /// Revit failures during a transaction (R058, F18): each warning is classified by FailureDefinitionId and linked to its elements,
+    /// instead of being deleted without a trace. Warnings are removed from the dialog (they do not block an unattended job) but come back in the response.
+    /// Errors: the whole transaction is rolled back and they are reported.
     /// </summary>
     public sealed class FailureLog : IFailuresPreprocessor
     {
@@ -31,7 +31,7 @@ namespace Bimbridge.Addin.Revit
         }
 
         public readonly List<Item> Items = new List<Item>();
-        /// <summary>false = dejar los avisos en Revit (el usuario los verá en el diálogo de avisos).</summary>
+        /// <summary>false = leave the warnings in Revit (the user will see them in the warnings dialog).</summary>
         public bool DeleteWarnings = true;
 
         public List<string> Errors => Items.Where(i => i.Severity != "aviso").Select(i => i.Text).ToList();
@@ -59,7 +59,7 @@ namespace Bimbridge.Addin.Revit
             return hasError ? FailureProcessingResult.ProceedWithRollBack : FailureProcessingResult.Continue;
         }
 
-        /// <summary>Tipo corto y estable para agrupar en el QC.</summary>
+        /// <summary>Short, stable kind for grouping in QC.</summary>
         public static string Classify(FailureDefinitionId id, string text)
         {
             try

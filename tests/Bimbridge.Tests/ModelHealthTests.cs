@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.9.1 (Bloque H): reglas de salud del modelo sobre datos sintéticos.</summary>
+    /// <summary>0.9.1 (Block H): model health rules on synthetic data.</summary>
     public class ModelHealthTests
     {
         private static ModelHealth.Element E(long id, double x, double y, string type = "A", double rot = 0, string level = "L1") =>
@@ -23,14 +23,14 @@ namespace Bimbridge.Tests
             Assert.Equal(2, g.Count);
             Assert.Equal(new long[] { 1, 2 }, g[0]);
             Assert.Equal(new long[] { 6, 7 }, g[1].Take(2).ToArray());
-            // 8 está a 3,9 mm de 6: fuera de la tolerancia de 3 mm respecto a 6 aunque cerca de 7.
+            // 8 is 3.9 mm from 6: outside the 3 mm tolerance relative to 6 even though it is close to 7.
             Assert.DoesNotContain(new[] { 3L, 4L, 5L }, id => g.Any(x => x.Contains(id)));
         }
 
         [Fact]
         public void Duplicates_DenseClusters_AreLinearish_AndNonFiniteOrHugeCoordsAreIgnored()
         {
-            // Un grupo muy denso (20.000 elementos en el mismo punto) y 20.000 dispersos: debe terminar rápido y dar un solo grupo.
+            // A very dense group (20,000 elements at the same point) and 20,000 scattered ones: it must finish fast and give a single group.
             var els = new List<ModelHealth.Element>();
             for (var i = 0; i < 20000; i++) els.Add(E(i + 1, 5, 5));
             for (var i = 0; i < 20000; i++) els.Add(E(100000 + i, 1000 + i * 3.0, 2000));
@@ -42,7 +42,7 @@ namespace Bimbridge.Tests
             Assert.Single(g);
             Assert.Equal(20000, g[0].Count);
             Assert.DoesNotContain(g[0], id => id >= 900001);
-            Assert.True(sw.ElapsedMilliseconds < 5000, "tardó " + sw.ElapsedMilliseconds + " ms");
+            Assert.True(sw.ElapsedMilliseconds < 5000, "took " + sw.ElapsedMilliseconds + " ms");
         }
 
         [Fact]

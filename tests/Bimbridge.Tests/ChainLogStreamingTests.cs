@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>alpha3 P1-C: ChainLog.Open valida en streaming con memoria acotada, sin perder detección de corrupción.</summary>
+    /// <summary>alpha3 P1-C: ChainLog.Open validates in streaming mode with bounded memory, without losing corruption detection.</summary>
     public class ChainLogStreamingTests
     {
         private static string NewPath() { var d = Path.Combine(Path.GetTempPath(), "bimbridge-chain-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(d); return Path.Combine(d, "diario.jsonl"); }
@@ -19,7 +19,7 @@ namespace Bimbridge.Tests
             var path = NewPath();
             var w = ChainLog.Open(path, true, _ => true, new List<Diagnostic>(), "t");
             var pad = new string('x', 900);
-            const int N = 40000;   // ~40 MB de diario
+            const int N = 40000;   // ~40 MB of journal
             for (var i = 0; i < N; i++) w.Append(new Dictionary<string, object> { ["ev"] = "x", ["i"] = (long)i, ["pad"] = pad });
             Assert.True(new FileInfo(path).Length > 35_000_000);
             GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
@@ -30,8 +30,8 @@ namespace Bimbridge.Tests
             Assert.False(Diagnostic.AnyError(diags));
             Assert.Equal(N, seen);
             Assert.Equal(N, log.LastSeq);
-            // el pico de memoria viva no crece con el tamaño del archivo (antes: byte[] del archivo entero + lista de registros)
-            Assert.True(peak < 200_000_000, "pico " + peak);
+            // peak live memory does not grow with file size (before: byte[] of the whole file + list of records)
+            Assert.True(peak < 200_000_000, "peak " + peak);
         }
 
         [Fact]
@@ -40,7 +40,7 @@ namespace Bimbridge.Tests
             var path = NewPath();
             var w = ChainLog.Open(path, true, _ => true, new List<Diagnostic>(), "t");
             for (var i = 0; i < 5; i++) w.Append(new Dictionary<string, object> { ["i"] = (long)i });
-            File.AppendAllText(path, "{\"i\":9");        // cola cortada
+            File.AppendAllText(path, "{\"i\":9");        // torn tail
             var d1 = new List<Diagnostic>();
             var l1 = ChainLog.Open(path, true, _ => true, d1, "t");
             Assert.False(Diagnostic.AnyError(d1));
@@ -49,7 +49,7 @@ namespace Bimbridge.Tests
             Assert.EndsWith("\n", File.ReadAllText(path));
 
             var lines = File.ReadAllLines(path);
-            lines[2] = lines[2].Replace("\"i\":2", "\"i\":7");   // contenido alterado
+            lines[2] = lines[2].Replace("\"i\":2", "\"i\":7");   // tampered content
             File.WriteAllText(path, string.Join("\n", lines) + "\n");
             var d2 = new List<Diagnostic>(); var got = 0;
             ChainLog.Open(path, true, _ => { got++; return true; }, d2, "t");

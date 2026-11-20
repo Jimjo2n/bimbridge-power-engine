@@ -8,30 +8,30 @@ using Bimbridge.Protocol;
 
 namespace BimBridge.PowerEngine.Workflows
 {
-    /// <summary>Símbolo candidato leído del PDF (salida de pdf_symbols).</summary>
+    /// <summary>Candidate symbol read from the PDF (pdf_symbols output).</summary>
     public sealed class SymbolCandidate
     {
-        public double Px, Py;            // pt, espacio visible
+        public double Px, Py;            // pt, visible space
         public string Code, Signature, Label;
         public double Confidence;
-        public double RotDeg;            // giro del símbolo en la página
+        public double RotDeg;            // rotation of the symbol on the page
         public int Page = 1;
     }
 
-    /// <summary>Cómo se materializa un código del plano en el modelo (lo decide la persona o la tabla de luminarias, no el agente).</summary>
+    /// <summary>How a drawing code materializes in the model (decided by the person or the fixture schedule, not the agent).</summary>
     public sealed class TypeRule
     {
         public string Code;
-        public string FamilyType;        // "Familia: Tipo" tal como lo usa la operación place
-        public double? ElevFt;           // offset sobre el nivel; null = usar Montaje
-        public string Montaje;           // "losa" (cara inferior de lo de arriba) u otro modo de place
+        public string FamilyType;        // "Family: Type" as used by the place operation
+        public double? ElevFt;           // offset above the level; null = use Montaje
+        public string Montaje;           // "losa" (underside of what is above) or another place mode
         public string Workset;
-        public string Host;              // anfitrión requerido (techo, muro, losa…) — restricción declarada
-        public bool Directional;         // si true, la orientación del símbolo importa (tiras, apliques)
+        public string Host;              // required host (ceiling, wall, slab…) — declared constraint
+        public bool Directional;         // if true, the symbol orientation matters (strips, sconces)
         public Dictionary<string, object> Params = new Dictionary<string, object>();
     }
 
-    /// <summary>Elemento ya existente en el modelo (para no duplicar).</summary>
+    /// <summary>Element that already exists in the model (to avoid duplicates).</summary>
     public sealed class ExistingElement
     {
         public long Id; public double X, Y; public string FamilyType, Level;
@@ -41,11 +41,11 @@ namespace BimBridge.PowerEngine.Workflows
     {
         public string Level;
         public double MinConfidence = 0.9;
-        public double DuplicateTolFt = 0.5;      // dos símbolos a menos de esto en el modelo = casi duplicado (6")
+        public double DuplicateTolFt = 0.5;      // two symbols closer than this in the model = near-duplicate (6")
         public double ExistingTolFt = 0.5;
-        public int BatchMax = 500;               // máximo de la operación place
+        public int BatchMax = 500;               // maximum of the place operation
         public string SourceId, SourceSha256, SourceRevision;
-        public double MinRotationDeg = 0.5;      // por debajo, sin giro
+        public double MinRotationDeg = 0.5;      // below this, no rotation
     }
 
     public sealed class PlacementItem
@@ -96,10 +96,10 @@ namespace BimBridge.PowerEngine.Workflows
     }
 
     /// <summary>
-    /// Planificador de colocación: símbolos del PDF + registro + reglas de tipo → plan determinista. Resuelve lo que tiene una sola
-    /// respuesta; lo demás (confianza baja, sin tipo, casi duplicados, conflicto con lo existente) se ESCALA como ambiguo, nunca se
-    /// adivina. Produce lotes de la operación tipada "place" (≤500 puntos) agrupados por tipo, nivel, montaje, giro y workset: la
-    /// ejecución reutiliza el plan/commit existente (cola, diario, idempotencia). No llama a Revit.
+    /// Placement planner: PDF symbols + registration + type rules → deterministic plan. Resolves what has a single
+    /// answer; everything else (low confidence, no type, near-duplicates, conflict with existing elements) is ESCALATED as ambiguous, never
+    /// guessed. Produces batches of the typed "place" operation (≤500 points) grouped by type, level, mounting, rotation and workset:
+    /// execution reuses the existing plan/commit (queue, journal, idempotency). Does not call Revit.
     /// </summary>
     public static class PlacementPlanner
     {
@@ -113,7 +113,7 @@ namespace BimBridge.PowerEngine.Workflows
             var byCode = (rules ?? new List<TypeRule>()).GroupBy(r => r.Code ?? "", StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
             var regRot = reg.RotationDeg;
 
-            // 1) transformar todos los símbolos (una sola llamada: C# o Rust según tamaño)
+            // 1) transform all symbols (a single call: C# or Rust depending on size)
             var syms = symbols ?? new List<SymbolCandidate>();
             var xyz = new double[syms.Count * 3];
             for (var i = 0; i < syms.Count; i++) { xyz[3 * i] = syms[i].Px; xyz[3 * i + 1] = syms[i].Py; }
@@ -129,22 +129,22 @@ namespace BimBridge.PowerEngine.Workflows
                     Id = StableId(o.SourceSha256, s.Page, s.Px, s.Py, s.Code),
                 };
                 var rule = s.Code != null && byCode.TryGetValue(s.Code, out var rl) ? rl : null;
-                if (rule == null) Amb(it, "sin_tipo", "el código «" + (s.Code ?? "?") + "» no tiene regla de tipo: lo decide una persona o la tabla de luminarias");
-                else if (rule.Count > 1) Amb(it, "tipo_ambiguo", "el código «" + s.Code + "» tiene " + rule.Count + " reglas de tipo");
+                if (rule == null) Amb(it, "sin_tipo", "code «" + (s.Code ?? "?") + "» has no type rule: a person or the fixture schedule decides");
+                else if (rule.Count > 1) Amb(it, "tipo_ambiguo", "code «" + s.Code + "» has " + rule.Count + " type rules");
                 else
                 {
                     var r = rule[0];
                     it.FamilyType = r.FamilyType; it.ElevFt = r.ElevFt; it.Montaje = r.Montaje; it.Workset = r.Workset; it.Host = r.Host;
                     var rot = r.Directional ? Norm180(s.RotDeg + regRot) : 0.0;
                     it.RotDeg = Math.Abs(rot) < o.MinRotationDeg ? 0 : rot;
-                    if (s.Confidence < o.MinConfidence) Amb(it, "confianza_baja", "confianza " + s.Confidence.ToString("0.##", CultureInfo.InvariantCulture) + " < " + o.MinConfidence.ToString("0.##", CultureInfo.InvariantCulture));
-                    else if (!it.ElevFt.HasValue && string.IsNullOrEmpty(it.Montaje)) Amb(it, "sin_altura", "la regla no da altura ni modo de montaje: no se inventa");
+                    if (s.Confidence < o.MinConfidence) Amb(it, "confianza_baja", "confidence " + s.Confidence.ToString("0.##", CultureInfo.InvariantCulture) + " < " + o.MinConfidence.ToString("0.##", CultureInfo.InvariantCulture));
+                    else if (!it.ElevFt.HasValue && string.IsNullOrEmpty(it.Montaje)) Amb(it, "sin_altura", "the rule gives neither height nor mounting mode: nothing is invented");
                     else it.Estado = "colocar";
                 }
                 items.Add(it);
             }
 
-            // 2) casi duplicados entre símbolos (en pies de modelo): se coloca el de mayor confianza (desempate: índice menor); el resto, ambiguo
+            // 2) near-duplicates among symbols (in model feet): the highest-confidence one is placed (tie-break: lowest index); the rest, ambiguous
             if (items.Count > 1)
             {
                 var pts = new double[items.Count * 2];
@@ -154,11 +154,11 @@ namespace BimBridge.PowerEngine.Workflows
                 {
                     var keep = g.OrderByDescending(i => items[i].Confidence).ThenBy(i => i).First();
                     foreach (var i in g.Where(i => i != keep))
-                        Amb(items[i], "casi_duplicado", "a menos de " + o.DuplicateTolFt.ToString("0.##", CultureInfo.InvariantCulture) + " ft de " + items[keep].Id + " (se coloca sólo aquel; confirme si son dos luminarias)");
+                        Amb(items[i], "casi_duplicado", "within " + o.DuplicateTolFt.ToString("0.##", CultureInfo.InvariantCulture) + " ft of " + items[keep].Id + " (only that one is placed; confirm whether they are two fixtures)");
                 }
             }
 
-            // 3) lo que ya existe en el modelo
+            // 3) what already exists in the model
             var ex = (existing ?? new List<ExistingElement>())
                 .Where(e => string.IsNullOrWhiteSpace(e.Level) || string.Equals(e.Level, o.Level, StringComparison.OrdinalIgnoreCase)).ToList();
             if (ex.Count > 0)
@@ -177,13 +177,13 @@ namespace BimBridge.PowerEngine.Workflows
                     if (nn.Index[i] < 0) continue;
                     var e = ex[nn.Index[i]];
                     if (!string.Equals(e.FamilyType, cand[i].FamilyType, StringComparison.Ordinal))
-                        Amb(cand[i], "conflicto_existente", "elemento " + e.Id + " de otro tipo (" + e.FamilyType + ") a " + nn.Dist[i].ToString("0.###", CultureInfo.InvariantCulture) + " ft");
+                        Amb(cand[i], "conflicto_existente", "element " + e.Id + " of another type (" + e.FamilyType + ") at " + nn.Dist[i].ToString("0.###", CultureInfo.InvariantCulture) + " ft");
                     else if (claims[nn.Index[i]].Count() > 1)
-                        Amb(cand[i], "existente_compartido", "el elemento " + e.Id + " coincide con más de un símbolo");
+                        Amb(cand[i], "existente_compartido", "element " + e.Id + " matches more than one symbol");
                     else
                     {
                         cand[i].Estado = "ya_existe";
-                        cand[i].Motivo = "elemento " + e.Id + " del mismo tipo a " + nn.Dist[i].ToString("0.###", CultureInfo.InvariantCulture) + " ft";
+                        cand[i].Motivo = "element " + e.Id + " of the same type at " + nn.Dist[i].ToString("0.###", CultureInfo.InvariantCulture) + " ft";
                     }
                 }
             }
@@ -192,7 +192,7 @@ namespace BimBridge.PowerEngine.Workflows
             plan.Ambiguous = items.Where(i => i.Estado == "ambiguo").ToList();
             plan.AlreadyThere = items.Where(i => i.Estado == "ya_existe").ToList();
 
-            // 4) lotes "place": mismos tipo, nivel, montaje/elev, giro y workset; ≤ BatchMax puntos; orden estable
+            // 4) "place" batches: same type, level, mounting/elev, rotation and workset; ≤ BatchMax points; stable order
             foreach (var g in plan.Place.GroupBy(i => (i.FamilyType, i.Level, i.Montaje, Elev: i.ElevFt.HasValue ? Math.Round(i.ElevFt.Value, 6) : (double?)null, Rot: Math.Round(i.RotDeg, 3), i.Workset, i.Host,
                                             Parameters: OpSemantics.Canonical(byCode[i.Code][0].Params)))
                                         .OrderBy(g => g.Key.FamilyType, StringComparer.Ordinal).ThenBy(g => g.Key.Rot))
@@ -221,9 +221,9 @@ namespace BimBridge.PowerEngine.Workflows
             return plan;
         }
 
-        /// <summary>Huella del plan (igual criterio que IndependentVerifier.Fingerprint, con los ids estables del plan como clave): permite
-        /// rechazar una verificación cuyo "esperado" es el propio plan copiado. Una fuente independiente que coincide en posiciones
-        /// no comparte los ids del plan, así que un acierto preciso no se confunde con una copia.</summary>
+        /// <summary>Plan fingerprint (same criterion as IndependentVerifier.Fingerprint, with the plan's stable ids as key): allows
+        /// rejecting a verification whose "expected" is the plan itself copied. An independent source that matches in positions
+        /// does not share the plan ids, so an accurate match is not mistaken for a copy.</summary>
         public static string Fingerprint(IEnumerable<PlacementItem> items) =>
             Bimbridge.Engine.Workflow.IndependentVerifier.Fingerprint(items.Select(i => new Bimbridge.Engine.Workflow.IndependentVerifier.Item
             { Key = i.Id, X = i.X, Y = i.Y, Attrs = { ["tipo"] = i.FamilyType ?? "" } }));
@@ -232,7 +232,7 @@ namespace BimBridge.PowerEngine.Workflows
             "pl-" + Home.Sha256Hex((sourceSha ?? "") + "|" + page.ToString(CultureInfo.InvariantCulture) + "|" + Math.Round(px * 8).ToString(CultureInfo.InvariantCulture) + "|" +
                                    Math.Round(py * 8).ToString(CultureInfo.InvariantCulture) + "|" + (code ?? "")).Substring(0, 16);
 
-        /// <summary>Lee los candidatos (y ambiguos, marcados con su confianza) de la salida de pdf_symbols.</summary>
+        /// <summary>Reads the candidates (and ambiguous ones, marked with their confidence) from the pdf_symbols output.</summary>
         public static List<SymbolCandidate> FromPdfSymbols(Dictionary<string, object> result, bool includeAmbiguous = true, bool confirmedOnly = false)
         {
             var l = new List<SymbolCandidate>();

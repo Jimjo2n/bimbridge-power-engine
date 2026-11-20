@@ -10,13 +10,13 @@ using System.Runtime.Intrinsics;
 namespace Bimbridge.Engine.Geo
 {
     /// <summary>
-    /// Acumula los triángulos de un elemento (coordenadas del anfitrión, pies). El orden a→b→c debe dar la normal
-    /// HACIA AFUERA del sólido (regla de la mano derecha); el add-in la corrige con la normal de la cara de Revit.
-    /// Las caras verticales se descartan: una vertical nunca las cruza, y así la malla pesa la mitad.
+    /// Accumulates an element's triangles (host coordinates, feet). The order a→b→c must give the solid's OUTWARD
+    /// normal (right-hand rule); the add-in corrects it with the Revit face normal.
+    /// Vertical faces are discarded: a vertical ray never crosses them, and the mesh weighs half as much.
     /// </summary>
     public sealed class TriMeshBuilder
     {
-        /// <summary>|nz| / |n| por debajo de esto = cara vertical (se descarta).</summary>
+        /// <summary>|nz| / |n| below this = vertical face (discarded).</summary>
         public const double VerticalTolerance = 1e-6;
 
         private double[] _v = new double[9 * 64];
@@ -44,7 +44,7 @@ namespace Bimbridge.Engine.Geo
             _v[o] = ax; _v[o + 1] = ay; _v[o + 2] = az;
             _v[o + 3] = bx; _v[o + 4] = by; _v[o + 5] = bz;
             _v[o + 6] = cx; _v[o + 7] = cy; _v[o + 8] = cz;
-            // Normal hacia afuera con z > 0 = cara que mira hacia arriba: por ahí SALE una vertical que sube.
+            // Outward normal with z > 0 = upward-facing face: an upgoing vertical ray EXITS through it.
             _s[_n] = nz > 0 ? (sbyte)1 : (sbyte)-1;
             _n++;
         }
@@ -52,9 +52,9 @@ namespace Bimbridge.Engine.Geo
         public TriMesh Build() => TriMesh.Create(_v, _s, _n);
 
         /// <summary>
-        /// La misma geometría girada en planta <paramref name="cos"/>/<paramref name="sin"/> alrededor de (ox, oy) y desplazada (tx, ty, tz).
-        /// Sirve para medir dónde quedaría una familia que todavía no existe (place con montaje) sin crearla en Revit.
-        /// Un giro en planta no cambia qué caras miran hacia arriba: los signos se conservan.
+        /// The same geometry rotated in plan by <paramref name="cos"/>/<paramref name="sin"/> about (ox, oy) and translated (tx, ty, tz).
+        /// Used to measure where a family that does not exist yet would end up (place with mounting) without creating it in Revit.
+        /// A rotation in plan does not change which faces point up: the signs are preserved.
         /// </summary>
         public TriMesh BuildMoved(double ox, double oy, double cos, double sin, double tx, double ty, double tz)
         {
@@ -71,17 +71,17 @@ namespace Bimbridge.Engine.Geo
         }
     }
 
-    /// <summary>Resultado de lanzar una vertical contra una malla.</summary>
+    /// <summary>Result of casting a vertical ray against a mesh.</summary>
     public enum RayResult
     {
-        /// <summary>La vertical no toca el elemento.</summary>
+        /// <summary>The vertical ray does not touch the element.</summary>
         Miss = 0,
         Ok = 1,
-        /// <summary>Entradas y salidas no cuadran ni moviendo el punto una millonésima de pie (arista o sólido abierto).</summary>
+        /// <summary>Entries and exits do not match, even after moving the point a millionth of a foot (edge or open solid).</summary>
         Inconsistent = 2,
     }
 
-    /// <summary>Memoria de trabajo por hilo (sin asignaciones por rayo).</summary>
+    /// <summary>Per-thread scratch memory (no allocations per ray).</summary>
     public sealed class RayScratch
     {
         internal double[] Z = new double[32];
@@ -103,49 +103,49 @@ namespace Bimbridge.Engine.Geo
     }
 
     /// <summary>
-    /// Malla inmutable de un elemento para rayos verticales, pensada para correr FUERA del hilo de Revit y en paralelo.
+    /// Immutable mesh of an element for vertical rays, designed to run OFF the Revit thread and in parallel.
     ///
-    /// Por qué: pyRevit (y la versión 0.2) llamaban Solid.IntersectWithCurve en el hilo de Revit por cada punto y cada sólido
-    /// candidato: 1442 luminarias × 9 puntos × ~5 sólidos ≈ 65 000 llamadas a la API (0,05–0,5 ms cada una) con Revit congelado.
-    /// Aquí cada elemento se triangula UNA vez (en el hilo de Revit, por tramos) y luego cada rayo cuesta ~1 µs en cualquier hilo.
+    /// Why: pyRevit (and version 0.2) called Solid.IntersectWithCurve on the Revit thread for every point and every candidate
+    /// solid: 1442 fixtures × 9 points × ~5 solids ≈ 65,000 API calls (0.05–0.5 ms each) with Revit frozen.
+    /// Here each element is triangulated ONCE (on the Revit thread, in slices) and then each ray costs ~1 µs on any thread.
     ///
-    /// Estructura: triángulos no verticales en arreglos paralelos (SoA) agrupados en hojas de 4 dentro de un BVH 2D (XY).
-    /// Cada hoja de 4 triángulos se prueba con una sola instrucción AVX2 en .NET 8 (Revit 2025–2026) y con un bucle escalar
-    /// en .NET Framework 4.8 (Revit 2022–2024). Ambos caminos hacen exactamente las mismas operaciones: mismos resultados.
+    /// Structure: non-vertical triangles in parallel arrays (SoA) grouped into leaves of 4 inside a 2D (XY) BVH.
+    /// Each leaf of 4 triangles is tested with a single AVX2 instruction on .NET 8 (Revit 2025–2026) and with a scalar loop
+    /// on .NET Framework 4.8 (Revit 2022–2024). Both paths perform exactly the same operations: same results.
     ///
-    /// Robustez: prueba de "punto dentro del triángulo" inclusiva (tolerancia 1e-9 pies) y orientación por la normal hacia afuera:
-    /// cara que mira abajo = entrada, cara que mira arriba = salida. Golpes del mismo signo a la misma altura (arista compartida)
-    /// cuentan una vez; entrada y salida a la misma altura (rozar una silueta) se anulan. Si aun así no cuadra, se mueve el punto
-    /// 1e-6 pies y se repite; si tampoco, se informa Inconsistent y ese punto no se usa (nunca se inventa una altura).
+    /// Robustness: inclusive "point inside triangle" test (1e-9 ft tolerance) and orientation from the outward normal:
+    /// downward-facing face = entry, upward-facing face = exit. Hits of the same sign at the same height (shared edge)
+    /// count once; an entry and an exit at the same height (grazing a silhouette) cancel out. If it still does not match, the point
+    /// is moved 1e-6 ft and retried; if that also fails, Inconsistent is reported and that point is not used (a height is never invented).
     /// </summary>
     public sealed class TriMesh
     {
         public const int Lanes = 4;
 
         /// <summary>
-        /// .NET 8 (Revit 2025–2026) compila primero sin optimizar y optimiza después de ~30 llamadas: el núcleo de rayos con AVX2 sería
-        /// lento justo en la primera revisión. AggressiveOptimization lo compila optimizado desde la primera llamada.
-        /// En .NET Framework (2022–2024) no hay compilación por niveles: siempre se optimiza y la marca no hace falta.
+        /// .NET 8 (Revit 2025–2026) first compiles unoptimized and optimizes after ~30 calls: the AVX2 ray kernel would be
+        /// slow precisely on the first check. AggressiveOptimization compiles it optimized from the first call.
+        /// .NET Framework (2022–2024) has no tiered compilation: it always optimizes and the flag is not needed.
         /// </summary>
 #if NET8_0_OR_GREATER
         internal const System.Runtime.CompilerServices.MethodImplOptions Hot = System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization;
 #else
         internal const System.Runtime.CompilerServices.MethodImplOptions Hot = 0;
 #endif
-        /// <summary>Tolerancia de borde (pies) para "dentro del triángulo".</summary>
+        /// <summary>Edge tolerance (feet) for "inside the triangle".</summary>
         public const double EdgeTolerance = 1e-9;
-        /// <summary>Golpes a menos de esto (pies) se consideran a la misma altura.</summary>
+        /// <summary>Hits closer than this (feet) are considered to be at the same height.</summary>
         public const double SameZ = 1e-7;
         private const double JitterX = 1.3e-6, JitterY = 0.7e-6;
 
-        /// <summary>Usar AVX2 cuando el procesador lo tiene (sólo .NET 8). Las pruebas lo apagan para comparar con el camino escalar.</summary>
+        /// <summary>Use AVX2 when the processor has it (.NET 8 only). Tests turn it off to compare against the scalar path.</summary>
         public static bool SimdEnabled = true;
 
-        // Hojas: 4 carriles por hoja. Arista i: d = Ux*py - Uy*px + K (distancia con signo; triángulo en sentido antihorario).
+        // Leaves: 4 lanes per leaf. Edge i: d = Ux*py - Uy*px + K (signed distance; counterclockwise triangle).
         internal double[] U0x, U0y, K0, U1x, U1y, K1, U2x, U2y, K2;
-        // Plano: z = A x + B y + C. Sg: +1 salida (cara hacia arriba), -1 entrada, 0 carril vacío.
+        // Plane: z = A x + B y + C. Sg: +1 exit (upward face), -1 entry, 0 empty lane.
         internal double[] PA, PB, PC, Sg;
-        // Nodos del BVH (XY).
+        // BVH nodes (XY).
         internal double[] NMinX, NMinY, NMaxX, NMaxY;
         internal int[] NLeft, NRight, NLeaf;
 
@@ -154,7 +154,7 @@ namespace Bimbridge.Engine.Geo
         public Box3 Bounds { get; private set; }
         public bool IsEmpty => Triangles == 0;
 
-        /// <summary>Memoria aproximada (bytes) para el informe del índice.</summary>
+        /// <summary>Approximate memory (bytes) for the index report.</summary>
         public long Bytes => (long)Leaves * Lanes * 13 * 8 + (NMinX?.Length ?? 0) * (4 * 8 + 3 * 4);
 
         public static readonly TriMesh Empty = Create(new double[0], new sbyte[0], 0);
@@ -198,7 +198,7 @@ namespace Bimbridge.Engine.Geo
             }
             m.Bounds = bounds;
 
-            // BVH por mediana del eje más largo; hojas de hasta 4 triángulos.
+            // BVH split by the median of the longest axis; leaves of up to 4 triangles.
             var order = new int[n];
             for (var i = 0; i < n; i++) order[i] = i;
             var maxNodes = 2 * ((n + Lanes - 1) / Lanes) + 1;
@@ -236,7 +236,7 @@ namespace Bimbridge.Engine.Geo
 
         private void SetDummy(int k)
         {
-            // Aristas nulas con K = -1: la distancia sale -1 para cualquier punto → nunca "dentro".
+            // Null edges with K = -1: the distance is -1 for any point → never "inside".
             U0x[k] = U0y[k] = U1x[k] = U1y[k] = U2x[k] = U2y[k] = 0;
             K0[k] = K1[k] = K2[k] = -1;
             PA[k] = PB[k] = PC[k] = 0;
@@ -248,7 +248,7 @@ namespace Bimbridge.Engine.Geo
             double ax = v[o], ay = v[o + 1], az = v[o + 2];
             double bx = v[o + 3], by = v[o + 4], bz = v[o + 5];
             double cx = v[o + 6], cy = v[o + 7], cz = v[o + 8];
-            // Plano con la normal de la terna tal cual (el signo de entrada/salida ya está en "sign").
+            // Plane from the triple's normal as is (the entry/exit sign is already in "sign").
             double ux = bx - ax, uy = by - ay, uz = bz - az;
             double vx = cx - ax, vy = cy - ay, vz = cz - az;
             double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
@@ -256,7 +256,7 @@ namespace Bimbridge.Engine.Geo
             PB[k] = -ny / nz;
             PC[k] = az - PA[k] * ax - PB[k] * ay;
             Sg[k] = sign;
-            // Prueba en planta siempre en sentido antihorario.
+            // The plan test is always counterclockwise.
             if (nz < 0) { var tx = bx; bx = cx; cx = tx; var ty = by; by = cy; cy = ty; }
             Edge(ax, ay, bx, by, out U0x[k], out U0y[k], out K0[k]);
             Edge(bx, by, cx, cy, out U1x[k], out U1y[k], out K1[k]);
@@ -319,7 +319,7 @@ namespace Bimbridge.Engine.Geo
                 leafTris.Add(tris);
                 return node;
             }
-            // División por la mediana de los centroides en el eje más largo (selección parcial, O(n) por nivel).
+            // Split at the centroid median on the longest axis (partial selection, O(n) per level).
             var byX = (cx1 - cx0) >= (cy1 - cy0);
             var key = byX ? cx : cy;
             var mid = (lo + hi) / 2;
@@ -332,7 +332,7 @@ namespace Bimbridge.Engine.Geo
             return node;
         }
 
-        /// <summary>Quickselect: deja en order[k] el elemento k-ésimo según key, menores a la izquierda.</summary>
+        /// <summary>Quickselect: leaves the k-th element by key at order[k], smaller ones to the left.</summary>
         private static void NthElement(int[] order, int lo, int hi, int k, double[] key)
         {
             while (hi > lo)
@@ -355,9 +355,9 @@ namespace Bimbridge.Engine.Geo
             }
         }
 
-        // ------------------------------------------------------------------ consultas
+        // ------------------------------------------------------------------ queries
 
-        /// <summary>Junta en <paramref name="sc"/> los golpes (z, signo) de la vertical que pasa por (px, py).</summary>
+        /// <summary>Collects into <paramref name="sc"/> the hits (z, sign) of the vertical ray through (px, py).</summary>
         [System.Runtime.CompilerServices.MethodImpl(Hot)]
         internal void Probe(double px, double py, RayScratch sc)
         {
@@ -391,7 +391,7 @@ namespace Bimbridge.Engine.Geo
             }
         }
 
-        /// <summary>Árbol más profundo que la pila (no pasa con mallas reales): recorre recursivamente.</summary>
+        /// <summary>Tree deeper than the stack (does not happen with real meshes): traverses recursively.</summary>
         private void LeafFallback(int n, double px, double py, RayScratch sc)
         {
             if (px < NMinX[n] - EdgeTolerance || px > NMaxX[n] + EdgeTolerance || py < NMinY[n] - EdgeTolerance || py > NMaxY[n] + EdgeTolerance)
@@ -414,7 +414,7 @@ namespace Bimbridge.Engine.Geo
         }
 
 #if NET8_0_OR_GREATER
-        /// <summary>Las 4 pruebas de una hoja en una sola pasada AVX2 (Revit 2025–2026, .NET 8).</summary>
+        /// <summary>The 4 tests of a leaf in a single AVX2 pass (Revit 2025–2026, .NET 8).</summary>
         [System.Runtime.CompilerServices.MethodImpl(Hot)]
         private void LeafSimd(int k0, double px, double py, RayScratch sc)
         {
@@ -444,8 +444,8 @@ namespace Bimbridge.Engine.Geo
 #endif
 
         /// <summary>
-        /// Tramos de la vertical (x, y) que quedan dentro del elemento y tocan [z0, z1]. Se agregan a <paramref name="into"/>
-        /// sin recortar (ZIn/ZOut son las caras reales). Mismo significado que Solid.IntersectWithCurve(CurveSegmentsInside).
+        /// Segments of the vertical ray (x, y) that lie inside the element and touch [z0, z1]. They are added to <paramref name="into"/>
+        /// unclipped (ZIn/ZOut are the real faces). Same meaning as Solid.IntersectWithCurve(CurveSegmentsInside).
         /// </summary>
         [System.Runtime.CompilerServices.MethodImpl(Hot)]
         public RayResult Segments(double x, double y, double z0, double z1, int item, List<Segment> into, RayScratch sc)
@@ -470,7 +470,7 @@ namespace Bimbridge.Engine.Geo
             return any ? RayResult.Ok : RayResult.Miss;
         }
 
-        /// <summary>Altura inferior y superior del propio cuerpo en (x, y): para medir la cara superior real de una luminaria.</summary>
+        /// <summary>Bottom and top height of the body itself at (x, y): used to measure the real top face of a fixture.</summary>
         [System.Runtime.CompilerServices.MethodImpl(Hot)]
         public RayResult Extent(double x, double y, RayScratch sc, out double zBot, out double zTop)
         {
@@ -495,8 +495,8 @@ namespace Bimbridge.Engine.Geo
         }
 
         /// <summary>
-        /// Ordena los golpes y los convierte en tramos [entrada, salida] con la profundidad (número de sólidos que contienen el punto).
-        /// Devuelve false si no cuadran (profundidad negativa o que no vuelve a 0).
+        /// Sorts the hits and turns them into [entry, exit] segments using the depth (number of solids containing the point).
+        /// Returns false if they do not match (negative depth or depth that does not return to 0).
         /// </summary>
         [System.Runtime.CompilerServices.MethodImpl(Hot)]
         internal static bool Resolve(RayScratch sc)
@@ -504,7 +504,7 @@ namespace Bimbridge.Engine.Geo
             sc.Lo.Clear(); sc.Hi.Clear();
             var n = sc.N;
             var z = sc.Z; var s = sc.S;
-            // Inserción: casi siempre hay 2 a 6 golpes.
+            // Insertion sort: there are almost always 2 to 6 hits.
             for (var i = 1; i < n; i++)
             {
                 var zi = z[i]; var si = s[i];
@@ -517,7 +517,7 @@ namespace Bimbridge.Engine.Geo
             var r = 0;
             while (r < n)
             {
-                // Racha de golpes a la misma altura.
+                // Run of hits at the same height.
                 var hasIn = false; var hasOut = false;
                 var zr = z[r];
                 var e = r;
@@ -528,7 +528,7 @@ namespace Bimbridge.Engine.Geo
                 }
                 var zMid = z[r];
                 r = e;
-                if (hasIn && hasOut) continue; // rozar una silueta o tocar entre dos sólidos: no cambia nada
+                if (hasIn && hasOut) continue; // grazing a silhouette or touching between two solids: changes nothing
                 if (hasIn)
                 {
                     if (depth == 0) start = zMid;
@@ -556,13 +556,13 @@ namespace Bimbridge.Engine.Geo
     }
 
     /// <summary>
-    /// Un cuerpo del índice de geometría, sin nada de la API de Revit: id, de qué modelo viene, caja y malla (coordenadas del anfitrión).
-    /// La malla se llena sólo cuando algo lo necesita. Una vez llena no cambia: se lee desde varios hilos a la vez.
+    /// A body of the geometry index, with nothing from the Revit API: id, source model, box and mesh (host coordinates).
+    /// The mesh is filled only when something needs it. Once filled it does not change: it is read from several threads at once.
     /// </summary>
     public sealed class GeoBody
     {
         public long Id;
-        /// <summary>0 = anfitrión; si no, id de la instancia del vínculo.</summary>
+        /// <summary>0 = host; otherwise, the id of the link instance.</summary>
         public long LinkId;
         public string Source;
         public string Category;
@@ -570,16 +570,16 @@ namespace Bimbridge.Engine.Geo
         public Box3 Box;
         public volatile TriMesh Mesh;
         public bool MeshFailed;
-        /// <summary>Revisión del anfitrión cuando se extrajo la malla (los vínculos no cambian mientras siguen cargados).</summary>
+        /// <summary>Host revision when the mesh was extracted (links do not change while they stay loaded).</summary>
         public long MeshRev;
-        /// <summary>Muros: eje en planta como polilínea [x0,y0,x1,y1,…] (coordenadas del anfitrión) y espesor.</summary>
+        /// <summary>Walls: plan axis as a polyline [x0,y0,x1,y1,…] (host coordinates) and thickness.</summary>
         public double[] Line;
         public double Width;
-        /// <summary>Caja del elemento tal como la dio Revit al extraer la malla (si cambia, la malla se rehace).</summary>
+        /// <summary>Element box as Revit reported it when the mesh was extracted (if it changes, the mesh is rebuilt).</summary>
         public Box3 RawBox = Box3.Empty;
-        /// <summary>Subcategorías excluidas con que se extrajo la malla ("" = ninguna).</summary>
+        /// <summary>Excluded subcategories the mesh was extracted with ("" = none).</summary>
         public string MeshKey = "";
-        /// <summary>Subcategorías de los sólidos del cuerpo (p. ej. "Lighting Fixtures", "JBox").</summary>
+        /// <summary>Subcategories of the body's solids (e.g. "Lighting Fixtures", "JBox").</summary>
         public string[] Parts;
     }
 }

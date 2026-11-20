@@ -20,7 +20,7 @@ namespace Bimbridge.Addin.Revit
             var scope = equipment ? "equipos" : "terminales";
             if (!request.Args.TryGetValue(scope, out var raw) || !(raw is List<object> input) ||
                 input.Count == 0 || input.Count > 200 || input.Any(x => x is not Dictionary<string, object>))
-                return Response.Fail(request.Id, Status.Invalido, scope + " exige de 1 a 200 objetos con expectativas del markup");
+                return Response.Fail(request.Id, Status.Invalido, scope + " requires 1 to 200 objects with the markup expectations");
             var specs = input.Cast<Dictionary<string, object>>().ToList();
             var unexpected = new List<long>();
             if (equipment && request.Args.ContainsKey("ids_observados"))
@@ -66,22 +66,22 @@ namespace Bimbridge.Addin.Revit
         {
             const double tolerance = 1.0 / 304.8;
             if (!(Arg.GetLong(spec, "id") is long id) || id <= 0 || !spec.TryGetValue("xy_ft", out var xy))
-                throw new QueryException("terminales: cada inspección exige id y xy_ft del markup");
+                throw new QueryException("terminales: each inspection requires the markup id and xy_ft");
             var expected = OpCatalog.Point(xy, "terminales xy_ft", false);
-            var offset = OpCatalog.Number(spec, "elev_ft", "terminales") ?? throw new QueryException("falta elev_ft");
+            var offset = OpCatalog.Number(spec, "elev_ft", "terminales") ?? throw new QueryException("missing elev_ft");
             var expectedType = Arg.GetString(spec, "tipo");
             var expectedLevel = Arg.GetString(spec, "nivel");
             var direction = Arg.GetString(spec, "sentido");
             var parameter = Arg.GetString(spec, "parametro_sentido");
             if (string.IsNullOrWhiteSpace(expectedType) || string.IsNullOrWhiteSpace(expectedLevel))
-                throw new QueryException("falta el tipo o el nivel esperado");
+                throw new QueryException("missing the expected tipo or nivel");
             if (!equipment && ((direction != "UP" && direction != "DN") || string.IsNullOrWhiteSpace(parameter)))
-                throw new QueryException("faltan sentido UP/DN o parametro_sentido");
+                throw new QueryException("missing sentido UP/DN or parametro_sentido");
             var diagnostics = new List<object>();
             var row = new Dictionary<string, object> { ["id"] = id, ["ref"] = Arg.GetString(spec, "ref"), ["diferencias"] = diagnostics };
             if (!(doc.GetElement(Ids.ToId(id)) is FamilyInstance terminal))
             {
-                diagnostics.Add("terminal no encontrado");
+                diagnostics.Add("terminal not found");
                 ok = false;
                 return row;
             }
@@ -93,10 +93,10 @@ namespace Bimbridge.Addin.Revit
             var loc = terminal.Location as LocationPoint;
             var point = loc?.Point;
             if (point == null || level == null || point.DistanceTo(new XYZ(expected[0], expected[1], level.ProjectElevation + offset)) > tolerance)
-                diagnostics.Add("posición");
+                diagnostics.Add("position");
             if (OpCatalog.Number(spec, "giro_deg", "terminales") is double rotation &&
                 (loc == null || ManifestQc.RotDiff(loc.Rotation * 180 / Math.PI, rotation, 0) > 0.5))
-                diagnostics.Add("orientación");
+                diagnostics.Add("orientation");
             if (!equipment)
             {
                 var shown = WriteKit.ParamValue(terminal.LookupParameter(parameter));
@@ -125,8 +125,8 @@ namespace Bimbridge.Addin.Revit
                 var arrives = curve != null && point != null && new[] { curve.Curve.GetEndPoint(0), curve.Curve.GetEndPoint(1) }
                     .Any(end => end.DistanceTo(point) <= tolerance || ports.Any(p => end.DistanceTo(p.Origin) <= tolerance));
                 row["llegada"] = connected ? "conexion_fisica" : arrives ? "llegada_geometrica" : "sin_llegada";
-                if (!connected && !arrives) diagnostics.Add("el tramo no llega al terminal");
-                if (Arg.GetBool(spec, "exigir_conexion") == true && !connected) diagnostics.Add("sin conexión física requerida");
+                if (!connected && !arrives) diagnostics.Add("the segment does not reach the terminal");
+                if (Arg.GetBool(spec, "exigir_conexion") == true && !connected) diagnostics.Add("required physical connection is missing");
             }
             ok = diagnostics.Count == 0;
             return row;

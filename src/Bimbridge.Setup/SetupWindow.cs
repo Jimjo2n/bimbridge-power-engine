@@ -14,8 +14,8 @@ using Bimbridge.Addin.Ui;
 namespace Bimbridge.Setup
 {
     /// <summary>
-    /// Ventana única del instalador: elegir versiones de Revit, qué puede hacer la IA y con qué IAs conectarse;
-    /// luego instalar y ver el resultado. También sirve para modificar y desinstalar.
+    /// The installer's single window: choose Revit versions, what the AI can do and which AIs to connect;
+    /// then install and see the result. It is also used to modify and uninstall.
     /// </summary>
     internal sealed class SetupWindow
     {
@@ -47,7 +47,7 @@ namespace Bimbridge.Setup
             _installed = _core.ReadInstalled();
             _uninstallMode = uninstallMode;
 
-            Window = Theme.NewWindow(_uninstallMode ? "Desinstalar BIMBRIDGE - Power Engine" : "Instalar BIMBRIDGE - Power Engine", 640, 720);
+            Window = Theme.NewWindow(_uninstallMode ? "Uninstall BIMBRIDGE - Power Engine" : "Install BIMBRIDGE - Power Engine", 640, 720);
             Window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             Window.ShowInTaskbar = true;
             Window.MinHeight = 560;
@@ -61,14 +61,14 @@ namespace Bimbridge.Setup
             var root = new DockPanel();
             var header = Theme.Header(
                 Theme.ProductEyebrow,
-                _uninstallMode ? "Desinstalar" : _installed != null ? "Modificar instalación" : "Instalar",
-                "Claude y Codex trabajando con Revit, con su permiso.",
+                _uninstallMode ? "Uninstall" : _installed != null ? "Modify installation" : "Install",
+                "Claude and Codex working with Revit, with your permission.",
                 out _subtitle, out var pill, out var pillText);
             pillText.Text = "v" + Platform.ProductVersion;
             DockPanel.SetDock(header, Dock.Top);
             root.Children.Add(header);
 
-            // Pie: enlace discreto a la izquierda (p. ej. Desinstalar), nota, y acciones a la derecha.
+            // Footer: discreet link on the left (e.g. Uninstall), note, and actions on the right.
             var left = new DockPanel();
             DockPanel.SetDock(_footerLink, Dock.Left);
             left.Children.Add(_footerLink);
@@ -88,9 +88,9 @@ namespace Bimbridge.Setup
             else ShowInstallForm();
         }
 
-        // ================= Instalar / modificar =================
+        // ================= Install / modify =================
 
-        /// <summary>El aviso se reutiliza entre pantallas: hay que soltarlo de la anterior antes de ponerlo en la nueva.</summary>
+        /// <summary>The banner is reused across screens: it must be detached from the previous one before adding it to the new one.</summary>
         private void PutBanner(Panel body, int index = -1)
         {
             (_banner.Parent as Panel)?.Children.Remove(_banner);
@@ -104,18 +104,18 @@ namespace Bimbridge.Setup
             var body = new StackPanel();
             PutBanner(body);
             if (_installed != null)
-                ShowBanner("Ya está instalada la versión " + _installed.ProductVersion + ". Puede cambiar las opciones y pulsar Actualizar.", Theme.NavySoft);
+                ShowBanner("Version " + _installed.ProductVersion + " is already installed. You can change the options and click Update.", Theme.NavySoft);
 
             // 1. Revit
             var revit = new StackPanel();
-            revit.Children.Add(Theme.Section("¿En qué versiones de Revit?", "Se marcaron las que hay en esta computadora.", "1"));
+            revit.Children.Add(Theme.Section("Which Revit versions?", "The ones on this computer are checked.", "1"));
             var grid = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3, Margin = new Thickness(0, 4, -8, 0) };
             foreach (var r in _core.DetectRevit())
             {
                 var chosen = _installed != null ? _installed.Versions.Contains(r.Version) : r.Installed;
                 var withBimbridge = _installed != null && _installed.Versions.Contains(r.Version);
-                var hint = withBimbridge ? (r.Installed ? "Con BIMBRIDGE" : "Con BIMBRIDGE · Revit no encontrado")
-                                         : r.Installed ? "Revit encontrado" : "No encontrado";
+                var hint = withBimbridge ? (r.Installed ? "With BIMBRIDGE" : "With BIMBRIDGE · Revit not found")
+                                         : r.Installed ? "Revit found" : "Not found";
                 var cb = Theme.Choice(new CheckBox
                 {
                     IsChecked = chosen && r.Installed || (_installed != null && _installed.Versions.Contains(r.Version)),
@@ -129,49 +129,49 @@ namespace Bimbridge.Setup
             revit.Children.Add(grid);
             if (!_core.DetectRevit().Any(r => r.Installed))
             {
-                var none = Theme.Notice("No se encontró Revit 2022–2027 en C:\\Program Files\\Autodesk. Instale Revit primero.", Theme.Amber, out _);
+                var none = Theme.Notice("Revit 2022–2027 was not found in C:\\Program Files\\Autodesk. Install Revit first.", Theme.Amber, out _);
                 none.Margin = new Thickness(0, 12, 0, 0);
                 revit.Children.Add(none);
             }
             body.Children.Add(Theme.Card(revit));
 
-            // 2. Permisos
+            // 2. Permissions
             var perms = new StackPanel();
-            perms.Children.Add(Theme.Section("¿Qué puede hacer la IA?", "Se puede cambiar después volviendo a abrir este instalador.", "2"));
+            perms.Children.Add(Theme.Section("What can the AI do?", "You can change this later by opening this installer again.", "2"));
             var current = _installed?.Levels ?? "RPW";
-            _r = Option(perms, "Sólo leer el modelo", "Consultar, contar y auditar. No puede proponer ni hacer cambios.", current == "R");
-            _rp = Option(perms, "Leer y proponer cambios (todo espera en la cola)", "Los cambios nunca se aplican solos: usted los revisa y aplica desde el botón Cola del ribbon.", current == "RP");
-            _rpw = Option(perms, "Leer y cambiar con su aprobación (recomendado)", "La IA le muestra el antes y el después y usted aprueba. Con el botón Modo elige si se aplica al momento o espera en la cola.", current == "RPW");
+            _r = Option(perms, "Read the model only", "Query, count and audit. It cannot propose or make changes.", current == "R");
+            _rp = Option(perms, "Read and propose changes (everything waits in the queue)", "Changes are never applied on their own: you review and apply them from the Queue button on the ribbon.", current == "RP");
+            _rpw = Option(perms, "Read and change with your approval (recommended)", "The AI shows you the before and after and you approve. With the Mode button you choose whether it applies right away or waits in the queue.", current == "RPW");
             body.Children.Add(Theme.Card(perms));
 
-            // 3. IAs
+            // 3. AIs
             var ais = new StackPanel();
-            ais.Children.Add(Theme.Section("¿Con qué IA la va a usar?", "Marque las que usa. Puede añadir otra después volviendo a abrir este instalador.", "3"));
+            ais.Children.Add(Theme.Section("Which AI will you use it with?", "Check the ones you use. You can add another later by opening this installer again.", "3"));
             var claudePath = Platform.FindClaude();
-            _claude = AiOption(ais, "Claude Code", claudePath != null ? "Encontrado. Se conectará solo." : "No se encontró en esta computadora. Puede conectarlo después volviendo a abrir este instalador.", claudePath != null, claudePath != null);
-            _codex = AiOption(ais, "Codex", _core.CodexPresent ? "Encontrado. Se añadirá a su configuración." : "No se encontró. Si lo instala más tarde, vuelva a abrir este instalador.", _core.CodexPresent || (_installed?.Codex ?? false), true);
+            _claude = AiOption(ais, "Claude Code", claudePath != null ? "Found. It will connect automatically." : "Not found on this computer. You can connect it later by opening this installer again.", claudePath != null, claudePath != null);
+            _codex = AiOption(ais, "Codex", _core.CodexPresent ? "Found. It will be added to its configuration." : "Not found. If you install it later, open this installer again.", _core.CodexPresent || (_installed?.Codex ?? false), true);
             body.Children.Add(Theme.Card(ais));
 
-            // Nota de seguridad
+            // Security note
             var note = Theme.Notice(
-                "La primera vez que abra Revit aparecerá el aviso \"Complemento sin firmar\" (Unsigned Add-In). Elija \"Cargar siempre\" (Always Load). " +
-                "Si IT firma el complemento, ese aviso desaparece.", Theme.Slate, out var noteText);
+                "The first time you open Revit, the \"Unsigned Add-In\" warning will appear. Choose \"Always Load\". " +
+                "If IT signs the add-in, that warning goes away.", Theme.Slate, out var noteText);
             noteText.FontSize = 12.5;
             body.Children.Add(note);
 
             _scroll.Content = body;
             Theme.Enter(body);
             SetFooter(
-                "Se instala sólo para su usuario. No pide permisos de administrador.",
-                _installed != null ? Link("Desinstalar", ShowUninstallForm) : null,
-                Btn("Cancelar", Theme.Kind.Secondary, () => Window.Close()),
-                Btn(_installed != null ? "Actualizar" : "Instalar", Theme.Kind.Primary, () => _ = InstallAsync()));
+                "Installs for your user only. Does not ask for administrator permissions.",
+                _installed != null ? Link("Uninstall", ShowUninstallForm) : null,
+                Btn("Cancel", Theme.Kind.Secondary, () => Window.Close()),
+                Btn(_installed != null ? "Update" : "Install", Theme.Kind.Primary, () => _ = InstallAsync()));
         }
 
         private async Task InstallAsync()
         {
             var versions = _versionChecks.Where(c => c.IsChecked == true).Select(c => (string)c.Tag).ToList();
-            if (versions.Count == 0) { ShowBanner("Elija al menos una versión de Revit.", Theme.Amber); return; }
+            if (versions.Count == 0) { ShowBanner("Choose at least one Revit version.", Theme.Amber); return; }
             var revitOpen = Platform.RevitRunning();
 
             var levels = _r.IsChecked == true ? "R" : _rp.IsChecked == true ? "RP" : "RPW";
@@ -181,8 +181,8 @@ namespace Bimbridge.Setup
             using var waiting = new CancellationTokenSource();
             _installationWait = waiting;
             if (revitOpen) ShowWaitingForRevit();
-            else ShowBusy("Instalando…");
-            SetFooter("", null, Btn("Cancelar", Theme.Kind.Secondary, () => Window.Close()));
+            else ShowBusy("Installing…");
+            SetFooter("", null, Btn("Cancel", Theme.Kind.Secondary, () => Window.Close()));
 
             string error = null;
             string claudeResult = null;
@@ -191,12 +191,12 @@ namespace Bimbridge.Setup
                 try
                 {
                     using var installation = Platform.LockInstallation(_paths);
-                    if (!Platform.WaitForRevitExit(waiting.Token)) throw new InvalidOperationException("La espera terminó con Revit abierto. Puede volver a intentar la instalación.");
+                    if (!Platform.WaitForRevitExit(waiting.Token)) throw new InvalidOperationException("The wait ended with Revit still open. You can try the install again.");
                     Window.Dispatcher.Invoke(() =>
                     {
                         waiting.Token.ThrowIfCancellationRequested();
                         _applyingInstallation = true;
-                        ShowBusy("Instalando…");
+                        ShowBusy("Installing…");
                     });
                     Platform.MigrateLegacyData(_paths, _log.Add);
                     using (var zip = new ZipArchive(Platform.OpenPayload()))
@@ -205,13 +205,13 @@ namespace Bimbridge.Setup
                     if (wantClaude)
                     {
                         var claude = Platform.FindClaude();
-                        if (claude != null && Platform.RegisterClaude(claude, _paths.BridgeExe, out var detail)) _log.Add("Conectado con Claude Code");
-                        else claudeResult = "No se pudo conectar con Claude Code automáticamente. En una consola escriba:\nclaude mcp add --scope user bimbridge -- \"" + _paths.BridgeExe + "\"";
+                        if (claude != null && Platform.RegisterClaude(claude, _paths.BridgeExe, out var detail)) _log.Add("Connected to Claude Code");
+                        else claudeResult = "Could not connect to Claude Code automatically. In a terminal type:\nclaude mcp add --scope user bimbridge -- \"" + _paths.BridgeExe + "\"";
                     }
                     var recycled = Platform.AfterInstall(_core, _paths, before);
-                    if (Platform.LastWarning != null) _log.Add("Aviso: " + Platform.LastWarning);
-                    if (recycled.Count > 0) _log.Add("Instaladores viejos enviados a la papelera: " + recycled.Count);
-                    if (_core.ReplacedInUse > 0) _log.Add("Reinicie las conversaciones que usaban BIMBRIDGE para cargar el puente nuevo.");
+                    if (Platform.LastWarning != null) _log.Add("Warning: " + Platform.LastWarning);
+                    if (recycled.Count > 0) _log.Add("Old installers sent to the Recycle Bin: " + recycled.Count);
+                    if (_core.ReplacedInUse > 0) _log.Add("Restart the conversations that were using BIMBRIDGE to load the new bridge.");
                 }
                 catch (Exception ex) { error = ex.Message; }
             });
@@ -231,67 +231,67 @@ namespace Bimbridge.Setup
         private void ShowDone(List<string> versions, string levels, string warning)
         {
             var body = new StackPanel();
-            body.Children.Add(Hero(Theme.Green, "Listo", "BIMBRIDGE - Power Engine quedó instalado."));
+            body.Children.Add(Hero(Theme.Green, "Done", "BIMBRIDGE - Power Engine is installed."));
             var steps = new StackPanel();
-            steps.Children.Add(Theme.Section("Qué sigue"));
-            steps.Children.Add(Step("1", OpenRevitText(versions) + ". Si pregunta por el complemento sin firmar, elija \"Cargar siempre\"."));
-            steps.Children.Add(Step("2", "Verá la pestaña BIMBRIDGE. El botón Power Engine | Estado se pone verde cuando una IA se conecta."));
-            steps.Children.Add(Step("3", "En Claude o Codex pida, por ejemplo: \"¿Cuántas luminarias hay por nivel en el modelo abierto?\""));
+            steps.Children.Add(Theme.Section("What's next"));
+            steps.Children.Add(Step("1", OpenRevitText(versions) + ". If it asks about the unsigned add-in, choose \"Always Load\"."));
+            steps.Children.Add(Step("2", "You will see the BIMBRIDGE tab. The Power Engine | Status button turns green when an AI connects."));
+            steps.Children.Add(Step("3", "In Claude or Codex ask, for example: \"How many lighting fixtures are there per level in the open model?\""));
             body.Children.Add(Theme.Card(steps));
 
             var done = new StackPanel();
-            done.Children.Add(Theme.Section("Lo que se hizo"));
+            done.Children.Add(Theme.Section("What was done"));
             foreach (var l in _log) done.Children.Add(Did(l));
-            done.Children.Add(Did("Permisos de la IA: " + SetupCore.LevelsText(levels)));
-            done.Children.Add(Did("Aparece en Configuración > Aplicaciones como \"BIMBRIDGE - Power Engine\" para quitarlo cuando quiera"));
+            done.Children.Add(Did("AI permissions: " + SetupCore.LevelsText(levels)));
+            done.Children.Add(Did("Listed in Settings > Apps as \"BIMBRIDGE - Power Engine\" so you can remove it whenever you want"));
             body.Children.Add(Theme.Card(done));
             if (warning != null) { PutBanner(body, 0); ShowBanner(warning, Theme.Amber); }
 
             _scroll.Content = body;
             Theme.Enter(body);
-            SetFooter("", null, Btn("Cerrar", Theme.Kind.Primary, () => Window.Close()));
+            SetFooter("", null, Btn("Close", Theme.Kind.Primary, () => Window.Close()));
         }
 
-        /// <summary>"Abra Revit 2024", "Abra Revit 2024 o 2025", "Abra Revit 2022, 2024 o 2026", "Abra cualquier Revit entre 2022 y 2026".</summary>
+        /// <summary>"Open Revit 2024", "Open Revit 2024 or 2025", "Open Revit 2022, 2024 or 2026", "Open any Revit from 2022 to 2026".</summary>
         private static string OpenRevitText(List<string> versions)
         {
-            var v = versions.Distinct().OrderBy(s => s, StringComparer.Ordinal).ToList(); // años de 4 cifras: orden de texto = orden numérico
-            if (v.Count == 1) return "Abra Revit " + v[0];
+            var v = versions.Distinct().OrderBy(s => s, StringComparer.Ordinal).ToList(); // 4-digit years: text order = numeric order
+            if (v.Count == 1) return "Open Revit " + v[0];
             if (v.Count >= 3 && int.TryParse(v[0], out var first) && int.TryParse(v[v.Count - 1], out var last) && v.All(s => int.TryParse(s, out _)) && last - first == v.Count - 1)
-                return "Abra cualquier Revit entre " + first + " y " + last;
-            return "Abra Revit " + string.Join(", ", v.Take(v.Count - 1)) + " o " + v[v.Count - 1];
+                return "Open any Revit from " + first + " to " + last;
+            return "Open Revit " + string.Join(", ", v.Take(v.Count - 1)) + " or " + v[v.Count - 1];
         }
 
-        // ================= Desinstalar =================
+        // ================= Uninstall =================
 
         private void ShowUninstallForm()
         {
             var body = new StackPanel();
             PutBanner(body);
             var s = new StackPanel();
-            s.Children.Add(Theme.Section("¿Quitar BIMBRIDGE - Power Engine de esta computadora?", "Se quita el complemento de Revit, la conexión con Claude y Codex y el puente. Sus modelos no se tocan."));
-            _removeData = Theme.Choice(new CheckBox(), "Borrar también mis datos", "Registros, la cola de cambios pendientes y la configuración.");
+            s.Children.Add(Theme.Section("Remove BIMBRIDGE - Power Engine from this computer?", "Removes the Revit add-in, the connection to Claude and Codex, and the bridge. Your models are not touched."));
+            _removeData = Theme.Choice(new CheckBox(), "Also delete my data", "Logs, the queue of pending changes and the configuration.");
             _removeData.Margin = new Thickness(0, 12, 0, 0);
             s.Children.Add(_removeData);
             body.Children.Add(Theme.Card(s));
             _scroll.Content = body;
             Theme.Enter(body);
-            // Intro y Esc vuelven atrás: la acción destructiva sólo se confirma con un clic o Tab + Espacio sobre su botón.
-            var cancel = Btn("Cancelar", Theme.Kind.Secondary, () => { if (_uninstallMode) Window.Close(); else ShowInstallForm(); });
+            // Enter and Esc go back: the destructive action is only confirmed with a click or Tab + Space on its button.
+            var cancel = Btn("Cancel", Theme.Kind.Secondary, () => { if (_uninstallMode) Window.Close(); else ShowInstallForm(); });
             cancel.IsDefault = true;
             cancel.IsCancel = true;
             SetFooter(
-                _installed != null ? "Versión instalada: " + _installed.ProductVersion : "",
+                _installed != null ? "Installed version: " + _installed.ProductVersion : "",
                 null,
                 cancel,
-                Btn("Desinstalar", Theme.Kind.DangerSolid, () => _ = UninstallAsync()));
+                Btn("Uninstall", Theme.Kind.DangerSolid, () => _ = UninstallAsync()));
         }
 
         private async Task UninstallAsync()
         {
-            if (Platform.RevitRunning()) { ShowBanner("Revit está abierto. Ciérrelo y pulse Desinstalar otra vez.", Theme.Amber); return; }
+            if (Platform.RevitRunning()) { ShowBanner("Revit is open. Close it and click Uninstall again.", Theme.Amber); return; }
             var removeData = _removeData.IsChecked == true;
-            ShowBusy("Desinstalando…");
+            ShowBusy("Uninstalling…");
             string error = null;
             await Task.Run(() =>
             {
@@ -308,30 +308,30 @@ namespace Bimbridge.Setup
             if (error != null) { ShowUninstallForm(); ShowBanner(error, Theme.Red); return; }
 
             var body = new StackPanel();
-            body.Children.Add(Hero(Theme.Slate, "Desinstalado", "BIMBRIDGE - Power Engine se quitó de esta computadora."));
+            body.Children.Add(Hero(Theme.Slate, "Uninstalled", "BIMBRIDGE - Power Engine was removed from this computer."));
             _scroll.Content = body;
             Theme.Enter(body);
-            SetFooter("", null, Btn("Cerrar", Theme.Kind.Primary, () => { Platform.DeleteSetupCopyLater(_paths); Window.Close(); }));
+            SetFooter("", null, Btn("Close", Theme.Kind.Primary, () => { Platform.DeleteSetupCopyLater(_paths); Window.Close(); }));
         }
 
-        // ================= piezas =================
+        // ================= pieces =================
 
-        /// <summary>Trabajo en curso: frase de estado y barra de progreso. El pie queda oculto hasta que alguien ponga botones.</summary>
+        /// <summary>Work in progress: status sentence and progress bar. The footer stays hidden until someone adds buttons.</summary>
         private void ShowBusy(string text)
         {
             var s = BusyPanel(text);
-            var bar = Theme.ProgressLine(!Theme.ReducedMotion); // movimiento reducido: sin animación indeterminada; la frase y el cursor de espera siguen
+            var bar = Theme.ProgressLine(!Theme.ReducedMotion); // reduced motion: no indeterminate animation; the sentence and the wait cursor remain
             bar.Width = 240;
             bar.Margin = new Thickness(0, 16, 0, 0);
             s.Children.Add(bar);
             ShowBusyPanel(s);
         }
 
-        /// <summary>Esperando a que el usuario cierre Revit: no hay progreso que medir, así que aviso ámbar en vez de barra.</summary>
+        /// <summary>Waiting for the user to close Revit: there is no progress to measure, so an amber notice instead of a bar.</summary>
         private void ShowWaitingForRevit()
         {
-            var s = BusyPanel("Esperando a que se cierre Revit");
-            var notice = Theme.Notice("Instalación pendiente. Guarde su trabajo y cierre todas las ventanas de Revit. Deje abierto este instalador.", Theme.Amber, out _);
+            var s = BusyPanel("Waiting for Revit to close");
+            var notice = Theme.Notice("Install pending. Save your work and close all Revit windows. Leave this installer open.", Theme.Amber, out _);
             notice.Margin = new Thickness(0, 16, 0, 0);
             s.Children.Add(notice);
             ShowBusyPanel(s);
@@ -383,10 +383,10 @@ namespace Bimbridge.Setup
             return g;
         }
 
-        /// <summary>Fila de "Lo que se hizo": marca a la izquierda y texto con sangría francesa (las líneas largas no pasan bajo la marca).</summary>
+        /// <summary>"What was done" row: mark on the left and text with a hanging indent (long lines do not wrap under the mark).</summary>
         private static UIElement Did(string text)
         {
-            var warning = text.StartsWith("Aviso: ", StringComparison.Ordinal);
+            var warning = text.StartsWith("Warning: ", StringComparison.Ordinal);
             var g = new Grid { Margin = new Thickness(0, 6, 0, 0) };
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(22) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -421,7 +421,7 @@ namespace Bimbridge.Setup
             return b;
         }
 
-        /// <summary>Acción secundaria con aspecto de enlace, alineada con el margen izquierdo del pie.</summary>
+        /// <summary>Secondary action styled as a link, aligned with the footer's left margin.</summary>
         private static Button Link(string text, Action click)
         {
             var b = Btn(text, Theme.Kind.Quiet, click);
@@ -430,7 +430,7 @@ namespace Bimbridge.Setup
             return b;
         }
 
-        /// <summary>Pie de cada pantalla. Sin nota, enlace ni botones se oculta (p. ej. mientras se desinstala).</summary>
+        /// <summary>Footer of each screen. With no note, link or buttons it is hidden (e.g. while uninstalling).</summary>
         private void SetFooter(string note, Button link, params Button[] buttons)
         {
             _footerNote.Text = note ?? "";

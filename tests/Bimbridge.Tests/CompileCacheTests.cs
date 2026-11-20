@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Issue #9: la caché de compilación compila una sola vez por huella aunque lleguen peticiones simultáneas.</summary>
+    /// <summary>Issue #9: the compile cache compiles only once per fingerprint even when simultaneous requests arrive.</summary>
     public class CompileCacheTests
     {
         private sealed class Unit { public int N; }
@@ -25,7 +25,7 @@ namespace Bimbridge.Tests
                 {
                     Interlocked.Increment(ref compiles);
                     inside.Set();
-                    start.Wait();                                  // compilación lenta, retenida de forma determinista
+                    start.Wait();                                  // slow compile, held deterministically
                     return Tuple.Create(new Unit { N = 1 }, 40L);
                 }, out _));
                 Assert.True(inside.Wait(5000));
@@ -56,7 +56,7 @@ namespace Bimbridge.Tests
             Assert.NotNull(u);
             Assert.False(fc2);
             Assert.Equal(1, cache.Failures);
-            Assert.Same(u, cache.GetOrCompile("k", () => throw new InvalidOperationException("no debe compilar"), out var fc3));
+            Assert.Same(u, cache.GetOrCompile("k", () => throw new InvalidOperationException("must not compile"), out var fc3));
             Assert.True(fc3);
             Assert.Equal(1L, (long)cache.Stats()["guardados"]);
         }
@@ -74,8 +74,8 @@ namespace Bimbridge.Tests
         [Fact]
         public void FailedCompile_WhileOthersWait_NeverCompilesTheSameKeyTwiceAtOnce()
         {
-            // AUD-05: antes, al retirar la compuerta mientras otro hilo esperaba, un tercero creaba una compuerta nueva y compilaba en
-            // paralelo con el que esperaba (la primera compilación había fallado). Ahora la compuerta vive mientras alguien la use.
+            // AUD-05: before, when the gate was removed while another thread was waiting, a third one created a new gate and compiled in
+            // parallel with the waiting one (the first compile had failed). Now the gate lives as long as someone uses it.
             var cache = new CompileCache<Unit>();
             var concurrent = 0; var maxConcurrent = 0; var calls = 0;
             Tuple<Unit, long> SlowFail()
@@ -85,39 +85,39 @@ namespace Bimbridge.Tests
                 Interlocked.Increment(ref calls);
                 Thread.Sleep(30);
                 Interlocked.Decrement(ref concurrent);
-                return null;   // fallo de compilación: no se guarda
+                return null;   // compile failure: not cached
             }
             var threads = Enumerable.Range(0, 16).Select(i => new Thread(() => cache.GetOrCompile("k", SlowFail, out bool _))).ToList();
             threads.ForEach(t => t.Start());
             threads.ForEach(t => t.Join(20000));
-            Assert.Equal(1, maxConcurrent);                 // nunca dos compilaciones de la misma clave a la vez
-            Assert.Equal(16, calls);                        // los fallos no se guardan: cada intento vuelve a compilar, en serie
-            Assert.Equal(0, cache.LiveGates);               // sin compuertas huérfanas
+            Assert.Equal(1, maxConcurrent);                 // never two compiles of the same key at once
+            Assert.Equal(16, calls);                        // failures are not cached: each attempt compiles again, serially
+            Assert.Equal(0, cache.LiveGates);               // no orphan gates
             Assert.Equal(0, cache.Count);
         }
 
         [Fact]
         public void EntryLimit_RefusesNewKeysWithReason_KeepsServingCompiledOnes()
         {
-            // AUD-05: los ensamblados cargados no se descargan; descartar entradas (LRU) sólo obligaría a recompilar y cargar otro. Al llegar
-            // al límite se rechazan claves NUEVAS con un motivo claro y lo ya compilado se sigue sirviendo.
+            // AUD-05: loaded assemblies are not unloaded; evicting entries (LRU) would only force recompiling and loading another one. When the
+            // limit is reached, NEW keys are refused with a clear reason and what is already compiled keeps being served.
             var cache = new CompileCache<Unit>(maxEntries: 3, sizeOf: u => 1000);
             for (var i = 0; i < 3; i++) Assert.NotNull(cache.GetOrCompile("k" + i, "agente-A", () => Tuple.Create(new Unit { N = i }, 1L), out _, out var r0));
-            Assert.Null(cache.GetOrCompile("k3", "agente-B", () => throw new InvalidOperationException("no debe compilar"), out _, out var refusal));
+            Assert.Null(cache.GetOrCompile("k3", "agente-B", () => throw new InvalidOperationException("must not compile"), out _, out var refusal));
             Assert.Contains("límite", refusal);
             Assert.Contains("reinicie Revit", refusal);
-            Assert.NotNull(cache.GetOrCompile("k1", "agente-B", () => throw new InvalidOperationException("no debe compilar"), out var fc, out _));
+            Assert.NotNull(cache.GetOrCompile("k1", "agente-B", () => throw new InvalidOperationException("must not compile"), out var fc, out _));
             Assert.True(fc);
             Assert.Equal(1, cache.Refused);
             Assert.Equal(3000, cache.LoadedBytes);
-            Assert.Equal(3L, cache.ByOwner().Single(kv => kv.Key == "agente-A").Value);   // contabilidad por agente
+            Assert.Equal(3L, cache.ByOwner().Single(kv => kv.Key == "agente-A").Value);   // per-agent accounting
         }
 
         [Fact]
         public void EntryLimit_IsExactUnderConcurrentDistinctKeys_AndFailuresFreeTheirSlot()
         {
             var cache = new CompileCache<Unit>(maxEntries: 10);
-            Assert.Null(cache.GetOrCompile("falla", null, () => null, out _, out _));   // un fallo no consume plaza
+            Assert.Null(cache.GetOrCompile("falla", null, () => null, out _, out _));   // a failure does not use up a slot
             var ok = 0;
             var threads = Enumerable.Range(0, 64).Select(i => new Thread(() =>
             {

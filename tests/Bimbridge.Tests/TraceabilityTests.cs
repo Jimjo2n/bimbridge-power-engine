@@ -7,14 +7,14 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.8.0: el registro único es coherente (estados, 15 CAP, 14 WF, familias) y docs/MATRIZ_TRAZABILIDAD_0.8.0.md coincide con el código.</summary>
+    /// <summary>0.8.0: the single registry is consistent (states, 15 CAP, 14 WF, families) and docs/MATRIZ_TRAZABILIDAD_0.8.0.md matches the code.</summary>
     public class TraceabilityTests
     {
         private static string Root()
         {
             var d = new DirectoryInfo(AppContext.BaseDirectory);
             while (d != null && !File.Exists(Path.Combine(d.FullName, "Directory.Build.props"))) d = d.Parent;
-            return d?.FullName ?? throw new InvalidOperationException("raíz del repo");
+            return d?.FullName ?? throw new InvalidOperationException("repo root");
         }
 
         [Fact]
@@ -31,7 +31,7 @@ namespace Bimbridge.Tests
         {
             var doc = Path.Combine(Root(), "docs", "0.8.0", "MATRIZ_TRAZABILIDAD_0.8.0.md");
             var text = Traceability.Markdown("0.8.0", "Candidato interno; aceptación nativa pendiente.");
-            // Regenerar: BIMBRIDGE_GEN_MATRIZ=1 dotnet test --filter Traceability_DocMatchesCode
+            // Regenerate: BIMBRIDGE_GEN_MATRIZ=1 dotnet test --filter Traceability_DocMatchesCode
             if (Environment.GetEnvironmentVariable("BIMBRIDGE_GEN_MATRIZ") == "1") { Directory.CreateDirectory(Path.GetDirectoryName(doc)); File.WriteAllText(doc, text); }
             Assert.True(File.Exists(doc), "falta " + doc);
             Assert.Equal(text.Replace("\r\n", "\n"), File.ReadAllText(doc).Replace("\r\n", "\n"));

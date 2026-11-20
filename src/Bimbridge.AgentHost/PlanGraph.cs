@@ -5,13 +5,13 @@ using System.Linq;
 
 namespace Bimbridge.AgentHost
 {
-    /// <summary>Grafo de dependencias del plan: orden topológico determinista (empates por id) y detección de ciclos con su recorrido.</summary>
+    /// <summary>Plan dependency graph: deterministic topological order (ties broken by id) and cycle detection with its path.</summary>
     public static class PlanGraph
     {
         public static List<string> Order(IReadOnlyList<ValidatedOp> ops) => Order(ops.Select(o => (o.Id, (IEnumerable<string>)o.DependsOn)).ToList());
         public static List<string> FindCycle(IReadOnlyList<OpDraft> ops) => FindCycle(ops.Where(o => o.Id != null).Select(o => (o.Id, (IEnumerable<string>)o.DependsOn)).ToList());
 
-        /// <summary>Orden de ejecución (Kahn con cola ordenada). Lanza InvalidOperationException si hay ciclo o dependencia desconocida.</summary>
+        /// <summary>Execution order (Kahn with a sorted queue). Throws InvalidOperationException on a cycle or an unknown dependency.</summary>
         public static List<string> Order(IReadOnlyList<(string Id, IEnumerable<string> Deps)> ops)
         {
             var indeg = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -20,7 +20,7 @@ namespace Bimbridge.AgentHost
             foreach (var o in ops)
                 foreach (var d in o.Deps.Distinct(StringComparer.Ordinal))
                 {
-                    if (!indeg.ContainsKey(d)) throw new InvalidOperationException(o.Id + ": dependencia desconocida " + d);
+                    if (!indeg.ContainsKey(d)) throw new InvalidOperationException(o.Id + ": unknown dependency " + d);
                     indeg[o.Id]++;
                     next[d].Add(o.Id);
                 }
@@ -32,16 +32,16 @@ namespace Bimbridge.AgentHost
                 res.Add(id);
                 foreach (var n in next[id]) if (--indeg[n] == 0) ready.Add(n);
             }
-            if (res.Count != ops.Count) throw new InvalidOperationException("ciclo: " + string.Join(" → ", FindCycle(ops) ?? new List<string>()));
+            if (res.Count != ops.Count) throw new InvalidOperationException("cycle: " + string.Join(" → ", FindCycle(ops) ?? new List<string>()));
             return res;
         }
 
-        /// <summary>Un ciclo (lista de ids, el primero repetido al final) o null. Iterativo: no desborda la pila con planes largos.</summary>
+        /// <summary>A cycle (list of ids, the first repeated at the end) or null. Iterative: does not overflow the stack on long plans.</summary>
         public static List<string> FindCycle(IReadOnlyList<(string Id, IEnumerable<string> Deps)> ops)
         {
             var deps = new Dictionary<string, List<string>>(StringComparer.Ordinal);
             foreach (var o in ops) if (!deps.ContainsKey(o.Id)) deps[o.Id] = o.Deps.Where(x => x != null).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToList();
-            var color = new Dictionary<string, int>(StringComparer.Ordinal); // 0 blanco, 1 gris, 2 negro
+            var color = new Dictionary<string, int>(StringComparer.Ordinal); // 0 white, 1 gray, 2 black
             foreach (var root in deps.Keys.OrderBy(x => x, StringComparer.Ordinal))
             {
                 if (color.TryGetValue(root, out var c0) && c0 != 0) continue;

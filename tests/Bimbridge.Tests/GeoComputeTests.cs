@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Recetas de geo sobre escenas sintéticas (las mismas situaciones de SAMPLE PROJECT: losa, rampa, viga, muro).</summary>
+    /// <summary>Geo recipes on synthetic scenes (the same situations as SAMPLE PROJECT: slab, ramp, beam, wall).</summary>
     public class GeoComputeTests
     {
         private static GeoBody Slab(double z0, double z1, string label = "losa", double x0 = -50, double y0 = -50, double x1 = 50, double y1 = 50)
@@ -42,10 +42,10 @@ namespace Bimbridge.Tests
             var bodies = new List<GeoBody> { Slab(20, 20.75) };
             var targets = new List<GeoTarget>
             {
-                Fixture(1, 0, 0, 19.5, 20),                    // cara superior = cara inferior de la losa
-                Fixture(2, 10, 0, 19.0, 19.5),                 // 6" de aire
-                Fixture(3, 20, 0, 19.75, 20.125),              // 1 1/2" dentro de la losa
-                Fixture(4, 30, 0, 19.5, 20.0 + 1.0 / 16 / 12), // 1/16": dentro de la tolerancia
+                Fixture(1, 0, 0, 19.5, 20),                    // top face = slab underside
+                Fixture(2, 10, 0, 19.0, 19.5),                 // 6" of air
+                Fixture(3, 20, 0, 19.75, 20.125),              // 1 1/2" into the slab
+                Fixture(4, 30, 0, 19.5, 20.0 + 1.0 / 16 / 12), // 1/16": within tolerance
             };
             var rows = GeoCompute.Mount(targets, bodies, Spec("montaje"), new GeoCompute.Stats());
             Assert.Equal(new[] { "ok", "flotando", "empotrada", "ok" }, rows.Select(r => (string)r["clase"]).ToArray());
@@ -79,15 +79,15 @@ namespace Bimbridge.Tests
         public void Mount_UnderRamp_ControllingCornerIsTheLowestUnderside()
         {
             var rb = new TriMeshBuilder();
-            MeshTests.Ramp(rb, -20, -20, 20, 20, 15, 4, 1); // cara inferior: z = 15 + 4 (x + 20)/40
+            MeshTests.Ramp(rb, -20, -20, 20, 20, 15, 4, 1); // underside: z = 15 + 4 (x + 20)/40
             var bodies = new List<GeoBody> { new GeoBody { Label = "rampa", Box = new Box3(-20, -20, 15, 20, 20, 20), Mesh = rb.Build() } };
-            // Luminaria de 2×4 centrada en x=0: el borde izquierdo controla. Se mide 1/2" hacia adentro del borde (x = -1 + 1/24),
-            // donde la cara inferior está en 15 + 0.1 (x + 20) = 16.9 + 0.1/24.
+            // 2×4 fixture centered at x=0: the left edge controls. It is measured 1/2" in from the edge (x = -1 + 1/24),
+            // where the underside is at 15 + 0.1 (x + 20) = 16.9 + 0.1/24.
             var t = Fixture(9, 0, 0, 16.4, 16.9 + 0.1 / 24);
             var rows = GeoCompute.Mount(new[] { t }, bodies, Spec("montaje"), null);
             Assert.Equal("ok", rows[0]["clase"]);
             Assert.True(rows[0].ContainsKey("pend"));
-            // Subir 1/8" la deja empotrada en la esquina baja aunque el centro tenga aire.
+            // Raising it 1/8" leaves it embedded at the low corner even though the center has air.
             var t2 = Fixture(10, 0, 0, 16.5, 16.9 + 1.0 / 96);
             var r2 = GeoCompute.Mount(new[] { t2 }, bodies, Spec("montaje"), null);
             Assert.Equal("empotrada", r2[0]["clase"]);
@@ -140,9 +140,9 @@ namespace Bimbridge.Tests
         public void Wall_TouchPenetrateSeparate()
         {
             var wall = new GeoBody { Label = "muro", Box = new Box3(-50, 4.75, 0, 50, 5.25, 30), Line = new[] { -50.0, 5, 50, 5 }, Width = 0.5 };
-            var touch = Fixture(1, 0, 3.75, 10, 11, w: 1, d: 1);    // borde en y=4.25 … no toca
-            var flush = Fixture(2, 0, 4.25, 10, 11, w: 1, d: 1);    // borde en y=4.75 = cara del muro
-            var inside = Fixture(3, 0, 4.5, 10, 11, w: 1, d: 1);    // 3" dentro
+            var touch = Fixture(1, 0, 3.75, 10, 11, w: 1, d: 1);    // edge at y=4.25 … does not touch
+            var flush = Fixture(2, 0, 4.25, 10, 11, w: 1, d: 1);    // edge at y=4.75 = wall face
+            var inside = Fixture(3, 0, 4.5, 10, 11, w: 1, d: 1);    // 3" inside
             foreach (var t in new[] { touch, flush, inside }) t.Candidates = new[] { 0 };
             var rows = GeoCompute.Wall(new[] { touch, flush, inside }, new List<GeoBody> { wall }, Spec("muro"));
             Assert.Equal(new[] { "separada", "toca", "penetra" }, rows.Select(r => (string)r["clase"]).ToArray());
@@ -218,8 +218,8 @@ namespace Bimbridge.Tests
             };
             var exact = new[]
             {
-                new GeoCompute.ExactResult { Target = 0, Body = 1, Volume = 0.002 },   // 1 también toca la viga
-                new GeoCompute.ExactResult { Target = 1, Body = 1, Volume = 0.01 },    // 2 sólo por booleana
+                new GeoCompute.ExactResult { Target = 0, Body = 1, Volume = 0.002 },   // 1 also touches the beam
+                new GeoCompute.ExactResult { Target = 1, Body = 1, Volume = 0.01 },    // 2 only by boolean
                 new GeoCompute.ExactResult { Target = 2, Body = 2, Issues = GeoCompute.ExactIssue.Boolean },
             };
             var rows = GeoCompute.MergeClashes(new[] { a, b, c, d }, bodies, screened, exact, 0.0001);
@@ -282,9 +282,9 @@ namespace Bimbridge.Tests
             Assert.Equal(new[] { 3L }, sets["$empotradas"]);
             Assert.Equal(new[] { 2L }, sets["$flotando"]);
             var r = (List<object>)d["rows"];
-            Assert.Equal(2, r.Count); // sólo problemas
-            Assert.Equal(3L, ((object[])r[0])[0]); // empotrada primero
-            Assert.Equal(-1.5, (double)((object[])r[0])[3], 6); // pulgadas
+            Assert.Equal(2, r.Count); // problems only
+            Assert.Equal(3L, ((object[])r[0])[0]); // embedded first
+            Assert.Equal(-1.5, (double)((object[])r[0])[3], 6); // inches
         }
     }
 }

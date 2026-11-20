@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Native Validation 0.9.0: reversión, reconciliación durable y retorno de instalación. Sin Revit.</summary>
+    /// <summary>Native Validation 0.9.0: rollback, durable reconciliation and installation restore. No Revit.</summary>
     public class ReconciliationTests : IDisposable
     {
         private readonly string _root = Path.Combine(Path.GetTempPath(), "bimbridge-recon-" + Guid.NewGuid().ToString("N").Substring(0, 8));
@@ -121,7 +121,7 @@ namespace Bimbridge.Tests
             Assert.Equal("corte", q.Reconciliation["rollback_error"]);
         }
 
-        /// <summary>Recorrido completo del aborto con el mismo orden que PlanApplier.AbortGroup, por cada resultado de RollBack.</summary>
+        /// <summary>Full abort walk in the same order as PlanApplier.AbortGroup, for each RollBack result.</summary>
         private static string Abort(Plan plan, Func<string> rollBack, GroupAbort.Evidence ev, out string error)
         {
             var state = GroupAbort.Attempt(() => true, rollBack, () => "x", out error);
@@ -132,7 +132,7 @@ namespace Bimbridge.Tests
 
         public static IEnumerable<object[]> BadRollbacks()
         {
-            yield return new object[] { (Func<string>)(() => throw new InvalidOperationException("RollBack lanzó")), GroupAbort.NotObserved };
+            yield return new object[] { (Func<string>)(() => throw new InvalidOperationException("RollBack threw")), GroupAbort.NotObserved };
             yield return new object[] { (Func<string>)(() => "Pending"), "Pending" };
             yield return new object[] { (Func<string>)(() => "Error"), "Error" };
         }
@@ -222,7 +222,7 @@ namespace Bimbridge.Tests
         [Fact]
         public void Adapter_RoutesEveryOutcomeThroughTheTestedDecision()
         {
-            // La parte con TransactionGroup real sólo se puede ejercer en Revit (NATIVE_ACCEPTANCE_PENDING); aquí se fija que el adaptador delega.
+            // The part with a real TransactionGroup can only be exercised in Revit (NATIVE_ACCEPTANCE_PENDING); here we pin that the adapter delegates.
             var s = File.ReadAllText(TestPaths.Addin("Revit/Writes/PlanApplier.cs"));
             Assert.Contains("GroupAbort.Attempt(group.HasStarted", s);
             Assert.Contains("try { group.Dispose(); }", s);
@@ -305,12 +305,12 @@ namespace Bimbridge.Tests
             Assert.Equal("{\"levels\":\"R\"}", File.ReadAllText(_p.ConfigFile));
             Assert.Equal("{\"version\":\"viejo\"}", File.ReadAllText(_p.InstallRecord));
             Assert.False(File.Exists(_p.SetupCopy));
-            // Decisión de esta revisión: config.toml es del usuario. El retorno sólo devuelve la sección de BIMBRIDGE,
-            // así que [mcp], que NewInstall escribe fuera de ella, se conserva. CodexRestore_* fija el caso de la sección propia.
+            // Decision in this revision: config.toml belongs to the user. The restore only restores the BIMBRIDGE section,
+            // so [mcp], which NewInstall writes outside it, is kept. CodexRestore_* pins the own-section case.
             Assert.Equal("[otro]\nx=1\n[mcp]\n", File.ReadAllText(_p.CodexConfig));
             Assert.Equal("ajeno", File.ReadAllText(Path.Combine(_p.AddinsDir("2024"), "pyRevit.addin")));
 
-            // El retorno también se puede deshacer.
+            // The restore can also be undone.
             InstallBackup.Restore(_p, undo, DateTime.UtcNow.AddSeconds(2));
             Assert.Equal("nuevo-puente", File.ReadAllText(_p.BridgeExe));
             Assert.True(File.Exists(Path.Combine(_p.BinDir, "power_engine", "w.exe")));

@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>AUD-09: un commit confirmado con diferencias en la relectura no es un éxito funcional pleno.</summary>
+    /// <summary>AUD-09: a committed commit with differences on reread is not a full functional success.</summary>
     public class PlanVerificationTests
     {
         [Fact]

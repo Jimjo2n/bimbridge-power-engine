@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    Instalador de doble clic: Bimbridge.Setup.exe
-    net48 porque viene con Windows 10/11: no hay que instalar nada antes.
-    Lleva dentro payload.zip (add-in 2022-2027 + puente autocontenido), que arma build.sh/build.ps1.
+    Double-click installer: Bimbridge.Setup.exe
+    net48 because it ships with Windows 10/11: nothing needs to be installed first.
+    Embeds payload.zip (add-in 2022-2027 + self-contained bridge), built by build.sh/build.ps1.
   -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -14,7 +14,7 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <Description>Instalador de BIMBRIDGE</Description>
+    <Description>BIMBRIDGE installer</Description>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
@@ -32,12 +32,12 @@
     <ProjectReference Include="..\Bimbridge.Setup.Core\Bimbridge.Setup.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Mismo estilo e iconos que el ribbon -->
+    <!-- Same style and icons as the ribbon -->
     <Compile Include="..\Bimbridge.Addin\Ui\Theme.cs" Link="Shared\Theme.cs" />
     <Compile Include="..\Bimbridge.Addin\Ui\Icons.cs" Link="Shared\Icons.cs" />
     <EmbeddedResource Include="payload.zip" LogicalName="payload.zip" Condition="Exists('payload.zip')" />
   </ItemGroup>
-  <!-- Las DLL de Protocol y Setup.Core se incrustan en el .exe para que sea un solo archivo. -->
+  <!-- The Protocol and Setup.Core DLLs are embedded in the .exe so it is a single file. -->
   <Target Name="EmbedDeps" AfterTargets="ResolveAssemblyReferences">
     <ItemGroup>
       <EmbeddedResource Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.Extension)' == '.dll'" LogicalName="lib.%(ReferenceCopyLocalPaths.Filename)%(ReferenceCopyLocalPaths.Extension)" />

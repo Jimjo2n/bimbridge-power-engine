@@ -16,12 +16,12 @@ namespace Bimbridge.Addin.Revit
         private async Task<Response> GroupAuditCheck(Request request, CancellationToken ct)
         {
             var id = Arg.GetLong(request.Args, "grupo");
-            if (!id.HasValue || id <= 0) return Response.Fail(request.Id, Status.Invalido, "indique el ID del grupo actual");
+            if (!id.HasValue || id <= 0) return Response.Fail(request.Id, Status.Invalido, "give the ID of the current group");
             List<object> previous = null;
             if (request.Args.TryGetValue("anterior", out var raw))
             {
                 previous = raw as List<object>;
-                if (previous == null) return Response.Fail(request.Id, Status.Invalido, "anterior exige la lista miembros del control previo");
+                if (previous == null) return Response.Fail(request.Id, Status.Invalido, "anterior requires the miembros list from the previous check");
             }
             Dictionary<string, object> data = null;
             string error = null;
@@ -32,7 +32,7 @@ namespace Bimbridge.Addin.Revit
                 if (doc == null) return true;
                 if (!(doc.GetElement(Ids.ToId(id.Value)) is Group group))
                 {
-                    error = "no existe el grupo en el documento destino";
+                    error = "the group does not exist in the target document";
                     return true;
                 }
                 var snapshot = group.GetMemberIds().Select(doc.GetElement).Where(e => e != null).OrderBy(e => Ids.ToLong(e.Id))

@@ -11,12 +11,12 @@ using Bimbridge.Engine.Geo;
 namespace Bimbridge.AgentHost
 {
     /// <summary>
-    /// Kernel candidato para una futura comparación C# ↔ Rust (P2 §8): "extensión vertical de N puntos contra una malla de triángulos"
-    /// (TriMesh.Extent del motor 0.3+, usado por el QC de montaje). Cumple las condiciones:
-    /// - no usa objetos de Revit: entra un buffer binario determinista (triángulos + puntos), sale un buffer de resultados;
-    /// - resultado verificable: digest sha256 de (resultado, zBot, zTop) redondeados a 1e-9 ft — Rust debe dar el mismo digest;
-    /// - medible: construcción del índice, consulta (mediana de rondas), bytes asignados, serialización y tamaño de datos.
-    /// Formato de entrada (little endian): int32 nTri, nTri×9 float64, int32 nPts, nPts×2 float64. Semilla fija.
+    /// Candidate kernel for a future C# ↔ Rust comparison (P2 §8): "vertical extent of N points against a triangle mesh"
+    /// (TriMesh.Extent from engine 0.3+, used by the mounting QC). It meets the conditions:
+    /// - uses no Revit objects: a deterministic binary buffer goes in (triangles + points), a result buffer comes out;
+    /// - verifiable result: sha256 digest of (result, zBot, zTop) rounded to 1e-9 ft — Rust must produce the same digest;
+    /// - measurable: index build, query (median of rounds), allocated bytes, serialization and data size.
+    /// Input format (little endian): int32 nTri, nTri×9 float64, int32 nPts, nPts×2 float64. Fixed seed.
     /// </summary>
     public static class MountKernelBench
     {
@@ -29,14 +29,14 @@ namespace Bimbridge.AgentHost
             for (var b = 0; b < boxes; b++)
             {
                 double x0 = b % side * 2.0, y0 = b / side * 2.0, x1 = x0 + 1.8, y1 = y0 + 1.8;
-                var zb = 8 + rng.NextDouble() * 4;            // cara inferior de losa (ft)
-                var zt = zb + 0.5 + rng.NextDouble() * 0.5;   // cara superior, algo inclinada
+                var zb = 8 + rng.NextDouble() * 4;            // slab bottom face (ft)
+                var zt = zb + 0.5 + rng.NextDouble() * 0.5;   // top face, slightly sloped
                 var s = (rng.NextDouble() - 0.5) * 0.05;
                 double Top(double x, double y) => zt + s * (x - x0);
-                // superior (normal +z)
+                // top (normal +z)
                 tri.AddRange(new[] { x0, y0, Top(x0, y0), x1, y0, Top(x1, y0), x1, y1, Top(x1, y1) });
                 tri.AddRange(new[] { x0, y0, Top(x0, y0), x1, y1, Top(x1, y1), x0, y1, Top(x0, y1) });
-                // inferior (normal −z)
+                // bottom (normal −z)
                 tri.AddRange(new[] { x0, y0, zb, x1, y1, zb, x1, y0, zb });
                 tri.AddRange(new[] { x0, y0, zb, x0, y1, zb, x1, y1, zb });
             }
@@ -67,7 +67,7 @@ namespace Bimbridge.AgentHost
             }
         }
 
-        /// <summary>El kernel: índice + consulta. Devuelve (resultado, zBot, zTop) por punto.</summary>
+        /// <summary>The kernel: index + query. Returns (result, zBot, zTop) per point.</summary>
         public static (byte[] Res, double[] Z) Compute(double[] tri, double[] pts, out double buildMs)
         {
             var sw = Stopwatch.StartNew();
@@ -111,7 +111,7 @@ namespace Bimbridge.AgentHost
             sw.Restart();
             var (tri, pts) = Deserialize(bytes);
             var deserMs = sw.Elapsed.TotalMilliseconds;
-            Compute(tri, pts, out _); // calentamiento (JIT)
+            Compute(tri, pts, out _); // warm-up (JIT)
             var build = new List<double>(); var query = new List<double>(); var alloc = new List<long>();
             string digest = null; var hits = 0;
             for (var r = 0; r < Math.Max(1, rounds); r++)
@@ -124,13 +124,13 @@ namespace Bimbridge.AgentHost
                 alloc.Add(GC.GetAllocatedBytesForCurrentThread() - a0);
                 build.Add(bms); query.Add(total - bms);
                 var d = Digest(res, z);
-                if (digest != null && d != digest) throw new InvalidOperationException("el kernel no es determinista");
+                if (digest != null && d != digest) throw new InvalidOperationException("the kernel is not deterministic");
                 digest = d; hits = res.Count(x => x == 1);
             }
             double Med(List<double> l) { var s = l.OrderBy(x => x).ToList(); return Math.Round(s[s.Count / 2], 3); }
             return new Dictionary<string, object>
             {
-                ["kernel"] = "TriMesh.Extent (montaje vertical)", ["lenguaje"] = "C# " + Environment.Version, ["simd"] = TriMesh.SimdAvailable && TriMesh.SimdEnabled,
+                ["kernel"] = "TriMesh.Extent (vertical mounting)", ["lenguaje"] = "C# " + Environment.Version, ["simd"] = TriMesh.SimdAvailable && TriMesh.SimdEnabled,
                 ["triangulos"] = (long)(tri.Length / 9), ["puntos"] = (long)(pts.Length / 2), ["aciertos"] = (long)hits, ["rondas"] = (long)rounds,
                 ["entrada_bytes"] = (long)bytes.Length, ["serializar_ms"] = Math.Round(serMs, 3), ["deserializar_ms"] = Math.Round(deserMs, 3),
                 ["indice_ms_mediana"] = Med(build), ["consulta_ms_mediana"] = Med(query),

@@ -7,17 +7,17 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Consulta declarativa (sección 7, herramienta "query"). La IA manda unas pocas claves
-    /// cortas en lugar de un script; aquí se validan y se normalizan antes de tocar Revit.
+    /// Declarative query (section 7, "query" tool). The AI sends a few short keys
+    /// instead of a script; they are validated and normalized here before touching Revit.
     /// </summary>
     public sealed class QuerySpec
     {
         public List<string> Categories = new List<string>();
         public List<string> Levels = new List<string>();
-        public List<string> Types = new List<string>();      // "Familia: Tipo", "Tipo" o fragmento
+        public List<string> Types = new List<string>();      // "Family: Type", "Type" or fragment
         public List<string> Worksets = new List<string>();
         public List<long> Ids = new List<long>();
-        public string FromSet;                                // "$nombre"
+        public string FromSet;                                // "$name"
         public long? ViewId;
         public List<Condition> Where = new List<Condition>();
         public List<string> Fields = new List<string>();
@@ -28,22 +28,22 @@ namespace Bimbridge.Engine
         public int PageSize = DefaultPageSize;
         public string SaveAs;
         public long? Since;
-        /// <summary>true = longitudes (elev, x, y, z) en mm en vez de pies; también en where.</summary>
+        /// <summary>true = lengths (elev, x, y, z) in mm instead of feet; also in where.</summary>
         public bool Millimeters;
-        /// <summary>true = no recortar textos largos.</summary>
+        /// <summary>true = do not truncate long texts.</summary>
         public bool FullText;
 
         public const int DefaultPageSize = 100;
         public const int MaxPageSize = 200;
-        /// <summary>Textos más largos se recortan con "…" salvo full=true (un Comments de 600 caracteres en 290 filas eran ~45 000 caracteres).</summary>
+        /// <summary>Longer texts are truncated with "…" unless full=true (a 600-character Comments over 290 rows was ~45 000 characters).</summary>
         public const int MaxTextLength = 120;
 
-        /// <summary>Campos de longitud que se convierten con units=mm.</summary>
+        /// <summary>Length fields converted with units=mm.</summary>
         public static readonly HashSet<string> LengthFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "elev", "x", "y", "z" };
 
         public static readonly string[] DefaultFields = { "id", "fam", "type", "lvl" };
 
-        /// <summary>Campos que el adaptador de Revit conoce sin buscar un parámetro por nombre.</summary>
+        /// <summary>Fields the Revit adapter knows without looking up a parameter by name.</summary>
         public static readonly HashSet<string> BuiltInFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "id", "cat", "fam", "type", "lvl", "ws", "elev", "mark", "comments", "host", "x", "y", "z", "view", "name", "uid",
@@ -70,13 +70,13 @@ namespace Bimbridge.Engine
             };
             var units = (Arg.GetString(a, "units") ?? "ft").Trim().ToLowerInvariant();
             if (units == "mm") q.Millimeters = true;
-            else if (units != "ft" && units != "") throw new QueryException("units: use ft (por defecto) o mm");
+            else if (units != "ft" && units != "") throw new QueryException("units: use ft (default) or mm");
 
             foreach (var s in Arg.GetStringList(a, "ids"))
             {
                 if (s.StartsWith("$")) { q.FromSet = NamedSets.Normalize(s); continue; }
                 if (!long.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
-                    throw new QueryException("ids: '" + s + "' no es un id ni un conjunto ($nombre)");
+                    throw new QueryException("ids: '" + s + "' is not an id or a set ($name)");
                 q.Ids.Add(id);
             }
             var set = Arg.GetString(a, "set");
@@ -85,26 +85,26 @@ namespace Bimbridge.Engine
             foreach (var w in Arg.GetStringList(a, "where")) q.Where.Add(Condition.Parse(w));
 
             if (q.Categories.Count == 0 && q.Ids.Count == 0 && q.FromSet == null && q.ViewId == null)
-                throw new QueryException("indique al menos cat, ids, set o view");
-            if (q.Page < 1) throw new QueryException("page empieza en 1");
-            if (q.PageSize < 1 || q.PageSize > MaxPageSize) throw new QueryException("page_size entre 1 y " + MaxPageSize + "; para más filas use page, group_by o count");
+                throw new QueryException("specify at least cat, ids, set or view");
+            if (q.Page < 1) throw new QueryException("page starts at 1");
+            if (q.PageSize < 1 || q.PageSize > MaxPageSize) throw new QueryException("page_size between 1 and " + MaxPageSize + "; for more rows use page, group_by or count");
             if (q.SaveAs != null) q.SaveAs = NamedSets.Normalize(q.SaveAs);
             if (q.Fields.Count == 0) q.Fields.AddRange(DefaultFields);
-            if (q.GroupBy.Count > 3) throw new QueryException("group_by admite hasta 3 campos");
+            if (q.GroupBy.Count > 3) throw new QueryException("group_by accepts up to 3 fields");
             if (q.Digest && (q.CountOnly || q.GroupBy.Count > 0))
-                throw new QueryException("digest no se combina con count ni group_by; indique f= para seleccionar campos");
+                throw new QueryException("digest cannot be combined with count or group_by; use f= to select fields");
             return q;
         }
 
         /// <summary>
-        /// Conteo que Revit resuelve con su índice (FilteredElementCollector.GetElementCount) sin abrir ningún elemento:
-        /// sólo filtros rápidos (categoría, vista) y nada que haya que leer por elemento.
+        /// Count that Revit resolves with its index (FilteredElementCollector.GetElementCount) without opening any element:
+        /// only quick filters (category, view) and nothing that must be read per element.
         /// </summary>
         public bool CanFastCount => CountOnly && GroupBy.Count == 0 && Levels.Count == 0 && Types.Count == 0 && Worksets.Count == 0 &&
                                     Where.Count == 0 && Ids.Count == 0 && FromSet == null && Since == null && SaveAs == null && !Digest;
         public bool CanAggregateDuringRead => GroupBy.Count > 0 && SaveAs == null && !Digest;
 
-        /// <summary>Todos los campos que hay que leer de cada elemento (salida + filtros + agrupación).</summary>
+        /// <summary>All the fields to read from each element (output + filters + grouping).</summary>
         public List<string> FieldsToRead()
         {
             var set = new List<string>();
@@ -123,7 +123,7 @@ namespace Bimbridge.Engine
         public QueryException(string message) : base(message) { }
     }
 
-    /// <summary>Condición compacta: "Mark=LT-01", "elev>10.5", "type~STRIP", "comments?" (no vacío), "!comments" (vacío).</summary>
+    /// <summary>Compact condition: "Mark=LT-01", "elev>10.5", "type~STRIP", "comments?" (not empty), "!comments" (empty).</summary>
     public sealed class Condition
     {
         public string Field;
@@ -136,7 +136,7 @@ namespace Bimbridge.Engine
         public static Condition Parse(string text)
         {
             var t = (text ?? "").Trim();
-            if (t.Length == 0) throw new QueryException("where vacío");
+            if (t.Length == 0) throw new QueryException("empty where");
             if (t.EndsWith("?")) return new Condition { Field = t.Substring(0, t.Length - 1).Trim(), Op = "notempty" };
             if (t.StartsWith("!") && t.IndexOfAny(new[] { '=', '<', '>', '~' }) < 0)
                 return new Condition { Field = t.Substring(1).Trim(), Op = "empty" };
@@ -146,18 +146,18 @@ namespace Bimbridge.Engine
                 if (i <= 0) continue;
                 var c = new Condition { Field = t.Substring(0, i).Trim(), Op = op, Value = t.Substring(i + op.Length).Trim() };
                 if (c.Field.Length == 0) break;
-                // Nada de resultados vacíos en silencio por un where mal escrito ("elev>>3", "mark==A"): la IA sacaría conclusiones falsas.
+                // No silent empty results from a mistyped where ("elev>>3", "mark==A"): the AI would draw false conclusions.
                 if (c.Field.IndexOfAny(OpChars) >= 0 || (c.Value.Length > 0 && c.Value.IndexOfAny(OpChars) == 0))
-                    throw new QueryException("where '" + text + "' está mal formado: use un solo operador (campo=valor, !=, >, <, >=, <=, ~)");
+                    throw new QueryException("where '" + text + "' is malformed: use a single operator (field=value, !=, >, <, >=, <=, ~)");
                 if ((op == ">" || op == "<" || op == ">=" || op == "<=") &&
                     !double.TryParse(c.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
-                    throw new QueryException("where '" + text + "': '" + c.Value + "' no es un número (use punto decimal; longitudes en pies o con units=mm)");
+                    throw new QueryException("where '" + text + "': '" + c.Value + "' is not a number (use a decimal point; lengths in feet or with units=mm)");
                 return c;
             }
-            throw new QueryException("where '" + text + "': use campo=valor, !=, >, <, >=, <=, ~ (contiene), campo? o !campo");
+            throw new QueryException("where '" + text + "': use field=value, !=, >, <, >=, <=, ~ (contains), field? or !field");
         }
 
-        /// <summary>Evalúa contra un valor ya leído (string, double, long, bool o null).</summary>
+        /// <summary>Evaluates against an already-read value (string, double, long, bool or null).</summary>
         public bool Matches(object value)
         {
             var s = value == null ? "" : Convert.ToString(value, CultureInfo.InvariantCulture);

@@ -256,9 +256,9 @@ namespace Bimbridge.Tests
             Assert.True(data.ContainsKey("recibo"));
             Assert.Equal("r123", data["res"]);
             Assert.Equal(expected, detail.Replace("\n", ""));
-            var failed = Response.FromJson(PipeHost.FitResponse(response, true, _ => throw new IOException("sin espacio")));
+            var failed = Response.FromJson(PipeHost.FitResponse(response, true, _ => throw new IOException("out of space")));
             Assert.Equal(response.Estado, failed.Estado);
-            Assert.Contains("sin espacio", (string)Assert.IsType<Dictionary<string, object>>(failed.Datos)["aviso_resultado"]);
+            Assert.Contains("out of space", (string)Assert.IsType<Dictionary<string, object>>(failed.Datos)["aviso_resultado"]);
             Assert.Equal(expected, PipeHost.FitResponse(response, false, _ => throw new InvalidOperationException()));
         }
 

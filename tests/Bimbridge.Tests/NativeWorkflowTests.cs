@@ -9,8 +9,8 @@ using Xunit;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// 0.9.1 (Bloque F): contratos veraces de flujos nativos interactivos (#23), verificación de Copy/Monitor (#24) y destino estable y
-    /// diagnóstico de conexión (#25). Todo sintético: ningún modelo real, ninguna ruta privada, sin Revit.
+    /// 0.9.1 (Block F): truthful contracts for interactive native workflows (#23), Copy/Monitor verification (#24) and stable target and
+    /// connection diagnostics (#25). All synthetic: no real model, no private path, no Revit.
     /// </summary>
     public class NativeWorkflowTests : IDisposable
     {
@@ -28,7 +28,7 @@ namespace Bimbridge.Tests
 
         private ReceiptStore Store() => new ReceiptStore(_dir);
 
-        // ------------------------------------------------------------------ #23 recibos y estados
+        // ------------------------------------------------------------------ #23 receipts and states
 
         [Fact]
         public void PostCommandAccepted_WithoutFurtherProof_StaysCommandAccepted_NeverCompleted()
@@ -41,7 +41,7 @@ namespace Bimbridge.Tests
             Assert.Equal(WorkflowState.command_accepted, r.State);
             Assert.False(r.IsTerminal);
             Assert.NotEqual(ProofLevel.verified, r.Proof);
-            // Saltar a "terminado" o "verificado" sin la evidencia intermedia no es posible.
+            // Jumping to "finished" or "verified" without the intermediate evidence is not possible.
             Assert.Throws<InvalidOperationException>(() => st.Record(key, Ev(EvidenceKind.FinishObserved)));
             Assert.Throws<InvalidOperationException>(() => st.Record(key, Ev(EvidenceKind.VerificationPassed, ProofLevel.verified)));
             Assert.Throws<InvalidOperationException>(() => st.Record(key, Ev(EvidenceKind.SaveConfirmed, ProofLevel.verified)));
@@ -57,7 +57,7 @@ namespace Bimbridge.Tests
             foreach (var k in new[] { EvidenceKind.PostCommandAccepted, EvidenceKind.CommandActive, EvidenceKind.LinkSelected, EvidenceKind.MappingDialog, EvidenceKind.CopyStarted, EvidenceKind.CopyObserved, EvidenceKind.FinishObserved })
                 st.Record(key, Ev(k));
             Assert.Equal(WorkflowState.finished, st.Load(key).State);
-            // La verificación con nivel "observed" no basta.
+            // Verification at level "observed" is not enough.
             Assert.Throws<InvalidOperationException>(() => st.Record(key, Ev(EvidenceKind.VerificationPassed, ProofLevel.observed)));
             st.Record(key, Ev(EvidenceKind.VerificationPassed, ProofLevel.verified));
             var r = st.Record(key, Ev(EvidenceKind.SaveConfirmed, ProofLevel.verified));
@@ -68,9 +68,9 @@ namespace Bimbridge.Tests
         }
 
         [Theory]
-        [InlineData(1)]   // tras aceptar la orden, antes de la copia por lotes
-        [InlineData(5)]   // con la copia iniciada
-        [InlineData(6)]   // con la copia observada, antes de Finalizar
+        [InlineData(1)]   // after accepting the command, before the batch copy
+        [InlineData(5)]   // with the copy started
+        [InlineData(6)]   // with the copy observed, before Finish
         public void FaultAtAnyStep_GoesToReconciliation_AndNeverAllowsABlindRePostCommand(int stepsBeforeFault)
         {
             var steps = new[] { EvidenceKind.PostCommandAccepted, EvidenceKind.CommandActive, EvidenceKind.LinkSelected, EvidenceKind.MappingDialog, EvidenceKind.CopyStarted, EvidenceKind.CopyObserved };
@@ -82,17 +82,17 @@ namespace Bimbridge.Tests
             Assert.Equal(WorkflowState.reconciliation_required, r.State);
             Assert.False(WorkflowMachine.CanInvoke(r, out _));
 
-            // Reabrir el intento (reintento del cliente / reinicio) devuelve el mismo recibo: no se duplica la orden.
+            // Reopening the attempt (client retry / restart) returns the same receipt: the command is not duplicated.
             var again = new ReceiptStore(_dir).Begin("copy_monitor_fixtures", key, Corr(), out var created);
             Assert.False(created);
             Assert.Equal(WorkflowState.reconciliation_required, again.State);
 
-            // Una reconciliación no puede declarar guardado ni verificación.
+            // A reconciliation cannot declare a save or a verification.
             Assert.Throws<InvalidOperationException>(() => st.Record(key, Ev(EvidenceKind.Reconciled, ProofLevel.observed, "save_confirmed")));
             Assert.Throws<InvalidOperationException>(() => st.Record(key, Ev(EvidenceKind.Reconciled, ProofLevel.observed, "verification_passed")));
             if (stepsBeforeFault >= 5)
             {
-                // Con indicios de copia no se vuelve a preflight (eso permitiría repetir la copia).
+                // With signs of a copy it does not go back to preflight (that would allow repeating the copy).
                 Assert.Throws<InvalidOperationException>(() => st.Record(key, Ev(EvidenceKind.Reconciled, ProofLevel.observed, "preflight")));
                 Assert.Equal(WorkflowState.awaiting_finish, st.Record(key, Ev(EvidenceKind.Reconciled, ProofLevel.observed, "awaiting_finish")).State);
             }
@@ -143,7 +143,7 @@ namespace Bimbridge.Tests
             st.Begin("copy_monitor_fixtures", k2, Corr(), out _);
             File.WriteAllText(Path.Combine(_dir, "roto.json"), "{no es json");
             var open = st.Open(out var unreadable);
-            // AUD-08: el traspaso manual queda abierto, pendiente de la verificación posterior.
+            // AUD-08: the manual handoff stays open, pending the later verification.
             Assert.Equal(new[] { k1, k2 }.OrderBy(x => x), open.Select(r => r.AttemptKey).OrderBy(x => x));
             Assert.Single(unreadable);
             var steps = NativeCapabilities.CopyMonitorManualSteps("MEP-LINK", new[] { "WC-A → WC-B" }, saveAuthorized: false);
@@ -159,10 +159,10 @@ namespace Bimbridge.Tests
             st.Begin("copy_monitor_fixtures", key, Corr(), out _);
             st.Record(key, Ev(EvidenceKind.PreflightPassed));
             st.Record(key, Ev(EvidenceKind.NoUiExecutor));
-            // Un cliente no puede declarar la verificación ni el guardado.
+            // A client cannot declare the verification or the save.
             Assert.Throws<InvalidOperationException>(() => st.Record(key, Ev(EvidenceKind.VerificationPassed, ProofLevel.verified, source: "client")));
             Assert.Throws<InvalidOperationException>(() => st.Record(key, Ev(EvidenceKind.SaveConfirmed, ProofLevel.verified, source: "client")));
-            // Tras el traspaso manual (y una reconexión: otra instancia del almacén), el verificador continúa.
+            // After the manual handoff (and a reconnection: another store instance), the verifier continues.
             var again = new ReceiptStore(_dir);
             Assert.Equal(WorkflowState.verification_failed, again.Record(key, Ev(EvidenceKind.VerificationFailed, ProofLevel.verified)).State);
             Assert.Equal(WorkflowState.verification_passed, again.Record(key, Ev(EvidenceKind.VerificationPassed, ProofLevel.verified)).State);
@@ -174,7 +174,7 @@ namespace Bimbridge.Tests
         {
             var key = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "conc");
             Store().Begin("copy_monitor_fixtures", key, Corr(), out _);
-            // Dos "procesos" (almacenes independientes) aportan preflights a la vez: ninguna transición se pierde.
+            // Two "processes" (independent stores) submit preflights at the same time: no transition is lost.
             var tasks = Enumerable.Range(0, 2).Select(_ => System.Threading.Tasks.Task.Run(() =>
             {
                 var s = new ReceiptStore(_dir);
@@ -188,7 +188,7 @@ namespace Bimbridge.Tests
                 Assert.Throws<TimeoutException>(() => held.Record(key, Ev(EvidenceKind.PreflightPassed)));
         }
 
-        // ------------------------------------------------------------------ AUD-12 inventario inicial por intento
+        // ------------------------------------------------------------------ AUD-12 initial inventory per attempt
 
         [Fact]
         public void Baseline_IsWrittenOncePerAttempt_RepeatedPreflightNeverOverwritesIt()
@@ -197,16 +197,16 @@ namespace Bimbridge.Tests
             var first = Store().SaveBaselineOnce(key, "doc-A", "link-1", new long[] { 3, 1, 2, 2 }, out var created);
             Assert.True(created);
             Assert.Equal(new long[] { 1, 2, 3 }, first.Ids);
-            // El usuario copia en Revit (aparecen 10 y 11) y alguien repite el preflight: se conserva el inventario original.
+            // The user copies in Revit (10 and 11 appear) and someone repeats the preflight: the original inventory is kept.
             var second = Store().SaveBaselineOnce(key, "doc-A", "link-1", new long[] { 1, 2, 3, 10, 11 }, out created);
             Assert.False(created);
             Assert.Equal(new long[] { 1, 2, 3 }, second.Ids);
             Assert.Equal(first.Sha256, second.Sha256);
             Assert.Equal(first.CreatedUtc, second.CreatedUtc);
-            // Reconexión / reinicio: otra instancia del almacén (otra sesión) lee lo mismo; no depende de conjuntos de sesión.
+            // Reconnection / restart: another store instance (another session) reads the same; it does not depend on session sets.
             var afterReconnect = new ReceiptStore(_dir).LoadBaseline(key);
             Assert.Equal(new long[] { 1, 2, 3 }, afterReconnect.Ids);
-            // El inventario no se confunde con un recibo ilegible.
+            // The inventory is not confused with an unreadable receipt.
             Store().Begin("copy_monitor_fixtures", key, Corr(), out _);
             Store().Open(out var unreadable);
             Assert.Empty(unreadable);
@@ -224,7 +224,7 @@ namespace Bimbridge.Tests
             {
                 var threads = Enumerable.Range(0, n).Select(i => new System.Threading.Thread(() =>
                 {
-                    var store = new ReceiptStore(_dir);   // cada «sesión/proceso» con su propio almacén
+                    var store = new ReceiptStore(_dir);   // each "session/process" with its own store
                     start.Wait();
                     results[i] = store.SaveBaselineOnce(key, "doc-A", "link-1", new long[] { 100 + i, 200 + i }, out createdFlags[i]);
                 })).ToList();
@@ -243,7 +243,7 @@ namespace Bimbridge.Tests
         [Fact]
         public void Baseline_IsBoundToDocumentAndLink_AndTamperingIsDetected()
         {
-            // Cambio de documento: la clave de intento ya es distinta por documento, así que cada documento tiene su inventario…
+            // Document change: the attempt key is already different per document, so each document has its own inventory...
             var keyA = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "b3");
             var keyB = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-B", "link-1", "b3");
             Assert.NotEqual(keyA, keyB);
@@ -252,12 +252,12 @@ namespace Bimbridge.Tests
             Assert.True(createdB);
             Assert.Equal(new long[] { 1, 2 }, Store().LoadBaseline(keyA).Ids);
             Assert.Equal(new long[] { 7 }, Store().LoadBaseline(keyB).Ids);
-            // …y si alguien presenta la clave de A con otro documento u otro vínculo, se rechaza (no se reutiliza ni se pisa).
+            // ...and if someone presents A's key with another document or another link, it is rejected (neither reused nor overwritten).
             Assert.Throws<InvalidOperationException>(() => Store().SaveBaselineOnce(keyA, "doc-B", "link-1", new long[] { 9 }, out _));
             Assert.Throws<InvalidOperationException>(() => Store().SaveBaselineOnce(keyA, "doc-A", "link-2", new long[] { 9 }, out _));
             Assert.Equal(new long[] { 1, 2 }, Store().LoadBaseline(keyA).Ids);
 
-            // Manipular el archivo (añadir un id para «esconder» una copia) invalida la huella: no se usa.
+            // Tampering with the file (adding an id to "hide" a copy) invalidates the fingerprint: it is not used.
             var file = Path.Combine(_dir, keyA + ".inv");
             File.WriteAllText(file, File.ReadAllText(file).Replace("[1,2]", "[1,2,55]"));
             Assert.Throws<InvalidDataException>(() => Store().LoadBaseline(keyA));
@@ -266,7 +266,7 @@ namespace Bimbridge.Tests
             Assert.Throws<InvalidDataException>(() => Store().LoadBaseline(keyA));
         }
 
-        // ------------------------------------------------------------------ AUD-20 expectativas congeladas
+        // ------------------------------------------------------------------ AUD-20 frozen expectations
 
         private static CopyMonitorExpectations Expect(List<SourceFixture> src = null, LinkTransform tf = null, List<TypeMapping> maps = null, string category = "PlumbingFixtures",
                                                       string host = "doc-A", string link = "link-1", string rev = "g1#3") =>
@@ -280,12 +280,12 @@ namespace Bimbridge.Tests
             var first = CopyMonitorFlow.Freeze(Store(), key, Expect(maps: maps), new long[] { 1, 2 });
             Assert.True(first.Created); Assert.False(first.Conflict);
             Assert.Equal(88, first.Frozen.Source.Count);
-            // Mismo objetivo otra vez (otra sesión, reconexión): se conserva, sin diferencias.
+            // Same target again (another session, reconnection): it is kept, with no differences.
             var again = CopyMonitorFlow.Freeze(new ReceiptStore(_dir), key, Expect(maps: maps.AsEnumerable().Reverse().ToList()), new long[] { 1, 2, 99 });
             Assert.False(again.Created); Assert.Empty(again.Differences);
             Assert.Equal(first.Frozen.Fingerprint, again.Frozen.Fingerprint);
             Assert.Equal(new long[] { 1, 2 }, again.Baseline.Ids);
-            // Un preflight con OTRO objetivo no lo sustituye: devuelve lo congelado y el conflicto.
+            // A preflight with ANOTHER target does not replace it: it returns the frozen one and the conflict.
             var other = CopyMonitorFlow.Freeze(Store(), key, Expect(), new long[] { 1, 2 });
             Assert.True(other.Conflict);
             Assert.Equal(first.Frozen.Fingerprint, other.Frozen.Fingerprint);
@@ -299,15 +299,15 @@ namespace Bimbridge.Tests
             var key = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "e2");
             var maps = new List<TypeMapping> { new TypeMapping { Source = "WC: B", Target = "WC: A" } };
             CopyMonitorFlow.Freeze(Store(), key, Expect(maps: maps), new long[0]);
-            // Verificar sin repetir el mapeo: se usa el congelado (no es un cambio). Tras reconectar.
+            // Verify without repeating the mapping: the frozen one is used (it is not a change). After reconnecting.
             var ok = CopyMonitorFlow.Load(new ReceiptStore(_dir), key, Expect(), mappingGiven: false);
             Assert.False(ok.Conflict);
             Assert.Single(ok.Frozen.Mappings);
-            // Otra revisión guardada del vínculo sin cambios en los aparatos: se informa, no bloquea.
+            // Another saved revision of the link with no changes to the fixtures: reported, not blocking.
             var saved = CopyMonitorFlow.Load(Store(), key, Expect(maps: maps, rev: "g2#4"), true);
             Assert.False(saved.Conflict); Assert.Single(saved.Differences);
 
-            // Cada condición que altera el objetivo → conflicto, y las expectativas originales siguen intactas.
+            // Each condition that alters the target -> conflict, and the original expectations stay intact.
             var moved = Synthetic88(); moved[5].X += 2;
             var fewer = Synthetic88(); fewer.RemoveAt(0);
             var retyped = Synthetic88(); retyped[3].Type = "Z";
@@ -327,7 +327,7 @@ namespace Bimbridge.Tests
             }
             Assert.Contains(CopyMonitorFlow.Load(Store(), key, Expect(fewer, maps: maps), true).Differences, x => x.Contains("+0 −1 modificados 0"));
 
-            // Sin preflight no hay nada que verificar; un intento antiguo sin expectativas no se da por bueno.
+            // Without a preflight there is nothing to verify; an old attempt without expectations is not accepted.
             Assert.Null(CopyMonitorFlow.Load(Store(), WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "nada"), Expect(), true));
             var legacy = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "viejo");
             Store().SaveBaselineOnce(legacy, "doc-A", "link-1", new long[] { 1 }, out _);
@@ -343,14 +343,14 @@ namespace Bimbridge.Tests
             var back = CopyMonitorExpectations.FromText(e.ToText());
             Assert.Equal(e.Fingerprint, back.Fingerprint);
             Assert.Empty(e.Diff(back));
-            // Cambiar una expectativa en el archivo (quitar un aparato esperado) invalida la huella del inventario: no se usa.
+            // Changing an expectation in the file (removing an expected fixture) invalidates the inventory fingerprint: it is not used.
             var file = Path.Combine(_dir, key + ".inv");
             File.WriteAllText(file, File.ReadAllText(file).Replace("S87", "S86x"));
             Assert.Throws<InvalidDataException>(() => CopyMonitorFlow.Load(Store(), key, e, true));
             Assert.Throws<InvalidDataException>(() => CopyMonitorExpectations.FromText(e.ToText().Replace("\"WC: A\"", "\"WC: C\"")));
         }
 
-        // ------------------------------------------------------------------ #23 matriz de capacidades
+        // ------------------------------------------------------------------ #23 capability matrix
 
         [Theory]
         [InlineData(2022)] [InlineData(2023)] [InlineData(2024)] [InlineData(2025)] [InlineData(2026)] [InlineData(2027)]
@@ -374,7 +374,7 @@ namespace Bimbridge.Tests
             Assert.Throws<ArgumentOutOfRangeException>(() => NativeCapabilities.Describe(NativeCapabilities.CopyMonitorFixtures, 2021, null));
         }
 
-        // ------------------------------------------------------------------ #25 destino estable y diagnóstico
+        // ------------------------------------------------------------------ #25 stable target and diagnostics
 
         private static RevitInstance Inst(int pid, string ver, DateTime start, params (string h, string s, string id)[] docs) => new RevitInstance
         {
@@ -398,11 +398,11 @@ namespace Bimbridge.Tests
             Assert.Equal("Z", b.DocumentIdentity);
             Assert.True(TargetResolver.StillValid(b, list, out _));
 
-            // Revit 2026 se reinicia y el sistema reutiliza el pid 200: el destino ya no es el mismo.
+            // Revit 2026 restarts and the OS reuses pid 200: the target is no longer the same.
             var restarted = new List<RevitInstance> { list[0], Inst(200, "2026", t0.AddMinutes(30), ("d1", "s1", "Z")) };
             Assert.False(TargetResolver.StillValid(b, restarted, out why));
             Assert.Contains("pid 200", why);
-            // El documento se cierra.
+            // The document is closed.
             var closed = new List<RevitInstance> { list[0], Inst(200, "2026", t0, ("d1", "s1", "Y")) };
             Assert.False(TargetResolver.StillValid(b, closed, out why));
         }
@@ -429,9 +429,9 @@ namespace Bimbridge.Tests
             Assert.Contains(((List<object>)rep["hallazgos"]).Cast<Dictionary<string, object>>(), f => (string)f["codigo"] == "sin_ejecutor_ui");
         }
 
-        // ------------------------------------------------------------------ #24 verificador Copy/Monitor (aparatos sintéticos)
+        // ------------------------------------------------------------------ #24 Copy/Monitor verifier (synthetic fixtures)
 
-        /// <summary>Fixture sintético redistribuible: 88 aparatos en 5 tipos (40/2/20/20/6), rejilla regular, rotaciones variadas.</summary>
+        /// <summary>Redistributable synthetic fixture: 88 fixtures in 5 types (40/2/20/20/6), regular grid, varied rotations.</summary>
         private static List<SourceFixture> Synthetic88()
         {
             var types = new[] { ("WC", "A", 40), ("WC", "B", 2), ("Lavabo", "C", 20), ("Urinario", "D", 20), ("Ducha", "E", 6) };
@@ -472,14 +472,14 @@ namespace Bimbridge.Tests
         [Fact]
         public void MirroredLink_IsHandled_AndUnrepresentableTransformsAreRejected()
         {
-            // AUD-11: reflexión X → −X con traslación.
+            // AUD-11: reflection X -> -X with translation.
             var src = Synthetic88();
             var mirror = new LinkTransform { Dx = 10, Dy = 5, BasisX = new[] { -1.0, 0, 0 }, BasisY = new[] { 0.0, 1, 0 }, BasisZ = new[] { 0.0, 0, 1 } };
             Assert.True(mirror.Mirrored);
             var r = CopyMonitorVerifier.Verify(src, null, PerfectCopy(src, mirror, 77), mirror, null, 77);
             Assert.Equal("verificado", r["resultado"]);
             Assert.Equal(true, r["vinculo_reflejado"]);
-            // Copiado como si no hubiera reflexión: posiciones mal.
+            // Copied as if there were no reflection: wrong positions.
             var naive = PerfectCopy(src, new LinkTransform { Dx = 10, Dy = 5 }, 77);
             Assert.Equal("fallido", CopyMonitorVerifier.Verify(src, null, naive, mirror, null, 77)["resultado"]);
 
@@ -517,15 +517,15 @@ namespace Bimbridge.Tests
         {
             var src = Synthetic88();
             var host = PerfectCopy(src, LinkTransform.Identity, 77);
-            host.RemoveAt(0);                                                    // ausente
-            host[1].Type = "B";                                                  // tipo incorrecto (WC A → WC B)
-            host[2].Monitoring = false;                                          // sin supervisión
-            host[3].RotationDeg += 90;                                           // girado
-            host[4].X += 0.5;                                                    // desplazado
+            host.RemoveAt(0);                                                    // missing
+            host[1].Type = "B";                                                  // wrong type (WC A -> WC B)
+            host[2].Monitoring = false;                                          // not monitored
+            host[3].RotationDeg += 90;                                           // rotated
+            host[4].X += 0.5;                                                    // moved
             var dup = host[10];
-            host.Add(new HostFixture { Id = 9999, Family = dup.Family, Type = dup.Type, X = dup.X, Y = dup.Y, Z = dup.Z, RotationDeg = dup.RotationDeg, Monitoring = true, MonitoredLinkInstances = new List<long> { 77 } }); // duplicado
+            host.Add(new HostFixture { Id = 9999, Family = dup.Family, Type = dup.Type, X = dup.X, Y = dup.Y, Z = dup.Z, RotationDeg = dup.RotationDeg, Monitoring = true, MonitoredLinkInstances = new List<long> { 77 } }); // duplicate
             var existing = new HostFixture { Id = 1, Family = "WC", Type = "A", X = -50, Y = -50 };
-            host.Add(existing);                                                  // ya estaba antes: no cuenta
+            host.Add(existing);                                                  // already there before: does not count
             var r = CopyMonitorVerifier.Verify(src, new List<HostFixture> { existing }, host, null, null, 77);
             long N(string b) => (long)((Dictionary<string, object>)r[b])["n"];
             Assert.Equal("fallido", r["resultado"]);
@@ -550,7 +550,7 @@ namespace Bimbridge.Tests
             Assert.Equal(82L, r["esperados"]);
             Assert.Equal(6L, ((Dictionary<string, object>)r["excluidos"])["n"]);
 
-            // Sin aplicar el mapeo (copió el tipo original): tipo incorrecto en los 2 WC B.
+            // Without applying the mapping (copied the original type): wrong type on the 2 WC B.
             var unmapped = PerfectCopy(kept, LinkTransform.Identity, 77);
             var r2 = CopyMonitorVerifier.Verify(src, null, unmapped, null, maps, 77);
             Assert.Equal(2L, ((Dictionary<string, object>)r2["tipo_incorrecto"])["n"]);

@@ -8,17 +8,17 @@ using Bimbridge.Protocol;
 namespace Bimbridge.AgentHost
 {
     /// <summary>
-    /// Vía manual de reconciliación, para lo que no se puede demostrar leyendo el modelo (evidencia dañada, plan con ids perdidos).
-    ///   plan-store estado --doc "clave"
-    ///   plan-store resolver --doc "clave" --plan P-x|--archivo P-x.json --autor nombre --motivo "qué revisé" --confirmo-revision-humana
-    /// Exige Revit cerrado y conserva la evidencia: archiva o aparta a cuarentena, nunca borra.
+    /// Manual reconciliation path, for what cannot be proven by reading the model (damaged evidence, plan with lost ids).
+    ///   plan-store estado --doc "key"
+    ///   plan-store resolver --doc "key" --plan P-x|--archivo P-x.json --autor name --motivo "what I reviewed" --confirmo-revision-humana
+    /// Requires Revit to be closed and keeps the evidence: archives or sets it aside in quarantine, never deletes.
     /// </summary>
     public static class PlanStoreCli
     {
         public static int Run(string[] a)
         {
             var doc = Program.Opt(a, "--doc");
-            if (string.IsNullOrWhiteSpace(doc)) { Console.Error.WriteLine("falta --doc"); return 2; }
+            if (string.IsNullOrWhiteSpace(doc)) { Console.Error.WriteLine("missing --doc"); return 2; }
             var store = new PlanStore(PlanStore.DefaultQueueRoot);
             if (a[1] == "estado") { store.LoadPersisted(doc); Console.WriteLine(Json.Write(store.CheckWritable(doc).ToJson())); return 0; }
             if (a[1] != "resolver") { Console.Error.WriteLine("plan-store estado|resolver"); return 2; }
@@ -27,26 +27,26 @@ namespace Bimbridge.AgentHost
             var reason = Program.Opt(a, "--motivo");
             if (Array.IndexOf(a, "--confirmo-revision-humana") < 0 || string.IsNullOrWhiteSpace(author) || string.IsNullOrWhiteSpace(reason))
             {
-                Console.Error.WriteLine("resolver exige --autor, --motivo y --confirmo-revision-humana: una persona debe haber revisado el modelo");
+                Console.Error.WriteLine("resolver requires --autor, --motivo and --confirmo-revision-humana: a person must have reviewed the model");
                 return 2;
             }
-            if (Process.GetProcessesByName("Revit").Length > 0) { Console.Error.WriteLine("Revit está abierto: ciérrelo antes de resolver. No se cambió nada."); return 3; }
+            if (Process.GetProcessesByName("Revit").Length > 0) { Console.Error.WriteLine("Revit is open: close it before resolving. Nothing was changed."); return 3; }
 
             var file = Program.Opt(a, "--archivo");
             if (file != null)
             {
                 store.QuarantineCorrupt(store.DocDir(doc), file, author, reason);
-                Console.WriteLine("Apartado a cuarentena: " + file);
+                Console.WriteLine("Set aside in quarantine: " + file);
             }
             else
             {
                 store.LoadPersisted(doc);
                 var plan = store.Get(Program.Opt(a, "--plan"));
-                if (plan == null) { Console.Error.WriteLine("no hay ese plan en ese documento"); return 2; }
+                if (plan == null) { Console.Error.WriteLine("that plan does not exist in that document"); return 2; }
                 var check = new ReconcileCheck { Verdict = ReconcileCheck.ManualHuman };
                 check.Reasons.Add(reason);
                 store.Reconcile(plan, check, author);
-                Console.WriteLine("Registrado como " + check.Verdict + ": " + plan.Id);
+                Console.WriteLine("Recorded as " + check.Verdict + ": " + plan.Id);
             }
             Console.WriteLine(Json.Write(store.CheckWritable(doc).ToJson()));
             return 0;

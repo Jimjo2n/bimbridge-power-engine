@@ -11,24 +11,24 @@ namespace BimBridge.PowerEngine.Workflows
     public static class MarkupPlacement
     {
         private static Dictionary<string, object> Map(object value) => value as Dictionary<string, object> ??
-            throw new QueryException("cada ancla o terminal debe ser un objeto JSON");
+            throw new QueryException("each anchor or terminal must be a JSON object");
         private static List<object> List(Dictionary<string, object> args, string key) =>
             args.TryGetValue(key, out var value) && value is List<object> list && list.Count > 0 ? list :
-                throw new QueryException("falta la lista " + key);
+                throw new QueryException("missing list " + key);
         private static string Text(Dictionary<string, object> args, string key) =>
             Arg.GetString(args, key)?.Trim() is string value && value.Length > 0 ? value :
-                throw new QueryException("falta " + key);
+                throw new QueryException("missing " + key);
         private static double Number(object value)
         {
-            if (!(value is long || value is double)) throw new QueryException("se necesita una coordenada numérica");
+            if (!(value is long || value is double)) throw new QueryException("a numeric coordinate is required");
             var number = Convert.ToDouble(value, CultureInfo.InvariantCulture);
-            if (double.IsNaN(number) || double.IsInfinity(number)) throw new QueryException("se necesita una coordenada finita");
+            if (double.IsNaN(number) || double.IsInfinity(number)) throw new QueryException("a finite coordinate is required");
             return number;
         }
         private static (double X, double Y) Point(Dictionary<string, object> row, string key)
         {
             var list = List(row, key);
-            if (list.Count != 2) throw new QueryException(key + " exige dos coordenadas");
+            if (list.Count != 2) throw new QueryException(key + " requires two coordinates");
             return (Number(list[0]), Number(list[1]));
         }
 
@@ -51,7 +51,7 @@ namespace BimBridge.PowerEngine.Workflows
             if (!registration.Ok) { result["estado"] = "sin_registro"; return result; }
 
             var items = List(args, "items");
-            if (items.Count > PlanOpsLimits.MaxEntries) throw new QueryException("demasiados terminales en una sola llamada");
+            if (items.Count > PlanOpsLimits.MaxEntries) throw new QueryException("too many terminals in a single call");
             var names = new HashSet<string>(StringComparer.Ordinal);
             var existing = new HashSet<long>();
             var rows = new List<object>();
@@ -60,10 +60,10 @@ namespace BimBridge.PowerEngine.Workflows
             {
                 var item = Map(raw);
                 var id = Text(item, "ref");
-                if (!names.Add(id)) throw new QueryException("referencia repetida: " + id);
+                if (!names.Add(id)) throw new QueryException("duplicate reference: " + id);
                 var (px, py) = Point(item, "pt");
                 var (x, y) = registration.Map(px, py);
-                if (!item.TryGetValue("elev", out var elevation)) throw new QueryException("falta elev de " + id);
+                if (!item.TryGetValue("elev", out var elevation)) throw new QueryException("missing elev for " + id);
                 var offset = Number(elevation);
                 var expected = new Dictionary<string, object>
                 {
@@ -74,7 +74,7 @@ namespace BimBridge.PowerEngine.Workflows
                 if (equipmentRules == null)
                 {
                     var direction = Text(item, "sentido").ToUpperInvariant();
-                    if (direction != "UP" && direction != "DN") throw new QueryException("sentido de " + id + ": use UP o DN");
+                    if (direction != "UP" && direction != "DN") throw new QueryException("sentido of " + id + ": use UP or DN");
                     expected["tipo"] = Text(item, "tipo");
                     expected["sentido"] = direction;
                     expected["parametro_sentido"] = parameter;
@@ -84,7 +84,7 @@ namespace BimBridge.PowerEngine.Workflows
                     var scope = Text(item, "ambito");
                     var code = Text(item, "codigo");
                     if (!equipmentRules.TryGetValue((scope.ToUpperInvariant(), code.ToUpperInvariant()), out var rule))
-                        throw new QueryException("falta regla de equipo para " + scope + " / " + code + " (" + id + ")");
+                        throw new QueryException("missing equipment rule for " + scope + " / " + code + " (" + id + ")");
                     expected["ambito"] = scope;
                     expected["zona"] = Text(item, "zona");
                     expected["codigo"] = code;
@@ -99,7 +99,7 @@ namespace BimBridge.PowerEngine.Workflows
                 if (item.ContainsKey("existente_id"))
                 {
                     if (!(Arg.GetLong(item, "existente_id") is long reused) || reused <= 0 || !existing.Add(reused))
-                        throw new QueryException("ID existente inválido o utilizado más de una vez: " + id);
+                        throw new QueryException("existing ID invalid or used more than once: " + id);
                     expected["id"] = reused;
                     expected["estado"] = "reutilizacion_por_verificar";
                     continue;
@@ -145,9 +145,9 @@ namespace BimBridge.PowerEngine.Workflows
                 var code = Text(entry, "codigo");
                 var role = Text(entry, "clase").ToLowerInvariant();
                 if (role != "tablero" && role != "msde" && role != "desconectivo_hvac")
-                    throw new QueryException("clase inválida para " + code + "; use tablero, msde o desconectivo_hvac");
+                    throw new QueryException("invalid clase for " + code + "; use tablero, msde or desconectivo_hvac");
                 var key = (scope.ToUpperInvariant(), code.ToUpperInvariant());
-                if (rules.ContainsKey(key)) throw new QueryException("reglas de equipo contradictorias para " + scope + " / " + code);
+                if (rules.ContainsKey(key)) throw new QueryException("contradictory equipment rules for " + scope + " / " + code);
                 rules.Add(key, (role, Text(entry, "tipo")));
             }
             return rules;

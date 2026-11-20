@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Bloqueo fail-closed, persistencia y reconciliación del documento. Sin Revit.</summary>
+    /// <summary>Fail-closed lock, persistence and document reconciliation. No Revit.</summary>
     public class WriteSafetyTests : IDisposable
     {
         private const string Doc = "c:\\lab\\x.rvt";
@@ -57,7 +57,7 @@ namespace Bimbridge.Tests
             var s = Store();
             var p = NewPlan();
             s.Add(p);
-            s.BeginWrite(p); // aquí muere Revit
+            s.BeginWrite(p); // Revit dies here
 
             var again = Store();
             Assert.True(again.CheckWritable(Doc).Blocked);
@@ -95,10 +95,10 @@ namespace Bimbridge.Tests
         public void IntentWriteFailure_RefusesBeforeTouchingAnything()
         {
             var s = Store();
-            s.WriteFile = (_, __) => throw new IOException("disco lleno");
+            s.WriteFile = (_, __) => throw new IOException("disk full");
             var p = NewPlan();
             var ex = Assert.Throws<PlanStoreException>(() => s.BeginWrite(p));
-            Assert.Contains("disco lleno", ex.Message);
+            Assert.Contains("disk full", ex.Message);
             Assert.Equal(PlanStatus.Listo, p.Status);
             Assert.Null(p.Reconciliation);
         }
@@ -210,7 +210,7 @@ namespace Bimbridge.Tests
             Assert.Equal(2, ((List<object>)again.Get(p.Id).Reconciliation["ids_creados"]).Count);
         }
 
-        // ---- Veredicto ----
+        // ---- Verdict ----
 
         private static ReconcileCheck Eval(Plan p, string value, params long[] existing) =>
             ReconcileEvaluator.Evaluate(p, _ => value, id => existing.Contains(id));
@@ -266,7 +266,7 @@ namespace Bimbridge.Tests
             Assert.Equal(ReconcileCheck.Reverted, Eval(p, "a", 77).Verdict);
         }
 
-        // ---- Liberar ----
+        // ---- Release ----
 
         private Plan Unknown(PlanStore s)
         {
@@ -311,7 +311,7 @@ namespace Bimbridge.Tests
         {
             var s = Store();
             var p = Unknown(s);
-            s.WriteFile = (_, __) => throw new IOException("disco lleno");
+            s.WriteFile = (_, __) => throw new IOException("disk full");
             Assert.Throws<PlanStoreException>(() => s.Reconcile(p, new ReconcileCheck { Verdict = ReconcileCheck.Applied }, "s1"));
             Assert.True(Store().CheckWritable(Doc).Blocked);
             Assert.NotEqual(PlanStatus.Reconciliado, p.Status);
@@ -330,7 +330,7 @@ namespace Bimbridge.Tests
             Assert.Equal(2, Directory.GetFiles(Path.Combine(s.DocDir(Doc), "cuarentena")).Length);
         }
 
-        // ---- Ensayo ----
+        // ---- Trial ----
 
         [Theory]
         [InlineData(true, true, true, TrialGuard.CorrectReverted)]
@@ -341,7 +341,7 @@ namespace Bimbridge.Tests
         public void Trial_FourOutcomes(bool functional, bool rollback, bool restored, string expected) =>
             Assert.Equal(expected, TrialGuard.Classify(functional, rollback, restored));
 
-        // ---- Código del add-in: no compila aquí sin Revit, así que se fija el cableado ----
+        // ---- Add-in code: it does not compile here without Revit, so the wiring is pinned ----
 
         private static string Source(string relative)
         {
@@ -360,15 +360,15 @@ namespace Bimbridge.Tests
             Assert.Contains("Checkpoint(_plan)", Source("src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs"));
         }
 
-        // ---- Descriptor con pid reutilizado ----
+        // ---- Descriptor with reused pid ----
 
         [Fact]
         public void IsAlive_ProtectedProcess_DoesNotThrow()
         {
             if (!OperatingSystem.IsWindows()) return;
-            // pid 4 es System. Que Windows deje abrirlo depende del entorno: un usuario normal recibe acceso denegado (Win32Exception,
-            // que IsAlive trata como «no es un Revit nuestro»), y un runner elevado puede abrirlo (el proceso existe y sigue vivo).
-            // El contrato probado es: nunca lanza, y su respuesta coincide con lo que el sistema permite en este entorno.
+            // pid 4 is System. Whether Windows lets it be opened depends on the environment: a normal user gets access denied (Win32Exception,
+            // which IsAlive treats as "not one of our Revits"), and an elevated runner can open it (the process exists and is alive).
+            // The tested contract is: it never throws, and its answer matches what the OS allows in this environment.
             bool expected;
             try { using (var p = System.Diagnostics.Process.GetProcessById(4)) expected = !p.HasExited; }
             catch (System.ComponentModel.Win32Exception) { expected = false; }
@@ -377,7 +377,7 @@ namespace Bimbridge.Tests
             Assert.Equal(expected, InstanceDescriptor.IsAlive(4));
         }
 
-        // ---- Instalador ----
+        // ---- Installer ----
 
         [Fact]
         public void CodexRestore_OnlyTouchesOurSection()

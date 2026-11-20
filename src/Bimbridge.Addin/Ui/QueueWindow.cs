@@ -18,9 +18,9 @@ using Visibility = System.Windows.Visibility;
 namespace Bimbridge.Addin.Ui
 {
     /// <summary>
-    /// Ventana "Cola de cambios": muestra lo que las IAs dejaron esperando, deja elegir qué aplicar o descartar,
-    /// y muestra el resultado de cada plan en la misma tarjeta. Se abre modal desde un comando de Revit,
-    /// así que aplicar ocurre en un contexto válido de la API, sin interrumpir nada.
+    /// "Change queue" window: shows what the AIs left waiting, lets you choose what to apply or discard,
+    /// and shows each plan's result on the same card. It opens modally from a Revit command,
+    /// so applying happens in a valid API context, without interrupting anything.
     /// </summary>
     internal sealed class QueueWindow
     {
@@ -45,11 +45,11 @@ namespace Bimbridge.Addin.Ui
 
         public void ShowDialog()
         {
-            _win = Theme.NewWindow("BIMBRIDGE · Cola de cambios", 860, 640);
+            _win = Theme.NewWindow("BIMBRIDGE · Change queue", 860, 640);
             try { new WindowInteropHelper(_win) { Owner = _app.MainWindowHandle }; } catch (Exception) { }
 
             var root = new DockPanel();
-            var header = Theme.Header("Cola de cambios de la IA", _doc.Title, out _, out _pill, out _pillText);
+            var header = Theme.Header("AI change queue", _doc.Title, out _, out _pill, out _pillText);
             DockPanel.SetDock(header, Dock.Top);
             root.Children.Add(header);
 
@@ -87,10 +87,10 @@ namespace Bimbridge.Addin.Ui
         {
             var s = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 64, 0, 0), MaxWidth = 400 };
             s.Children.Add(new Image { Source = Icons.Queue(0, 32), Width = 40, Height = 40, Opacity = 0.85, Margin = new Thickness(0, 0, 0, 16) });
-            s.Children.Add(new TextBlock { Text = "No hay cambios esperando", FontSize = 17, FontWeight = FontWeights.SemiBold, Foreground = Theme.B(Theme.Ink), HorizontalAlignment = HorizontalAlignment.Center });
+            s.Children.Add(new TextBlock { Text = "No changes waiting", FontSize = 17, FontWeight = FontWeights.SemiBold, Foreground = Theme.B(Theme.Ink), HorizontalAlignment = HorizontalAlignment.Center });
             s.Children.Add(new TextBlock
             {
-                Text = "Con el modo Retener activado, cada cambio de la IA espera aquí antes de tocar el modelo. Usted decide cuándo aplicarlo.",
+                Text = "With Hold mode on, each AI change waits here before touching the model. You decide when to apply it.",
                 FontSize = 13, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Foreground = Theme.B(Theme.Muted), Margin = new Thickness(0, 8, 0, 0),
             });
             return s;
@@ -99,19 +99,19 @@ namespace Bimbridge.Addin.Ui
         private UIElement BuildFooter()
         {
             var left = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0) };
-            _all = new CheckBox { Content = "Seleccionar todo", IsChecked = true, Margin = new Thickness(0, 0, 0, 4), Visibility = _plans.Count > 0 ? Visibility.Visible : Visibility.Collapsed };
+            _all = new CheckBox { Content = "Select all", IsChecked = true, Margin = new Thickness(0, 0, 0, 4), Visibility = _plans.Count > 0 ? Visibility.Visible : Visibility.Collapsed };
             _all.Click += (s, e) => { foreach (var c in _cards.Where(c => c.Pending)) c.Selected = _all.IsChecked == true; UpdateButtons(); };
             left.Children.Add(_all);
             left.Children.Add(new TextBlock
             {
-                Text = "Cada plan se deshace con un Ctrl+Z. Aplicar no guarda ni sincroniza el modelo.",
+                Text = "Each plan is undone with one Ctrl+Z. Applying does not save or sync the model.",
                 FontSize = 12, Foreground = Theme.B(Theme.Muted), TextWrapping = TextWrapping.Wrap,
             });
 
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            _discard = Theme.Button("Descartar", Theme.Kind.Danger);
-            _close = Theme.Button("Cerrar");
-            _apply = Theme.Button("Aplicar", Theme.Kind.Primary);
+            _discard = Theme.Button("Discard", Theme.Kind.Danger);
+            _close = Theme.Button("Close");
+            _apply = Theme.Button("Apply", Theme.Kind.Primary);
             _apply.IsDefault = true;
             _close.IsCancel = true;
             _discard.Click += (s, e) => Discard();
@@ -127,7 +127,7 @@ namespace Bimbridge.Addin.Ui
         private void UpdateButtons()
         {
             var n = _cards.Count(c => c.Pending && c.Selected);
-            _apply.Content = n == 0 ? "Aplicar" : n == 1 ? "Aplicar 1 plan" : "Aplicar " + n + " planes";
+            _apply.Content = n == 0 ? "Apply" : n == 1 ? "Apply 1 plan" : "Apply " + n + " plans";
             _apply.IsEnabled = n > 0;
             _discard.IsEnabled = n > 0;
             _apply.Visibility = _discard.Visibility = _cards.Any(c => c.Pending) ? Visibility.Visible : Visibility.Collapsed;
@@ -138,7 +138,7 @@ namespace Bimbridge.Addin.Ui
         {
             var pending = _cards.Count(c => c.Pending);
             Theme.SetPill(_pill, Theme.Tabular(_pillText), pending == 0 ? Theme.Green : Theme.Amber,
-                pending == 0 ? "Sin pendientes" : pending == 1 ? "1 plan esperando" : pending + " planes esperando", dot: true);
+                pending == 0 ? "Nothing pending" : pending == 1 ? "1 plan waiting" : pending + " plans waiting", dot: true);
         }
 
         private void Apply()
@@ -153,7 +153,7 @@ namespace Bimbridge.Addin.Ui
                 foreach (var card in selected)
                 {
                     card.ShowRunning();
-                    _win.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render); // pintar antes de aplicar
+                    _win.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render); // paint before applying
                     var r = Runtime.ApplyHeld(_doc, card.Plan);
                     card.ShowResult(r.Status, r.Detail);
                     if (r.Status == PlanStatus.Aplicado) ok++;
@@ -168,11 +168,11 @@ namespace Bimbridge.Addin.Ui
                 Runtime.MarkDirty();
             }
 
-            var msg = ok + (ok == 1 ? " plan aplicado" : " planes aplicados");
-            if (conflict > 0) msg += " · " + conflict + " omitido" + (conflict > 1 ? "s" : "") + " porque el modelo cambió mientras esperaba";
-            if (failed > 0) msg += " · " + failed + " revertido" + (failed > 1 ? "s" : "") + " por un error de Revit";
+            var msg = ok + (ok == 1 ? " plan applied" : " plans applied");
+            if (conflict > 0) msg += " · " + conflict + " skipped because the model changed while waiting";
+            if (failed > 0) msg += " · " + failed + " rolled back because of a Revit error";
             ShowBanner(msg, failed > 0 ? Theme.Red : conflict > 0 ? Theme.Amber : Theme.Green);
-            _close.Content = "Listo";
+            _close.Content = "Done";
             UpdatePill();
             UpdateButtons();
         }
@@ -181,17 +181,17 @@ namespace Bimbridge.Addin.Ui
         {
             var selected = _cards.Where(c => c.Pending && c.Selected).ToList();
             if (selected.Count == 0) return;
-            var r = TaskDialog.Show("BIMBRIDGE - Power Engine", "¿Descartar " + (selected.Count == 1 ? "1 plan" : selected.Count + " planes") + " sin aplicarlos?\nLa IA verá que usted los descartó.",
+            var r = TaskDialog.Show("BIMBRIDGE - Power Engine", "Discard " + (selected.Count == 1 ? "1 plan" : selected.Count + " plans") + " without applying?\nThe AI will see that you discarded them.",
                 TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No, TaskDialogResult.No);
             if (r != TaskDialogResult.Yes) return;
             foreach (var c in selected)
             {
-                Runtime.Plans.Finish(c.Plan, PlanStatus.Descartado, "descartado por el usuario");
+                Runtime.Plans.Finish(c.Plan, PlanStatus.Descartado, "discarded by the user");
                 Runtime.Journal?.Log(VersionRegistry.HumanAuthor, "descartar", PlanStatus.Descartado, 0, new Dictionary<string, object> { ["plan"] = c.Plan.Id });
-                c.ShowResult(PlanStatus.Descartado, "Descartado. No se tocó el modelo.");
+                c.ShowResult(PlanStatus.Descartado, "Discarded. The model was not touched.");
             }
             Runtime.MarkDirty();
-            ShowBanner(selected.Count == 1 ? "1 plan descartado" : selected.Count + " planes descartados", Theme.Slate);
+            ShowBanner(selected.Count == 1 ? "1 plan discarded" : selected.Count + " plans discarded", Theme.Slate);
             UpdatePill();
             UpdateButtons();
         }
@@ -201,12 +201,12 @@ namespace Bimbridge.Addin.Ui
             _bannerText.Text = text;
             Theme.SetNotice(_banner, _bannerText, color);
             _banner.Visibility = Visibility.Visible;
-            Theme.Enter(_banner, 4, 200); // resultado de una acción del usuario: ocasional
+            Theme.Enter(_banner, 4, 200); // result of a user action: occasional
         }
 
         // ------------------------------------------------------------------
 
-        /// <summary>Tarjeta de un plan: quién lo pidió, qué cambia, el detalle desplegable y su resultado.</summary>
+        /// <summary>A plan's card: who asked for it, what changes, the expandable detail and its result.</summary>
         private sealed class PlanCard
         {
             public readonly Plan Plan;
@@ -232,7 +232,7 @@ namespace Bimbridge.Addin.Ui
                 grid.Children.Add(_check);
 
                 var main = new StackPanel();
-                var top = new DockPanel { Margin = new Thickness(0, 0, 0, 8) }; // la última línea llena y recorta títulos largos
+                var top = new DockPanel { Margin = new Thickness(0, 0, 0, 8) }; // the last line fills and trims long titles
                 top.Children.Add(new TextBlock { Text = "#" + position, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Theme.B(Theme.Muted), Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center });
                 top.Children.Add(Theme.Chip(Theme.ClientName(p.Client ?? p.SessionId), Theme.ClientColor(p.Client ?? p.SessionId)));
                 top.Children.Add(new TextBlock
@@ -244,16 +244,16 @@ namespace Bimbridge.Addin.Ui
                 main.Children.Add(top);
                 main.Children.Add(new TextBlock { Text = Friendly(p), FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = Theme.B(Theme.Ink), TextWrapping = TextWrapping.Wrap });
 
-                // avisos de riesgo: los primeros a la vista (deciden aplicar o no); el resto dentro de "Ver cambios"
+                // risk warnings: the first ones in view (they decide whether to apply); the rest inside "View changes"
                 foreach (var w in p.Warnings.Take(4))
                     main.Children.Add(WarningLine(w));
 
                 _detail = new TextBlock { FontSize = 12.5, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed };
                 main.Children.Add(_detail);
 
-                // detalle técnico (tabla, ids, plan) a un clic; se construye al abrir la primera vez
+                // technical detail (table, ids, plan) one click away; built the first time it opens
                 var details = new Border();
-                var disclosure = Theme.Disclosure("Ver cambios (" + p.Entries.Count + ")", details);
+                var disclosure = Theme.Disclosure("View changes (" + p.Entries.Count + ")", details);
                 disclosure.Margin = new Thickness(0, 10, 0, 0);
                 ((System.Windows.Controls.Primitives.ToggleButton)disclosure.Children[0]).Checked += (s, e) => { if (details.Child == null) details.Child = Details(p); };
                 main.Children.Add(disclosure);
@@ -262,14 +262,14 @@ namespace Bimbridge.Addin.Ui
 
                 _statusText = new TextBlock { FontSize = 11.5, FontWeight = FontWeights.SemiBold };
                 _statusChip = new Border { CornerRadius = new CornerRadius(999), Padding = new Thickness(9, 2, 9, 3), Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Top, Child = _statusText };
-                SetChip("En espera", Theme.Amber);
+                SetChip("Waiting", Theme.Amber);
                 Grid.SetColumn(_statusChip, 2);
                 grid.Children.Add(_statusChip);
 
                 Root = Theme.Card(grid);
             }
 
-            public void ShowRunning() => SetChip("Aplicando…", Theme.NavySoft);
+            public void ShowRunning() => SetChip("Applying…", Theme.NavySoft);
 
             public void ShowResult(string status, string detail)
             {
@@ -278,15 +278,15 @@ namespace Bimbridge.Addin.Ui
                 _check.IsEnabled = false;
                 switch (status)
                 {
-                    case PlanStatus.Aplicado: SetChip("Aplicado", Theme.Green); break;
-                    case PlanStatus.Conflicto: SetChip("Omitido", Theme.Amber); break;
-                    case PlanStatus.Descartado: SetChip("Descartado", Theme.Slate); break;
-                    default: SetChip("Revertido", Theme.Red); break;
+                    case PlanStatus.Aplicado: SetChip("Applied", Theme.Green); break;
+                    case PlanStatus.Conflicto: SetChip("Skipped", Theme.Amber); break;
+                    case PlanStatus.Descartado: SetChip("Discarded", Theme.Slate); break;
+                    default: SetChip("Rolled back", Theme.Red); break;
                 }
                 _detail.Text = Humanize(status, detail);
                 _detail.Foreground = Theme.B(status == PlanStatus.Aplicado ? Theme.Darken(Theme.Green, 0.8) : status == PlanStatus.Descartado ? Theme.Muted : Theme.Darken(status == PlanStatus.Conflicto ? Theme.Amber : Theme.Red, 0.8));
                 _detail.Visibility = Visibility.Visible;
-                Theme.Enter(_detail, 4, 200); // cambio de estado ocasional (aplicar/descartar), no un refresco
+                Theme.Enter(_detail, 4, 200); // occasional state change (apply/discard), not a refresh
                 Root.Opacity = status == PlanStatus.Descartado ? 0.7 : 1;
             }
 
@@ -295,7 +295,7 @@ namespace Bimbridge.Addin.Ui
             private static TextBlock WarningLine(string w) =>
                 new TextBlock { Text = "• " + w, FontSize = 12.5, Foreground = Theme.B(Theme.Darken(Theme.Amber, 0.72)), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) };
 
-            /// <summary>Lo que va detrás de "Ver cambios": avisos restantes, tabla de cambios e identificador del plan.</summary>
+            /// <summary>What sits behind "View changes": remaining warnings, the change table and the plan identifier.</summary>
             private static UIElement Details(Plan p)
             {
                 var s = new StackPanel();
@@ -315,20 +315,20 @@ namespace Bimbridge.Addin.Ui
             {
                 switch (status)
                 {
-                    case PlanStatus.Aplicado: return "Listo: " + detail + ". Ctrl+Z lo deshace.";
-                    case PlanStatus.Conflicto: return "No se aplicó: alguien cambió estos elementos mientras el plan esperaba. La IA lo sabrá y puede volver a planificarlo. Detalle: " + detail;
+                    case PlanStatus.Aplicado: return "Done: " + detail + ". Ctrl+Z undoes it.";
+                    case PlanStatus.Conflicto: return "Not applied: someone changed these elements while the plan was waiting. The AI will know and can plan it again. Detail: " + detail;
                     case PlanStatus.Descartado: return detail;
-                    default: return "Revit no aceptó el cambio y se deshizo completo. Detalle: " + detail;
+                    default: return "Revit did not accept the change and it was fully undone. Detail: " + detail;
                 }
             }
 
             private static string Counts(Plan p)
             {
                 var n = p.ElementCount;
-                return n == 1 ? "1 elemento" : n + " elementos";
+                return n == 1 ? "1 element" : n + " elements";
             }
 
-            /// <summary>Resumen en palabras: el que dio la IA o uno generado ("Altura en 12 elementos").</summary>
+            /// <summary>Summary in words: the one the AI gave or a generated one ("Height on 12 elements").</summary>
             private static string Friendly(Plan p)
             {
                 if (!string.IsNullOrWhiteSpace(p.Summary) && !p.Summary.Contains("×")) return p.Summary;
@@ -337,19 +337,19 @@ namespace Bimbridge.Addin.Ui
                     var op = g.First().Op;
                     var created = g.Count(e => e.IsCreation);
                     var n = g.Where(e => e.Id != 0).Select(e => e.Id).Distinct().Count();
-                    var what = n == 1 ? "1 elemento" : n + " elementos";
+                    var what = n == 1 ? "1 element" : n + " elements";
                     switch (op)
                     {
-                        case "set_param": return "Cambiar «" + g.First().Key + "» en " + what;
-                        case "change_type": return "Cambiar tipo de " + what;
-                        case "set_elevation": return "Cambiar altura de " + what;
-                        case "set_workset": return "Mover " + what + " de workset";
-                        case "delete": return "Borrar " + what;
+                        case "set_param": return "Change «" + g.First().Key + "» on " + what;
+                        case "change_type": return "Change type of " + what;
+                        case "set_elevation": return "Change height of " + what;
+                        case "set_workset": return "Move " + what + " to another workset";
+                        case "delete": return "Delete " + what;
                         default:
                             var name = OpCatalog.NameOf(op);
-                            if (created > 0) return name + ": " + created + (created == 1 ? " nuevo" : " nuevos");
-                            if (n > 0) return name + " en " + what;
-                            return name + " (sobre lo que crea el plan)";
+                            if (created > 0) return name + ": " + created + " new";
+                            if (n > 0) return name + " on " + what;
+                            return name + " (on what the plan creates)";
                     }
                 });
                 return string.Join(" · ", parts);
@@ -359,7 +359,7 @@ namespace Bimbridge.Addin.Ui
             {
                 var rows = p.Entries.Take(300).Select(e => new DiffRow
                 {
-                    Elemento = e.Ref > 0 ? "lo creado por @" + e.Ref : e.Id == 0 ? "nuevo" : e.Id.ToString(CultureInfo.InvariantCulture),
+                    Elemento = e.Ref > 0 ? "created by @" + e.Ref : e.Id == 0 ? "new" : e.Id.ToString(CultureInfo.InvariantCulture),
                     Cambio = OpName(e.Op),
                     Campo = Field(e.Key),
                     Antes = e.Id == 0 ? "—" : Show(e, e.Before),
@@ -384,17 +384,17 @@ namespace Bimbridge.Addin.Ui
                     FontSize = 12,
                     ColumnWidth = new DataGridLength(1, DataGridLengthUnitType.Star),
                 };
-                // cabeceras y etiquetas en la fuente normal; monoespaciada sólo en ids y valores
+                // headers and labels in the normal font; monospace only for ids and values
                 grid.AutoGeneratingColumn += (s, e) =>
                 {
                     if (e.Column is DataGridTextColumn tc && (e.PropertyName == nameof(DiffRow.Elemento) || e.PropertyName == nameof(DiffRow.Antes) || e.PropertyName == nameof(DiffRow.Después)))
                         tc.FontFamily = Theme.Mono;
                 };
-                // zona hundida de lectura: el diff se distingue del resto de la tarjeta
+                // sunken reading area: the diff stands apart from the rest of the card
                 var panel = new StackPanel();
                 panel.Children.Add(grid);
                 if (p.Entries.Count > 300)
-                    panel.Children.Add(new TextBlock { Text = "… y " + (p.Entries.Count - 300) + " cambios más", FontSize = 12, Foreground = Theme.B(Theme.Muted), Margin = new Thickness(0, 8, 0, 0) });
+                    panel.Children.Add(new TextBlock { Text = "… and " + (p.Entries.Count - 300) + " more changes", FontSize = 12, Foreground = Theme.B(Theme.Muted), Margin = new Thickness(0, 8, 0, 0) });
                 return Theme.Inset(panel);
             }
 
@@ -405,26 +405,26 @@ namespace Bimbridge.Addin.Ui
                 if (key == null) return "";
                 switch (key)
                 {
-                    case "elev": return "Altura";
+                    case "elev": return "Height";
                     case "ws": return "Workset";
-                    case "type": return "Tipo";
-                    case "lvl": return "Nivel";
-                    case "loc": return "Posición";
-                    case "rot": return "Giro";
-                    case "head": return "Cabeza del tag";
+                    case "type": return "Type";
+                    case "lvl": return "Level";
+                    case "loc": return "Position";
+                    case "rot": return "Rotation";
+                    case "head": return "Tag head";
                     case "exists": case "nuevo": return "";
                     case "tag": return "Tag";
-                    case "rango": return "Rango de vista";
-                    case "plantilla": return "Plantilla";
-                    case "escala": return "Escala";
-                    case "detalle": return "Nivel de detalle";
-                    case "recorte": return "Recorte";
-                    case "caja_seccion": return "Caja de sección";
+                    case "rango": return "View range";
+                    case "plantilla": return "Template";
+                    case "escala": return "Scale";
+                    case "detalle": return "Detail level";
+                    case "recorte": return "Crop";
+                    case "caja_seccion": return "Section box";
                 }
-                if (key.StartsWith("oculto@", StringComparison.Ordinal)) return "Oculto en vista";
-                if (key.StartsWith("graficos@", StringComparison.Ordinal)) return "Gráficos en vista";
-                if (key.StartsWith("cat_oculta:", StringComparison.Ordinal)) return "Categoría oculta: " + key.Substring(11);
-                if (key.StartsWith("cat_graficos:", StringComparison.Ordinal)) return "Gráficos de " + key.Substring(13);
+                if (key.StartsWith("oculto@", StringComparison.Ordinal)) return "Hidden in view";
+                if (key.StartsWith("graficos@", StringComparison.Ordinal)) return "Graphics in view";
+                if (key.StartsWith("cat_oculta:", StringComparison.Ordinal)) return "Hidden category: " + key.Substring(11);
+                if (key.StartsWith("cat_graficos:", StringComparison.Ordinal)) return "Graphics of " + key.Substring(13);
                 return key;
             }
 
@@ -432,10 +432,10 @@ namespace Bimbridge.Addin.Ui
             {
                 if (e.Key == "elev" && double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var ft)) return FeetInches(ft);
                 var shown = Plan.ShowValue(e, v, false);
-                return string.IsNullOrEmpty(shown) ? "(vacío)" : shown;
+                return string.IsNullOrEmpty(shown) ? "(empty)" : shown;
             }
 
-            /// <summary>10.5 → 10'-6"; redondeado a 1/8".</summary>
+            /// <summary>10.5 → 10'-6"; rounded to 1/8".</summary>
             internal static string FeetInches(double ft)
             {
                 var sign = ft < 0 ? "-" : "";

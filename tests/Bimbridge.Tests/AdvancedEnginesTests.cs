@@ -19,12 +19,12 @@ namespace Bimbridge.Tests
             var segs = new List<RunSegment>
             {
                 S("c1", 0, 0, 10, 0, null, "c2"),
-                S("c2", 10, 0, 20, 0, "c1", null),             // conectado y continuo
-                S("c3", 20, 0, 30, 0),                         // toca c2 pero sin conector: toca_sin_conectar
-                S("c4", 30.2, 0, 40, 0),                       // a 0,2 ft de c3: proximidad, no conexión
-                S("c5", 50, 0, 60, 0, null, "c6", 1.0 / 12),   // conectado a c6 con un hueco de 1 ft y otro diámetro
+                S("c2", 10, 0, 20, 0, "c1", null),             // connected and continuous
+                S("c3", 20, 0, 30, 0),                         // touches c2 but has no connector: toca_sin_conectar
+                S("c4", 30.2, 0, 40, 0),                       // 0.2 ft from c3: proximity, not a connection
+                S("c5", 50, 0, 60, 0, null, "c6", 1.0 / 12),   // connected to c6 with a 1 ft gap and a different diameter
                 S("c6", 61, 0, 70, 0, "c5", null),
-                S("c7", 80, 0, 90, 0, null, "EQ-1"),           // conectado a un equipo fuera del conjunto
+                S("c7", 80, 0, 90, 0, null, "EQ-1"),           // connected to equipment outside the set
             };
             foreach (var eng in new[] { null, new PowerEngineDispatcher(PowerEngineEnv.Options("rust_ffi")) })
             {
@@ -38,7 +38,7 @@ namespace Bimbridge.Tests
                 Assert.Equal(new List<object> { "c3", "c4" }, ((Dictionary<string, object>)near[0])["tramos"]);
                 Assert.Single((List<object>)r["conectado_fuera_del_conjunto"]);
                 var capas = (Dictionary<string, object>)r["capas"];
-                // continuidad: {c1,c2,c3}, {c4}, {c5}, {c6}, {c7}; física: {c1,c2}, {c3}, {c4}, {c5,c6}, {c7}
+                // continuity: {c1,c2,c3}, {c4}, {c5}, {c6}, {c7}; physical: {c1,c2}, {c3}, {c4}, {c5,c6}, {c7}
                 Assert.Equal(5L, ((Dictionary<string, object>)capas["continuidad"])["componentes"]);
                 Assert.Equal(5L, ((Dictionary<string, object>)capas["conexion_fisica"])["componentes"]);
                 eng?.Dispose();
@@ -53,11 +53,11 @@ namespace Bimbridge.Tests
             {
                 new RiserNode { Id = "P1", Kind = "panel", Level = "L01", LevelElevFt = 0 },
                 new RiserNode { Id = "J2", Kind = "union", Level = "L02", LevelElevFt = 12 },
-                new RiserNode { Id = "J3", Kind = "union", Level = "L03", LevelElevFt = 24 },   // extremo abierto (unión sin salida)
+                new RiserNode { Id = "J3", Kind = "union", Level = "L03", LevelElevFt = 24 },   // open end (junction with no outlet)
                 new RiserNode { Id = "D2", Kind = "dispositivo", Level = "L02", LevelElevFt = 12 },
                 new RiserNode { Id = "F-7", Kind = "terminal", Level = "L02", LevelElevFt = 12 },
-                new RiserNode { Id = "F-7", Kind = "terminal", Level = "L03", LevelElevFt = 24 },  // ID repetido válido (feeder)
-                new RiserNode { Id = "X9", Kind = "union", Level = "L03", LevelElevFt = 24 },   // repetido inválido
+                new RiserNode { Id = "F-7", Kind = "terminal", Level = "L03", LevelElevFt = 24 },  // valid repeated ID (feeder)
+                new RiserNode { Id = "X9", Kind = "union", Level = "L03", LevelElevFt = 24 },   // invalid repeat
                 new RiserNode { Id = "X9", Kind = "union", Level = "L01", LevelElevFt = 0 },
             };
             var edges = new List<RiserEdge>
@@ -102,8 +102,8 @@ namespace Bimbridge.Tests
             {
                 G("U1", "UNIT A", 0, 0, 0, false, unit),
                 G("U2", "UNIT A", 100, 0, 90, false, unit),
-                G("U3", "UNIT A", 0, 100, 0, true, unit),                        // espejada: misma firma
-                G("U4", "UNIT A", 200, 0, 0, false, unit.Take(2).ToArray()),     // le falta la G
+                G("U3", "UNIT A", 0, 100, 0, true, unit),                        // mirrored: same signature
+                G("U4", "UNIT A", 200, 0, 0, false, unit.Take(2).ToArray()),     // missing the G
                 G("U5", "UNIT B", 0, 300, 0, false, unit),
             };
             var r = GroupVariants.Analyze(groups);
@@ -127,7 +127,7 @@ namespace Bimbridge.Tests
             Assert.Equal(0L, r["colisiones"]);
             Assert.True((bool)r["legible"]);
             Assert.False((bool)AnnotationLayout.Layout(tags, obstacles, textHeightIn: 1.0 / 16)["legible"]);
-            // ancla rodeada: la etiqueta se aleja y lleva leader
+            // crowded anchor: the tag moves away and gets a leader
             var crowd = new List<Box> { new Box { X0 = 4.0, X1 = 6.0, Y0 = 4.0, Y1 = 6.0 } };
             var one = AnnotationLayout.Layout(new List<TagRequest> { new TagRequest { Id = "x", X = 5, Y = 5 } }, crowd);
             var tag = (Dictionary<string, object>)((List<object>)one["etiquetas"])[0];

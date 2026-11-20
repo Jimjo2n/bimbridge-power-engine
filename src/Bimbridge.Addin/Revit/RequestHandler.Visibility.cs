@@ -24,7 +24,7 @@ namespace Bimbridge.Addin.Revit
             var ids = IdList(request.Args, "ids");
             if (views.Length == 0 || ids.Length == 0 || views.Length > 8 || (long)views.Length * ids.Length > 100 ||
                 views.Contains(0) || ids.Contains(0))
-                return Response.Fail(request.Id, Status.Invalido, "indique IDs positivos en vistas e ids. Máximo 8 vistas y 100 pares vista-elemento.");
+                return Response.Fail(request.Id, Status.Invalido, "give positive IDs in vistas and ids. Maximum 8 views and 100 view-element pairs.");
             VisibilityAudit audit;
             try { audit = new VisibilityAudit(request.Args, views, ids); }
             catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
@@ -42,7 +42,7 @@ namespace Bimbridge.Addin.Revit
                     if (!(doc.GetElement(Ids.ToId(id)) is View view) || view.IsTemplate || !view.AreGraphicsOverridesAllowed() ||
                         !FilteredElementCollector.IsViewValidForElementIteration(doc, view.Id))
                     {
-                        error = "la vista " + id + " no admite diagnóstico de visibilidad";
+                        error = "view " + id + " does not support visibility diagnosis";
                         return true;
                     }
                     var existing = targets.Where(e => e.Element != null).Select(e => e.Element.Id).ToList();
@@ -104,7 +104,7 @@ namespace Bimbridge.Addin.Revit
                 {
                     ["vistas"] = rows,
                     ["diferencias"] = differences,
-                    ["alcance"] = "El colector identifica candidatos de la vista. Las causas y los overrides son evidencia de configuración. Compruebe el render final para recortes y colores.",
+                    ["alcance"] = "The collector identifies the view's candidates. The causes and overrides are configuration evidence. Check the final render for crops and colors.",
                 },
             };
         }

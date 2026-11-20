@@ -6,21 +6,21 @@ using System.Security.Cryptography;
 
 namespace Bimbridge.Engine
 {
-    /// <summary>Resultado de buscar un cursor de consulta.</summary>
+    /// <summary>Result of looking up a query cursor.</summary>
     public enum SnapshotLookup
     {
         Ok,
-        /// <summary>No existe, venció o pertenece a otra sesión (no se distingue para no filtrar cursores ajenos).</summary>
+        /// <summary>Does not exist, expired or belongs to another session (not distinguished, so other sessions' cursors are not leaked).</summary>
         Unknown,
-        /// <summary>El documento cambió de revisión desde que se tomó la instantánea: repetir la consulta.</summary>
+        /// <summary>The document revision changed since the snapshot was taken: repeat the query.</summary>
         Stale,
-        /// <summary>La petición apunta a otro documento distinto del de la instantánea.</summary>
+        /// <summary>The request targets a document other than the snapshot's.</summary>
         OtherDocument,
-        /// <summary>Era de esta sesión pero se descartó (presupuesto de memoria, vencimiento o cierre del documento): repetir la consulta.</summary>
+        /// <summary>Belonged to this session but was discarded (memory budget, expiry or document closed): repeat the query.</summary>
         Evicted,
     }
 
-    /// <summary>Filas ya filtradas de una consulta, ligadas a sesión, documento y revisión (issue #2).</summary>
+    /// <summary>Already-filtered rows of a query, bound to session, document and revision (issue #2).</summary>
     public sealed class QuerySnapshot
     {
         public string Id { get; internal set; }
@@ -30,23 +30,23 @@ namespace Bimbridge.Engine
         public QuerySpec Spec { get; internal set; }
         public IReadOnlyList<Dictionary<string, object>> Rows { get; internal set; }
         public long Cells { get; internal set; }
-        /// <summary>Tamaño ESTIMADO de las filas guardadas (ver <see cref="QuerySnapshotStore.EstimateBytes"/>). No es una medición del heap.</summary>
+        /// <summary>ESTIMATED size of the stored rows (see <see cref="QuerySnapshotStore.EstimateBytes"/>). Not a heap measurement.</summary>
         public long EstimatedBytes { get; internal set; }
         internal Func<long> LiveRev;
         internal DateTime LastUseUtc;
     }
 
     /// <summary>
-    /// Instantáneas de consultas paginadas (issue #2). La primera página lee el modelo UNA vez en el hilo de Revit; las páginas
-    /// siguientes se sirven con "query cursor=… page=N" desde estas filas, sin volver a Revit.
-    /// Garantías: un cursor sólo vale para la sesión que lo creó, para el mismo documento y mientras su revisión no cambie
-    /// (si cambió, se rechaza con Stale y se descarta: nunca se mezclan filas de dos revisiones). Vencen por inactividad (TTL).
+    /// Snapshots of paged queries (issue #2). The first page reads the model ONCE on the Revit thread; subsequent pages
+    /// are served with "query cursor=… page=N" from these rows, without going back to Revit.
+    /// Guarantees: a cursor is valid only for the session that created it, for the same document and while its revision does not change
+    /// (if it changed, it is rejected with Stale and discarded: rows from two revisions are never mixed). They expire on inactivity (TTL).
     ///
-    /// Presupuesto de memoria (revisión PR #22): se mide en BYTES estimados, no en celdas. Una celda con un texto de 50 000 caracteres
-    /// ya no cuenta como una celda de un número. Límites: global, por documento, por sesión (cantidad) y por instantánea. Se guarda una
-    /// proyección compacta (sólo las columnas pedidas, valores simples; nunca objetos de la API de Revit). La cifra es una ESTIMACIÓN
-    /// conservadora del tamaño gestionado (cabeceras de objeto, cadenas UTF-16, valores en caja, diccionarios); no es una medición del heap
-    /// ni una garantía exacta. Un cursor descartado por presupuesto, vencimiento o cierre del documento se informa como tal (Evicted).
+    /// Memory budget (PR #22 review): measured in estimated BYTES, not cells. A cell with a 50 000-character text
+    /// no longer counts the same as a numeric cell. Limits: global, per document, per session (count) and per snapshot. A compact
+    /// projection is stored (only the requested columns, simple values; never Revit API objects). The figure is a conservative ESTIMATE
+    /// of the managed size (object headers, UTF-16 strings, boxed values, dictionaries); it is not a heap measurement
+    /// nor an exact guarantee. A cursor discarded by budget, expiry or document close is reported as such (Evicted).
     /// </summary>
     public sealed class QuerySnapshotStore
     {
@@ -78,24 +78,24 @@ namespace Bimbridge.Engine
 
         public int Count { get { lock (_lock) return _items.Count; } }
         public long Cells { get { lock (_lock) return _cells; } }
-        /// <summary>Suma de tamaños estimados de las instantáneas guardadas.</summary>
+        /// <summary>Sum of the estimated sizes of the stored snapshots.</summary>
         public long EstimatedBytes { get { lock (_lock) return _bytes; } }
         public long MaxBytes => _maxBytes;
         public TimeSpan Ttl => _ttl;
 
         /// <summary>
-        /// Estimación conservadora del tamaño gestionado de filas simples (x64): diccionario (cabecera, tablas) + por entrada (entrada y cubo)
-        /// + por valor (cadena = cabecera + 2 bytes por carácter; número/booleano en caja; otros como su texto). Las claves compartidas
-        /// (nombres de campo) no se cuentan por fila.
+        /// Conservative estimate of the managed size of simple rows (x64): dictionary (header, tables) + per entry (entry and bucket)
+        /// + per value (string = header + 2 bytes per character; boxed number/boolean; others as their text). Shared keys
+        /// (field names) are not counted per row.
         /// </summary>
         public static long EstimateBytes(IReadOnlyList<Dictionary<string, object>> rows)
         {
-            long total = 24 + 8L * rows.Count;                     // la lista y sus referencias
+            long total = 24 + 8L * rows.Count;                     // the list and its references
             foreach (var r in rows) total += RowBytes(r);
             return total;
         }
 
-        /// <summary>Tamaño estimado de una fila: Dictionary&lt;string,object&gt; (objeto + arrays + entrada/cubo por clave) + sus valores.</summary>
+        /// <summary>Estimated size of a row: Dictionary&lt;string,object&gt; (object + arrays + entry/bucket per key) + its values.</summary>
         private static long RowBytes(Dictionary<string, object> r)
         {
             long b = 80 + 32L * r.Count;
@@ -104,20 +104,20 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// AUD-03: proyección con presupuesto INCREMENTAL. Estima fila a fila mientras proyecta y se detiene en cuanto supera
-        /// <paramref name="limit"/>: nunca construye entera una proyección que no va a caber (antes se proyectaba todo y después se
-        /// rechazaba). Devuelve null si no cabe; en <paramref name="bytes"/> queda la estimación alcanzada. No recorta filas: o todo o nada.
+        /// AUD-03: projection with an INCREMENTAL budget. Estimates row by row while projecting and stops as soon as it exceeds
+        /// <paramref name="limit"/>: it never builds in full a projection that will not fit (previously everything was projected and then
+        /// rejected). Returns null if it does not fit; <paramref name="bytes"/> holds the estimate reached. Does not trim rows: all or nothing.
         /// </summary>
         public static List<Dictionary<string, object>> ProjectWithinBudget(QuerySpec spec, IReadOnlyList<Dictionary<string, object>> rows, long limit, out long bytes)
         {
             bytes = 24 + 8L * rows.Count;
-            if (bytes > limit) return null;                         // rechazo anticipado: ni siquiera caben las referencias
+            if (bytes > limit) return null;                         // early rejection: not even the references fit
             var list = new List<Dictionary<string, object>>(rows.Count);
             foreach (var r in rows)
             {
                 var d = ProjectRow(spec, r);
                 bytes += RowBytes(d);
-                if (bytes > limit) { list.Clear(); return null; }   // se suelta lo construido en cuanto se sabe que no cabe
+                if (bytes > limit) { list.Clear(); return null; }   // release what was built as soon as we know it will not fit
                 list.Add(d);
             }
             return list;
@@ -145,7 +145,7 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Proyección compacta: sólo las columnas que la página devolverá. Filtros y unidades ya se aplicaron.</summary>
+        /// <summary>Compact projection: only the columns the page will return. Filters and units were already applied.</summary>
         public static List<Dictionary<string, object>> Project(QuerySpec spec, IReadOnlyList<Dictionary<string, object>> rows)
         {
             var list = new List<Dictionary<string, object>>(rows.Count);
@@ -154,9 +154,9 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// Guarda la instantánea y devuelve su cursor. null si no cabe en el presupuesto, con el motivo en <paramref name="refusal"/>
-        /// (la respuesta lo comunica al agente; la paginación clásica sigue disponible). <paramref name="liveRev"/> devuelve la revisión
-        /// ACTUAL del documento (hilo seguro).
+        /// Stores the snapshot and returns its cursor. null if it does not fit in the budget, with the reason in <paramref name="refusal"/>
+        /// (the response passes it on to the agent; classic paging is still available). <paramref name="liveRev"/> returns the CURRENT
+        /// revision of the document (thread-safe).
         /// </summary>
         public string Put(string sessionId, string docId, long rev, QuerySpec spec, IReadOnlyList<Dictionary<string, object>> rows, Func<long> liveRev, out string refusal)
         {
@@ -165,12 +165,12 @@ namespace Bimbridge.Engine
             if (spec == null) throw new ArgumentNullException(nameof(spec));
             if (rows == null) throw new ArgumentNullException(nameof(rows));
             if (liveRev == null) throw new ArgumentNullException(nameof(liveRev));
-            // AUD-03: proyección incremental con rechazo anticipado; el límite es el presupuesto por documento.
+            // AUD-03: incremental projection with early rejection; the limit is the per-document budget.
             var compact = ProjectWithinBudget(spec, rows, _maxDocBytes, out var bytes);
             if (compact == null)
             {
-                refusal = "el resultado ocupa ~" + Mb(bytes) + " MB estimados y supera el presupuesto de instantáneas (" + Mb(_maxDocBytes) +
-                          " MB por documento): no hay cursor; acote la consulta (f=, where, group_by) o pagine sin cursor";
+                refusal = "the result takes ~" + Mb(bytes) + " MB (estimated) and exceeds the snapshot budget (" + Mb(_maxDocBytes) +
+                          " MB per document): no cursor; narrow the query (f=, where, group_by) or page without a cursor";
                 return null;
             }
             var snap = new QuerySnapshot
@@ -181,14 +181,14 @@ namespace Bimbridge.Engine
             lock (_lock)
             {
                 PruneExpired();
-                // Límite por sesión: se descartan sus instantáneas menos usadas.
+                // Per-session limit: its least recently used snapshots are discarded.
                 var mine = _items.Values.Where(s => s.SessionId == sessionId).OrderBy(s => s.LastUseUtc).ToList();
-                for (var i = 0; i <= mine.Count - _maxPerSession; i++) Remove(mine[i].Id, "límite de instantáneas por sesión");
-                // Presupuesto por documento y global: LRU dentro del ámbito que se excede.
+                for (var i = 0; i <= mine.Count - _maxPerSession; i++) Remove(mine[i].Id, "per-session snapshot limit");
+                // Per-document and global budget: LRU within the scope that is exceeded.
                 while (_items.Values.Where(s => SameDoc(s.DocId, docId)).Sum(s => s.EstimatedBytes) + bytes > _maxDocBytes)
-                    Remove(_items.Values.Where(s => SameDoc(s.DocId, docId)).OrderBy(s => s.LastUseUtc).First().Id, "presupuesto de memoria del documento");
+                    Remove(_items.Values.Where(s => SameDoc(s.DocId, docId)).OrderBy(s => s.LastUseUtc).First().Id, "document memory budget");
                 while (_bytes + bytes > _maxBytes && _items.Count > 0)
-                    Remove(_items.Values.OrderBy(s => s.LastUseUtc).First().Id, "presupuesto global de memoria");
+                    Remove(_items.Values.OrderBy(s => s.LastUseUtc).First().Id, "global memory budget");
                 _items[snap.Id] = snap;
                 _cells += snap.Cells;
                 _bytes += bytes;
@@ -199,13 +199,13 @@ namespace Bimbridge.Engine
         private static bool SameDoc(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
         private static string Mb(long b) => (b / (1024.0 * 1024.0)).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
 
-        /// <summary>Motivo del descarte de un cursor de esta sesión, si se recuerda (null si no).</summary>
+        /// <summary>Reason a cursor of this session was discarded, if remembered (null otherwise).</summary>
         public string EvictionReason(string id, string sessionId)
         {
             lock (_lock) return id != null && _evicted.TryGetValue(id, out var e) && e.Key == sessionId ? e.Value : null;
         }
 
-        /// <summary>Busca un cursor para <paramref name="sessionId"/>. <paramref name="targetDocId"/> null = sin destino explícito.</summary>
+        /// <summary>Looks up a cursor for <paramref name="sessionId"/>. <paramref name="targetDocId"/> null = no explicit target.</summary>
         public SnapshotLookup Get(string id, string sessionId, string targetDocId, out QuerySnapshot snapshot)
         {
             snapshot = null;
@@ -220,11 +220,11 @@ namespace Bimbridge.Engine
             }
             long live;
             try { live = s.LiveRev(); }
-            catch (Exception) { live = long.MinValue; }   // no se puede comprobar: fail-closed
+            catch (Exception) { live = long.MinValue; }   // cannot be checked: fail-closed
             lock (_lock)
             {
-                // AUD-02: entre el primer bloqueo y éste (LiveRev corre fuera del bloqueo) otro hilo pudo descartar la instantánea
-                // (DropSession, DropDocument, presupuesto, vencimiento). Sólo vale si sigue siendo EXACTAMENTE el mismo objeto autorizado.
+                // AUD-02: between the first lock and this one (LiveRev runs outside the lock) another thread may have discarded the snapshot
+                // (DropSession, DropDocument, budget, expiry). It is valid only if it is still EXACTLY the same authorized object.
                 if (!_items.TryGetValue(s.Id, out var current) || !ReferenceEquals(current, s))
                     return _evicted.TryGetValue(s.Id, out var ev) && ev.Key == sessionId ? SnapshotLookup.Evicted : SnapshotLookup.Unknown;
                 if (live != s.Rev)
@@ -246,16 +246,16 @@ namespace Bimbridge.Engine
         public void DropDocument(string docId)
         {
             lock (_lock)
-                foreach (var s in _items.Values.Where(x => string.Equals(x.DocId, docId, StringComparison.OrdinalIgnoreCase)).ToList()) Remove(s.Id, "el documento se cerró");
+                foreach (var s in _items.Values.Where(x => string.Equals(x.DocId, docId, StringComparison.OrdinalIgnoreCase)).ToList()) Remove(s.Id, "the document was closed");
         }
 
         private void PruneExpired()
         {
             var now = _clock();
-            foreach (var s in _items.Values.Where(x => now - x.LastUseUtc > _ttl).ToList()) Remove(s.Id, "vencido (" + (int)_ttl.TotalMinutes + " min sin uso)");
+            foreach (var s in _items.Values.Where(x => now - x.LastUseUtc > _ttl).ToList()) Remove(s.Id, "expired (" + (int)_ttl.TotalMinutes + " min unused)");
         }
 
-        /// <param name="reason">Motivo que se recordará para informar al agente; null = no recordar (revisión cambiada o sesión cerrada).</param>
+        /// <param name="reason">Reason remembered to inform the agent; null = do not remember (revision changed or session closed).</param>
         private void Remove(string id, string reason)
         {
             if (!_items.TryGetValue(id, out var s)) return;

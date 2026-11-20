@@ -5,15 +5,15 @@ using System.Globalization;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Identidad duradera de un documento (0.6.0, §3.1). Separa cuatro cosas que antes se mezclaban:
-    /// - <b>instancia</b>: el proceso de Revit (pid + hora de arranque);
-    /// - <b>handle dN</b>: abreviatura de sesión, sólo vale mientras el documento sigue abierto en esa instancia;
-    /// - <b>clave</b> (<see cref="Key"/>): el modelo persistente. Cloud: GUID de proyecto/modelo. Archivo: ruta normalizada.
-    ///   Sin guardar: "nuevo:" + instancia + secuencia, así que nunca reclama operaciones de otra instancia ni de otro "Proyecto1";
-    /// - <b>huella</b> (<see cref="Print"/>): identidad interna del modelo (ProjectInformation.UniqueId, GUID central, GUID cloud…). Si en la
-    ///   misma ruta aparece un modelo con otra huella, el archivo fue sustituido; si la misma huella aparece en otra ruta, es una copia;
-    /// - <b>generación</b>: cada apertura (instancia + secuencia). Una reapertura no hereda lo que sólo estaba en memoria.
-    /// El título nunca se usa como identidad.
+    /// Durable identity of a document (0.6.0, §3.1). Separates four things that used to be mixed up:
+    /// - <b>instance</b>: the Revit process (pid + start time);
+    /// - <b>handle dN</b>: session shorthand, only valid while the document stays open in that instance;
+    /// - <b>key</b> (<see cref="Key"/>): the persistent model. Cloud: project/model GUID. File: normalized path.
+    ///   Unsaved: "nuevo:" + instance + sequence, so it never claims operations of another instance or of another "Project1";
+    /// - <b>fingerprint</b> (<see cref="Print"/>): internal identity of the model (ProjectInformation.UniqueId, central GUID, cloud GUID…). If a model
+    ///   with another fingerprint appears at the same path, the file was replaced; if the same fingerprint appears at another path, it is a copy;
+    /// - <b>generation</b>: each opening (instance + sequence). A reopen does not inherit what was only in memory.
+    /// The title is never used as identity.
     /// </summary>
     public sealed class DocIdentity
     {
@@ -48,7 +48,7 @@ namespace Bimbridge.Engine
 
         public static string GenerationOf(string instanceId, int sequence) => instanceId + "#" + sequence.ToString(CultureInfo.InvariantCulture);
 
-        /// <summary>Ruta comparable: separadores uniformes, sin "." ni "..", sin barra final, sin distinguir mayúsculas (Windows).</summary>
+        /// <summary>Comparable path: uniform separators, no "." or "..", no trailing slash, case-insensitive (Windows).</summary>
         public static string NormalizePath(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) return "";

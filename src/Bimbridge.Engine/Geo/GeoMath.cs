@@ -6,9 +6,9 @@ using System.Linq;
 namespace Bimbridge.Engine.Geo
 {
     /// <summary>
-    /// Matemática de geometría sin la API de Revit (se prueba en Linux). El add-in sólo extrae cajas,
-    /// segmentos e intersecciones; aquí se decide qué significan: holgura, empotrada, flotando, nivel real, duplicados.
-    /// Todo en pies (unidad interna de Revit) y en coordenadas del modelo anfitrión.
+    /// Geometry math without the Revit API (tested on Linux). The add-in only extracts boxes,
+    /// segments and intersections; this decides what they mean: clearance, embedded, floating, real level, duplicates.
+    /// Everything in feet (Revit's internal unit) and in host model coordinates.
     /// </summary>
     public struct Box3
     {
@@ -60,7 +60,7 @@ namespace Bimbridge.Engine.Geo
             MinY <= o.MaxY + tol && MaxY >= o.MinY - tol &&
             MinZ <= o.MaxZ + tol && MaxZ >= o.MinZ - tol;
 
-        /// <summary>Distancia horizontal entre dos cajas (0 si se solapan en planta).</summary>
+        /// <summary>Horizontal distance between two boxes (0 if they overlap in plan).</summary>
         public double DistanceXY(Box3 o)
         {
             var dx = Math.Max(0, Math.Max(o.MinX - MaxX, MinX - o.MaxX));
@@ -68,14 +68,14 @@ namespace Bimbridge.Engine.Geo
             return Math.Sqrt(dx * dx + dy * dy);
         }
 
-        /// <summary>Separación vertical: positiva si o está entera encima o debajo; 0 si se solapan en Z.</summary>
+        /// <summary>Vertical gap: positive if o is entirely above or below; 0 if they overlap in Z.</summary>
         public double GapZ(Box3 o) => Math.Max(0, Math.Max(o.MinZ - MaxZ, MinZ - o.MaxZ));
     }
 
     /// <summary>
-    /// Índice espacial en planta: rejilla uniforme. Una losa grande cae en muchas celdas; una luminaria en una o dos.
-    /// Consultar una caja devuelve sólo los elementos de las celdas tocadas (sin duplicados).
-    /// Evita el patrón de pyRevit que cuesta O(luminarias × elementos): cada script recorría todos los sólidos del vínculo.
+    /// Spatial index in plan: uniform grid. A large slab falls into many cells; a fixture into one or two.
+    /// Querying a box returns only the elements of the touched cells (no duplicates).
+    /// Avoids the pyRevit pattern that costs O(fixtures × elements): every script walked all the solids of the link.
     /// </summary>
     public sealed class GridIndex
     {
@@ -86,7 +86,7 @@ namespace Bimbridge.Engine.Geo
         private int[] _stamp = new int[0];
         private int _stampValue;
 
-        /// <summary>Un elemento que ocuparía más celdas que esto va a una lista aparte que se revisa siempre.</summary>
+        /// <summary>An element that would occupy more cells than this goes to a separate list that is always checked.</summary>
         public const int MaxCellsPerItem = 4096;
 
         public GridIndex(double cellSize = 8.0)
@@ -99,7 +99,7 @@ namespace Bimbridge.Engine.Geo
         public double CellSize => _cell;
         public Box3 BoxOf(int item) => _boxes[item];
 
-        /// <summary>Agrega un elemento y devuelve su índice (0, 1, 2…).</summary>
+        /// <summary>Adds an element and returns its index (0, 1, 2…).</summary>
         public int Add(Box3 b)
         {
             var item = _boxes.Count;
@@ -117,7 +117,7 @@ namespace Bimbridge.Engine.Geo
             return item;
         }
 
-        /// <summary>Elementos cuya caja toca el rectángulo en planta (y, si se da, el rango Z).</summary>
+        /// <summary>Elements whose box touches the plan rectangle (and, if given, the Z range).</summary>
         public List<int> Query(double minX, double minY, double maxX, double maxY, double minZ = double.MinValue, double maxZ = double.MaxValue)
         {
             var result = new List<int>();
@@ -155,20 +155,20 @@ namespace Bimbridge.Engine.Geo
         private static long Key(long x, long y) => (x << 32) ^ (y & 0xFFFFFFFFL);
     }
 
-    /// <summary>Tramo de una vertical que queda dentro de un sólido: entra en ZIn y sale en ZOut.</summary>
+    /// <summary>Segment of a vertical ray that lies inside a solid: enters at ZIn and exits at ZOut.</summary>
     public struct Segment
     {
         public double ZIn, ZOut;
-        /// <summary>Índice del elemento (en el índice de geometría) al que pertenece.</summary>
+        /// <summary>Index of the element (in the geometry index) it belongs to.</summary>
         public int Item;
         public Segment(double a, double b, int item) { ZIn = Math.Min(a, b); ZOut = Math.Max(a, b); Item = item; }
         public override string ToString() => "[" + ZIn + ", " + ZOut + "] #" + Item;
     }
 
-    /// <summary>Resultado en un punto de la huella.</summary>
+    /// <summary>Result at one point of the footprint.</summary>
     public struct ProbeHit
     {
-        /// <summary>Holgura con signo: positiva = espacio libre; negativa = penetración. NaN = sin superficie en el rango.</summary>
+        /// <summary>Signed clearance: positive = free space; negative = penetration. NaN = no surface in range.</summary>
         public double Gap;
         public int Item;
         public double X, Y, SurfaceZ;
@@ -184,37 +184,37 @@ namespace Bimbridge.Engine.Geo
         public const string NoBody = "sin_cuerpo";
     }
 
-    /// <summary>Resumen de todos los puntos de una luminaria.</summary>
+    /// <summary>Summary of all the points of a fixture.</summary>
     public sealed class MountResult
     {
         public string Class;
-        /// <summary>Holgura en el punto que controla (el más cercano o el más empotrado).</summary>
+        /// <summary>Clearance at the controlling point (the closest or the most embedded).</summary>
         public double GapMin = double.NaN;
         public double GapMax = double.NaN;
         public int Item = -1;
         public double SurfaceX, SurfaceY, SurfaceZ;
         public int PointsTotal;
         public int PointsWithSurface;
-        /// <summary>La superficie no es paralela al cuerpo (rampa, escalera): la holgura varía más que la tolerancia.</summary>
+        /// <summary>The surface is not parallel to the body (ramp, stair): the clearance varies more than the tolerance.</summary>
         public bool Sloped;
         public bool Partial => PointsWithSurface > 0 && PointsWithSurface < PointsTotal;
-        /// <summary>Cuánto hay que subir (positivo) o bajar (negativo) para que el punto que controla quede a la holgura deseada.</summary>
+        /// <summary>How much to raise (positive) or lower (negative) so the controlling point ends up at the desired clearance.</summary>
         public double DeltaFor(double targetGap) => double.IsNaN(GapMin) ? double.NaN : GapMin - targetGap;
     }
 
     /// <summary>
-    /// Regla de montaje del operador (2026-10-13): sin altura explícita, la cara superior de la luminaria queda exactamente
-    /// en la cara inferior de la losa de arriba, nunca empotrada. En pendiente manda la esquina más cercana.
+    /// Operator mounting rule (2026-10-13): without an explicit height, the fixture's top face sits exactly
+    /// on the bottom face of the slab above, never embedded. On a slope the closest corner controls.
     /// </summary>
     public static class Mounting
     {
-        /// <summary>1/16" en pies: tolerancia del QC histórico (±1/16").</summary>
+        /// <summary>1/16" in feet: historical QC tolerance (±1/16").</summary>
         public const double DefaultTolerance = 1.0 / 16.0 / 12.0;
 
         /// <summary>
-        /// Hacia arriba: el cuerpo ocupa [zBot, zTop] en este punto. Se busca el primer sólido que no esté
-        /// entero por debajo del cuerpo. Holgura = cara inferior de ese sólido − cara superior del cuerpo.
-        /// Si el sólido envuelve al cuerpo (luminaria dentro de la losa) la holgura sale negativa: empotrada.
+        /// Upward: the body occupies [zBot, zTop] at this point. Finds the first solid that is not
+        /// entirely below the body. Clearance = bottom face of that solid − top face of the body.
+        /// If the solid wraps the body (fixture inside the slab) the clearance is negative: embedded.
         /// </summary>
         public static ProbeHit Up(double x, double y, double zBot, double zTop, IEnumerable<Segment> surfaces, double maxUp, double tol)
         {
@@ -222,7 +222,7 @@ namespace Bimbridge.Engine.Geo
             var bestIn = double.MaxValue;
             foreach (var s in surfaces)
             {
-                if (s.ZOut <= zBot + tol) continue;            // entero por debajo del cuerpo: es un piso, no lo de arriba
+                if (s.ZOut <= zBot + tol) continue;            // entirely below the body: it is a floor, not what is above
                 if (s.ZOut - s.ZIn <= 1e-9) continue;
                 if (s.ZIn < bestIn) { bestIn = s.ZIn; best.Item = s.Item; }
             }
@@ -234,14 +234,14 @@ namespace Bimbridge.Engine.Geo
             return best;
         }
 
-        /// <summary>Hacia abajo (luminarias o equipos apoyados en piso): holgura = base del cuerpo − cara superior del sólido de abajo.</summary>
+        /// <summary>Downward (fixtures or equipment resting on a floor): clearance = body base − top face of the solid below.</summary>
         public static ProbeHit Down(double x, double y, double zBot, double zTop, IEnumerable<Segment> surfaces, double maxDown, double tol)
         {
             var best = new ProbeHit { Gap = double.NaN, Item = -1, X = x, Y = y };
             var bestOut = double.MinValue;
             foreach (var s in surfaces)
             {
-                if (s.ZIn >= zTop - tol) continue;             // entero por encima del cuerpo
+                if (s.ZIn >= zTop - tol) continue;             // entirely above the body
                 if (s.ZOut - s.ZIn <= 1e-9) continue;
                 if (s.ZOut > bestOut) { bestOut = s.ZOut; best.Item = s.Item; }
             }
@@ -253,7 +253,7 @@ namespace Bimbridge.Engine.Geo
             return best;
         }
 
-        /// <summary>Junta los puntos: manda el de menor holgura (el que toca primero o el más empotrado).</summary>
+        /// <summary>Combines the points: the one with the smallest clearance controls (the first to touch or the most embedded).</summary>
         public static MountResult Classify(IList<ProbeHit> hits, double tol)
         {
             var r = new MountResult { PointsTotal = hits.Count };
@@ -278,15 +278,15 @@ namespace Bimbridge.Engine.Geo
         }
     }
 
-    /// <summary>Puntos de la huella donde se mide: 1 (centro), 5 (esquinas + centro) o 9 (rejilla 3×3).</summary>
+    /// <summary>Footprint points where measurements are taken: 1 (center), 5 (corners + center) or 9 (3×3 grid).</summary>
     public static class Probes
     {
         public static readonly int[] Allowed = { 1, 5, 9 };
 
         public static List<double[]> Points(Box3 footprint, int n, double inset = 1.0 / 24.0)
         {
-            if (Array.IndexOf(Allowed, n) < 0) throw new ArgumentException("puntos debe ser 1, 5 o 9");
-            // Se mide un poco hacia adentro del borde: justo en la arista la intersección es inestable.
+            if (Array.IndexOf(Allowed, n) < 0) throw new ArgumentException("puntos must be 1, 5 or 9");
+            // Measure slightly inside the border: right on the edge the intersection is unstable.
             var ix = Math.Min(inset, footprint.SizeX * 0.1);
             var iy = Math.Min(inset, footprint.SizeY * 0.1);
             double x0 = footprint.MinX + ix, x1 = footprint.MaxX - ix, y0 = footprint.MinY + iy, y1 = footprint.MaxY - iy;
@@ -300,7 +300,7 @@ namespace Bimbridge.Engine.Geo
         }
     }
 
-    /// <summary>Nivel real por altura: el nivel más alto cuya elevación queda por debajo (o a tolerancia) del punto.</summary>
+    /// <summary>Real level by height: the highest level whose elevation is below (or within tolerance of) the point.</summary>
     public static class LevelMath
     {
         public sealed class LevelInfo
@@ -318,7 +318,7 @@ namespace Bimbridge.Engine.Geo
             return best;
         }
 
-        /// <summary>El nivel inmediatamente encima de uno dado (por elevación), o null.</summary>
+        /// <summary>The level immediately above a given one (by elevation), or null.</summary>
         public static LevelInfo Above(IList<LevelInfo> levels, double elevation, double tol = 0.01) =>
             levels.Where(l => l.Elevation > elevation + tol).OrderBy(l => l.Elevation).FirstOrDefault();
 
@@ -326,7 +326,7 @@ namespace Bimbridge.Engine.Geo
             levels.Where(l => l.Elevation < elevation - tol).OrderByDescending(l => l.Elevation).FirstOrDefault();
     }
 
-    /// <summary>Duplicados: elementos con la misma clave (tipo) a menos de tol en X, Y y Z.</summary>
+    /// <summary>Duplicates: elements with the same key (type) within tol in X, Y and Z.</summary>
     public static class Clusters
     {
         public struct Point
@@ -336,7 +336,7 @@ namespace Bimbridge.Engine.Geo
             public double X, Y, Z;
         }
 
-        /// <summary>Grupos de 2 o más. En cada grupo el primero es el de id menor (el más antiguo): los demás son los sobrantes.</summary>
+        /// <summary>Groups of 2 or more. In each group the first is the lowest id (the oldest): the others are the extras.</summary>
         public static List<List<Point>> Duplicates(IList<Point> pts, double tol, bool sameKey = true)
         {
             var grid = new GridIndex(Math.Max(tol * 4, 0.5));
@@ -363,10 +363,10 @@ namespace Bimbridge.Engine.Geo
         }
     }
 
-    /// <summary>Distancias en planta para contacto con muros.</summary>
+    /// <summary>Plan distances for wall contact.</summary>
     public static class Plan2D
     {
-        /// <summary>Distancia en planta entre la huella (rectángulo de la caja) y el segmento AB; 0 si se cruzan o se tocan.</summary>
+        /// <summary>Plan distance between the footprint (box rectangle) and segment AB; 0 if they cross or touch.</summary>
         public static double BoxSegment(Box3 b, double ax, double ay, double bx, double by)
         {
             if (b.ContainsXY(ax, ay) || b.ContainsXY(bx, by)) return 0;
@@ -382,7 +382,7 @@ namespace Bimbridge.Engine.Geo
             return d;
         }
 
-        /// <summary>Distancia mínima entre dos segmentos en planta (0 si se cruzan).</summary>
+        /// <summary>Minimum distance between two segments in plan (0 if they cross).</summary>
         public static double SegmentSegment(double ax, double ay, double bx, double by, double cx, double cy, double dx, double dy)
         {
             double o1 = Orient(ax, ay, bx, by, cx, cy), o2 = Orient(ax, ay, bx, by, dx, dy);
@@ -398,7 +398,7 @@ namespace Bimbridge.Engine.Geo
         private static double Orient(double ax, double ay, double bx, double by, double px, double py) =>
             (bx - ax) * (py - ay) - (by - ay) * (px - ax);
 
-        /// <summary>Distancia de P al segmento AB y lado (+1 izquierda de A→B, −1 derecha).</summary>
+        /// <summary>Distance from P to segment AB and side (+1 left of A→B, −1 right).</summary>
         public static double PointSegment(double px, double py, double ax, double ay, double bx, double by, out int side, out double t)
         {
             var vx = bx - ax; var vy = by - ay;
@@ -412,9 +412,9 @@ namespace Bimbridge.Engine.Geo
     }
 
     /// <summary>
-    /// Rango de vista. En un plano de techo (RCP) se ve hacia arriba desde el plano de corte hasta la profundidad;
-    /// en un plano de planta, hacia abajo desde el corte hasta la profundidad. Estimación: no considera regiones de plano
-    /// (Plan Regions, cuyo rango no expone la API) ni ajustes por familia.
+    /// View range. A ceiling plan (RCP) looks up from the cut plane to the depth;
+    /// a floor plan looks down from the cut to the depth. Estimate: does not consider plan regions
+    /// (Plan Regions, whose range the API does not expose) or per-family adjustments.
     /// </summary>
     public static class ViewBand
     {

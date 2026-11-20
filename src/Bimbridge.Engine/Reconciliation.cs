@@ -7,7 +7,7 @@ using Bimbridge.Protocol;
 
 namespace Bimbridge.Engine
 {
-    /// <summary>Estado de escritura de un documento. Cualquier duda (evidencia, archivo dañado, error de disco) lo deja bloqueado.</summary>
+    /// <summary>Write state of a document. Any doubt (evidence, damaged file, disk error) leaves it blocked.</summary>
     public sealed class DocWriteBlock
     {
         public const string Code = "documento_bloqueado_reconciliacion";
@@ -18,15 +18,15 @@ namespace Bimbridge.Engine
         public bool Blocked => Plans.Count > 0 || CorruptFiles.Count > 0 || Errors.Count > 0;
 
         public string Message =>
-            "No se aplicó nada: el documento tiene operaciones sin reconciliar" +
+            "Nothing was applied: the document has unreconciled operations" +
             (Plans.Count > 0 ? " (" + string.Join(", ", Plans) + ")" : "") +
-            (CorruptFiles.Count > 0 ? "; archivos de evidencia dañados: " + string.Join(", ", CorruptFiles) : "") +
-            (Errors.Count > 0 ? "; no se pudo leer la evidencia: " + string.Join("; ", Errors) : "") +
-            ". Use job op=reconciliar plan_id=… para comprobarlo contra el modelo; no repita la operación.";
+            (CorruptFiles.Count > 0 ? "; damaged evidence files: " + string.Join(", ", CorruptFiles) : "") +
+            (Errors.Count > 0 ? "; could not read the evidence: " + string.Join("; ", Errors) : "") +
+            ". Use job op=reconciliar plan_id=… to check it against the model; do not repeat the operation.";
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            // El código sólo aparece cuando hay bloqueo: un "documento_bloqueado" con bloqueado=no confunde a quien lo lee.
+            // The code only appears when blocked: a "documento_bloqueado" with bloqueado=no confuses the reader.
             ["codigo"] = Blocked ? Code : null,
             ["bloqueado"] = Blocked,
             ["planes"] = Plans.Cast<object>().ToList(),
@@ -41,13 +41,13 @@ namespace Bimbridge.Engine
         public DocWriteBlockedException(DocWriteBlock block) : base(block.Message) { Block = block; }
     }
 
-    /// <summary>La evidencia no quedó en disco: quien llama no debe escribir en el modelo.</summary>
+    /// <summary>The evidence did not reach disk: the caller must not write to the model.</summary>
     public sealed class PlanStoreException : System.IO.IOException
     {
         public PlanStoreException(string message, Exception inner = null) : base(message, inner) { }
     }
 
-    /// <summary>Resultado de comparar la evidencia de un plan con el modelo actual. Nunca adivina: lo que no se puede comprobar no libera.</summary>
+    /// <summary>Result of comparing a plan's evidence with the current model. Never guesses: what cannot be checked does not release.</summary>
     public sealed class ReconcileCheck
     {
         public const string Reverted = "revertido_verificado";
@@ -71,8 +71,8 @@ namespace Bimbridge.Engine
 
     public static class ReconcileEvaluator
     {
-        /// <param name="current">Valor canónico actual de la entrada, como PlanApplier.Current.</param>
-        /// <param name="exists">¿Existe ese id en el documento?</param>
+        /// <param name="current">Current canonical value of the entry, like PlanApplier.Current.</param>
+        /// <param name="exists">Does that id exist in the document?</param>
         public static ReconcileCheck Evaluate(Plan plan, Func<PlanEntry, string> current, Func<long, bool> exists)
         {
             var result = new ReconcileCheck();
@@ -91,7 +91,7 @@ namespace Bimbridge.Engine
                     result.Checked++;
                     if (PlanEntry.Same(now, e.Before)) asBefore++;
                     else if (PlanEntry.Same(now, e.After)) asAfter++;
-                    else result.Reasons.Add(e.Id + " " + e.Key + ": no coincide ni con el antes ni con el después");
+                    else result.Reasons.Add(e.Id + " " + e.Key + ": matches neither the before nor the after");
                 }
                 var createdPresent = created.Where(exists).ToList();
                 var survivors = created.Where(id => !deleted.Contains(id)).ToList();
@@ -101,10 +101,10 @@ namespace Bimbridge.Engine
                 var revertedOk = asBefore == entries.Count && createdPresent.Count == 0 && deletedOriginals.All(exists);
                 var appliedOk = asAfter == entries.Count && survivors.All(exists) && deletedOriginals.All(id => !exists(id));
 
-                // Sin ids no se puede demostrar qué pasó con lo creado.
+                // Without ids it cannot be shown what happened to what was created.
                 if (plannedCreations + templates > 0 && created.Count == 0 && plan.AppliedBatches > 0)
                 {
-                    result.Reasons.Add("el plan crea elementos y la evidencia no conserva sus ids");
+                    result.Reasons.Add("the plan creates elements and the evidence does not keep their ids");
                     return result;
                 }
                 if (revertedOk && (entries.Count > 0 || created.Count > 0 || plan.AppliedBatches == 0))
@@ -112,19 +112,19 @@ namespace Bimbridge.Engine
                     result.Verdict = ReconcileCheck.Reverted;
                     return result;
                 }
-                // "Aplicado" exige ver todo el plan: creaciones completas y sin plantillas @n, que no tienen un después comparable.
+                // "Applied" requires seeing the whole plan: complete creations and no @n templates, which have no comparable after.
                 if (appliedOk && templates == 0 && created.Count >= plannedCreations && (entries.Count > 0 || created.Count > 0))
                 {
                     result.Verdict = ReconcileCheck.Applied;
                     return result;
                 }
-                result.Reasons.Add("estado mixto: " + asBefore + " como antes, " + asAfter + " como después de " + entries.Count +
-                                   "; creados presentes " + createdPresent.Count + " de " + created.Count +
-                                   (templates > 0 ? "; incluye " + templates + " plantillas @n" : ""));
+                result.Reasons.Add("mixed state: " + asBefore + " as before, " + asAfter + " as after, of " + entries.Count +
+                                   "; created present " + createdPresent.Count + " of " + created.Count +
+                                   (templates > 0 ? "; includes " + templates + " @n templates" : ""));
             }
             catch (Exception ex)
             {
-                result.Reasons.Add("no se pudo leer el modelo: " + ex.GetType().Name + ": " + ex.Message);
+                result.Reasons.Add("could not read the model: " + ex.GetType().Name + ": " + ex.Message);
             }
             return result;
         }

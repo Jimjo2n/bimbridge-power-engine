@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Bimbridge.Engine.Geo
 {
-    /// <summary>Un elemento que se revisa (luminaria, equipo…). Lo llena el add-in en el hilo de Revit; aquí sólo se lee.</summary>
+    /// <summary>An element being checked (fixture, equipment…). The add-in fills it on the Revit thread; here it is only read.</summary>
     public sealed class GeoTarget
     {
         public long Id;
@@ -17,23 +17,23 @@ namespace Bimbridge.Engine.Geo
         public string Category;
         public Box3 Box;
         public double X, Y, Z;
-        /// <summary>Cuerpo real (malla). Vacío o null = se usa la caja.</summary>
+        /// <summary>Real body (mesh). Empty or null = the box is used.</summary>
         public TriMesh Body;
-        /// <summary>Índices de cuerpos del índice que pueden tocarlo (los decide el add-in al juntar).</summary>
+        /// <summary>Indices of index bodies that may touch it (decided by the add-in while collecting).</summary>
         public int[] Candidates = new int[0];
         public string Room;
         public string Space;
         public string Note;
     }
 
-    /// <summary>Nivel del anfitrión para nivel_real y rango_vista.</summary>
+    /// <summary>Host level for nivel_real and rango_vista.</summary>
     public sealed class GeoLevel
     {
         public string Name;
         public double Elevation;
     }
 
-    /// <summary>Plano (de planta o de techo) con su rango ya en alturas absolutas del anfitrión.</summary>
+    /// <summary>Plan view (floor or ceiling) with its range already in absolute host heights.</summary>
     public sealed class GeoView
     {
         public long Id;
@@ -41,20 +41,20 @@ namespace Bimbridge.Engine.Geo
         public string Level;
         public bool Ceiling;
         public double Cut, Top, Bottom, Depth;
-        /// <summary>Recorte en planta (si está activo). Vacío = sin recorte.</summary>
+        /// <summary>Plan crop (if active). Empty = no crop.</summary>
         public Box3 Crop = Box3.Empty;
         public List<Box3> Regions = new List<Box3>();
     }
 
     /// <summary>
-    /// Cálculo de las recetas de "geo" sobre datos ya juntados: corre fuera del hilo de Revit y en paralelo.
-    /// Cada receta devuelve filas (valores simples) que GeoSummary convierte en la respuesta compacta.
+    /// Computes the "geo" recipes over already collected data: runs off the Revit thread and in parallel.
+    /// Each recipe returns rows (simple values) that GeoSummary turns into the compact response.
     /// </summary>
     public static class GeoCompute
     {
         public static int Threads => Math.Max(1, Math.Min(Environment.ProcessorCount - 1, 8));
 
-        /// <summary>Altura de búsqueda por debajo del cuerpo (pies) para encontrar lo que lo envuelve.</summary>
+        /// <summary>Search height below the body (feet) to find what wraps it.</summary>
         public const double BelowMargin = 1.0;
 
         public sealed class Stats
@@ -65,11 +65,11 @@ namespace Bimbridge.Engine.Geo
             public long Ms;
         }
 
-        // ------------------------------------------------------------------ montaje / holgura
+        // ------------------------------------------------------------------ mounting / clearance
 
         /// <summary>
-        /// Montaje: en cada punto de la huella se mide la cara superior real del cuerpo (malla) contra la cara inferior de lo de arriba
-        /// (o la base contra lo de abajo). Manda el punto de menor holgura (esquina en pendiente). Sin cuerpo se usa la caja y se dice.
+        /// Mounting: at each footprint point, the body's real top face (mesh) is measured against the bottom face of what is above
+        /// (or the base against what is below). The point with the smallest clearance controls (corner on a slope). Without a body the box is used and reported.
         /// </summary>
         public static List<Dictionary<string, object>> Mount(IList<GeoTarget> targets, IList<GeoBody> bodies, GeoSpec spec, Stats stats)
         {
@@ -101,7 +101,7 @@ namespace Bimbridge.Engine.Geo
             public int Rays, Bad, Boxes;
         }
 
-        /// <summary>Resultado de montaje de un elemento (también lo usa snap_to_surface al planificar).</summary>
+        /// <summary>Mounting result of one element (also used by snap_to_surface when planning).</summary>
         public static MountResult MeasureMount(GeoTarget t, IList<GeoBody> bodies, GeoSpec spec, RayScratch sc, out bool usedBox, out int inconsistent)
         {
             var loc = new Local();
@@ -150,7 +150,7 @@ namespace Bimbridge.Engine.Geo
             var onBody = 0;
             for (var pass = 0; pass < 2 && onBody == 0; pass++)
             {
-                // Segunda pasada sólo si ningún punto cayó sobre el cuerpo (malla rara): se mide con la caja.
+                // Second pass only if no point landed on the body (odd mesh): measure with the box.
                 if (pass == 1) { usedBox = true; hits.Clear(); }
                 foreach (var p in pts)
                 {
@@ -159,7 +159,7 @@ namespace Bimbridge.Engine.Geo
                     {
                         var er = body.Extent(p[0], p[1], loc.Sc, out zBot, out zTop);
                         if (er == RayResult.Inconsistent) { loc.Bad++; continue; }
-                        if (er != RayResult.Ok) continue; // el punto queda fuera del cuerpo (p. ej. esquina de un puck redondo)
+                        if (er != RayResult.Ok) continue; // the point falls outside the body (e.g. corner of a round puck)
                     }
                     else { zBot = t.Box.MinZ; zTop = t.Box.MaxZ; }
                     onBody++;
@@ -181,7 +181,7 @@ namespace Bimbridge.Engine.Geo
             return Mounting.Classify(hits, spec.Tolerance);
         }
 
-        // ------------------------------------------------------------------ cerca
+        // ------------------------------------------------------------------ near
 
         public static List<Dictionary<string, object>> Near(IList<GeoTarget> targets, IList<GeoBody> bodies, GeoSpec spec)
         {
@@ -230,7 +230,7 @@ namespace Bimbridge.Engine.Geo
             }
         }
 
-        // ------------------------------------------------------------------ muro
+        // ------------------------------------------------------------------ wall
 
         public static List<Dictionary<string, object>> Wall(IList<GeoTarget> targets, IList<GeoBody> walls, GeoSpec spec)
         {
@@ -242,7 +242,7 @@ namespace Bimbridge.Engine.Geo
                 {
                     var w = walls[c];
                     if (w.Line == null || w.Line.Length < 4) continue;
-                    // Sólo muros que existen a la altura del elemento.
+                    // Only walls that exist at the element's height.
                     if (w.Box.MaxZ < t.Box.MinZ - spec.Tolerance || w.Box.MinZ > t.Box.MaxZ + spec.Tolerance) continue;
                     for (var k = 0; k + 3 < w.Line.Length; k += 2)
                     {
@@ -287,7 +287,7 @@ namespace Bimbridge.Engine.Geo
             return rows;
         }
 
-        // ------------------------------------------------------------------ duplicados
+        // ------------------------------------------------------------------ duplicates
 
         public static List<Dictionary<string, object>> Duplicates(IList<GeoTarget> targets, GeoSpec spec)
         {
@@ -311,7 +311,7 @@ namespace Bimbridge.Engine.Geo
             return rows;
         }
 
-        // ------------------------------------------------------------------ cuarto
+        // ------------------------------------------------------------------ room
 
         public static List<Dictionary<string, object>> Rooms(IList<GeoTarget> targets, string source)
         {
@@ -330,9 +330,9 @@ namespace Bimbridge.Engine.Geo
         // ------------------------------------------------------------------ rango_vista
 
         /// <summary>
-        /// Por cada plano: las luminarias de su nivel quedan dentro, encima o debajo del rango, o fuera del recorte;
-        /// las de otros niveles que caen dentro del rango se marcan "ajena" (se verán en ese plano).
-        /// Las que están dentro de una región de plano se marcan en_region: su rango no lo expone la API.
+        /// For each plan view: fixtures on its level fall inside, above or below the range, or outside the crop;
+        /// those on other levels that fall inside the range are marked "ajena" (they will show in that view).
+        /// Those inside a plan region are marked en_region: the API does not expose its range.
         /// </summary>
         public static List<Dictionary<string, object>> ViewRange(IList<GeoTarget> targets, IList<GeoView> views)
         {
@@ -357,9 +357,9 @@ namespace Bimbridge.Engine.Geo
             return rows;
         }
 
-        // ------------------------------------------------------------------ choques (cribado fuera de Revit)
+        // ------------------------------------------------------------------ clashes (screened outside Revit)
 
-        /// <summary>Un par elemento–cuerpo que la criba no pudo decidir: se resuelve con Revit (booleana exacta).</summary>
+        /// <summary>An element–body pair the screen could not decide: resolved with Revit (exact boolean).</summary>
         public struct PairToCheck
         {
             public int Target;
@@ -367,8 +367,8 @@ namespace Bimbridge.Engine.Geo
         }
 
         /// <summary>
-        /// Criba de choques: descarta pares que sólo se tocan (solape vertical ≤ tolerancia) y confirma con rayos los que se
-        /// penetran verticalmente (luminaria metida en la losa o la viga). Lo que queda va a la booleana exacta de Revit.
+        /// Clash screen: discards pairs that only touch (vertical overlap ≤ tolerance) and confirms with rays those that
+        /// penetrate vertically (fixture sunk into the slab or beam). What remains goes to Revit's exact boolean.
         /// </summary>
         public static List<Dictionary<string, object>> ClashScreen(IList<GeoTarget> targets, IList<GeoBody> bodies, GeoSpec spec,
             List<PairToCheck> exact, Stats stats)
@@ -384,7 +384,7 @@ namespace Bimbridge.Engine.Geo
                 foreach (var c in t.Candidates)
                 {
                     var b = bodies[c];
-                    if (!t.Box.Overlaps(b.Box, -spec.Tolerance)) continue; // sólo se tocan
+                    if (!t.Box.Overlaps(b.Box, -spec.Tolerance)) continue; // they only touch
                     double depth = 0;
                     var decided = false;
                     if (t.Body != null && !t.Body.IsEmpty && b.Mesh != null && !b.Mesh.IsEmpty)
@@ -422,7 +422,7 @@ namespace Bimbridge.Engine.Geo
         [Flags]
         public enum ExactIssue { None = 0, NoSolid = 1, Extraction = 2, Transform = 4, Boolean = 8 }
 
-        /// <summary>Volumen observado y condiciones que impiden darlo por completo.</summary>
+        /// <summary>Observed volume and the conditions that prevent treating it as complete.</summary>
         public struct ExactResult
         {
             public int Target;
@@ -432,8 +432,8 @@ namespace Bimbridge.Engine.Geo
         }
 
         /// <summary>
-        /// Une la criba por rayos y la booleana exacta en una fila por elemento: el choque más profundo (o de más volumen),
-        /// cuántos cuerpos toca (n) y el método. Sin choques: libre; si alguna booleana falló y no hubo choque: no_evaluable.
+        /// Merges the ray screen and the exact boolean into one row per element: the deepest (or largest-volume) clash,
+        /// how many bodies it touches (n) and the method. No clashes: libre; if some boolean failed and there was no clash: no_evaluable.
         /// </summary>
         public static List<Dictionary<string, object>> MergeClashes(IList<GeoTarget> targets, IList<GeoBody> bodies,
             IEnumerable<Dictionary<string, object>> screened, IEnumerable<ExactResult> exact, double minVolume)

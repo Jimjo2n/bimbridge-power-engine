@@ -9,10 +9,10 @@ using System.Threading;
 namespace Bimbridge.Addin
 {
     /// <summary>
-    /// Revit 2022–2024 (.NET Framework 4.8) compila cada método la primera vez que se usa: la primera consulta o la primera
-    /// revisión geométrica pagan ese costo dentro del turno de Revit. Aquí se precompila en segundo plano, con prioridad mínima
-    /// y 20 s después de abrir Revit, todo el motor (mallas, consultas, formato, protocolo), que no toca la API de Revit.
-    /// En Revit 2025–2026 (.NET 8) no hace falta: esas DLL ya vienen precompiladas (ReadyToRun) desde el instalador.
+    /// Revit 2022–2024 (.NET Framework 4.8) compiles each method the first time it is used: the first query or the first
+    /// geometry check pays that cost inside Revit's turn. Here the whole engine (meshes, queries, formatting, protocol), which
+    /// does not touch the Revit API, is precompiled in the background, at lowest priority and 20 s after Revit opens.
+    /// Revit 2025–2026 (.NET 8) does not need it: those DLLs already ship precompiled (ReadyToRun) from the installer.
     /// </summary>
     internal static class Warmup
     {
@@ -26,22 +26,22 @@ namespace Bimbridge.Addin
                     Thread.Sleep(20000);
                     var sw = Stopwatch.StartNew();
                     var n = Prepare(typeof(Bimbridge.Engine.EngineConfig).Assembly) + Prepare(typeof(Bimbridge.Protocol.Wire).Assembly);
-                    log?.Invoke("Precompilación en segundo plano (.NET Framework): " + n + " métodos en " + sw.ElapsedMilliseconds + " ms");
+                    log?.Invoke("Background precompilation (.NET Framework): " + n + " methods in " + sw.ElapsedMilliseconds + " ms");
                 }
-                catch (Exception ex) { log?.Invoke("Precompilación omitida: " + ex.Message); }
+                catch (Exception ex) { log?.Invoke("Precompilation skipped: " + ex.Message); }
             })
             {
                 IsBackground = true,
                 Priority = ThreadPriority.Lowest,
-                Name = "BIMBRIDGE precompilación",
+                Name = "BIMBRIDGE precompilation",
             };
             t.Start();
 #else
-            log?.Invoke("Motor precompilado (ReadyToRun, .NET 8): sin precompilación en segundo plano.");
+            log?.Invoke("Engine precompiled (ReadyToRun, .NET 8): no background precompilation.");
 #endif
         }
 
-        /// <summary>Compila (sin ejecutar) los métodos no genéricos del ensamblado. Devuelve cuántos.</summary>
+        /// <summary>Compiles (without running) the assembly's non-generic methods. Returns how many.</summary>
         internal static int Prepare(Assembly a)
         {
             Type[] types;

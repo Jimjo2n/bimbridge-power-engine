@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Receta incluida en BIMBRIDGE - Power Engine (desde 0.6.0). Una etiqueta por luminaria en UNA vista (regla "exactamente una etiqueta por luminaria"):
-// una unidad por luminaria visible en la vista; si ya tiene etiqueta en esa vista se omite (no duplica al reanudar ni al repetir).
-// Termina guardando (barrera) y, si se piden hojas, exportando el PDF. La postcondición lista luminarias con 0 o más de 1 etiqueta.
-// args: vista (ElementId de la vista), tipo_etiqueta (ElementId del tipo de etiqueta; opcional: por categoría),
-//       guardar (si|no, por defecto si), pdf_hojas (lista de números de hoja, opcional), pdf_carpeta, pdf_nombre.
+// Recipe shipped with BIMBRIDGE - Power Engine (since 0.6.0). One tag per fixture in ONE view (rule "exactly one tag per fixture"):
+// one unit per fixture visible in the view; if it already has a tag in that view it is skipped (no duplicates on resume or repeat).
+// Ends by saving (barrier) and, if sheets are requested, exporting the PDF. The postcondition lists fixtures with 0 or more than 1 tag.
+// args: vista (ElementId of the view), tipo_etiqueta (ElementId of the tag type; optional: by category),
+//       guardar (si|no, default si), pdf_hojas (list of sheet numbers, optional), pdf_carpeta, pdf_nombre.
 public class EtiquetarLuces : Receta
 {
     public override string Version => "1";
-    public override string Descripcion => "Una etiqueta por luminaria en una vista; reanudable sin duplicar; guarda y exporta PDF opcional";
+    public override string Descripcion => "One tag per fixture in a view; resumable without duplicates; saves and optionally exports PDF";
     public override IEnumerable<string> Entradas => new[] { "vista" };
 
-    private static View Vista(ScriptContext ctx) => ctx.E<View>(Convert.ToInt64(ctx.Args["vista"])) ?? throw new ArgumentException("la vista no existe");
+    private static View Vista(ScriptContext ctx) => ctx.E<View>(Convert.ToInt64(ctx.Args["vista"])) ?? throw new ArgumentException("the view does not exist");
 
     private static int TagsOf(Document doc, View v, ElementId id)
     {
@@ -26,7 +26,7 @@ public class EtiquetarLuces : Receta
     {
         base.Preparar(ctx);
         var v = Vista(ctx);
-        if (v.IsTemplate) throw new ArgumentException("la vista es una plantilla");
+        if (v.IsTemplate) throw new ArgumentException("the view is a template");
     }
 
     public override IEnumerable<Unidad> Unidades(ScriptContext ctx)
@@ -51,10 +51,10 @@ public class EtiquetarLuces : Receta
     {
         var v = Vista(ctx);
         var e = ctx.Doc.GetElement(Convert.ToString(u.D("uid")));
-        if (e == null) ctx.Omitir("la luminaria ya no existe");
-        if (TagsOf(ctx.Doc, v, e.Id) > 0) ctx.Omitir("ya tenía etiqueta en la vista");
+        if (e == null) ctx.Omitir("the fixture no longer exists");
+        if (TagsOf(ctx.Doc, v, e.Id) > 0) ctx.Omitir("it already had a tag in the view");
         var p = (e.Location as LocationPoint)?.Point ?? (e.get_BoundingBox(v) is BoundingBoxXYZ bb ? (bb.Min + bb.Max) / 2 : null);
-        if (p == null) { ctx.Excepcion("sin punto de inserción", ctx.Long(e.Id)); ctx.Omitir("sin punto"); }
+        if (p == null) { ctx.Excepcion("no insertion point", ctx.Long(e.Id)); ctx.Omitir("no point"); }
         IndependentTag tag;
         if (ctx.Args.TryGetValue("tipo_etiqueta", out var tt) && tt != null)
             tag = IndependentTag.Create(ctx.Doc, ctx.Id(Convert.ToInt64(tt)), v.Id, new Reference(e), false, TagOrientation.Horizontal, p);
@@ -81,8 +81,8 @@ public class EtiquetarLuces : Receta
             foreach (var id in ids) count[id] = count.TryGetValue(id, out var n) ? n + 1 : 1;
         }
         var luces = new FilteredElementCollector(ctx.Doc, v.Id).OfCategory(BuiltInCategory.OST_LightingFixtures).WhereElementIsNotElementType().ToElementIds();
-        var sin = luces.Where(i => !count.ContainsKey(i)).Select(i => (object)("sin etiqueta: " + ctx.Long(i)));
-        var dobles = luces.Where(i => count.TryGetValue(i, out var n) && n > 1).Select(i => (object)("con " + count[i] + " etiquetas: " + ctx.Long(i)));
+        var sin = luces.Where(i => !count.ContainsKey(i)).Select(i => (object)("untagged: " + ctx.Long(i)));
+        var dobles = luces.Where(i => count.TryGetValue(i, out var n) && n > 1).Select(i => (object)("with " + count[i] + " tags: " + ctx.Long(i)));
         return new Dictionary<string, object> { ["luces_en_vista"] = luces.Count, ["desviaciones"] = sin.Concat(dobles).ToList() };
     }
 }

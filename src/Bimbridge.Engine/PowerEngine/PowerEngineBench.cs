@@ -10,10 +10,10 @@ using Bimbridge.Protocol;
 namespace BimBridge.PowerEngine
 {
     /// <summary>
-    /// Benchmark del Power Engine (sin Revit): C# frente a Rust FFI y Rust IPC por trabajo y tamaño, Python frente a .NET en DOCX,
-    /// coste fijo de cada vía y eficiencia de texto (descubrimiento bajo demanda y lote frente a llamadas sueltas).
-    /// Mide; no supone. La calibración (a partir de qué n gana Rust FFI) sale de estos números.
-    /// Los "tokens" son ESTIMADOS (caracteres/4): sin contador del cliente no hay tokens reales y se dice así.
+    /// Power Engine benchmark (no Revit): C# vs Rust FFI and Rust IPC per job and size, Python vs .NET on DOCX,
+    /// fixed cost of each path and text efficiency (on-demand discovery and batch vs individual calls).
+    /// It measures; it does not assume. The calibration (from which n Rust FFI wins) comes from these numbers.
+    /// "Tokens" are ESTIMATED (characters/4): without the client's counter there are no real tokens, and it says so.
     /// </summary>
     public static class PowerEngineBench
     {
@@ -46,11 +46,11 @@ namespace BimBridge.PowerEngine
                         string reference = null;
                         foreach (var e in engines)
                         {
-                            // IPC con 100 000 puntos en JSON mide sobre todo serialización: se limita para no alargar la campaña
+                            // IPC with 100,000 points in JSON mostly measures serialization: capped so the campaign does not drag on
                             if (e == "rust_ipc" && n > 20000) { row[e] = null; continue; }
                             var pe = pes[e];
                             string sig = null;
-                            Exec(pe, job, input, out sig);                         // calentamiento (JIT, arranque del proceso IPC)
+                            Exec(pe, job, input, out sig);                         // warm-up (JIT, IPC process startup)
                             var times = new List<double>();
                             for (var r = 0; r < s.Rounds; r++)
                             {
@@ -62,7 +62,7 @@ namespace BimBridge.PowerEngine
                             var m = times[times.Count / 2];
                             med[(job, e, n)] = m;
                             row[e] = Math.Round(m, 3);
-                            if (reference == null) reference = sig; else if (sig != reference) row["diferencia_" + e] = "resultado distinto de C#";
+                            if (reference == null) reference = sig; else if (sig != reference) row["diferencia_" + e] = "result differs from C#";
                         }
                         if (row.TryGetValue("rust_ffi", out var f) && f != null) row["rust_ffi_vs_csharp"] = Math.Round(med[(job, "csharp", n)] / med[(job, "rust_ffi", n)], 2);
                         geo.Add(row);
@@ -84,24 +84,24 @@ namespace BimBridge.PowerEngine
             finally { foreach (var p in pes.Values) p.Dispose(); }
         }
 
-        /// <summary>n mínimo medido a partir del cual Rust FFI gana a C# en ese y en todos los tamaños mayores; si no, C# siempre.</summary>
+        /// <summary>Smallest measured n from which Rust FFI beats C# at that size and at all larger sizes; otherwise, always C#.</summary>
         public static Calibration Calibrate(Dictionary<(string job, string eng, int n), double> med, bool haveFfi, Settings s)
         {
             var c = Calibration.Default();
-            if (!haveFfi) { c.Source = "sin Rust FFI: C# siempre"; foreach (var j in Jobs) c.RustFfiFrom[j] = int.MaxValue; return c; }
+            if (!haveFfi) { c.Source = "no Rust FFI: always C#"; foreach (var j in Jobs) c.RustFfiFrom[j] = int.MaxValue; return c; }
             foreach (var job in Jobs)
             {
                 var sizes = (job == "segment_contacts" ? s.SegmentSizes : s.Sizes).OrderBy(x => x).ToList();
                 var from = int.MaxValue;
                 for (var i = sizes.Count - 1; i >= 0; i--)
                 {
-                    // margen del 10 %: un empate técnico no justifica cruzar la frontera FFI
+                    // 10 % margin: a statistical tie does not justify crossing the FFI boundary
                     if (med.TryGetValue((job, "rust_ffi", sizes[i]), out var r) && med.TryGetValue((job, "csharp", sizes[i]), out var cs) && r * 1.1 < cs) from = sizes[i];
                     else break;
                 }
                 c.RustFfiFrom[job] = from;
             }
-            c.Source = "medida " + DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + ", " + Environment.ProcessorCount + " CPU";
+            c.Source = "measured " + DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + ", " + Environment.ProcessorCount + " CPU";
             return c;
         }
 
@@ -137,9 +137,9 @@ namespace BimBridge.PowerEngine
                         var sw = Stopwatch.StartNew();
                         var first = py.Document("docx_extract", args, dir);
                         d["python_arranque_y_primer_trabajo_ms"] = Math.Round(sw.Elapsed.TotalMilliseconds, 1);
-                        d["docx_python_ms"] = first.Ok ? Median(() => py.Document("docx_extract", args, dir), s.Rounds) : (object)("no disponible: " + first.Error);
+                        d["docx_python_ms"] = first.Ok ? Median(() => py.Document("docx_extract", args, dir), s.Rounds) : (object)("not available: " + first.Error);
                     }
-                    else d["docx_python_ms"] = "Python no configurado";
+                    else d["docx_python_ms"] = "Python not configured";
                 }
                 if (s.PdfPath != null && File.Exists(s.PdfPath) && py.PythonConfigured)
                 {
@@ -167,9 +167,9 @@ namespace BimBridge.PowerEngine
         }
 
         /// <summary>
-        /// Texto que lee y escribe la IA (estimación caracteres/4 = tokens ESTIMADOS):
-        ///  - descubrimiento: búsqueda breve + una ficha frente al catálogo completo;
-        ///  - colocación de N elementos: un lote "place" frente a N órdenes sueltas (mismo contenido, distinto número de llamadas).
+        /// Text the AI reads and writes (estimate characters/4 = ESTIMATED tokens):
+        ///  - discovery: brief search + one card vs the full catalog;
+        ///  - placement of N elements: one "place" batch vs N individual commands (same content, different number of calls).
         /// </summary>
         public static Dictionary<string, object> TextEfficiency(int n = 72)
         {
@@ -182,7 +182,7 @@ namespace BimBridge.PowerEngine
             long Tok(long chars) => (chars + 3) / 4;
             return new Dictionary<string, object>
             {
-                ["metodo"] = "tokens ESTIMADOS = caracteres/4; no son tokens reales del cliente",
+                ["metodo"] = "ESTIMATED tokens = characters/4; not the client's real tokens",
                 ["descubrimiento"] = new Dictionary<string, object>
                 {
                     ["catalogo_completo_chars"] = (long)full.Length, ["busqueda_mas_ficha_chars"] = (long)(search.Length + one.Length),
@@ -194,12 +194,12 @@ namespace BimBridge.PowerEngine
                     ["lote_chars"] = (long)batch.Length, ["lote_llamadas"] = 1L,
                     ["sueltas_chars"] = (long)single.Sum(x => x.Length), ["sueltas_llamadas"] = (long)n,
                     ["reduccion_chars_pct"] = Math.Round(100.0 * (1 - (double)batch.Length / single.Sum(x => x.Length)), 1),
-                    ["nota"] = "cada llamada suelta añade además la respuesta y el razonamiento de un turno de la IA; aquí sólo se cuenta la orden",
+                    ["nota"] = "each individual call also adds the response and reasoning of one AI turn; only the command is counted here",
                 },
             };
         }
 
-        // ---------------- entradas deterministas ----------------
+        // ---------------- deterministic inputs ----------------
 
         private sealed class In { public double[] A, B; public int[] E; public int Nodes; }
 

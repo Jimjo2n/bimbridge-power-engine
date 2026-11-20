@@ -7,33 +7,33 @@ using Microsoft.Extensions.Logging;
 namespace Bimbridge.Bridge
 {
     /// <summary>
-    /// Bimbridge.Bridge.exe — lo arranca Claude Code o Codex. stdout queda reservado para MCP;
-    /// los registros van a stderr. No pide nada al usuario.
+    /// Bimbridge.Bridge.exe — launched by Claude Code or Codex. stdout is reserved for MCP;
+    /// logs go to stderr. It never prompts the user.
     ///
-    /// Claude Code:  claude mcp add bimbridge -- "C:\ruta\Bimbridge.Bridge.exe"
-    /// Codex:        [mcp_servers.bimbridge]  command = "C:\\ruta\\Bimbridge.Bridge.exe"
+    /// Claude Code:  claude mcp add bimbridge -- "C:\path\Bimbridge.Bridge.exe"
+    /// Codex:        [mcp_servers.bimbridge]  command = "C:\\path\\Bimbridge.Bridge.exe"
     /// </summary>
     public static class Program
     {
         public const string Instructions =
-            "Herramientas para leer y, si el usuario lo habilitó, cambiar el modelo de Revit abierto. Empiece con revit_context y catalog. " +
-            "Use query con group_by o count para resúmenes y pida filas sólo si hacen falta; varias lecturas a la vez con lote. " +
-            "Guarde resultados con save_as y reutilícelos con ids=$nombre en vez de repetir ids. " +
-            "Para ver una vista use capture (colorear=categorias distingue luminarias de tomas e interruptores); para señalar elementos al usuario, show. " +
-            "Para cambiar algo: plan → commit (tipado, un Deshacer), exec (C# sobre la API de Revit) o fam/doc_op (familias, conectores, guardar, sync, PDF). " +
-            "Si el usuario autorizó la tarea, aplique sin pedir confirmación por lote; si no, muestre el diff antes del commit. clave= evita repetir una escritura. " +
-            "estado=retenido significa que el cambio espera en la cola de Revit a que el usuario lo aplique: no lo repita. " +
-            "Si una respuesta trae 'estado', lea 'aviso' y siga su indicación. Detalle de cualquier herramienta: guide.";
+            "Tools to read and, if the user enabled it, change the open Revit model. Start with revit_context and catalog. " +
+            "Use query with group_by or count for summaries and request rows only when needed; several reads at once with lote. " +
+            "Save results with save_as and reuse them with ids=$name instead of repeating ids. " +
+            "To see a view use capture (colorear=categorias tells lighting fixtures apart from receptacles and switches); to point elements out to the user, show. " +
+            "To change something: plan → commit (typed, one Undo), exec (C# against the Revit API) or fam/doc_op (families, connectors, save, sync, PDF). " +
+            "If the user authorized the task, apply without asking for confirmation per batch; otherwise show the diff before the commit. clave= avoids repeating a write. " +
+            "estado=retenido means the change is waiting in the Revit queue for the user to apply it: do not repeat it. " +
+            "If a response has 'estado', read 'aviso' and follow it. Details for any tool: guide.";
 
         /// <summary>
-        /// Perfil: compacto (por defecto: 3 herramientas, órdenes de una línea, respuestas en texto compacto) o completo
-        /// (14 herramientas con JSON). BIMBRIDGE_PROFILE=completo o argumento --completo.
+        /// Profile: compact (default: 3 tools, one-line commands, compact text responses) or full
+        /// (14 tools with JSON). BIMBRIDGE_PROFILE=completo or the --completo argument.
         /// </summary>
         public static bool Full =>
             string.Equals(System.Environment.GetEnvironmentVariable("BIMBRIDGE_PROFILE"), "completo", System.StringComparison.OrdinalIgnoreCase)
             || System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--completo") >= 0;
 
-        /// <summary>Versión del puente (la del ensamblado, la misma que el instalador).</summary>
+        /// <summary>Bridge version (the assembly's, same as the installer's).</summary>
         public static readonly string Version = VersionOf(typeof(Program).Assembly);
 
         private static string VersionOf(System.Reflection.Assembly a)

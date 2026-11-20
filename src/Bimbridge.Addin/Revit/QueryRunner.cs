@@ -11,11 +11,11 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// Ejecuta una QuerySpec en el hilo de Revit, por tramos (sección 8):
-    ///   tramo 1: colector con filtros rápidos (categoría, vista, ids) → lista de ids;
-    ///   tramos siguientes: leer sólo los campos pedidos, hasta agotar el presupuesto de cada visita.
-    /// Sólo lee: no abre transacciones ni se suscribe a nada (P2).
-    /// Las filas resultantes son valores simples; filtrar, agrupar y paginar se hace fuera del hilo de Revit.
+    /// Runs a QuerySpec on the Revit thread, in slices (section 8):
+    ///   slice 1: collector with quick filters (category, view, ids) → list of ids;
+    ///   following slices: read only the requested fields, until each visit's budget runs out.
+    /// Read-only: opens no transactions and subscribes to nothing (P2).
+    /// The resulting rows are simple values; filtering, grouping and paging happen outside the Revit thread.
     /// </summary>
     public sealed class QueryRunner
     {
@@ -25,7 +25,7 @@ namespace Bimbridge.Addin.Revit
         private readonly List<string> _fields;
         private List<ElementId> _candidates;
         private readonly ElementFields.NameCache _names = new ElementFields.NameCache();
-        /// <summary>0.9.1: caché de nombres de esta consulta (aciertos/fallos observados) y elementos abiertos.</summary>
+        /// <summary>0.9.1: name cache of this query (observed hits/misses) and elements opened.</summary>
         public ElementFields.NameCache Names => _names;
         public long ElementsRead;
         private int _next;
@@ -33,13 +33,13 @@ namespace Bimbridge.Addin.Revit
         public readonly List<Dictionary<string, object>> Rows = new List<Dictionary<string, object>>();
         public readonly ResultTable.GroupAccumulator Groups;
         public long Rev;
-        /// <summary>Registro de revisiones y handle (dN) del documento leído: ligan el cursor de la instantánea (issue #2).</summary>
+        /// <summary>Revision registry and handle (dN) of the document read: they bind the snapshot cursor (issue #2).</summary>
         public VersionRegistry Registry;
         public string DocId;
         public string Error;
         public bool RevisionChanged;
         public string DocumentTitle;
-        /// <summary>Total obtenido con GetElementCount (conteo rápido); null si se leyeron los elementos.</summary>
+        /// <summary>Total obtained with GetElementCount (quick count); null if the elements were read.</summary>
         public long? FastCount;
 
         public QueryRunner(QuerySpec q, IReadOnlyCollection<long> explicitIds, HashSet<long> sinceIds)
@@ -52,13 +52,13 @@ namespace Bimbridge.Addin.Revit
                 !q.Where.Any(c => string.Equals(c.Field, "id", StringComparison.OrdinalIgnoreCase)))
                 _fields.Remove("id");
             if (q.CanAggregateDuringRead) Groups = new ResultTable.GroupAccumulator(q);
-            // Los filtros por nivel, tipo y workset se aplican sobre los campos leídos.
+            // Level, type and workset filters are applied on the fields read.
             if (q.Levels.Count > 0 && !_fields.Contains("lvl")) _fields.Add("lvl");
             if (q.Types.Count > 0) { if (!_fields.Contains("fam")) _fields.Add("fam"); if (!_fields.Contains("type")) _fields.Add("type"); }
             if (q.Worksets.Count > 0 && !_fields.Contains("ws")) _fields.Add("ws");
         }
 
-        /// <summary>Un tramo de trabajo. Devuelve true cuando terminó.</summary>
+        /// <summary>One slice of work. Returns true when it finished.</summary>
         public bool Step(UIApplication app, Stopwatch sw, int budgetMs, DocumentTracker tracker)
         {
             var doc = DocTarget.Resolve(app, out var docError);
@@ -77,7 +77,7 @@ namespace Bimbridge.Addin.Revit
                      DocRegistry.Instance.IdOf(doc) != DocId)
             {
                 RevisionChanged = true;
-                Error = "El documento o su revisión cambió durante la lectura. Repita la consulta.";
+                Error = "The document or its revision changed during the read. Repeat the query.";
                 return true;
             }
 
@@ -95,7 +95,7 @@ namespace Bimbridge.Addin.Revit
                         else Rows.Add(row);
                     }
                 }
-                // revisar el reloj cada 32 elementos: barato y suficiente
+                // check the clock every 32 elements: cheap and sufficient
                 if ((_next & 31) == 0 && sw.ElapsedMilliseconds >= deadline) return false;
             }
             return true;
@@ -115,7 +115,7 @@ namespace Bimbridge.Addin.Revit
                 if (_q.ViewId.HasValue)
                 {
                     var view = doc.GetElement(Ids.ToId(_q.ViewId.Value)) as View;
-                    if (view == null) { Error = "view " + _q.ViewId.Value + " no es una vista de este documento"; return null; }
+                    if (view == null) { Error = "view " + _q.ViewId.Value + " is not a view of this document"; return null; }
                     col = new FilteredElementCollector(doc, view.Id);
                 }
                 else
@@ -128,13 +128,13 @@ namespace Bimbridge.Addin.Revit
                     var cats = new List<BuiltInCategory>();
                     foreach (var name in _q.Categories)
                     {
-                        if (!TryCategory(name, out var bic)) { Error = "categoría desconocida: " + name + " (use nombres como LightingFixtures, ElectricalFixtures)"; return null; }
+                        if (!TryCategory(name, out var bic)) { Error = "unknown category: " + name + " (use names like LightingFixtures, ElectricalFixtures)"; return null; }
                         cats.Add(bic);
                     }
                     col = col.WherePasses(new ElementMulticategoryFilter(cats));
                 }
                 col = col.WhereElementIsNotElementType();
-                // Conteo puro: el índice de Revit da el total sin materializar ids ni abrir elementos.
+                // Pure count: the Revit index gives the total without materializing ids or opening elements.
                 if (_q.CanFastCount && _sinceIds == null)
                 {
                     FastCount = col.GetElementCount();
@@ -167,7 +167,7 @@ namespace Bimbridge.Addin.Revit
             return v != null && values.Any(x => string.Equals(x, v, StringComparison.OrdinalIgnoreCase));
         }
 
-        /// <summary>"LightingFixtures" u "OST_LightingFixtures" → BuiltInCategory.</summary>
+        /// <summary>"LightingFixtures" or "OST_LightingFixtures" → BuiltInCategory.</summary>
         public static bool TryCategory(string name, out BuiltInCategory bic)
         {
             var n = (name ?? "").Trim().Replace(" ", "");

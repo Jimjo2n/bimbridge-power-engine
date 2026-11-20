@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Copiar a %APPDATA%\Autodesk\Revit\Addins\<versión>\ junto con la carpeta Bimbridge\
-  (o pedir a IT que lo despliegue). Assembly es relativo a este archivo.
+  Copy to %APPDATA%\Autodesk\Revit\Addins\<version>\ together with the Bimbridge\ folder
+  (or ask IT to deploy it). Assembly is relative to this file.
 -->
 <RevitAddIns>
   <AddIn Type="Application">

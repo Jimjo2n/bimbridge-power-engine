@@ -9,9 +9,9 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Observabilidad del consumo (§6): por llamada del agente se registran herramienta, operación, caracteres recibidos y devueltos,
-    /// duración y estado. Son CARACTERES, no tokens: los tokens reales sólo los conoce el cliente (Codex/Claude). Un archivo JSONL por día
-    /// en metricas\ (se borran los de más de 14 días); sin argumentos ni resultados, sólo tamaños.
+    /// Usage observability (§6): for each agent call, tool, operation, characters received and returned,
+    /// duration and status are recorded. These are CHARACTERS, not tokens: only the client (Codex/Claude) knows the real tokens. One JSONL file per day
+    /// in metricas\ (files older than 14 days are deleted); no arguments or results, only sizes.
     /// </summary>
     public static class UsageMetrics
     {
@@ -61,10 +61,10 @@ namespace Bimbridge.Engine
                 }) + "\n";
                 File.AppendAllText(Path.Combine(Folder, "puente-" + DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture) + ".jsonl"), line);
             }
-            catch (Exception) { /* la métrica nunca rompe una llamada */ }
+            catch (Exception) { /* metrics never break a call */ }
         }
 
-        /// <summary>Resumen de este proceso del puente (desde que arrancó).</summary>
+        /// <summary>Summary of this bridge process (since it started).</summary>
         public static Dictionary<string, object> Summary()
         {
             lock (Lock)
@@ -80,7 +80,7 @@ namespace Bimbridge.Engine
                     ["chars_total"] = ByTool.Values.Sum(r => r.CharsIn + r.CharsOut),
                     ["tokens_estimados"] = TokenEstimate.FromChars(ByTool.Values.Sum(r => r.CharsIn + r.CharsOut)),
                     ["tokens_metodo"] = TokenEstimate.Method,
-                    ["nota"] = "caracteres intercambiados con el agente; los tokens reales los informa el cliente",
+                    ["nota"] = "characters exchanged with the agent; the client reports the real tokens",
                 };
             }
         }

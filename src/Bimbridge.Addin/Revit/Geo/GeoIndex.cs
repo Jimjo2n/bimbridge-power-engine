@@ -11,12 +11,12 @@ using Bimbridge.Engine.Geo;
 
 namespace Bimbridge.Addin.Revit.Geo
 {
-    /// <summary>Un modelo donde se busca geometría: el anfitrión o un vínculo cargado, con su transformación.</summary>
+    /// <summary>A model searched for geometry: the host or a loaded link, with its transform.</summary>
     internal sealed class GeoSource
     {
-        public long LinkId;              // 0 = anfitrión
-        public string Name;              // "anfitrión" o el nombre del tipo de vínculo ("ARCH.rvt")
-        public string Short;             // etiqueta corta para las tablas ("ARCH")
+        public long LinkId;              // 0 = host
+        public string Name;              // "host" or the link type name ("ARCH.rvt")
+        public string Short;             // short label for tables ("ARCH")
         public Document Doc;
         public Transform ToHost;
         public Transform ToLocal;
@@ -26,7 +26,7 @@ namespace Bimbridge.Addin.Revit.Geo
         public bool IsHost => LinkId == 0;
     }
 
-    /// <summary>Un elemento indexado: caja (coordenadas del anfitrión) y su cuerpo para el motor de mallas.</summary>
+    /// <summary>An indexed element: box (host coordinates) and its body for the mesh engine.</summary>
     internal sealed class GeoItem
     {
         public GeoSource Source;
@@ -35,12 +35,12 @@ namespace Bimbridge.Addin.Revit.Geo
         public string Category;
         public Box3 Box;
         public GeoBody Body;
-        /// <summary>Sólidos de Revit (sólo para la booleana exacta de choques). Se cargan si hacen falta.</summary>
+        /// <summary>Revit solids (only for the exact clash boolean). Loaded on demand.</summary>
         public List<Solid> Solids;
         public bool SolidsFailed;
     }
 
-    /// <summary>Elementos de una categoría en un modelo, con su rejilla en planta.</summary>
+    /// <summary>Elements of one category in one model, with their plan grid.</summary>
     internal sealed class GeoLayer
     {
         public GeoSource Source;
@@ -56,14 +56,14 @@ namespace Bimbridge.Addin.Revit.Geo
     }
 
     /// <summary>
-    /// Índice de geometría por documento (anfitrión + vínculos). Se construye una vez por categoría y modelo, por tramos
-    /// (nunca más de un tramo de 250 ms seguido en el hilo de Revit) y se reutiliza mientras el modelo y los vínculos no cambien.
-    /// Las mallas se extraen sólo de los elementos que caen cerca de lo que se mide y se guardan:
-    ///  - de un vínculo, mientras siga cargado y en el mismo sitio;
-    ///  - del anfitrión, por elemento: si la IA mueve 50 luminarias, sólo esas 50 se vuelven a triangular.
+    /// Geometry index per document (host + links). Built once per category and model, in slices
+    /// (never more than one 250 ms slice in a row on the Revit thread) and reused while the model and links do not change.
+    /// Meshes are extracted only from elements near what is being measured, and cached:
+    ///  - for a link, while it stays loaded and in the same place;
+    ///  - for the host, per element: if the AI moves 50 fixtures, only those 50 are re-triangulated.
     ///
-    /// Frente a pyRevit: sus scripts de altura (soffit, nueve puntos, columnas, choques) volvían a extraer en cada run todos los
-    /// sólidos del vínculo y lanzaban rayos contra cada uno en bucles anidados O(luminarias × elementos), sin caché ni cancelación.
+    /// Compared with pyRevit: its height scripts (soffit, nine points, columns, clashes) re-extracted every link solid on each run
+    /// and cast rays against each one in nested O(fixtures × elements) loops, with no cache or cancellation.
     /// </summary>
     internal sealed class GeoIndex
     {
@@ -72,7 +72,7 @@ namespace Bimbridge.Addin.Revit.Geo
         private readonly Dictionary<long, GeoBody> _hostBodies = new Dictionary<long, GeoBody>();
         private readonly Options _options = Bodies.NewOptions();
 
-        /// <summary>Tope de triángulos guardados del anfitrión (~13 doubles cada uno): pasado esto se vacía la caché.</summary>
+        /// <summary>Cap on cached host triangles (~13 doubles each): past this the cache is cleared.</summary>
         public const long MaxHostTriangles = 3000000;
 
         public int MeshesBuilt;
@@ -83,7 +83,7 @@ namespace Bimbridge.Addin.Revit.Geo
 
         public GeoIndex(string docKey) { DocKey = docKey; }
 
-        /// <summary>Categorías extra que acompañan a una pedida (las escaleras guardan su geometría en tramos y descansos).</summary>
+        /// <summary>Extra categories that go with a requested one (stairs keep their geometry in runs and landings).</summary>
         public static IEnumerable<BuiltInCategory> Expand(BuiltInCategory bic)
         {
             yield return bic;
@@ -99,16 +99,16 @@ namespace Bimbridge.Addin.Revit.Geo
             }
         }
 
-        // ---------------- fuentes ----------------
+        // ---------------- sources ----------------
 
         private static readonly string[] Disciplines = { "ARCH", "STRUCT", "STR", "MEP", "MECH", "ELEC", "PLMB", "PLUMB", "FP", "CIVIL", "SITE", "INT", "LAND", "FACADE" };
 
-        /// <summary>Anfitrión + vínculos cargados que pasan el filtro (nombre contiene). Barato: se llama en cada petición.</summary>
+        /// <summary>Host + loaded links that pass the filter (name contains). Cheap: called on every request.</summary>
         public static List<GeoSource> Sources(Document doc, bool host, bool links, IList<string> linkFilter, List<string> warnings)
         {
             var list = new List<GeoSource>();
             if (host)
-                list.Add(new GeoSource { LinkId = 0, Name = "anfitrión", Short = "", Doc = doc, ToHost = Transform.Identity, ToLocal = Transform.Identity, Identity = true, Key = "host" });
+                list.Add(new GeoSource { LinkId = 0, Name = "host", Short = "", Doc = doc, ToHost = Transform.Identity, ToLocal = Transform.Identity, Identity = true, Key = "host" });
             if (!links) return list;
             var shorts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var li in new FilteredElementCollector(doc).OfClass(typeof(RevitLinkInstance)).Cast<RevitLinkInstance>())
@@ -120,20 +120,20 @@ namespace Bimbridge.Addin.Revit.Geo
                 try { ld = li.GetLinkDocument(); } catch (Exception) { ld = null; }
                 if (ld == null)
                 {
-                    warnings?.Add("vínculo " + name + " no está cargado: no se usa");
+                    warnings?.Add("link " + name + " is not loaded: not used");
                     continue;
                 }
-                // F16/R041: si la transformación no se puede leer, el vínculo se excluye y se informa; nunca se supone la identidad.
+                // F16/R041: if the transform cannot be read, the link is excluded and reported; identity is never assumed.
                 Transform t;
                 try { t = li.GetTotalTransform(); }
                 catch (Exception ex)
                 {
-                    warnings?.Add("vínculo " + name + ": no se pudo leer su transformación (" + ex.GetType().Name + "); se excluyó de la revisión");
+                    warnings?.Add("link " + name + ": its transform could not be read (" + ex.GetType().Name + "); excluded from the check");
                     continue;
                 }
                 if (t == null)
                 {
-                    warnings?.Add("vínculo " + name + ": sin transformación; se excluyó de la revisión");
+                    warnings?.Add("link " + name + ": no transform; excluded from the check");
                     continue;
                 }
                 var id = Ids.ToLong(li.Id);
@@ -149,14 +149,14 @@ namespace Bimbridge.Addin.Revit.Geo
                     ToHost = t,
                     ToLocal = t.Inverse,
                     Identity = t.IsIdentity,
-                    // Si el vínculo se recarga, Revit da otro objeto Document; si se mueve, cambia la transformación.
+                    // If the link is reloaded, Revit gives a different Document object; if it moves, the transform changes.
                     Key = id + "|" + RuntimeHelpers.GetHashCode(ld) + "|" + TransformKey(t),
                 });
             }
             return list;
         }
 
-        /// <summary>"BIMBRIDGE_VDC-ARCH_SAMPLE PROJECT_R21.rvt" → "ARCH". Sin disciplina reconocible: las primeras letras del nombre.</summary>
+        /// <summary>"BIMBRIDGE_VDC-ARCH_SAMPLE PROJECT_R21.rvt" → "ARCH". No recognizable discipline: the first letters of the name.</summary>
         public static string ShortName(string name)
         {
             var n = (name ?? "").ToUpperInvariant();
@@ -169,24 +169,24 @@ namespace Bimbridge.Addin.Revit.Geo
                 if (before && after) return d == "STR" ? "STRUCT" : d == "PLUMB" ? "PLMB" : d;
             }
             var clean = new string(n.Where(char.IsLetterOrDigit).Take(8).ToArray());
-            return clean.Length == 0 ? "VINC" : clean;
+            return clean.Length == 0 ? "LINK" : clean;
         }
 
         private static string TransformKey(Transform t) =>
             string.Join(",", new[] { t.Origin.X, t.Origin.Y, t.Origin.Z, t.BasisX.X, t.BasisX.Y, t.BasisZ.Z }
                 .Select(v => Math.Round(v, 5).ToString(CultureInfo.InvariantCulture)));
 
-        /// <summary>Firma de los vínculos (para la caché de resultados): cambia si se recarga, mueve o quita uno.</summary>
+        /// <summary>Link signature (for the result cache): changes if one is reloaded, moved or removed.</summary>
         public static string Signature(IEnumerable<GeoSource> sources) => string.Join(";", sources.Where(s => !s.IsHost).Select(s => s.Key).OrderBy(k => k, StringComparer.Ordinal));
 
-        // ---------------- capas ----------------
+        // ---------------- layers ----------------
 
         private static string LayerKey(GeoSource s, BuiltInCategory c) => s.Key + "#" + (int)c;
 
         /// <summary>
-        /// Prepara (por tramos) las capas de esas categorías en esas fuentes. Devuelve true cuando todas están completas.
-        /// Las capas del anfitrión se rehacen si el modelo cambió (rev), reutilizando las mallas de lo que no cambió;
-        /// las de vínculos sólo si se recargan o se mueven.
+        /// Prepares (in slices) the layers for those categories in those sources. Returns true when all are complete.
+        /// Host layers are rebuilt if the model changed (rev), reusing meshes for what did not change;
+        /// link layers only if they are reloaded or moved.
         /// </summary>
         public bool Ensure(IList<GeoSource> sources, IList<BuiltInCategory> cats, long hostRev, Stopwatch sw, long deadlineMs, Action<string> phase)
         {
@@ -201,10 +201,10 @@ namespace Bimbridge.Addin.Revit.Geo
                     }
                     else
                     {
-                        layer.Source = s; // misma clave: mismo documento y transformación
+                        layer.Source = s; // same key: same document and transform
                     }
                     if (layer.Complete) continue;
-                    phase?.Invoke("indexando " + layer.CategoryName + (s.IsHost ? "" : " en " + s.Short));
+                    phase?.Invoke("indexing " + layer.CategoryName + (s.IsHost ? "" : " in " + s.Short));
                     if (!Build(layer, sw, deadlineMs)) return false;
                 }
             return true;
@@ -231,11 +231,11 @@ namespace Bimbridge.Addin.Revit.Geo
                 try { bb = e.get_BoundingBox(null); } catch (Exception) { bb = null; }
                 if (bb == null || bb.Min == null || bb.Max == null) continue;
                 var box = ToHostBox(bb, layer.Source);
-                if (box.IsEmpty || box.SizeX > 5000 || box.SizeY > 5000) continue; // topografías y similares
+                if (box.IsEmpty || box.SizeX > 5000 || box.SizeY > 5000) continue; // toposurfaces and the like
                 var id = Ids.ToLong(e.Id);
                 GeoBody body = null;
                 if (layer.Source.IsHost && _hostBodies.TryGetValue(id, out var cached) && SameBox(cached.RawBox, box))
-                    body = cached; // misma caja: la malla sigue valiendo si el registro no lo marca como cambiado (se revisa al usarla)
+                    body = cached; // same box: the mesh is still valid unless the registry marks it as changed (checked on use)
                 if (body == null) body = new GeoBody { Id = id, LinkId = layer.Source.LinkId, Source = layer.Source.Short, Category = layer.CategoryName, Box = box, RawBox = box };
                 var item = new GeoItem { Source = layer.Source, Element = e, Id = id, Category = layer.CategoryName, Box = box, Body = body };
                 layer.Items.Add(item);
@@ -248,7 +248,7 @@ namespace Bimbridge.Addin.Revit.Geo
             return true;
         }
 
-        /// <summary>Caja de un elemento (en coordenadas de su modelo, con la transformación de la caja) llevada al anfitrión.</summary>
+        /// <summary>Box of an element (in its model's coordinates, with the box transform) mapped to the host.</summary>
         public static Box3 ToHostBox(BoundingBoxXYZ bb, GeoSource s)
         {
             var b = Box3.Empty;
@@ -269,9 +269,9 @@ namespace Bimbridge.Addin.Revit.Geo
             catch (Exception) { return c.ToString().Replace("OST_", ""); }
         }
 
-        // ---------------- consultas ----------------
+        // ---------------- queries ----------------
 
-        /// <summary>Elementos de las capas pedidas cuya caja toca la caja dada (en coordenadas del anfitrión).</summary>
+        /// <summary>Elements of the requested layers whose box touches the given box (in host coordinates).</summary>
         public List<GeoItem> Query(IList<GeoSource> sources, IList<BuiltInCategory> cats, Box3 probe)
         {
             var result = new List<GeoItem>();
@@ -285,7 +285,7 @@ namespace Bimbridge.Addin.Revit.Geo
             return result;
         }
 
-        // ---------------- mallas ----------------
+        // ---------------- meshes ----------------
 
         private static bool Valid(GeoBody b, VersionRegistry reg, string key)
         {
@@ -299,7 +299,7 @@ namespace Bimbridge.Addin.Revit.Geo
             Math.Abs(a.MinX - b.MinX) < 1e-9 && Math.Abs(a.MinY - b.MinY) < 1e-9 && Math.Abs(a.MinZ - b.MinZ) < 1e-9 &&
             Math.Abs(a.MaxX - b.MaxX) < 1e-9 && Math.Abs(a.MaxY - b.MaxY) < 1e-9 && Math.Abs(a.MaxZ - b.MaxZ) < 1e-9;
 
-        /// <summary>Malla del elemento indexado (se triangula una vez). Devuelve false si no tiene sólidos.</summary>
+        /// <summary>Mesh of the indexed element (triangulated once). Returns false if it has no solids.</summary>
         public bool EnsureMesh(GeoItem item, VersionRegistry reg, long hostRev, ICollection<string> skip)
         {
             var body = item.Body;
@@ -329,7 +329,7 @@ namespace Bimbridge.Addin.Revit.Geo
             return !mesh.IsEmpty;
         }
 
-        /// <summary>Eje y espesor de un muro (barato: no triangula). false si no es un muro con curva de ubicación.</summary>
+        /// <summary>Wall location line and thickness (cheap: no triangulation). false if it is not a wall with a location curve.</summary>
         public bool EnsureWallLine(GeoItem item)
         {
             var body = item.Body;
@@ -353,8 +353,8 @@ namespace Bimbridge.Addin.Revit.Geo
         }
 
         /// <summary>
-        /// Cuerpo de un elemento del anfitrión que se revisa (luminaria…): caja de sus sólidos y malla, con caché por elemento.
-        /// La caché vale mientras el registro no marque el elemento como cambiado y su caja siga igual (doble seguro).
+        /// Body of a host element under check (fixture…): its solids' box and mesh, cached per element.
+        /// The cache is valid while the registry does not mark the element as changed and its box stays the same (double safeguard).
         /// </summary>
         public GeoBody TargetBody(Element e, VersionRegistry reg, long hostRev, ICollection<string> skip, bool needMesh)
         {
@@ -382,7 +382,7 @@ namespace Bimbridge.Addin.Revit.Geo
                     b.Parts = parts.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray();
                     if (solids.Count > 0)
                     {
-                        // La caja de los sólidos es la del cuerpo físico (la del elemento incluye líneas simbólicas y conectores).
+                        // The solids' box is the physical body's (the element box includes symbolic lines and connectors).
                         if (Bodies.TryBox(solids, out var sb)) b.Box = ToHostBox(sb, null);
                         var builder = new TriMeshBuilder();
                         foreach (var s in solids) Bodies.AddSolid(s, builder, null);
@@ -415,7 +415,7 @@ namespace Bimbridge.Addin.Revit.Geo
             }
         }
 
-        /// <summary>Sólidos de Revit de un elemento indexado (para la booleana exacta), en coordenadas de su propio modelo.</summary>
+        /// <summary>Revit solids of an indexed element (for the exact boolean), in its own model's coordinates.</summary>
         public List<Solid> SolidsOf(GeoItem item, ICollection<string> skip, out bool failed)
         {
             if (item.Solids == null)
@@ -469,11 +469,11 @@ namespace Bimbridge.Addin.Revit.Geo
                 ["reutilizadas"] = (long)HostReused,
                 ["simd"] = TriMesh.SimdAvailable && TriMesh.SimdEnabled,
                 ["detalle"] = layers.OrderBy(l => l.Source.Name).ThenBy(l => l.CategoryName)
-                    .Select(l => (object)((l.Source.IsHost ? "anfitrión" : l.Source.Short) + " · " + l.CategoryName + ": " + l.Items.Count + (l.Complete ? "" : " (incompleta)"))).ToList(),
+                    .Select(l => (object)((l.Source.IsHost ? "host" : l.Source.Short) + " · " + l.CategoryName + ": " + l.Items.Count + (l.Complete ? "" : " (incomplete)"))).ToList(),
             };
         }
 
-        /// <summary>Quita las capas de fuentes que ya no existen (vínculo recargado, movido o quitado).</summary>
+        /// <summary>Removes layers of sources that no longer exist (link reloaded, moved or removed).</summary>
         public int Prune(IList<GeoSource> current)
         {
             var keys = new HashSet<string>(current.Select(s => s.Key));
@@ -483,7 +483,7 @@ namespace Bimbridge.Addin.Revit.Geo
         }
     }
 
-    /// <summary>Índices por documento. Se usan sólo en el hilo de Revit.</summary>
+    /// <summary>Indexes per document. Used only on the Revit thread.</summary>
     internal static class GeoService
     {
         private static readonly Dictionary<string, GeoIndex> Indexes = new Dictionary<string, GeoIndex>(StringComparer.OrdinalIgnoreCase);

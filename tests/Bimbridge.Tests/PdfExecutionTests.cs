@@ -9,8 +9,8 @@ using Xunit;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// 0.9.1 (Bloque I): puente ejecutable PDF→Revit. El plan de colocación sólo se convierte en planes tipados cuando es seguro:
-    /// registro válido, operaciones que pasan la validación offline, clave de idempotencia estable y lo ambiguo fuera.
+    /// 0.9.1 (Block I): executable PDF->Revit bridge. The placement plan only becomes typed plans when it is safe:
+    /// valid registration, operations that pass offline validation, a stable idempotency key and ambiguous items left out.
     /// </summary>
     public class PdfExecutionTests
     {
@@ -72,10 +72,10 @@ namespace Bimbridge.Tests
             Assert.Equal(true, e["ejecutable"]);
             var one = (Dictionary<string, object>)((List<object>)e["planes"]).Single();
             Assert.Equal(3L, one["elementos"]);
-            // Lo devuelto es directamente aceptable por la herramienta plan (validación tipada offline).
+            // The output is directly acceptable to the plan tool (offline typed validation).
             var parsed = OpSpec.ParseAll(new Dictionary<string, object> { ["ops"] = one["ops"] });
             Assert.Equal(new[] { "place", "place" }, parsed.Select(o => o.Kind).ToArray());
-            // Misma entrada → misma clave (repetir no coloca dos veces); otro contenido u otra huella → otra clave.
+            // Same input -> same key (repeating does not place twice); other content or another fingerprint -> another key.
             var key = (string)one[Wire.KeyArg];
             Assert.StartsWith("src-", key);
             Assert.Equal(key, ((Dictionary<string, object>)((List<object>)PdfToPlan.Execution(Plan(Batch("F: A", new[] { 1.0, 2 }, new[] { 3.0, 4 }), Batch("F: B", new[] { 5.0, 6 })))["planes"])[0])[Wire.KeyArg]);
@@ -97,7 +97,7 @@ namespace Bimbridge.Tests
             var ea = PdfToPlan.Execution(onlyAmb);
             Assert.Equal(false, ea["ejecutable"]); Assert.Equal(1L, ea["pendiente_de_persona"]);
             Assert.False(ea.ContainsKey("planes"));
-            // Una operación que la validación tipada rechazaría (sin puntos, o que no es place) bloquea todo el plan.
+            // An operation that typed validation would reject (no points, or not a place) blocks the whole plan.
             var bad = Plan(Batch("F: A")); bad.Place.Add(new PlacementItem());
             Assert.Equal(false, PdfToPlan.Execution(bad)["ejecutable"]);
             var notPlace = Plan(Batch("F: A", new[] { 1.0, 2 }));

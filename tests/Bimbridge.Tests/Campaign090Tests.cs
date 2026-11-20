@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Campaña nativa 0.9.0: los archivos están bien formados y sus planes validan sin Revit. Ejecutarla sigue BLOCKED.</summary>
+    /// <summary>Native campaign 0.9.0: the files are well formed and their plans validate without Revit. Running it stays BLOCKED.</summary>
     public class Campaign090Tests
     {
         private static string Root()

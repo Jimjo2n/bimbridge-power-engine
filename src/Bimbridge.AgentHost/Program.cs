@@ -9,20 +9,20 @@ using Bimbridge.Protocol;
 namespace Bimbridge.AgentHost
 {
     /// <summary>
-    /// Bimbridge.AgentHost 0.7.0-alpha3 — orquestador local. Por defecto escribe en el modelo simulado durable; con `revit` y --revit-pid habla con un Revit concreto vía el puente tipado (lectura, ensayo o, con autorización explícita del operador, persistente).
+    /// Bimbridge.AgentHost 0.7.0-alpha3 — local orchestrator. By default it writes to the durable simulated model; with `revit` and --revit-pid it talks to a specific Revit through the typed bridge (read, trial or, with the operator's explicit authorization, persistent).
     ///   validar   &lt;plan.json&gt;
     ///   modelo    crear &lt;dir&gt; --clave K --huella H [--elementos Cat=N[@Nivel] ...] [--config JSON]
     ///   modelo    compactar &lt;dir&gt;
     ///   ejecutar  &lt;plan.json|-&gt; &lt;estado&gt; --modelo &lt;dir&gt; [--checkpoint N] [--lease-ms N]
-    ///   estado    &lt;estado&gt; [resumen|siguiente|excepciones|cambios N|fallos|informe]   (sólo lectura, sin lease)
+    ///   estado    &lt;estado&gt; [resumen|siguiente|excepciones|cambios N|fallos|informe]   (read-only, no lease)
     ///   pausar | reanudar | cancelar &lt;estado&gt; --modelo &lt;dir&gt;
     ///   servicio  &lt;raiz&gt; [--tuberia nombre] [--cola N] [--trabajadores N]
     ///   cliente   &lt;tuberia&gt; '&lt;json&gt;'
     ///   documento &lt;archivo.txt&gt; --clave K --huella H [--salida plan.json]
     ///   escenario &lt;dir&gt; [--n 1000]
     ///   banco-kernel [--puntos N] [--triangulos M]
-    /// Códigos de salida: 0 todo verificado · 2 terminó con excepciones · 3 plan en uso por otro proceso · 4 lease perdido ·
-    /// 5 pausado/cancelado · 1 error (plan inválido, estado corrupto, documento distinto…) · 64 uso.
+    /// Exit codes: 0 all verified · 2 finished with exceptions · 3 plan in use by another process · 4 lease lost ·
+    /// 5 paused/cancelled · 1 error (invalid plan, corrupt state, different document…) · 64 usage.
     /// </summary>
     public static class Program
     {
@@ -61,7 +61,7 @@ namespace Bimbridge.AgentHost
                 case "validar":
                 {
                     var errs = IrValidator.Validate(PlanDraft.Parse(File.ReadAllText(a[1])), out var vp);
-                    Console.WriteLine(errs.Count == 0 ? "valido " + vp.Hash + " · " + vp.Ops.Count + " operaciones" : string.Join(Environment.NewLine, errs));
+                    Console.WriteLine(errs.Count == 0 ? "valid " + vp.Hash + " · " + vp.Ops.Count + " operations" : string.Join(Environment.NewLine, errs));
                     return errs.Count == 0 ? 0 : 1;
                 }
                 case "modelo":
@@ -70,10 +70,10 @@ namespace Bimbridge.AgentHost
                     {
                         var cfg = Opt(a, "--config");
                         DurableSimModel.Create(a[2], Opt(a, "--clave"), Opt(a, "--huella"), Multi(a, "--elementos"), cfg == null ? null : Json.ParseObject(cfg));
-                        Console.WriteLine("modelo creado " + a[2]);
+                        Console.WriteLine("model created " + a[2]);
                         return 0;
                     }
-                    if (a.Length >= 3 && a[1] == "compactar") { DurableSimModel.Open(a[2]).Compact(); Console.WriteLine("compactado"); return 0; }
+                    if (a.Length >= 3 && a[1] == "compactar") { DurableSimModel.Open(a[2]).Compact(); Console.WriteLine("compacted"); return 0; }
                     break;
                 }
                 case "ejecutar":
@@ -107,7 +107,7 @@ namespace Bimbridge.AgentHost
                     break;
                 case "paquete-actualizacion":
                 {
-                    // 0.8.0: ZIP para "Actualizar desde ZIP". Sin --clave-privada queda SIN FIRMA (el usuario tendrá que confirmarlo expresamente).
+                    // 0.8.0: ZIP for "Update from ZIP". Without --clave-privada it is UNSIGNED (the user will have to confirm it explicitly).
                     var files = new Dictionary<string, string> { ["Bimbridge.Setup.exe"] = Opt(a, "--setup") };
                     foreach (var x in Multi(a, "--extra")) files[Path.GetFileName(x)] = x;
                     System.Security.Cryptography.RSA signer = null;
@@ -120,7 +120,7 @@ namespace Bimbridge.AgentHost
                 }
                 case "generar-clave":
                 {
-                    // Genera un par RSA-3072. La privada se guarda donde diga --salida y NUNCA va al repositorio; la pública va a config.json (claves_actualizacion).
+                    // Generates an RSA-3072 key pair. The private key is saved where --salida says and NEVER goes into the repository; the public key goes into config.json (claves_actualizacion).
                     using (var rsa = System.Security.Cryptography.RSA.Create(3072))
                     {
                         File.WriteAllText(Opt(a, "--salida"), rsa.ToXmlString(true));
@@ -134,7 +134,7 @@ namespace Bimbridge.AgentHost
                     Console.WriteLine(Json.Write(MountKernelBench.Run(int.Parse(Opt(a, "--puntos", "20000")), int.Parse(Opt(a, "--triangulos", "20000")), int.Parse(Opt(a, "--rondas", "5")))));
                     return 0;
             }
-            Console.Error.WriteLine("uso: validar | modelo crear|compactar | ejecutar [--revit-pid N --escritura lectura|ensayo|persistente] | revit instancias|identidad|nrt04 | estado | pausar | reanudar | cancelar | servicio | cliente | documento | escenario | banco-kernel | power-engine estado|bench|calibrar | paquete-actualizacion | generar-clave");
+            Console.Error.WriteLine("usage: validar | modelo crear|compactar | ejecutar [--revit-pid N --escritura lectura|ensayo|persistente] | revit instancias|identidad|nrt04 | estado | pausar | reanudar | cancelar | servicio | cliente | documento | escenario | banco-kernel | power-engine estado|bench|calibrar | paquete-actualizacion | generar-clave");
             return 64;
         }
 
@@ -168,7 +168,7 @@ namespace Bimbridge.AgentHost
             if (sub == "flujo-pdf")
             {
                 // power-engine flujo-pdf --pdf f.pdf --pagina 1 --nivel "LEVEL 09" --reglas reglas.json --ejes ejes_modelo_090.json --salida DIR
-                // Escribe DIR/plan.json (resumen) y DIR/ops.json (lista de ops place para plan→commit; campaña: --var ops=@DIR/ops.json).
+                // Writes DIR/plan.json (summary) and DIR/ops.json (list of place ops for plan→commit; campaign: --var ops=@DIR/ops.json).
                 var pdf = Opt(a, "--pdf");
                 var folder = Path.GetDirectoryName(Path.GetFullPath(pdf));
                 var q = new BimBridge.PowerEngine.Workflows.PdfToPlan.Request
@@ -190,7 +190,7 @@ namespace Bimbridge.AgentHost
                     return Arg.GetString(r, "estado")?.StartsWith("listo", StringComparison.Ordinal) == true ? 0 : 3;
                 }
             }
-            Console.Error.WriteLine("uso: power-engine estado | flujo-pdf --pdf f --nivel N --reglas r.json --ejes e.json --salida DIR | bench [--rondas N --docx f --pdf f --salida f.json] | calibrar [--salida f.json]");
+            Console.Error.WriteLine("usage: power-engine estado | flujo-pdf --pdf f --nivel N --reglas r.json --ejes e.json --salida DIR | bench [--rondas N --docx f --pdf f --salida f.json] | calibrar [--salida f.json]");
             return 64;
         }
 
@@ -210,7 +210,7 @@ namespace Bimbridge.AgentHost
             if (Opt(a, "--revit-pid") != null)
             {
                 if (NativeGate.Check(a) is int blocked) return blocked;
-                // alpha3: Revit real. El operador elige pid y modo; el plan no puede ampliarlos.
+                // alpha3: real Revit. The operator chooses pid and mode; the plan cannot widen them.
                 var mode = Opt(a, "--escritura", "lectura");
                 var link = RevitLink.ForPid(int.Parse(Opt(a, "--revit-pid")), out var lerr);
                 if (link == null) { Console.WriteLine("error " + lerr); return 1; }
@@ -223,7 +223,7 @@ namespace Bimbridge.AgentHost
             }
             else
             {
-                var model = DurableSimModel.Open(Opt(a, "--modelo") ?? throw new ArgumentException("falta --modelo o --revit-pid"));
+                var model = DurableSimModel.Open(Opt(a, "--modelo") ?? throw new ArgumentException("missing --modelo or --revit-pid"));
                 PrintDiags(model.OpenDiagnostics);
                 backend = new SimulatedBackend(model, Faults.Current);
             }
@@ -262,7 +262,7 @@ namespace Bimbridge.AgentHost
                 case "informe": Console.WriteLine(Json.Write(Compact.Report(a[1], plan, st))); break;
                 default:
                     var holder = PlanLease.Peek(a[1]);
-                    Console.WriteLine(Compact.Summary(plan, st) + (holder != null && holder.Valid(DateTime.UtcNow) ? " · dueño " + holder.Owner + " f" + holder.Fencing : ""));
+                    Console.WriteLine(Compact.Summary(plan, st) + (holder != null && holder.Valid(DateTime.UtcNow) ? " · owner " + holder.Owner + " f" + holder.Fencing : ""));
                     break;
             }
             return 0;
@@ -270,7 +270,7 @@ namespace Bimbridge.AgentHost
 
         private static int Control(string[] a)
         {
-            var model = DurableSimModel.Open(Opt(a, "--modelo") ?? throw new ArgumentException("falta --modelo"));
+            var model = DurableSimModel.Open(Opt(a, "--modelo") ?? throw new ArgumentException("missing --modelo"));
             using (var r = PlanRunner.Open(a[1], null, new SimulatedBackend(model), Options(a), out var diags))
             {
                 PrintDiags(diags);

@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.9.1: índice de capacidades con búsqueda, filtros y paginación; contrato completo sólo bajo demanda.</summary>
+    /// <summary>0.9.1: capability index with search, filters and pagination; full contract only on demand.</summary>
     public class CapabilityIndexTests
     {
         private static CapabilityIndex Idx => CapabilityIndex.Default;
@@ -73,7 +73,7 @@ namespace Bimbridge.Tests
             var e = CapabilityCatalog.All[0];
             Assert.Throws<ArgumentException>(() => new CapabilityIndex(new[] { e, e }));
             Assert.Equal(new CapabilityIndex(CapabilityCatalog.All).Version, Idx.Version);
-            // AUD-16: cambiar CUALQUIER campo del contrato (no sólo id/estado/estrategia) cambia la huella; el orden de entrada no.
+            // AUD-16: changing ANY contract field (not just id/estado/estrategia) changes the fingerprint; input order does not.
             CapabilityEntry Clone(CapabilityEntry c) => (CapabilityEntry)typeof(object).GetMethod("MemberwiseClone", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(c, null);
             var baseSet = CapabilityCatalog.All.Take(5).Select(Clone).ToList();
             var v0 = new CapabilityIndex(baseSet).Version;

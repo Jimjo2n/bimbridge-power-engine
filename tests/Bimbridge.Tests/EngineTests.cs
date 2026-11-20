@@ -18,7 +18,7 @@ namespace Bimbridge.Tests
         {
             var src = new Dictionary<string, object>
             {
-                ["s"] = "Ñandú \"comillas\" \n línea",
+                ["s"] = "Ñandú \"quotes\" \n café",
                 ["l"] = 17855175L,
                 ["big"] = 9007199254740993L,
                 ["d"] = 10.375,
@@ -27,7 +27,7 @@ namespace Bimbridge.Tests
                 ["arr"] = new List<object> { 1L, "x", false },
             };
             var back = Json.ParseObject(Json.Write(src));
-            Assert.Equal("Ñandú \"comillas\" \n línea", back["s"]);
+            Assert.Equal("Ñandú \"quotes\" \n café", back["s"]);
             Assert.Equal(17855175L, back["l"]);
             Assert.Equal(9007199254740993L, back["big"]);
             Assert.Equal(10.375, back["d"]);
@@ -78,8 +78,8 @@ namespace Bimbridge.Tests
         public void SmallJob_DoesNotWaitBehindBigJob()
         {
             var s = new WriteScheduler<int>();
-            for (var i = 0; i < 50; i++) s.Enqueue("claude", i);   // plan grande: 50 sub-lotes
-            s.Enqueue("codex", 999);                                   // 3 elementos de Codex
+            for (var i = 0; i < 50; i++) s.Enqueue("claude", i);   // big plan: 50 sub-batches
+            s.Enqueue("codex", 999);                                   // 3 Codex elements
             Assert.Equal(1, s.PositionOf("codex"));
             s.TryDequeue(out var first, out _);
             s.TryDequeue(out var second, out var item);
@@ -93,9 +93,9 @@ namespace Bimbridge.Tests
         {
             var s = new WriteScheduler<int>();
             s.Enqueue("a", 1);
-            s.CloseBarrier("sincronizando");
+            s.CloseBarrier("syncing");
             Assert.False(s.TryDequeue(out _, out _));
-            Assert.Equal("sincronizando", s.BarrierReason);
+            Assert.Equal("syncing", s.BarrierReason);
             Assert.Equal(1, s.Count);
             s.OpenBarrier();
             Assert.True(s.TryDequeue(out _, out _));
@@ -179,8 +179,8 @@ namespace Bimbridge.Tests
         [Fact]
         public void Parse_SetAndConditions()
         {
-            var q = QuerySpec.Parse(A(("ids", "$l5_perimetro"), ("where", new List<object> { "elev>=10.5", "comments?", "type~STRIP" })));
-            Assert.Equal("$l5_perimetro", q.FromSet);
+            var q = QuerySpec.Parse(A(("ids", "$l5_perimeter"), ("where", new List<object> { "elev>=10.5", "comments?", "type~STRIP" })));
+            Assert.Equal("$l5_perimeter", q.FromSet);
             Assert.Equal(">=", q.Where[0].Op);
             Assert.Equal("notempty", q.Where[1].Op);
             Assert.Equal("~", q.Where[2].Op);
@@ -206,7 +206,7 @@ namespace Bimbridge.Tests
         [InlineData("elev<=")]
         public void Condition_Malformed_IsRejected(string cond)
         {
-            // Antes "elev>>3" devolvía total 0 sin error y la IA concluía que no había nada.
+            // Before, "elev>>3" returned total 0 with no error and the AI concluded there was nothing.
             Assert.Throws<QueryException>(() => Condition.Parse(cond));
         }
 
@@ -236,7 +236,7 @@ namespace Bimbridge.Tests
         {
             var q = QuerySpec.Parse(A(("cat", "LightingFixtures"), ("f", "id,elev"), ("units", "mm"), ("where", new List<object> { "elev>3300" })));
             var r = (Dictionary<string, object>)ResultTable.Build(q, Rows(), out var ids);
-            // 10 ft = 3048 mm no pasa; 11 ft = 3352,8 mm sí. Filas con elev ≥ 11 ft: 2 + 1 + 3 = 6.
+            // 10 ft = 3048 mm does not pass; 11 ft = 3352.8 mm does. Rows with elev ≥ 11 ft: 2 + 1 + 3 = 6.
             Assert.Equal(6L, r["total"]);
             Assert.Equal("mm", r["unidades"]);
             Assert.Equal(3352.8, (double)((object[])((List<object>)r["rows"])[0])[1], 1);
@@ -279,10 +279,10 @@ namespace Bimbridge.Tests
         public void NamedSets_ValidateNames()
         {
             var s = new NamedSets();
-            s.Save("l5_perimetro", new long[] { 1, 2 });
-            Assert.True(s.TryGet("$L5_PERIMETRO", out var ids));
+            s.Save("l5_perimeter", new long[] { 1, 2 });
+            Assert.True(s.TryGet("$L5_PERIMETER", out var ids));
             Assert.Equal(2, ids.Length);
-            Assert.Throws<ArgumentException>(() => s.Save("$mal nombre", new long[0]));
+            Assert.Throws<ArgumentException>(() => s.Save("$bad name", new long[0]));
         }
 
         [Fact]
@@ -292,7 +292,7 @@ namespace Bimbridge.Tests
             var a = r.Open("Claude Code", 4812);
             var b = r.Open("codex-mcp-client", 900);
             var c = r.Open("Claude Code", 4812);
-            // Prefijo legible (cliente y pid) + sufijo aleatorio por instancia (revisión PR #22): distintos aunque coincidan cliente y pid.
+            // Readable prefix (client and pid) + random per-instance suffix (PR #22 review): distinct even when client and pid match.
             Assert.Matches("^S-claude-code-4812-[0-9a-f]{16}$", a.Id);
             Assert.Matches("^S-codex-mcp-client-900-[0-9a-f]{16}$", b.Id);
             Assert.StartsWith("S-claude-code-4812-", c.Id);
@@ -306,10 +306,10 @@ namespace Bimbridge.Tests
             var seen = new HashSet<string>();
             for (var i = 0; i < 200; i++)
             {
-                var s = r.Open("Claude Code", 4812);          // mismo cliente, mismo pid, contador de peticiones reiniciado
-                Assert.True(seen.Add(s.Id), "session_id repetido: " + s.Id);
+                var s = r.Open("Claude Code", 4812);          // same client, same pid, request counter reset
+                Assert.True(seen.Add(s.Id), "repeated session_id: " + s.Id);
                 var req = new Bimbridge.Protocol.Request { Id = 1, Op = Bimbridge.Protocol.Wire.OpPing, Args = new Dictionary<string, object>() };
-                Assert.True(seen.Add(Correlation.For(s, req).RequestId), "request_id repetido");
+                Assert.True(seen.Add(Correlation.For(s, req).RequestId), "repeated request_id");
                 r.Close(s);
             }
         }
@@ -325,9 +325,9 @@ namespace Bimbridge.Tests
         {
             var expected = new List<Engine.Qc.ManifestQc.Expected>
             {
-                new Engine.Qc.ManifestQc.Expected { Ref = "ref-dos-vistas", X = 500, Y = 100, Level = "L1", Tag = true },
+                new Engine.Qc.ManifestQc.Expected { Ref = "ref-two-views", X = 500, Y = 100, Level = "L1", Tag = true },
                 new Engine.Qc.ManifestQc.Expected { Ref = "ref-original", X = 1000, Y = 100, Level = "L1" },
-                new Engine.Qc.ManifestQc.Expected { Ref = "ref-faltante", X = 3000, Y = 100, Level = "L1" },
+                new Engine.Qc.ManifestQc.Expected { Ref = "ref-missing", X = 3000, Y = 100, Level = "L1" },
             };
             var physical = new List<Engine.Qc.ManifestQc.Actual>
             {
@@ -368,10 +368,10 @@ namespace Bimbridge.Tests
             var tags = new List<LightingAudit.Tag>
             {
                 new LightingAudit.Tag { Id = 100, ViewId = 9, Tagged = new long[] { 1 } },
-                new LightingAudit.Tag { Id = 101, ViewId = 9, Tagged = new long[] { 1 } },   // duplicado de 1 en la vista 9
-                new LightingAudit.Tag { Id = 102, ViewId = 8, Tagged = new long[] { 1 } },   // otra vista: válido (doble altura)
+                new LightingAudit.Tag { Id = 101, ViewId = 9, Tagged = new long[] { 1 } },   // duplicate of 1 in view 9
+                new LightingAudit.Tag { Id = 102, ViewId = 8, Tagged = new long[] { 1 } },   // another view: valid (double height)
                 new LightingAudit.Tag { Id = 103, ViewId = 9, Tagged = new long[] { 3 } },
-                new LightingAudit.Tag { Id = 104, ViewId = 9, Tagged = new long[0] },        // huérfano
+                new LightingAudit.Tag { Id = 104, ViewId = 9, Tagged = new long[0] },        // orphan
             };
             var r = LightingAudit.Summarize(fx, tags, null, out var sets);
 
@@ -415,15 +415,15 @@ namespace Bimbridge.Tests
         [Fact]
         public void Audit_LevelFilter_DoesNotFlagOtherLevelsTagsAsOrphans()
         {
-            // Regresión 0.2.2: con lvl=LEVEL 02 salían 877 huérfanos falsos.
+            // Regression 0.2.2: with lvl=LEVEL 02 there were 877 false orphans.
             var all = new long[] { 1, 2, 3 };
             var fx = new List<LightingAudit.Fixture> { new LightingAudit.Fixture { Id = 1, Level = "LEVEL 02" } };
             var tags = new List<LightingAudit.Tag>
             {
                 new LightingAudit.Tag { Id = 10, ViewId = 50, ViewLevel = "LEVEL 02", Tagged = new long[] { 1 } },
-                new LightingAudit.Tag { Id = 11, ViewId = 60, ViewLevel = "LEVEL 03", Tagged = new long[] { 2 } },   // de otro nivel
-                new LightingAudit.Tag { Id = 12, ViewId = 60, ViewLevel = "LEVEL 03", Tagged = new long[0] },        // huérfano de otro nivel
-                new LightingAudit.Tag { Id = 13, ViewId = 50, ViewLevel = "LEVEL 02", Tagged = new long[0] },        // huérfano de este nivel
+                new LightingAudit.Tag { Id = 11, ViewId = 60, ViewLevel = "LEVEL 03", Tagged = new long[] { 2 } },   // from another level
+                new LightingAudit.Tag { Id = 12, ViewId = 60, ViewLevel = "LEVEL 03", Tagged = new long[0] },        // orphan from another level
+                new LightingAudit.Tag { Id = 13, ViewId = 50, ViewLevel = "LEVEL 02", Tagged = new long[0] },        // orphan from this level
             };
             var r = LightingAudit.Summarize(fx, tags, null, out var sets, all, new List<string> { "level 02" });
             Assert.Equal(2L, r["tags"]);

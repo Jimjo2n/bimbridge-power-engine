@@ -16,7 +16,7 @@ namespace Bimbridge.Addin.Revit
         {
             var viewId = Arg.GetLong(request.Args, "vista");
             if (!viewId.HasValue || viewId.Value <= 0)
-                return Response.Fail(request.Id, Status.Invalido, "indique el ID positivo de la vista");
+                return Response.Fail(request.Id, Status.Invalido, "give the positive ID of the view");
             var rows = new List<object>();
             var refresh = new List<long>();
             string error = null;
@@ -28,7 +28,7 @@ namespace Bimbridge.Addin.Revit
                 if (doc == null) return true;
                 if (!(doc.GetElement(Ids.ToId(viewId.Value)) is View view) || view.IsTemplate)
                 {
-                    error = "no existe esa vista en el documento destino";
+                    error = "that view does not exist in the target document";
                     return true;
                 }
                 var notes = LightingCallout.InView(doc, view.Id).Select(note => (Note: note, Config: LightingCallout.Read(note)))

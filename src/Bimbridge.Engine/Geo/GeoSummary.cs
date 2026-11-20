@@ -7,17 +7,17 @@ using System.Linq;
 namespace Bimbridge.Engine.Geo
 {
     /// <summary>
-    /// Convierte las filas que junta el add-in (valores simples) en la respuesta compacta de "geo":
-    /// conteos por clase y por nivel, una tabla paginada con los problemas primero y conjuntos guardados por clase.
-    /// Corre fuera del hilo de Revit.
+    /// Turns the rows the add-in collects (simple values) into the compact "geo" response:
+    /// counts per class and per level, a paged table with problems first, and sets saved per class.
+    /// Runs off the Revit thread.
     /// </summary>
     public static class GeoSummary
     {
-        /// <summary>Columnas de longitud (pies) que se convierten con units=mm.</summary>
+        /// <summary>Length columns (feet) converted with units=mm.</summary>
         public static readonly HashSet<string> LengthCols = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         { "z", "ztop", "zbot", "x", "y", "dist", "dist_xy", "dz", "offset", "bajo", "alto", "elev", "cara_x", "cara_y", "cara_z" };
 
-        /// <summary>Orden de gravedad: lo que hay que corregir primero.</summary>
+        /// <summary>Severity order: what must be fixed first.</summary>
         private static readonly string[] Severity =
         {
             MountClass.Embedded, "penetra", "choque", MountClass.Floating, "separada", "distinto", "sobrante", "fuera", "ajena", "sin_cuarto",
@@ -44,7 +44,7 @@ namespace Bimbridge.Engine.Geo
                 if (rows.Any(r => r.ContainsKey("lvl")))
                 {
                     var byLevel = new Dictionary<string, object>();
-                    foreach (var g in rows.GroupBy(r => Str(r, "lvl") ?? "(sin nivel)").OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
+                    foreach (var g in rows.GroupBy(r => Str(r, "lvl") ?? "(no level)").OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
                     {
                         var counts = g.GroupBy(r => Str(r, classField) ?? "?").OrderBy(x => Rank(x.Key))
                             .ToDictionary(x => x.Key, x => (object)(long)x.Count());
@@ -63,7 +63,7 @@ namespace Bimbridge.Engine.Geo
                 }
             }
 
-            // Tabla: por defecto sólo lo que no está bien; solo=todos para verlo todo, solo=<clase> para una clase.
+            // Table: by default only what is not OK; solo=todos to see everything, solo=<class> for one class.
             IEnumerable<Dictionary<string, object>> shown = rows;
             var only = (spec.Only ?? "").Trim();
             if (classField != null)
@@ -71,7 +71,7 @@ namespace Bimbridge.Engine.Geo
                 if (only.Length == 0)
                 {
                     var problems = rows.Where(r => !OkClasses.Contains(Str(r, classField) ?? "")).ToList();
-                    if (problems.Count > 0) { shown = problems; d["tabla"] = "sólo problemas (" + problems.Count + "); use solo=todos para ver todo"; }
+                    if (problems.Count > 0) { shown = problems; d["tabla"] = "problems only (" + problems.Count + "); use solo=todos to see everything"; }
                 }
                 else if (!string.Equals(only, "todos", StringComparison.OrdinalIgnoreCase))
                 {
@@ -99,7 +99,7 @@ namespace Bimbridge.Engine.Geo
             d["rows"] = outRows;
             if (coverage.Count > 0) d["cobertura"] = coverage;
             if (pages > 1) { d["page"] = (long)spec.Page; d["pages"] = (long)pages; }
-            d["unidades"] = spec.Millimeters ? "mm" : "pies (holguras en pulgadas)";
+            d["unidades"] = spec.Millimeters ? "mm" : "feet (clearances in inches)";
             if (sets.Count > 0) d["conjuntos_guardados"] = sets.Keys.Cast<object>().ToList();
             return d;
         }

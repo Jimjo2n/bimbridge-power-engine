@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Las métricas declaran su procedencia: observadas, estimadas o no instrumentadas; nunca se rellena lo que no se midió.</summary>
+    /// <summary>Metrics declare their provenance: observed, estimated or not instrumented; what was not measured is never filled in.</summary>
     public class WorkflowMetricsTests
     {
         [Fact]
@@ -19,10 +19,10 @@ namespace Bimbridge.Tests
             Assert.Equal(120L, obs["total_ms"]); Assert.Equal(4L, obs["revit_slices"]); Assert.Equal(1000L, obs["elements_read"]);
             Assert.Equal(12345L, ((Dictionary<string, object>)d["estimadas"])["allocations_bytes"]);
             var missing = ((List<object>)d["no_instrumentadas"]).Cast<string>().ToList();
-            Assert.Contains("api_calls", missing);          // sin contador completo: se declara, no se rellena
+            Assert.Contains("api_calls", missing);          // no complete counter: declared, not filled in
             Assert.Contains("regenerations", missing);
             Assert.DoesNotContain("total_ms", missing);
-            Assert.Equal(1000L, d["tokens_estimados"]);     // bytes/4, estimación
+            Assert.Equal(1000L, d["tokens_estimados"]);     // bytes/4, estimate
             Assert.Equal(WorkflowMetrics.Names.Length, obs.Count + 1 + missing.Count);
         }
 

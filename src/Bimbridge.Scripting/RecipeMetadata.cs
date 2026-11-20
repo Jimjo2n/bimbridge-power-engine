@@ -7,15 +7,15 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace Bimbridge.Scripting
 {
     /// <summary>
-    /// rc3: metadatos declarativos de una receta leídos del CÓDIGO FUENTE, sin instanciarla (antes `tarea iniciar` llamaba al
-    /// constructor para leer Version/Transaccion, es decir, ejecutaba código de la receta sin autorización).
-    /// Sólo se aceptan valores constantes: `=> "2"`, `=> PoliticaTx.Lectura`, o `get { return …; }` con lo mismo. Cualquier otra forma
-    /// devuelve null y el llamador asume lo conservador (que escribe).
+    /// rc3: declarative metadata of a recipe read from the SOURCE CODE, without instantiating it (previously `tarea iniciar` called the
+    /// constructor to read Version/Transaccion, i.e. it ran recipe code without authorization).
+    /// Only constant values are accepted: `=> "2"`, `=> PoliticaTx.Lectura`, or `get { return …; }` with the same. Any other form
+    /// returns null and the caller assumes the conservative case (that it writes).
     /// </summary>
     public static class RecipeMetadata
     {
-        /// <summary>Valor constante de la propiedad <paramref name="name"/> en la clase que hereda de Receta: el literal de texto,
-        /// o el nombre del miembro de enumeración (p. ej. "Lectura"). null si no es constante o no existe.</summary>
+        /// <summary>Constant value of the property <paramref name="name"/> in the class that inherits from Receta: the string literal,
+        /// or the enum member name (e.g. "Lectura"). null if it is not constant or does not exist.</summary>
         public static string Constant(string source, string name)
         {
             var root = CSharpSyntaxTree.ParseText(source ?? "").GetRoot();

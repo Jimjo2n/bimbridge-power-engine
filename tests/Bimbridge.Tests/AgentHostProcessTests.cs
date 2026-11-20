@@ -12,10 +12,10 @@ using Xunit.Abstractions;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// AH-01 / AH-02 / AH-04 con PROCESOS INDEPENDIENTES: cada fase es un `dotnet Bimbridge.AgentHost.dll` distinto que se mata a sí
-    /// mismo (SIGKILL, sin finally) en el punto inyectado; la fase siguiente es otro proceso del sistema operativo que sólo dispone de lo que
-    /// quedó en disco. Ninguna referencia en memoria sobrevive entre fases. Cada prueba comprueba en el modelo (abierto de nuevo desde
-    /// disco) cuántas transacciones confirmadas tiene la operación: nunca más de una.
+    /// AH-01 / AH-02 / AH-04 with INDEPENDENT PROCESSES: each phase is a separate `dotnet Bimbridge.AgentHost.dll` that kills itself
+    /// (SIGKILL, no finally) at the injected point; the next phase is another operating system process that only has what
+    /// was left on disk. No in-memory reference survives between phases. Each test checks in the model (reopened from
+    /// disk) how many committed transactions the operation has: never more than one.
     /// </summary>
     public class AgentHostProcessTests
     {
@@ -42,9 +42,9 @@ namespace Bimbridge.Tests
         }
 
         /// <summary>
-        /// AUD-04 (#28): las pruebas de inyección de caídas no prueban la expiración. Usan un lease largo (no hay carrera entre la carga de la
-        /// máquina y el TTL antes del punto de caída) y, tras una caída, adelantan el vencimiento del lease del proceso muerto en el fixture.
-        /// La expiración, el fencing y la renovación tienen sus propias pruebas (AH04_*).
+        /// AUD-04 (#28): the crash injection tests do not test expiry. They use a long lease (no race between machine load
+        /// and the TTL before the crash point) and, after a crash, move the dead process's lease expiry forward in the fixture.
+        /// Expiry, fencing and renewal have their own tests (AH04_*).
         /// </summary>
         private const string CrashTestLeaseMs = "3600000";
 
@@ -58,7 +58,7 @@ namespace Bimbridge.Tests
 
         private static void AssertCrashedAt(Case c, AH.ChildResult r, string point)
         {
-            Assert.True(r.Killed, "el proceso debía morir en " + point + ": " + r);
+            Assert.True(r.Killed, "the process should have died at " + point + ": " + r);
             Assert.Contains(point, File.ReadAllText(c.Mark));
         }
 
@@ -70,7 +70,7 @@ namespace Bimbridge.Tests
             var c = Setup();
             var r1 = Exec(c, "backend.mitad_tx@" + c.SetOp + ":4");
             AssertCrashedAt(c, r1, "backend.mitad_tx");
-            // la "transacción" no llegó al WAL: el modelo en disco no tiene NINGUNO de los 4 cambios en memoria
+            // the "transaction" never reached the WAL: the on-disk model has NONE of the 4 in-memory changes
             Assert.Equal(0, AH.TxCount(c.Model, c.Hash, c.SetOp));
             var m = DurableSimModel.Open(c.Model);
             Assert.All(m.Targets(new Dictionary<string, object> { ["categoria"] = AH.Cat }), id => Assert.Null(m.Get(id, "Mounting Height")));
@@ -79,7 +79,7 @@ namespace Bimbridge.Tests
             var r2 = Exec(c);
             Assert.Equal(0, r2.Code);
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));
-            Assert.Equal(2, AH.Transitions(c.State, c.SetOp, OpState.EnEjecucion));   // intento 1 (cayó) + intento 2 (tras observar que no hubo efecto)
+            Assert.Equal(2, AH.Transitions(c.State, c.SetOp, OpState.EnEjecucion));   // attempt 1 (crashed) + attempt 2 (after observing there was no effect)
             Assert.Contains(AH.Notes(c.State, c.SetOp), n => ((Dictionary<string, object>)n["datos"])["efecto"].ToString() == "NoObservado");
             var st = AH.Read(c.State, out _, out _);
             Assert.Equal(OpState.Verificada, st.Ops[c.SetOp].State);
@@ -100,7 +100,7 @@ namespace Bimbridge.Tests
             var rec = st.Ops[c.SetOp];
             Assert.Equal(OpState.Verificada, rec.State);
             Assert.Equal(true, rec.Result["recuperada"]);
-            Assert.Equal(5L, Arg.GetLong(rec.Result, "elementos"));        // reconstruido desde la transacción, no inventado
+            Assert.Equal(5L, Arg.GetLong(rec.Result, "elementos"));        // rebuilt from the transaction, not invented
             Assert.Equal("Satisfechas", Arg.GetString(rec.Evidence, "postcondiciones"));
             Assert.Equal(OpState.Verificada, st.Ops[c.QcOp].State);
         }
@@ -108,7 +108,7 @@ namespace Bimbridge.Tests
         [Fact]
         public void AH01_CrashAfterUnexpectedNumberOfElements_VerificationFails_NotRepeated()
         {
-            var c = Setup(fixtures: 6, expect: 5);   // el modelo tiene 6; el plan esperaba 5
+            var c = Setup(fixtures: 6, expect: 5);   // the model has 6; the plan expected 5
             AssertCrashedAt(c, Exec(c, "backend.tras_commit@" + c.SetOp), "backend.tras_commit");
             var r2 = Exec(c);
             Assert.Equal(2, r2.Code);
@@ -125,8 +125,8 @@ namespace Bimbridge.Tests
         {
             var c = Setup();
             AssertCrashedAt(c, Exec(c, "runner.tras_ejecutar@" + c.SetOp), "runner.tras_ejecutar");
-            Assert.Equal(OpState.EnEjecucion, AH.StateOf(c.State, c.SetOp));    // el resultado no llegó al diario
-            Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));             // pero la transacción sí al modelo
+            Assert.Equal(OpState.EnEjecucion, AH.StateOf(c.State, c.SetOp));    // the result never reached the journal
+            Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));             // but the transaction did reach the model
             Assert.Equal(0, Exec(c).Code);
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));
             Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.EnEjecucion));
@@ -162,15 +162,15 @@ namespace Bimbridge.Tests
         {
             var c = Setup();
             AssertCrashedAt(c, Exec(c, "backend.tras_commit@" + c.SetOp), "backend.tras_commit");
-            Assert.Equal(0, AH.Run(null, null, "modelo", "compactar", c.Model).Code);   // el detalle de la transacción desaparece
+            Assert.Equal(0, AH.Run(null, null, "modelo", "compactar", c.Model).Code);   // the transaction detail disappears
             var r2 = Exec(c);
             Assert.Equal(2, r2.Code);
-            Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));                      // probado por el recuento compactado
+            Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));                      // proven by the compacted count
             var st = AH.Read(c.State, out _, out _);
             Assert.Equal(OpState.RequiereVerificacion, st.Ops[c.SetOp].State);
             Assert.Equal(ErrorClass.EvidenciaInsuficiente, st.Ops[c.SetOp].Error);
             Assert.Equal("Satisfechas", Arg.GetString(st.Ops[c.SetOp].Evidence, "postcondiciones"));
-            Assert.Null(st.Ops[c.SetOp].Result);                                          // ningún resultado fabricado
+            Assert.Null(st.Ops[c.SetOp].Result);                                          // no fabricated result
             Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.EnEjecucion));
         }
 
@@ -179,7 +179,7 @@ namespace Bimbridge.Tests
         {
             var c = Setup();
             AssertCrashedAt(c, Exec(c, "backend.tras_commit@" + c.SetOp), "backend.tras_commit");
-            var m = DurableSimModel.Open(c.Model);   // alguien añade una luminaria en L03 mientras el agente estaba caído
+            var m = DurableSimModel.Open(c.Model);   // someone adds a lighting fixture on L03 while the agent was down
             m.CommitExternal(new List<object[]>(), new List<object[]> { new object[] { m.NextElementId(), AH.Cat, new Dictionary<string, object> { ["nivel"] = "L03" } } });
             Assert.Equal(2, Exec(c).Code);
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));
@@ -193,7 +193,7 @@ namespace Bimbridge.Tests
         {
             var c = Setup();
             AssertCrashedAt(c, Exec(c, "backend.tras_commit@" + c.SetOp), "backend.tras_commit");
-            var m = DurableSimModel.Open(c.Model);   // otra persona cambia el valor de un elemento
+            var m = DurableSimModel.Open(c.Model);   // another person changes an element's value
             var first = m.Targets(new Dictionary<string, object> { ["categoria"] = AH.Cat }).First();
             m.CommitExternal(new List<object[]> { new object[] { first, "Mounting Height", 2700L, 3000L } });
             Assert.Equal(2, Exec(c).Code);
@@ -223,7 +223,7 @@ namespace Bimbridge.Tests
             Assert.True(r1.Killed, r1.ToString());
             var mid = AH.Read(state, out _, out _);
             Assert.Equal(8, mid.Ops.Values.Count(o => o.State == OpState.Verificada));
-            // un proceso nuevo del sistema operativo, sólo con lo que hay en disco
+            // a new operating system process, with only what is on disk
             AH.ExpireDeadLease(state);
             var r2 = AH.Run(null, null, "ejecutar", "-", state, "--modelo", model);
             _out.WriteLine(r2.ToString());
@@ -255,18 +255,18 @@ namespace Bimbridge.Tests
         [Fact]
         public void AH04_LeaseExpiresBeforeFirstAction_FailsClosed_NothingWritten()
         {
-            // AUD-04 / #28 reproducido de forma determinista: un retraso controlado de 1,5 s entre la inicialización y la primera acción con
-            // un TTL de 700 ms. Es exactamente lo que ocurrió en el runner de Windows: el lease vence antes de la primera comprobación.
-            // Comportamiento correcto: fail-closed (lease_perdido, código 4) ANTES de cualquier transición o escritura.
+            // AUD-04 / #28 reproduced deterministically: a controlled 1.5 s delay between initialization and the first action with
+            // a 700 ms TTL. This is exactly what happened on the Windows runner: the lease expires before the first check.
+            // Correct behavior: fail-closed (lease_perdido, code 4) BEFORE any transition or write.
             var c = Setup();
             var r = AH.RunWithEnv(new Dictionary<string, string> { ["BIMBRIDGE_AH_DELAY"] = "runner.antes_de_ejecutar:1500" }, null, null,
                 "ejecutar", c.PlanFile, c.State, "--modelo", c.Model, "--lease-ms", "700");
             _out.WriteLine(r.ToString());
             Assert.Equal(4, r.Code);
             Assert.Contains("lease_perdido", r.Out);
-            foreach (var op in c.Plan.Ops) Assert.Equal(0, AH.TxCount(c.Model, c.Hash, op.Id));     // ninguna escritura
-            Assert.Equal(0, AH.Transitions(c.State, c.SetOp, OpState.EnEjecucion));                  // ni siquiera empezó
-            // Sin carrera: el siguiente proceso (lease vencido) toma el plan con fencing mayor y lo completa una sola vez.
+            foreach (var op in c.Plan.Ops) Assert.Equal(0, AH.TxCount(c.Model, c.Hash, op.Id));     // no write
+            Assert.Equal(0, AH.Transitions(c.State, c.SetOp, OpState.EnEjecucion));                  // it did not even start
+            // No race: the next process (expired lease) takes the plan with a higher fencing token and completes it exactly once.
             var r2 = AH.Run(null, null, "ejecutar", c.PlanFile, c.State, "--modelo", c.Model, "--lease-ms", CrashTestLeaseMs);
             Assert.Equal(0, r2.Code);
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));
@@ -276,14 +276,14 @@ namespace Bimbridge.Tests
         [Fact]
         public void AH04_SlowInitializationWithinTtl_IsRenewedBeforeFirstAction_AndCompletesOnce()
         {
-            // Mismo retraso, TTL suficiente: la renovación explícita tras la inicialización mantiene dueño y fencing; sin re-adquirir.
+            // Same delay, sufficient TTL: the explicit renewal after initialization keeps owner and fencing; no re-acquire.
             var c = Setup();
             var r = AH.RunWithEnv(new Dictionary<string, string> { ["BIMBRIDGE_AH_DELAY"] = "runner.antes_de_ejecutar:1500" }, null, null,
                 "ejecutar", c.PlanFile, c.State, "--modelo", c.Model, "--lease-ms", "6000");
             _out.WriteLine(r.ToString());
             Assert.Equal(0, r.Code);
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));
-            Assert.Single(AH.Journal(c.State), x => Arg.GetString(x, "ev") == "dueno");             // un solo dueño, fencing 1
+            Assert.Single(AH.Journal(c.State), x => Arg.GetString(x, "ev") == "dueno");             // a single owner, fencing 1
         }
 
         [Fact]
@@ -299,7 +299,7 @@ namespace Bimbridge.Tests
             var ra = a.Wait(); var rb = b.Wait();
             _out.WriteLine("A: " + ra + "\nB: " + rb);
             var codes = new[] { ra.Code, rb.Code }.OrderBy(x => x).ToArray();
-            Assert.Equal(new[] { 0, 3 }, codes);                    // uno ejecuta; el otro sólo inspecciona
+            Assert.Equal(new[] { 0, 3 }, codes);                    // one runs; the other only inspects
             var loser = ra.Code == 3 ? ra : rb;
             Assert.Contains("plan_en_uso", loser.Out);
             var fresh = DurableSimModel.Open(model);
@@ -318,16 +318,16 @@ namespace Bimbridge.Tests
             var pf = AH.WritePlan(dir, plan);
             var mark = Path.Combine(dir, "caida.txt");
             var r1 = AH.Run("runner.entre_operaciones#4", mark, "ejecutar", pf, state, "--modelo", model, "--lease-ms", "3600000");
-            _out.WriteLine("Caída: " + r1);
+            _out.WriteLine("Crash: " + r1);
             Assert.True(r1.Killed, r1.ToString());
             var holder = PlanLease.Peek(state);
             Assert.Equal(1, holder.Fencing);
             Assert.True(holder.Valid(DateTime.UtcNow));
             var r2 = AH.Run(null, null, "ejecutar", "-", state, "--modelo", model);
-            _out.WriteLine("Vigente: " + r2);
+            _out.WriteLine("Current: " + r2);
             Assert.Equal(3, r2.Code);
             Assert.Contains("plan_en_uso", r2.Out);
-            // Ambos procesos ya salieron. Cambiamos sólo el vencimiento de este fixture en disco.
+            // Both processes have exited. We only change the expiry of this on-disk fixture.
             var path = Path.Combine(state, "control", "plan", "lease.json");
             var lease = Json.ParseObject(File.ReadAllText(path));
             lease["vence"] = "2000-01-01T00:00:00Z";
@@ -343,8 +343,8 @@ namespace Bimbridge.Tests
             Assert.Equal(2, fresh.MaxFencing(hash));
         }
 
-        /// <summary>rc1 · NRT-03 simulado con lotes: el proceso muere tras confirmar el lote (y a mitad de la "transacción"); al reanudar,
-        /// el lote se aplica UNA vez, con el valor de cada elemento, sin duplicar ni perder.</summary>
+        /// <summary>rc1 · NRT-03 simulated with batches: the process dies after committing the batch (and in the middle of the "transaction"); on resume,
+        /// the batch is applied ONCE, with each element's value, with nothing duplicated or lost.</summary>
         [Theory]
         [InlineData("backend.tras_commit")]
         [InlineData("backend.mitad_tx")]

@@ -25,7 +25,7 @@ namespace Bimbridge.Addin.Revit.Writes
             else
             {
                 var dim = (Dimension)element;
-                if (!(dim.Curve is Line axis)) throw new QueryException("la reparación de cotas admite cotas lineales");
+                if (!(dim.Curve is Line axis)) throw new QueryException("dimension repair supports linear dimensions");
                 var segments = dim.Segments.Cast<DimensionSegment>().ToList();
                 var formatting = segments.Count == 0
                     ? new List<object> { Format(dim.Prefix, dim.Suffix, dim.Above, dim.Below, dim.ValueOverride,
@@ -56,19 +56,19 @@ namespace Bimbridge.Addin.Revit.Writes
             if (original is IndependentTag && data.ContainsKey("destino"))
             {
                 if (existing.Count != 1 || existing[0].LinkedElementId != ElementId.InvalidElementId)
-                    throw new QueryException("sólo se puede reparar una etiqueta de una referencia local");
+                    throw new QueryException("only a tag with a single local reference can be repaired");
                 var target = doc.GetElement(Ids.ToId(WriteKit.L(data, "destino")));
                 if (target == null || target.Id == existing[0].ElementId)
-                    throw new QueryException("el elemento destino debe existir y diferir del etiquetado");
+                    throw new QueryException("the target element must exist and differ from the tagged one");
                 return new List<Reference> { new Reference(target) };
             }
             if (!(original is Dimension dim) || !data.ContainsKey("refs_estables"))
-                throw new QueryException("la etiqueta exige destino y la cota exige refs_estables");
+                throw new QueryException("a tag requires destino and a dimension requires refs_estables");
             if (dim.IsLocked || dim.Segments.Cast<DimensionSegment>().Any(s => s.IsLocked))
-                throw new QueryException("libere las restricciones de la cota antes de reparar sus referencias");
+                throw new QueryException("release the dimension's constraints before repairing its references");
             var supplied = Arg.GetStringList(data, "refs_estables");
             if (supplied.Count != existing.Count)
-                throw new QueryException("la cota exige una referencia destino por cada referencia previa, en el mismo orden");
+                throw new QueryException("the dimension requires one target reference per previous reference, in the same order");
             var references = new List<Reference>();
             foreach (var value in supplied)
             {
@@ -76,12 +76,12 @@ namespace Bimbridge.Addin.Revit.Writes
                 {
                     var reference = Reference.ParseFromStableRepresentation(doc, value);
                     if (reference == null || doc.GetElement(reference.ElementId) == null)
-                        throw new QueryException("no existe el destino de una referencia de cota");
+                        throw new QueryException("the target of a dimension reference does not exist");
                     references.Add(reference);
                 }
                 catch (Autodesk.Revit.Exceptions.ArgumentException)
                 {
-                    throw new QueryException("una referencia estable de cota no se resolvió en el documento");
+                    throw new QueryException("a stable dimension reference did not resolve in the document");
                 }
             }
             return references;
@@ -95,7 +95,7 @@ namespace Bimbridge.Addin.Revit.Writes
                 var old = References(original).Single();
                 var reference = references.Single();
                 var replacement = IndependentTag.Create(doc, tag.GetTypeId(), view.Id, reference, tag.HasLeader, tag.TagOrientation, tag.TagHeadPosition)
-                    ?? throw new InvalidOperationException("Revit no creó la etiqueta nueva");
+                    ?? throw new InvalidOperationException("Revit did not create the new tag");
                 replacement.TagHeadPosition = tag.TagHeadPosition;
                 if (Math.Abs(replacement.RotationAngle - tag.RotationAngle) > 1e-7) replacement.RotationAngle = tag.RotationAngle;
                 if (tag.HasLeader)
@@ -114,10 +114,10 @@ namespace Bimbridge.Addin.Revit.Writes
             foreach (var reference in references) array.Append(reference);
             var linear = axis.IsBound ? axis : Line.CreateBound(axis.Origin - axis.Direction, axis.Origin + axis.Direction);
             var result = doc.Create.NewDimension(view, linear, array, (DimensionType)doc.GetElement(originalDimension.GetTypeId()))
-                ?? throw new InvalidOperationException("Revit no creó una cota con las referencias pedidas");
+                ?? throw new InvalidOperationException("Revit did not create a dimension with the requested references");
             var originalSegments = originalDimension.Segments.Cast<DimensionSegment>().ToList();
             var resultSegments = result.Segments.Cast<DimensionSegment>().ToList();
-            if (originalSegments.Count != resultSegments.Count) throw new InvalidOperationException("cambió la cantidad de segmentos");
+            if (originalSegments.Count != resultSegments.Count) throw new InvalidOperationException("the number of segments changed");
             if (originalSegments.Count == 0)
             {
                 result.Prefix = originalDimension.Prefix; result.Suffix = originalDimension.Suffix;
@@ -138,7 +138,7 @@ namespace Bimbridge.Addin.Revit.Writes
         {
             if (element is IndependentTag tag && !tag.IsOrphaned) return tag.GetTaggedReferences().ToList();
             if (element is Dimension dim && dim.AreReferencesAvailable && dim.References != null) return dim.References.Cast<Reference>().ToList();
-            throw new QueryException("la etiqueta o cota debe existir y tener referencias legibles en su vista");
+            throw new QueryException("the tag or dimension must exist and have readable references in its view");
         }
 
         private static object Format(string prefix, string suffix, string above, string below, string value, XYZ text) =>

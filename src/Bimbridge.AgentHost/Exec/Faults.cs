@@ -8,12 +8,12 @@ using System.Text;
 namespace Bimbridge.AgentHost
 {
     /// <summary>
-    /// Inyección de caídas para pruebas de recuperación. Formato (variable BIMBRIDGE_AH_FAULT o <see cref="Configure"/>):
-    /// <c>punto[@op][#n][:k]</c> — cae en el punto <c>punto</c>, sólo para la operación <c>op</c> (si se da), la n-ésima vez que se pasa
-    /// (por defecto la 1.ª); <c>k</c> es un argumento del punto (p. ej. tras cuántos elementos dentro de una transacción).
-    /// Modo (BIMBRIDGE_AH_FAULT_MODE): "matar" (por defecto: el proceso se mata a sí mismo con SIGKILL, sin finally ni vaciados) o "excepcion".
-    /// Antes de matar escribe una línea en BIMBRIDGE_AH_FAULT_MARK (si existe) para que la prueba sepa dónde cayó.
-    /// Puntos: backend.mitad_tx, backend.tras_commit, runner.tras_ejecutar, runner.en_verificacion, runner.tras_verificar,
+    /// Crash injection for recovery tests. Format (variable BIMBRIDGE_AH_FAULT or <see cref="Configure"/>):
+    /// <c>point[@op][#n][:k]</c> — crashes at point <c>point</c>, only for operation <c>op</c> (if given), the n-th time it is passed
+    /// (the 1st by default); <c>k</c> is an argument of the point (e.g. after how many elements inside a transaction).
+    /// Mode (BIMBRIDGE_AH_FAULT_MODE): "matar" (default: the process kills itself with SIGKILL, with no finally blocks or flushes) or "excepcion".
+    /// Before killing it writes a line to BIMBRIDGE_AH_FAULT_MARK (if set) so the test knows where it crashed.
+    /// Points: backend.mitad_tx, backend.tras_commit, runner.tras_ejecutar, runner.en_verificacion, runner.tras_verificar,
     /// runner.en_checkpoint, runner.entre_operaciones.
     /// </summary>
     public sealed class Faults
@@ -36,8 +36,8 @@ namespace Bimbridge.AgentHost
         private int _delayMs;
 
         /// <summary>
-        /// AUD-04: retraso controlado para pruebas (variable BIMBRIDGE_AH_DELAY = "punto:ms"). Reproduce sin depender de la carga de la máquina
-        /// un periodo largo sin renovar el lease. Puntos: runner.antes_de_ejecutar.
+        /// AUD-04: controlled delay for tests (variable BIMBRIDGE_AH_DELAY = "point:ms"). Reproduces a long period without renewing the lease
+        /// without depending on machine load. Points: runner.antes_de_ejecutar.
         /// </summary>
         public Faults ConfigureDelay(string spec)
         {
@@ -50,7 +50,7 @@ namespace Bimbridge.AgentHost
             return this;
         }
 
-        /// <summary>Espera el retraso configurado si este es su punto (una sola vez).</summary>
+        /// <summary>Waits the configured delay if this is its point (only once).</summary>
         public void Delay(string point)
         {
             if (_delayPoint != point || _delayMs <= 0) return;
@@ -76,7 +76,7 @@ namespace Bimbridge.AgentHost
 
         public bool Armed(string point, string op = null) => _point == point && (_op == null || _op == op);
 
-        /// <summary>Punto de caída. No hace nada si no está armado para este punto/operación o aún no toca.</summary>
+        /// <summary>Crash point. Does nothing if not armed for this point/operation or if its turn has not come yet.</summary>
         public void Hit(string point, string op = null)
         {
             if (!Armed(point, op)) return;
@@ -84,8 +84,8 @@ namespace Bimbridge.AgentHost
             Crash(point + (op == null ? "" : "@" + op));
         }
 
-        /// <summary>Fallo SIN caída (0.8.0): devuelve true una sola vez si el punto está armado; el llamador simula el efecto
-        /// (p. ej. backend.respuesta_perdida: el add-in aplicó pero la respuesta no llega).</summary>
+        /// <summary>Failure WITHOUT a crash (0.8.0): returns true only once if the point is armed; the caller simulates the effect
+        /// (e.g. backend.respuesta_perdida: the add-in applied but the response never arrives).</summary>
         public bool Fire(string point, string op = null)
         {
             if (!Armed(point, op)) return false;
@@ -96,7 +96,7 @@ namespace Bimbridge.AgentHost
 
         public void Crash(string where)
         {
-            _point = null; // una sola vez
+            _point = null; // only once
             if (_mark != null)
             {
                 try
@@ -106,9 +106,9 @@ namespace Bimbridge.AgentHost
                 }
                 catch (IOException) { }
             }
-            if (_mode == "excepcion") throw new CrashException("caída simulada en " + where);
+            if (_mode == "excepcion") throw new CrashException("simulated crash at " + where);
             Process.GetCurrentProcess().Kill();
-            // Kill es asíncrono en algunos sistemas: no seguir ejecutando nada.
+            // Kill is asynchronous on some systems: do not keep running anything.
             System.Threading.Thread.Sleep(System.Threading.Timeout.Infinite);
         }
     }

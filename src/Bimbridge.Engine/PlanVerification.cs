@@ -5,8 +5,8 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// AUD-09: el estado del commit (la transacción se confirmó) y el de las postcondiciones (el modelo quedó como se pidió) son cosas
-    /// distintas. Un commit confirmado con diferencias en la relectura NO es un éxito funcional pleno.
+    /// AUD-09: the commit status (the transaction was committed) and the postcondition status (the model ended up as requested) are
+    /// different things. A committed commit with differences on re-read is NOT a full functional success.
     /// </summary>
     public static class PlanVerification
     {

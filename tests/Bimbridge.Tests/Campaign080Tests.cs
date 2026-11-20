@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.8.0: arnés de la campaña nativa (sin Revit). Sustitución, documento fijado, expectativas y validez de los archivos de pasos.</summary>
+    /// <summary>0.8.0: native campaign harness (without Revit). Substitution, pinned document, expectations and validity of the step files.</summary>
     public class Campaign080Tests
     {
         private static string Dir()
@@ -35,13 +35,13 @@ namespace Bimbridge.Tests
                 seen.Add((op, Arg.GetString(a, "doc"), w));
                 if (op == "plan") return new Response { Datos = new Dictionary<string, object> { ["plan_id"] = "P-7" } };
                 if (op == "commit") return new Response { Datos = new Dictionary<string, object> { ["plan_id"] = a["plan_id"] } };
-                return Response.Fail(0, Status.DestinoNoDisponible, "no existe d999");
+                return Response.Fail(0, Status.DestinoNoDisponible, "d999 does not exist");
             }
             var r = Campaign080.RunSteps(spec, Call, "d1", null);
-            Assert.Equal("FALLIDA", r["resultado"]);                 // el 4.º paso esperaba rechazado y fue ok
-            Assert.Equal(4, seen.Count);                              // el 5.º no se ejecuta
-            Assert.Equal("d1", seen[0].Doc);                          // el doc del archivo se sustituye por el fijado
-            Assert.Equal("d999", seen[2].Doc);                        // salvo en el paso negativo explícito
+            Assert.Equal("FALLIDA", r["resultado"]);                 // the 4th step expected rechazado and was ok
+            Assert.Equal(4, seen.Count);                              // the 5th does not run
+            Assert.Equal("d1", seen[0].Doc);                          // the file's doc is replaced by the pinned one
+            Assert.Equal("d999", seen[2].Doc);                        // except in the explicit negative step
             Assert.True(seen[1].Write);
             var pasos = (List<object>)r["pasos"];
             Assert.True((bool)((Dictionary<string, object>)pasos[1])["ok"]);
@@ -76,7 +76,7 @@ namespace Bimbridge.Tests
                     if ((string)s["op"] != "plan") continue;
                     var negative = (Arg.GetString(s, "esperar") ?? "ok") != "ok";
                     if (negative && Arg.GetBool(s, "depende_del_modelo") == true) continue;
-                    if (negative) Assert.ThrowsAny<Exception>(() => Bimbridge.Engine.OpSpec.ParseAll(args));   // los negativos fallan ya sin Revit, salvo los que dependen del modelo
+                    if (negative) Assert.ThrowsAny<Exception>(() => Bimbridge.Engine.OpSpec.ParseAll(args));   // negative steps already fail without Revit, except those that depend on the model
                     else Bimbridge.Engine.OpSpec.ParseAll(args);
                 }
             }
@@ -88,7 +88,7 @@ namespace Bimbridge.Tests
 {
     public class Campaign080PlanTemplateTests
     {
-        /// <summary>N8-10: plantilla IR de contraste independiente (sólo lectura). Se regenera con BIMBRIDGE_GEN_MATRIZ=1 y debe validar.</summary>
+        /// <summary>N8-10: IR template for independent cross-check (read only). Regenerated with BIMBRIDGE_GEN_MATRIZ=1 and must validate.</summary>
         [Fact]
         public void N810_Template_ValidatesAsIr()
         {
@@ -96,7 +96,7 @@ namespace Bimbridge.Tests
             var v = new OpDraft { Operation = "verificar_independiente" };
             v.Scope["categoria"] = "Doors";
             v.Params["fuente_id"] = "TABLA-PUERTAS-PRUEBA"; v.Params["fuente_tipo"] = "tabla"; v.Params["fuente_construccion"] = "N8-03";
-            // 0.9.0: SHA-256 de la tabla de prueba (archivo TABLA-PUERTAS-PRUEBA.csv de la campaña); sustituir por el real al correr N8-10.
+            // 0.9.0: SHA-256 of the test table (campaign file TABLA-PUERTAS-PRUEBA.csv); replace with the real one when running N8-10.
             v.Params["fuente_sha256"] = "SHA256_DE_LA_TABLA_DE_PRUEBA_0000000000000000000000000000000000";
             v.Params["parametro_clave"] = "Mark";
             v.Params["esperado"] = new System.Collections.Generic.Dictionary<string, object> { ["D-101"] = "-", ["D-102"] = "-", ["D-999"] = "-" };

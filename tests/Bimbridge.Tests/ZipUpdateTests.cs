@@ -12,7 +12,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.8.0: Actualizar desde ZIP. Inspección, preparación y aplicación diferida, sin Revit ni instaladores reales.</summary>
+    /// <summary>0.8.0: Update from ZIP. Inspection, staging and deferred apply, with no Revit or real installers.</summary>
     public class ZipUpdateTests : IDisposable
     {
         private readonly string _dir = Path.Combine(Path.GetTempPath(), "bb-zip-" + Guid.NewGuid().ToString("N").Substring(0, 8));
@@ -60,11 +60,11 @@ namespace Bimbridge.Tests
             using (var good = RSA.Create(2048))
             using (var other = RSA.Create(2048))
             {
-                // Firmado con una clave que no es de confianza.
+                // Signed with an untrusted key.
                 Assert.Equal("clave_desconocida", ZipUpdate.Inspect(Pkg("b", "0.8.1", other), "0.8.0", null, Keys(good)).Estado);
-                // Hay claves configuradas y el paquete no está firmado.
+                // Keys are configured and the package is not signed.
                 Assert.Equal("firma_exigida", ZipUpdate.Inspect(Pkg("c", "0.8.1"), "0.8.0", null, Keys(good)).Estado);
-                // Manifiesto alterado tras firmar (subir la versión).
+                // Manifest altered after signing (version bumped).
                 var zip = Pkg("d", "0.8.1", good);
                 using (var z = ZipFile.Open(zip, ZipArchiveMode.Update))
                 {
@@ -99,7 +99,7 @@ namespace Bimbridge.Tests
             var zip = Pkg("e2", "0.8.1");
             Assert.Equal("firma_exigida", ZipUpdate.Inspect(zip, "0.8.0", null, null).Estado);
             Assert.Equal("firma_exigida", ZipUpdate.Inspect(zip, "0.8.0", null, null, policy: Production).Estado);
-            // laboratorio sin el interruptor explícito tampoco
+            // lab without the explicit switch does not either
             var labNoFlag = ProfilePolicy.Parse("laboratorio", new[] { _dir }, false, null);
             Assert.Equal("firma_exigida", ZipUpdate.Inspect(zip, "0.8.0", null, null, policy: labNoFlag).Estado);
             var r = ZipUpdate.Inspect(zip, "0.8.0", null, null, policy: Lab);
@@ -115,7 +115,7 @@ namespace Bimbridge.Tests
             var h = fs.Host(); h.Policy = () => Production; h.Keys = () => new List<TrustedKey>();
             Assert.Equal("procedencia_rechazada", PendingApplier.Run(upd, h, TimeSpan.FromHours(1))["estado"]);
             Assert.Empty(fs.Runs);
-            // el mismo paquete preparado otra vez, con la política de laboratorio, sí se instala
+            // the same package staged again, with the lab policy, does install
             var upd2 = Path.Combine(_dir, "upd-lab2");
             ZipUpdate.Stage(ZipUpdate.Inspect(Pkg("lab2", "0.8.1"), "0.8.0", null, null, policy: Lab), upd2, "operator", true, policy: Lab);
             var fs2 = new FakeSystem();
@@ -172,7 +172,7 @@ namespace Bimbridge.Tests
             Assert.False(ZipUpdate.SafeEntry("C:/Windows/x.dll"));
             Assert.False(ZipUpdate.SafeEntry("/etc/x"));
 
-            // Un ZIP cualquiera no es un paquete.
+            // An arbitrary ZIP is not a package.
             var plain = Path.Combine(_dir, "plain.zip");
             using (var z = ZipFile.Open(plain, ZipArchiveMode.Create)) using (var w = new StreamWriter(z.CreateEntry("Bimbridge.Setup.exe").Open())) w.Write("x");
             Assert.Equal("no_es_paquete", ZipUpdate.Inspect(plain, "0.8.0", null, null, policy: Lab).Estado);
@@ -196,7 +196,7 @@ namespace Bimbridge.Tests
             Assert.Throws<InvalidDataException>(() => ZipUpdate.Stage(r, Path.Combine(_dir, "upd"), "operator", true, policy: Lab));
         }
 
-        // ---------------- aplicación diferida ----------------
+        // ---------------- deferred apply ----------------
 
         private sealed class FakeSystem
         {
@@ -247,9 +247,9 @@ namespace Bimbridge.Tests
             var r = PendingApplier.Run(upd, fs.Host(), TimeSpan.FromHours(8));
             Assert.Equal("aplicada_verificada", r["estado"]);
             Assert.Equal("0.8.1", fs.Installed);
-            Assert.Equal(4, fs.Sleeps);                 // esperó mientras Revit seguía abierto (y una lectura de confirmación)
+            Assert.Equal(4, fs.Sleeps);                 // waited while Revit was still open (plus one confirmation read)
             Assert.Single(fs.Runs);
-            Assert.Null(ZipUpdate.ReadPending(upd));     // la pendiente se consume
+            Assert.Null(ZipUpdate.ReadPending(upd));     // the pending update is consumed
             Assert.True(File.Exists(Path.Combine(upd, ZipUpdate.ResultFile)));
         }
 

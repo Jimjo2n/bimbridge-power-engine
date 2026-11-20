@@ -12,9 +12,9 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// 0.9.1 (Bloque F, #24): inventario de SOLO LECTURA para Copy/Monitor: vínculo (cargado, transformación), aparatos de origen en
-    /// el documento vinculado y aparatos del anfitrión con su relación de supervisión. No invoca comandos ni abre transacciones.
-    /// La comparación la hace Engine.Workflows.CopyMonitorVerifier fuera del hilo de Revit.
+    /// 0.9.1 (Block F, #24): READ-ONLY inventory for Copy/Monitor: link (loaded, transform), source fixtures in
+    /// the linked document and host fixtures with their monitoring relationship. Invokes no commands and opens no transactions.
+    /// The comparison is done by Engine.Workflows.CopyMonitorVerifier outside the Revit thread.
     /// </summary>
     public sealed class CopyMonitorProbe
     {
@@ -26,7 +26,7 @@ namespace Bimbridge.Addin.Revit
         public long LinkInstanceId;
         public string LinkName;
         public string LinkIdentity;
-        /// <summary>AUD-20: revisión guardada del documento vinculado (GUID de versión + número de guardados), o null si no se pudo leer.</summary>
+        /// <summary>AUD-20: saved revision of the linked document (version GUID + number of saves), or null if it could not be read.</summary>
         public string LinkRevision;
         public string Category => _category;
         public LinkTransform Transform;
@@ -60,8 +60,8 @@ namespace Bimbridge.Addin.Revit
         {
             var doc = DocTarget.Resolve(app, out var docError);
             if (doc == null) { Error = docError; return true; }
-            if (doc.IsFamilyDocument) { Error = Status.NoSoportado + ": copy_monitor revisa proyectos, no familias"; return true; }
-            if (!QueryRunner.TryCategory(_category, out var bic)) { Error = Status.Invalido + ": no existe la categoría " + _category; return true; }
+            if (doc.IsFamilyDocument) { Error = Status.NoSoportado + ": copy_monitor checks projects, not families"; return true; }
+            if (!QueryRunner.TryCategory(_category, out var bic)) { Error = Status.Invalido + ": category " + _category + " does not exist"; return true; }
             Rev = tracker.For(doc)?.Rev ?? 0;
             RevitVersion = app.Application.VersionNumber;
             DocumentIdentity = DocRegistry.Instance.IdentityOf(doc)?.Key;
@@ -74,21 +74,21 @@ namespace Bimbridge.Addin.Revit
                 var hits = links.Where(l => string.Equals(l.Name, _link, StringComparison.OrdinalIgnoreCase)
                                             || string.Equals((doc.GetElement(l.GetTypeId()) as RevitLinkType)?.Name, _link, StringComparison.OrdinalIgnoreCase)
                                             || l.Name.StartsWith(_link + " : ", StringComparison.OrdinalIgnoreCase)).ToList();
-                if (hits.Count > 1) { Error = Status.Invalido + ": hay " + hits.Count + " instancias del vínculo '" + _link + "'; use el id"; return true; }
+                if (hits.Count > 1) { Error = Status.Invalido + ": there are " + hits.Count + " instances of link '" + _link + "'; use the id"; return true; }
                 li = hits.FirstOrDefault();
             }
-            if (li == null) { Error = Status.Invalido + ": no existe el vínculo '" + _link + "'. Vínculos: " + string.Join(", ", links.Select(l => Ids.ToLong(l.Id) + " " + l.Name).Take(20)); return true; }
+            if (li == null) { Error = Status.Invalido + ": link '" + _link + "' does not exist. Links: " + string.Join(", ", links.Select(l => Ids.ToLong(l.Id) + " " + l.Name).Take(20)); return true; }
             var ldoc = li.GetLinkDocument();
-            if (ldoc == null) { Error = Status.Invalido + ": el vínculo '" + li.Name + "' no está cargado"; return true; }
+            if (ldoc == null) { Error = Status.Invalido + ": link '" + li.Name + "' is not loaded"; return true; }
 
             LinkInstanceId = Ids.ToLong(li.Id);
             LinkName = li.Name;
-            // Identidad estable sin exponer la ruta: hash SHA-256 de la ruta (string.GetHashCode cambia entre procesos en .NET 8).
+            // Stable identity without exposing the path: SHA-256 hash of the path (string.GetHashCode changes between processes in .NET 8).
             LinkIdentity = Bimbridge.Engine.Home.Sha256Hex(ldoc.PathName ?? ldoc.Title).Substring(0, 16);
             try { var dv = Document.GetDocumentVersion(ldoc); LinkRevision = dv.VersionGUID.ToString("N") + "#" + dv.NumberOfSaves.ToString(CultureInfo.InvariantCulture); }
             catch (Autodesk.Revit.Exceptions.ApplicationException) { LinkRevision = null; }
             var t = li.GetTotalTransform();
-            // AUD-11: transformación completa (rotación, reflexión, traslación); el verificador rechaza la que no pueda representar.
+            // AUD-11: full transform (rotation, reflection, translation); the verifier rejects any it cannot represent.
             Transform = new LinkTransform
             {
                 Dx = t.Origin.X, Dy = t.Origin.Y, Dz = t.Origin.Z, RotationDeg = Math.Atan2(t.BasisX.Y, t.BasisX.X) * 180.0 / Math.PI,

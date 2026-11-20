@@ -10,7 +10,7 @@ using Microsoft.Win32;
 
 namespace Bimbridge.Setup
 {
-    /// <summary>Lo que sólo existe en Windows: procesos, registro de "Aplicaciones" y la CLI de Claude Code.</summary>
+    /// <summary>What only exists on Windows: processes, the "Apps" registry and the Claude Code CLI.</summary>
     internal static class Platform
     {
         public const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Bimbridge";
@@ -53,7 +53,7 @@ namespace Bimbridge.Setup
 
         // ---------------- Claude Code ----------------
 
-        /// <summary>Busca la CLI de Claude Code en los lugares habituales.</summary>
+        /// <summary>Looks for the Claude Code CLI in the usual places.</summary>
         public static string FindClaude()
         {
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -72,7 +72,7 @@ namespace Bimbridge.Setup
             return candidates.FirstOrDefault(File.Exists);
         }
 
-        /// <summary>claude mcp add --scope user bimbridge -- "bridge.exe" (quitando antes una versión vieja).</summary>
+        /// <summary>claude mcp add --scope user bimbridge -- "bridge.exe" (removing an old version first).</summary>
         public static bool RegisterClaude(string claude, string bridgeExe, out string detail)
         {
             if (SetupPaths.IsSandbox) { detail = "sandbox"; return false; }
@@ -135,13 +135,13 @@ namespace Bimbridge.Setup
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
-                    CreateNoWindow = true, // comando de configuración de un instante; no es un servidor
+                    CreateNoWindow = true, // one-shot configuration command; not a server
                 };
                 using (var p = Process.Start(psi))
                 {
                     var o = p.StandardOutput.ReadToEndAsync();
                     var e = p.StandardError.ReadToEndAsync();
-                    if (!p.WaitForExit(30000)) { try { p.Kill(); } catch (Exception) { } output = "no respondió en 30 s"; return false; }
+                    if (!p.WaitForExit(30000)) { try { p.Kill(); } catch (Exception) { } output = "no response in 30 s"; return false; }
                     output = (o.Result + " " + e.Result).Trim();
                     return p.ExitCode == 0;
                 }
@@ -149,7 +149,7 @@ namespace Bimbridge.Setup
             catch (Exception ex) { output = ex.Message; return false; }
         }
 
-        // ---------------- "Aplicaciones" de Windows ----------------
+        // ---------------- Windows "Apps" ----------------
 
         public static void RegisterUninstall(SetupPaths p)
         {
@@ -177,7 +177,7 @@ namespace Bimbridge.Setup
             try { Registry.CurrentUser.DeleteSubKeyTree(UninstallKey, false); } catch (Exception) { }
         }
 
-        /// <summary>Guarda una copia del instalador para "Modificar" y "Desinstalar" desde Aplicaciones.</summary>
+        /// <summary>Keeps a copy of the installer for "Modify" and "Uninstall" from Apps.</summary>
         public static void KeepSetupCopy(SetupPaths p)
         {
             var self = Assembly.GetExecutingAssembly().Location;
@@ -186,21 +186,21 @@ namespace Bimbridge.Setup
             CopyOver(self, p.SetupCopy);
         }
 
-        /// <summary>Último aviso no fatal de AfterInstall (p. ej. la copia para Aplicaciones no se pudo renovar). Null si no hubo.</summary>
+        /// <summary>Last non-fatal warning from AfterInstall (e.g. the copy for Apps could not be renewed). Null if there was none.</summary>
         public static string LastWarning;
 
         public static void CopyOver(string from, string to) => SetupCore.CopyOver(from, to);
 
         /// <summary>
-        /// Pasos comunes después de instalar (ventana, /quiet y /actualizar): copia para Aplicaciones, entrada en Aplicaciones,
-        /// copia en la carpeta de actualizaciones (actual + anterior) y papelera para instaladores viejos que quedaron en Descargas
-        /// o en el Escritorio. Devuelve qué se mandó a la papelera.
+        /// Common steps after installing (window, /quiet and /actualizar): copy for Apps, entry in Apps,
+        /// copy in the updates folder (current + previous) and Recycle Bin for old installers left in Downloads
+        /// or on the Desktop. Returns what was sent to the Recycle Bin.
         /// </summary>
         public static List<string> AfterInstall(SetupCore core, SetupPaths p, InstalledInfo before, IEnumerable<string> extraFolders = null)
         {
             var self = Assembly.GetExecutingAssembly().Location;
             var prev = before != null && before.ProductVersion != ProductVersion ? before.ProductVersion : before?.Previous;
-            // Primera vez con actualizador: la copia de Aplicaciones aún es la versión anterior; se guarda para poder volver.
+            // First time with the updater: the Apps copy is still the previous version; it is kept so we can go back.
             try
             {
                 if (prev != null && !File.Exists(p.CachedSetup(prev)) && File.Exists(p.SetupCopy) &&
@@ -212,9 +212,9 @@ namespace Bimbridge.Setup
             }
             catch (Exception) { }
             LastWarning = null;
-            // La instalación ya terminó: si la copia para Aplicaciones falla, se avisa y no se da por fallida la instalación.
+            // The install already finished: if the copy for Apps fails, we warn and do not mark the install as failed.
             try { KeepSetupCopy(p); }
-            catch (Exception e) { LastWarning = "No se pudo renovar la copia del instalador en " + p.SetupCopy + ": " + e.Message; }
+            catch (Exception e) { LastWarning = "Could not renew the installer copy at " + p.SetupCopy + ": " + e.Message; }
             RegisterUninstall(p);
             var recycled = new List<string>();
             try
@@ -228,7 +228,7 @@ namespace Bimbridge.Setup
             return recycled;
         }
 
-        /// <summary>A la papelera de reciclaje (se puede recuperar), nunca borrado definitivo. Carpetas incluidas.</summary>
+        /// <summary>To the Recycle Bin (recoverable), never permanently deleted. Folders included.</summary>
         public static bool Recycle(string path)
         {
             try
@@ -236,7 +236,7 @@ namespace Bimbridge.Setup
                 if (File.Exists(path))
                     Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
                 else return false;
-                // Si quedó vacía la carpeta que dejó "Extraer todo" (Bimbridge.Setup_0.2.1\), también se recicla.
+                // If the folder left by "Extract all" (Bimbridge.Setup_0.2.1\) is now empty, it is recycled too.
                 var dir = Path.GetDirectoryName(path);
                 if (dir != null && Path.GetFileName(dir).StartsWith(Updates.Prefix, StringComparison.OrdinalIgnoreCase) && !Directory.EnumerateFileSystemEntries(dir).Any())
                     Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(dir, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
@@ -245,7 +245,7 @@ namespace Bimbridge.Setup
             catch (Exception) { return false; }
         }
 
-        /// <summary>El .exe no se puede borrar a sí mismo mientras corre: se borra unos segundos después de cerrar.</summary>
+        /// <summary>The .exe cannot delete itself while running: it is deleted a few seconds after it closes.</summary>
         public static void DeleteSetupCopyLater(SetupPaths p)
         {
             try
@@ -258,7 +258,7 @@ namespace Bimbridge.Setup
         }
     }
 
-    /// <summary>Modo /quiet para IT (Intune, SCCM, script de inicio de sesión).</summary>
+    /// <summary>/quiet mode for IT (Intune, SCCM, logon script).</summary>
     internal static class Quiet
     {
         public static int Run(CommandLine c)
@@ -269,7 +269,7 @@ namespace Bimbridge.Setup
             {
                 if (c.Diagnose)
                 {
-                    // 0.6.0: diagnóstico compacto (instalada / cargada / puente / hashes / reinicio pendiente). Sólo lee.
+                    // 0.6.0: compact diagnostics (installed / loaded / bridge / hashes / restart pending). Read-only.
                     var text = Bimbridge.Protocol.Json.Write(core.Diagnose());
                     Directory.CreateDirectory(paths.Home);
                     File.WriteAllText(Path.Combine(paths.Home, "diagnostico.json"), text);
@@ -279,7 +279,7 @@ namespace Bimbridge.Setup
                 if (c.Restore) return Restore(c, paths);
                 if (c.Update) return Update(c, paths, core);
                 if (c.ApplyPending) return ApplyPending(paths, core);
-                if (Platform.RevitRunning() && c.Uninstall) { Console.Error.WriteLine("Revit está abierto."); return 2; }
+                if (Platform.RevitRunning() && c.Uninstall) { Console.Error.WriteLine("Revit is open."); return 2; }
                 if (c.Uninstall)
                 {
                     Platform.MigrateLegacyData(paths, Console.WriteLine);
@@ -292,19 +292,19 @@ namespace Bimbridge.Setup
                 }
                 using var installation = Platform.LockInstallation(paths);
                 var before = core.ReadInstalled();
-                // 0.6.0: sin revit=/niveles= se conservan la elección y los permisos de la instalación anterior (p. ej. RPW).
+                // 0.6.0: without revit=/niveles= the choice and permissions of the previous install are kept (e.g. RPW).
                 var versions = c.Versions ?? (before != null && before.Versions.Count > 0 ? before.Versions.ToArray() : core.DetectRevit().Where(r => r.Installed).Select(r => r.Version).ToArray());
-                if (versions.Length == 0) { Console.Error.WriteLine("No se encontró Revit 2022-2027."); return 1; }
-                // Nunca sobre una instalación existente sin pedirlo; podría ser la de trabajo.
+                if (versions.Length == 0) { Console.Error.WriteLine("Revit 2022-2027 not found."); return 1; }
+                // Never over an existing install unless asked; it could be the production one.
                 var conflicts = core.DetectConflicts(Platform.ProductVersion);
                 if (conflicts.Count > 0 && !c.Replace)
                 {
-                    Console.Error.WriteLine("No se instaló nada: " + string.Join("; ", conflicts) + ". Si este perfil es de laboratorio y quiere reemplazarla, repita con /reemplazar (se crea un respaldo).");
+                    Console.Error.WriteLine("Nothing was installed: " + string.Join("; ", conflicts) + ". If this is a lab profile and you want to replace it, repeat with /reemplazar (a backup is created).");
                     return 5;
                 }
                 if (Platform.RevitRunning())
-                    Report(paths, Platform.WaitingForRevit, "Instalación pendiente. Cierre todas las ventanas de Revit para aplicarla.");
-                if (!Platform.WaitForRevitExit()) return Report(paths, 2, "La espera terminó con Revit abierto.");
+                    Report(paths, Platform.WaitingForRevit, "Install pending. Close all Revit windows to apply it.");
+                if (!Platform.WaitForRevitExit()) return Report(paths, 2, "The wait ended with Revit still open.");
                 Platform.MigrateLegacyData(paths, Console.WriteLine);
                 using (var zip = new System.IO.Compression.ZipArchive(Platform.OpenPayload()))
                     core.Install(zip, new InstallOptions { Versions = versions.ToList(), Levels = c.Levels ?? before?.Levels ?? "R", Codex = c.Codex || (before?.Codex ?? false), AllowInUse = true, RequireManifest = true }, Platform.ProductVersion);
@@ -315,9 +315,9 @@ namespace Bimbridge.Setup
                     if (claude != null) Platform.RegisterClaude(claude, paths.BridgeExe, out _);
                 }
                 Platform.AfterInstall(core, paths, before);
-                if (Platform.LastWarning != null) Console.Error.WriteLine("Aviso: " + Platform.LastWarning);
-                if (core.ReplacedInUse > 0) Console.WriteLine("Revit o una conversación de la IA estaba abierta: lo nuevo entra al reiniciarlos.");
-                return Report(paths, 0, "Instalada la versión " + Platform.ProductVersion + ".");
+                if (Platform.LastWarning != null) Console.Error.WriteLine("Warning: " + Platform.LastWarning);
+                if (core.ReplacedInUse > 0) Console.WriteLine("Revit or an AI conversation was open: the new version takes effect when they restart.");
+                return Report(paths, 0, "Installed version " + Platform.ProductVersion + ".");
             }
             catch (Exception ex)
             {
@@ -327,49 +327,49 @@ namespace Bimbridge.Setup
 
         private static int Restore(CommandLine c, SetupPaths paths)
         {
-            if (Platform.RevitRunning() && !SetupPaths.IsSandbox) { Console.Error.WriteLine("Revit está abierto: ciérrelo antes de restaurar."); return 2; }
+            if (Platform.RevitRunning() && !SetupPaths.IsSandbox) { Console.Error.WriteLine("Revit is open: close it before restoring."); return 2; }
             var dir = c.RestoreFrom ?? InstallBackup.Latest(paths);
-            if (dir == null) { Console.Error.WriteLine("No hay ningún respaldo de instalación."); return 1; }
+            if (dir == null) { Console.Error.WriteLine("There is no install backup."); return 1; }
             var undo = InstallBackup.Restore(paths, dir, DateTime.UtcNow);
             if (!SetupPaths.IsSandbox && !File.Exists(paths.InstallRecord)) { Platform.UnregisterClaude(); Platform.UnregisterUninstall(); }
-            Console.WriteLine("Restaurado desde " + dir);
-            Console.WriteLine("Para deshacer: /restaurar=\"" + undo + "\"");
+            Console.WriteLine("Restored from " + dir);
+            Console.WriteLine("To undo: /restaurar=\"" + undo + "\"");
             return 0;
         }
 
         /// <summary>
-        /// /actualizar: lo lanza el botón Actualizar de la cinta. Usa las mismas opciones de la instalación anterior
-        /// (versiones de Revit, permisos, Codex) y espera al cierre de Revit cuando está abierto.
-        /// Códigos: 0 bien, 1 error, 3 no hay instalación previa, 4 ya hay una versión igual o más nueva.
-        /// El resultado queda en actualizaciones\ultima.txt para que la cinta lo muestre.
+        /// /actualizar: launched by the ribbon Update button. Uses the same options as the previous install
+        /// (Revit versions, permissions, Codex) and waits for Revit to close when it is open.
+        /// Codes: 0 ok, 1 error, 3 no previous install, 4 the same or a newer version is already installed.
+        /// The result is left in actualizaciones\ultima.txt for the ribbon to show.
         /// </summary>
         private static int Update(CommandLine c, SetupPaths paths, SetupCore core)
         {
             using var installation = Platform.LockInstallation(paths);
             if (Platform.RevitRunning())
-                Report(paths, Platform.WaitingForRevit, "Actualización pendiente. Cierre todas las ventanas de Revit para aplicarla. Abra Revit después de que termine la instalación.");
-            if (!Platform.WaitForRevitExit()) return Report(paths, 2, "La espera terminó con Revit abierto.");
+                Report(paths, Platform.WaitingForRevit, "Update pending. Close all Revit windows to apply it. Open Revit after the install finishes.");
+            if (!Platform.WaitForRevitExit()) return Report(paths, 2, "The wait ended with Revit still open.");
             Platform.MigrateLegacyData(paths, Console.WriteLine);
             var before = core.ReadInstalled();
-            if (before == null || before.Versions.Count == 0) return Report(paths, 3, "No hay una instalación previa: use el instalador normal.");
+            if (before == null || before.Versions.Count == 0) return Report(paths, 3, "There is no previous install: use the normal installer.");
             var mine = Updates.Parse(Platform.ProductVersion);
             var installed = Updates.Parse(before.ProductVersion);
             if (installed != null && mine <= installed && !c.AllowOlder)
-                return Report(paths, 4, "Ya está instalada la versión " + before.ProductVersion + ".");
+                return Report(paths, 4, "Version " + before.ProductVersion + " is already installed.");
             using (var zip = new System.IO.Compression.ZipArchive(Platform.OpenPayload()))
                 core.Install(zip, new InstallOptions { Versions = before.Versions, Levels = before.Levels ?? "R", Codex = before.Codex, AllowInUse = true, RequireManifest = true }, Platform.ProductVersion);
             Platform.RemoveLegacyInstall(paths, Console.WriteLine, true);
             var recycled = Platform.AfterInstall(core, paths, before);
-            var msg = "Instalada la versión " + Platform.ProductVersion + " (antes " + before.ProductVersion + ")." +
-                      (core.ReplacedInUse > 0 ? " " + core.ReplacedInUse + " archivo(s) estaban en uso: la versión nueva se carga al reiniciar Revit y la conversación de la IA; hasta entonces sigue la anterior." : "") +
-                      (recycled.Count > 0 ? " Instaladores viejos enviados a la papelera: " + recycled.Count + "." : "") +
-                      (Platform.LastWarning != null ? " Aviso: " + Platform.LastWarning : "");
+            var msg = "Installed version " + Platform.ProductVersion + " (previously " + before.ProductVersion + ")." +
+                      (core.ReplacedInUse > 0 ? " " + core.ReplacedInUse + " file(s) were in use: the new version loads when Revit and the AI conversation restart; until then the previous one keeps running." : "") +
+                      (recycled.Count > 0 ? " Old installers sent to the Recycle Bin: " + recycled.Count + "." : "") +
+                      (Platform.LastWarning != null ? " Warning: " + Platform.LastWarning : "");
             return Report(paths, 0, msg);
         }
 
         /// <summary>
-        /// 0.8.0: aplica la actualización preparada desde "Actualizar desde ZIP". Espera hasta 24 h a que no quede ningún Revit abierto;
-        /// no cierra ni mata Revit. El instalador preparado se ejecuta como proceso aparte con /actualizar y luego se verifica.
+        /// 0.8.0: applies the update prepared by "Update from ZIP". Waits up to 24 h until no Revit is left open;
+        /// it never closes or kills Revit. The prepared installer runs as a separate process with /actualizar and is then verified.
         /// </summary>
         private static int ApplyPending(SetupPaths paths, SetupCore core)
         {
@@ -390,7 +390,7 @@ namespace Bimbridge.Setup
                 CachedSetup = v => { var f = paths.CachedSetup(v); return File.Exists(f) ? f : null; },
                 Log = Console.WriteLine,
             };
-            // 0.9.0: claves y perfil vigentes (no los de pendiente.json) para re-verificar la procedencia justo antes de instalar.
+            // 0.9.0: current keys and profile (not those in pendiente.json) to re-verify provenance right before installing.
             UpdateConfig.Load(UpdateConfig.DefaultPath, out var keys, out var policy);
             host.Keys = () => keys;
             host.Policy = () => policy;

@@ -17,9 +17,9 @@ namespace BimBridge.PowerEngine.Workflows
     }
 
     /// <summary>
-    /// Grupos y variantes: lleva cada instancia a coordenadas locales (deshace origen, giro y espejo), calcula la firma de sus
-    /// miembros y agrupa instancias idénticas. La variante mayoritaria de cada tipo de grupo es la referencia; el resto se informa
-    /// con lo que falta y lo que sobra. Da además cobertura por tipo de grupo y nivel.
+    /// Groups and variants: brings each instance to local coordinates (undoes origin, rotation and mirror), computes the signature of its
+    /// members and groups identical instances. The majority variant of each group type is the reference; the rest are reported
+    /// with what is missing and what is extra. Also gives coverage per group type and level.
     /// </summary>
     public static class GroupVariants
     {
@@ -54,11 +54,11 @@ namespace BimBridge.PowerEngine.Workflows
             return new Dictionary<string, object>
             {
                 ["grupos"] = (long)groups.Count, ["tipos"] = types,
-                ["nota"] = "La variante mayoritaria es la referencia; no se decide cuál es la correcta: las desviaciones se escalan.",
+                ["nota"] = "The majority variant is the reference; which one is correct is not decided: deviations are escalated.",
             };
         }
 
-        /// <summary>Firma local ordenada: tipo|x|y|giro de cada miembro, en el marco de la instancia (cuantizado a tolFt y 1°).</summary>
+        /// <summary>Sorted local signature: type|x|y|rotation of each member, in the instance frame (quantized to tolFt and 1°).</summary>
         public static string[] Signature(GroupInstance g, double tolFt)
         {
             var c = Math.Cos(-g.RotDeg * Math.PI / 180); var s = Math.Sin(-g.RotDeg * Math.PI / 180);

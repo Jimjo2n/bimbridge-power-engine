@@ -13,25 +13,25 @@ using Microsoft.CodeAnalysis.Emit;
 namespace Bimbridge.Scripting
 {
     /// <summary>
-    /// Compila C# en memoria con Roslyn. API sólo con tipos de la BCL para que el add-in lo llame por reflexión desde otro contexto de carga.
-    /// No ejecuta nada: devuelve el ensamblado (y su PDB) para que el add-in lo cargue y lo corra en el hilo de Revit.
+    /// Compiles C# in memory with Roslyn. The API uses only BCL types so the add-in can call it by reflection from another load context.
+    /// It runs nothing: it returns the assembly (and its PDB) for the add-in to load and run on the Revit thread.
     /// </summary>
     public static class Compiler
     {
         private static readonly ConcurrentDictionary<string, MetadataReference> RefCache = new ConcurrentDictionary<string, MetadataReference>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Versión de Roslyn cargada (para ctx y la matriz).</summary>
+        /// <summary>Loaded Roslyn version (for ctx and the matrix).</summary>
         public static string RoslynVersion => typeof(CSharpCompilation).Assembly.GetName().Version.ToString();
 
         /// <summary>
-        /// Compila <paramref name="source"/>. Devuelve el ensamblado o null si hay errores.
-        /// diagnostics: "error CS0103 l3 c5: mensaje" (líneas del código del usuario gracias a #line). pdb: símbolos portables para trazas con línea.
+        /// Compiles <paramref name="source"/>. Returns the assembly, or null if there are errors.
+        /// diagnostics: "error CS0103 l3 c5: message" (user code lines thanks to #line). pdb: portable symbols for stack traces with line numbers.
         /// </summary>
         public static byte[] Compile(string source, string[] references, string assemblyName, out string[] diagnostics, out byte[] pdb, out long ms)
             => CompileWithCapabilities(source, references, assemblyName, out diagnostics, out pdb, out ms, out _);
 
-        /// <summary>Como Compile, y además devuelve las capacidades sensibles que el código usa ("tipo:detalle"), por análisis semántico.
-        /// Es una política estática, NO un sandbox: el código compilado corre con los permisos del proceso de Revit.</summary>
+        /// <summary>Like Compile, and also returns the sensitive capabilities the code uses ("type:detail"), by semantic analysis.
+        /// It is a static policy, NOT a sandbox: the compiled code runs with the permissions of the Revit process.</summary>
         public static byte[] CompileWithCapabilities(string source, string[] references, string assemblyName, out string[] diagnostics, out byte[] pdb, out long ms, out string[] capabilities)
         {
             capabilities = new string[0];
@@ -51,7 +51,7 @@ namespace Bimbridge.Scripting
                 nullableContextOptions: NullableContextOptions.Disable,
                 specificDiagnosticOptions: new Dictionary<string, ReportDiagnostic>
                 {
-                    // referencias a versiones distintas del mismo ensamblado: Roslyn unifica, no es un error del usuario
+                    // references to different versions of the same assembly: Roslyn unifies them, not a user error
                     ["CS1701"] = ReportDiagnostic.Suppress,
                     ["CS1702"] = ReportDiagnostic.Suppress,
                     ["CS1705"] = ReportDiagnostic.Warn,
@@ -66,7 +66,7 @@ namespace Bimbridge.Scripting
                     .OrderByDescending(d => d.Severity)
                     .Take(40)
                     .Select(Format)
-                    .Concat(skipped.Count > 0 ? new[] { "aviso: referencias no legibles omitidas: " + string.Join(", ", skipped.Take(10)) } : new string[0])
+                    .Concat(skipped.Count > 0 ? new[] { "warning: unreadable references skipped: " + string.Join(", ", skipped.Take(10)) } : new string[0])
                     .ToArray();
                 ms = sw.ElapsedMilliseconds;
                 if (!result.Success) { pdb = null; return null; }
@@ -76,7 +76,7 @@ namespace Bimbridge.Scripting
             }
         }
 
-        // tipo (prefijo de nombre completo) → capacidad. Miembro "*" = cualquier miembro.
+        // type (full-name prefix) → capability. Member "*" = any member.
         private static readonly (string type, string member, string cap)[] Rules =
         {
             ("System.Diagnostics.Process", "*", "proceso"),
@@ -124,8 +124,8 @@ namespace Bimbridge.Scripting
             ("Autodesk.Revit.ApplicationServices.Application", "OpenDocumentFile", "revit_abrir"),
             ("Autodesk.Revit.UI.UIDocument", "SaveAndClose", "revit_cerrar"),
             ("Autodesk.Revit.DB.WorksharingUtils", "*", "revit_sync"),
-            // rc3: las transacciones son del motor. Código autónomo que abre las suyas (o encola comandos de la UI) podría escribir
-            // fuera de Ejecutar o fuera de la auditoría: siempre denegado en el perfil restringido.
+            // rc3: transactions belong to the engine. Standalone code that opens its own (or queues UI commands) could write
+            // outside Ejecutar or outside the audit: always denied in the restricted profile.
             ("Autodesk.Revit.DB.Transaction", "*", "revit_transaccion"), ("Autodesk.Revit.DB.SubTransaction", "*", "revit_transaccion"),
             ("Autodesk.Revit.DB.TransactionGroup", "*", "revit_transaccion"), ("Autodesk.Revit.UI.UIApplication", "PostCommand", "revit_transaccion"),
             ("System.Runtime.CompilerServices.ModuleInitializerAttribute", "*", "reflexion"),
@@ -164,11 +164,11 @@ namespace Bimbridge.Scripting
         {
             var span = d.Location.GetMappedLineSpan();
             var where = span.IsValid ? " l" + (span.StartLinePosition.Line + 1) + " c" + (span.StartLinePosition.Character + 1) : "";
-            var sev = d.Severity == DiagnosticSeverity.Error ? "error" : "aviso";
+            var sev = d.Severity == DiagnosticSeverity.Error ? "error" : "warning";
             return sev + " " + d.Id + where + ": " + d.GetMessage(System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        /// <summary>Referencia de metadatos en caché (leer RevitAPI.dll cuesta cientos de ms la primera vez). null si no es un ensamblado .NET.</summary>
+        /// <summary>Cached metadata reference (reading RevitAPI.dll costs hundreds of ms the first time). null if it is not a .NET assembly.</summary>
         private static MetadataReference Reference(string path)
         {
             if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
@@ -177,8 +177,8 @@ namespace Bimbridge.Scripting
             try
             {
                 var md = AssemblyMetadata.CreateFromFile(path);
-                var mods = md.GetModules(); // fuerza la lectura: un DLL nativo falla aquí y se omite
-                // Un módulo sin manifiesto de ensamblado (p. ej. System.EnterpriseServices.Wrapper.dll) rompe la compilación con CS1509: se omite.
+                var mods = md.GetModules(); // forces the read: a native DLL fails here and is skipped
+                // A module without an assembly manifest (e.g. System.EnterpriseServices.Wrapper.dll) breaks compilation with CS1509: skipped.
                 if (mods.Length == 0 || !mods[0].GetMetadataReader().IsAssembly) return null;
                 var r = md.GetReference(filePath: path);
                 RefCache[stamp] = r;
@@ -190,7 +190,7 @@ namespace Bimbridge.Scripting
             }
         }
 
-        /// <summary>Compila algo trivial para cargar Roslyn y dejarlo en caliente (el primer exec real tarda menos).</summary>
+        /// <summary>Compiles something trivial to load Roslyn and keep it warm (the first real exec is faster).</summary>
         public static long Warm(string[] references)
         {
             Compile("public static class W { public static object Run() { return 1; } }", references, "BimbridgeWarm", out _, out _, out var ms);

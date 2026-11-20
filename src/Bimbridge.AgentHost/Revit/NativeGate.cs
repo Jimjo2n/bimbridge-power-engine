@@ -5,9 +5,9 @@ using System.Linq;
 namespace Bimbridge.AgentHost
 {
     /// <summary>
-    /// rc1: compuerta de pruebas nativas. Ningún comando que conecte con Revit (revit …, ejecutar --revit-pid) corre sin que el OPERADOR
-    /// declare en la misma invocación que Revit está disponible: variable BIMBRIDGE_REVIT_NATIVE=AUTORIZADO y bandera --revit-disponible.
-    /// Sin ambas, el comando no abre tuberías ni lee descriptores: informa el estado bloqueado y termina con código 3.
+    /// rc1: native test gate. No command that connects to Revit (revit …, ejecutar --revit-pid) runs unless the OPERATOR
+    /// declares in the same invocation that Revit is available: variable BIMBRIDGE_REVIT_NATIVE=AUTORIZADO and flag --revit-disponible.
+    /// Without both, the command opens no pipes and reads no descriptors: it reports the blocked state and exits with code 3.
     /// </summary>
     public static class NativeGate
     {
@@ -20,12 +20,12 @@ namespace Bimbridge.AgentHost
             return string.Equals(env(EnvVar), EnvValue, StringComparison.Ordinal) && args.Contains(Flag);
         }
 
-        /// <summary>Devuelve null si se puede continuar; si no, escribe el estado bloqueado y devuelve el código de salida (3).</summary>
+        /// <summary>Returns null if it may continue; otherwise writes the blocked state and returns the exit code (3).</summary>
         public static int? Check(string[] args, Func<string, string> env = null)
         {
             if (Open(args, env)) return null;
             Console.WriteLine(Blocked);
-            Console.WriteLine("(para la campaña autorizada: " + EnvVar + "=" + EnvValue + " y " + Flag + ")");
+            Console.WriteLine("(for the authorized campaign: " + EnvVar + "=" + EnvValue + " and " + Flag + ")");
             return 3;
         }
     }

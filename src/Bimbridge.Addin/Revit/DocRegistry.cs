@@ -12,10 +12,10 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// Identidad de documentos abiertos (R005, R007, A06, A25). Cada proyecto o familia abierto recibe un handle corto dN
-    /// que vale mientras siga abierto en este Revit; la instancia se identifica con pid + hora de arranque.
-    /// Dos RFA sin guardar con el mismo título tienen handles distintos (se comparan los objetos Document, no el título).
-    /// Mantiene además una copia de sólo lectura (handle, clave, título, tipo, activo) para resolver el destino fuera del hilo de Revit.
+    /// Identity of open documents (R005, R007, A06, A25). Each open project or family gets a short handle dN
+    /// that is valid while it stays open in this Revit; the instance is identified by pid + start time.
+    /// Two unsaved RFAs with the same title get different handles (Document objects are compared, not the title).
+    /// Also keeps a read-only copy (handle, key, title, kind, active) to resolve the target outside the Revit thread.
     /// </summary>
     public sealed class DocRegistry
     {
@@ -29,7 +29,7 @@ namespace Bimbridge.Addin.Revit
             public string Path;
             public string Kind;
             public bool Active;
-            /// <summary>Huella del modelo (ver <see cref="Engine.DocIdentity"/>).</summary>
+            /// <summary>Model fingerprint (see <see cref="Engine.DocIdentity"/>).</summary>
             public string Print;
             public string Generation;
         }
@@ -47,7 +47,7 @@ namespace Bimbridge.Addin.Revit
         private int _next;
         private volatile List<Info> _snapshot = new List<Info>();
 
-        /// <summary>pid.horaDeArranque: dos Revit (o el mismo reiniciado) nunca comparten instancia.</summary>
+        /// <summary>pid.startTime: two Revits (or the same one restarted) never share an instance.</summary>
         public readonly string InstanceId;
 
         private DocRegistry()
@@ -58,7 +58,7 @@ namespace Bimbridge.Addin.Revit
 
         public static string KindOf(Document doc) => doc == null ? null : doc.IsFamilyDocument ? "familia" : "proyecto";
 
-        /// <summary>Handle del documento (lo crea si es nuevo). Sólo en el hilo de Revit.</summary>
+        /// <summary>Document handle (created if new). Revit thread only.</summary>
         public string IdOf(Document doc)
         {
             if (doc == null) return null;
@@ -74,7 +74,7 @@ namespace Bimbridge.Addin.Revit
             }
         }
 
-        /// <summary>Identidad duradera del documento (clave, huella, generación). Sólo en el hilo de Revit.</summary>
+        /// <summary>Durable document identity (key, fingerprint, generation). Revit thread only.</summary>
         public Engine.DocIdentity IdentityOf(Document doc)
         {
             if (doc == null) return null;
@@ -83,8 +83,8 @@ namespace Bimbridge.Addin.Revit
         }
 
         /// <summary>
-        /// Recalcula la identidad tras Guardar como (la ruta cambió). Devuelve (anterior, nueva) si cambió la clave, para que el diario
-        /// traslade las operaciones del documento anterior al nuevo.
+        /// Recomputes the identity after Save As (the path changed). Returns (old, new) if the key changed, so the journal
+        /// moves the operations from the old document to the new one.
         /// </summary>
         public Tuple<string, string> Reidentify(Document doc)
         {
@@ -120,7 +120,7 @@ namespace Bimbridge.Addin.Revit
             return Engine.DocIdentity.File(doc.PathName, PrintOf(doc), gen);
         }
 
-        /// <summary>Huella interna del modelo: no cambia al mover el archivo, sí si en esa ruta hay otro modelo.</summary>
+        /// <summary>Internal model fingerprint: does not change when the file is moved, does if another model is at that path.</summary>
         private static string PrintOf(Document doc)
         {
             try
@@ -156,7 +156,7 @@ namespace Bimbridge.Addin.Revit
             catch (Exception) { return false; }
         }
 
-        /// <summary>Documento por handle, si sigue abierto. Sólo en el hilo de Revit.</summary>
+        /// <summary>Document by handle, if still open. Revit thread only.</summary>
         public Document Resolve(UIApplication app, string id)
         {
             if (string.IsNullOrEmpty(id)) return null;
@@ -168,7 +168,7 @@ namespace Bimbridge.Addin.Revit
             return null;
         }
 
-        /// <summary>Quita el documento que se cierra. Devuelve su handle (para invalidar conjuntos y planes).</summary>
+        /// <summary>Removes the closing document. Returns its handle (to invalidate sets and plans).</summary>
         public string Forget(Document doc)
         {
             lock (_lock)
@@ -182,7 +182,7 @@ namespace Bimbridge.Addin.Revit
             }
         }
 
-        /// <summary>Recalcula la copia de sólo lectura con los documentos abiertos (hilo de Revit: eventos y ctx).</summary>
+        /// <summary>Recomputes the read-only copy with the open documents (Revit thread: events and ctx).</summary>
         public List<Info> Refresh(UIApplication app, Document activeHint = null)
         {
             var list = new List<Info>();
@@ -200,7 +200,7 @@ namespace Bimbridge.Addin.Revit
             return list;
         }
 
-        /// <summary>Actualiza sólo cuál está activo (ViewActivated): no recorre documentos.</summary>
+        /// <summary>Updates only which one is active (ViewActivated): does not scan documents.</summary>
         public void SetActive(Document doc)
         {
             if (doc == null) return;
@@ -210,7 +210,7 @@ namespace Bimbridge.Addin.Revit
             _snapshot = snap;
         }
 
-        /// <summary>Añade a la copia un documento recién abierto o creado (sin cambiar cuál está activo).</summary>
+        /// <summary>Adds a newly opened or created document to the copy (without changing which one is active).</summary>
         public void Touch(Document doc)
         {
             if (doc == null || doc.IsLinked) return;
@@ -220,17 +220,17 @@ namespace Bimbridge.Addin.Revit
             _snapshot = snap;
         }
 
-        /// <summary>Copia de sólo lectura (cualquier hilo).</summary>
+        /// <summary>Read-only copy (any thread).</summary>
         public List<Info> Snapshot => _snapshot;
 
         public Info Active => _snapshot.FirstOrDefault(i => i.Active);
 
         /// <summary>
-        /// Resuelve lo que pidió la IA (dN, ruta o título) fuera del hilo de Revit. null + error si no existe o es ambiguo.
+        /// Resolves what the AI asked for (dN, path or title) outside the Revit thread. null + error if it does not exist or is ambiguous.
         /// </summary>
         public Info Find(string requested, out string error) => Find(requested, out error, out _);
 
-        /// <summary>Como Find; <paramref name="ambiguous"/> = true cuando varias coincidencias impiden elegir (se listan, no se elige la primera).</summary>
+        /// <summary>Like Find; <paramref name="ambiguous"/> = true when several matches prevent choosing (they are listed, the first is not picked).</summary>
         public Info Find(string requested, out string error, out bool ambiguous)
         {
             var snap = _snapshot;
@@ -245,9 +245,9 @@ namespace Bimbridge.Addin.Revit
     }
 
     /// <summary>
-    /// Destino de una petición: se decide UNA vez al recibirla (el activo en ese momento, o el pedido con doc=) y se mantiene fijo
-    /// en todos los tramos (F04). Si el documento se cierra a mitad, la petición falla con destino_no_disponible; nunca se pasa a otro.
-    /// Viaja con la petición por AsyncLocal y los ejecutores lo leen con <see cref="Current"/> dentro del hilo de Revit.
+    /// Target of a request: decided ONCE when it is received (the active one at that moment, or the one asked for with doc=) and kept fixed
+    /// across all slices (F04). If the document closes midway, the request fails with destino_no_disponible; it never moves to another one.
+    /// It travels with the request via AsyncLocal and runners read it with <see cref="Current"/> inside the Revit thread.
     /// </summary>
     public sealed class DocTarget
     {
@@ -257,14 +257,14 @@ namespace Bimbridge.Addin.Revit
         public string Kind;
         public string Print;
         public string Generation;
-        /// <summary>true si la IA lo pidió con doc=; false = el activo al recibir la petición.</summary>
+        /// <summary>true if the AI asked for it with doc=; false = the active one when the request was received.</summary>
         public bool Explicit;
         private Document _pinned;
 
         internal static readonly AsyncLocal<DocTarget> Ambient = new AsyncLocal<DocTarget>();
         [ThreadStatic] private static DocTarget _current;
 
-        /// <summary>El destino de la petición que corre ahora en el hilo de Revit (null = comportamiento anterior: el activo).</summary>
+        /// <summary>The target of the request now running on the Revit thread (null = previous behavior: the active one).</summary>
         public static DocTarget Current => _current;
 
         internal static IDisposable Enter(DocTarget t)
@@ -284,7 +284,7 @@ namespace Bimbridge.Addin.Revit
         public static DocTarget From(DocRegistry.Info i, bool explicitly) =>
             i == null ? null : new DocTarget { Id = i.Id, Key = i.Key, Title = i.Title, Kind = i.Kind, Print = i.Print, Generation = i.Generation, Explicit = explicitly };
 
-        /// <summary>Documento fijado (hilo de Revit). null si ya no está abierto; motivo en <paramref name="error"/>.</summary>
+        /// <summary>Pinned document (Revit thread). null if it is no longer open; reason in <paramref name="error"/>.</summary>
         public Document Get(UIApplication app, out string error)
         {
             error = null;
@@ -292,13 +292,13 @@ namespace Bimbridge.Addin.Revit
             {
                 try { if (_pinned.IsValidObject) return _pinned; } catch (Exception) { }
                 _pinned = null;
-                error = Status.DestinoNoDisponible + ": el documento " + Id + " (" + Title + ") se cerró durante la petición; no se continúa en otro";
+                error = Status.DestinoNoDisponible + ": document " + Id + " (" + Title + ") was closed during the request; not continuing on another one";
                 return null;
             }
             var d = DocRegistry.Instance.Resolve(app, Id);
             if (d == null)
             {
-                error = Status.DestinoNoDisponible + ": el documento " + Id + " (" + Title + ") ya no está abierto; use docs para ver los abiertos";
+                error = Status.DestinoNoDisponible + ": document " + Id + " (" + Title + ") is no longer open; use docs to see the open ones";
                 return null;
             }
             _pinned = d;
@@ -306,7 +306,7 @@ namespace Bimbridge.Addin.Revit
         }
 
         /// <summary>
-        /// Lo que usan los ejecutores en lugar de app.ActiveUIDocument.Document: el destino fijado si lo hay; si no, el activo.
+        /// What runners use instead of app.ActiveUIDocument.Document: the pinned target if any; otherwise, the active one.
         /// </summary>
         public static Document Resolve(UIApplication app, out string error)
         {
@@ -314,13 +314,13 @@ namespace Bimbridge.Addin.Revit
             var t = _current;
             if (t != null) return t.Get(app, out error);
             var doc = app.ActiveUIDocument?.Document;
-            if (doc == null) error = "No hay ningún documento activo en Revit.";
+            if (doc == null) error = "There is no active document in Revit.";
             return doc;
         }
 
         public static Document Resolve(UIApplication app) => Resolve(app, out _);
 
-        /// <summary>UIDocument del destino sólo si es el activo (capturas, selección): la interfaz sólo existe para el activo.</summary>
+        /// <summary>UIDocument of the target only if it is the active one (captures, selection): the UI only exists for the active one.</summary>
         public static UIDocument ActiveUi(UIApplication app, out string error)
         {
             error = null;
@@ -331,7 +331,7 @@ namespace Bimbridge.Addin.Revit
             if (d == null) return null;
             if (uidoc == null || !uidoc.Document.Equals(d))
             {
-                error = Status.NoSoportado + ": esta orden usa la interfaz de Revit y " + t.Id + " (" + t.Title + ") no es el documento activo; pida al usuario que lo active";
+                error = Status.NoSoportado + ": this command uses the Revit UI and " + t.Id + " (" + t.Title + ") is not the active document; ask the user to activate it";
                 return null;
             }
             return uidoc;

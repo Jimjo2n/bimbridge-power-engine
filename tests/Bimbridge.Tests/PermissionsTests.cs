@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.8.0: permisos separados (leer, modificar proyecto/familia, cargar archivo, guardar, sincronizar, exportar, publicar, código dinámico, interfaz).</summary>
+    /// <summary>0.8.0: separate permissions (read, modify project/family, load file, save, sync, export, publish, dynamic code, ui).</summary>
     public class PermissionsTests
     {
         private static Dictionary<string, object> A(params (string k, object v)[] kv) { var d = new Dictionary<string, object>(); foreach (var (k, v) in kv) d[k] = v; return d; }
@@ -35,11 +35,11 @@ namespace Bimbridge.Tests
         {
             var eff = Permissions.Effective(new List<string> { "leer", "modificar_proyecto", "publicar" }, "RPW");
             Assert.Null(Permissions.Deny(Permissions.ModifyProject, eff));
-            Assert.NotNull(Permissions.Deny(Permissions.DynamicCode, eff));   // W en niveles, pero la lista explícita no lo da
+            Assert.NotNull(Permissions.Deny(Permissions.DynamicCode, eff));   // W in levels, but the explicit list does not grant it
             Assert.NotNull(Permissions.Deny(Permissions.Sync, eff));
             Assert.NotNull(Permissions.Deny(Permissions.Export, eff));
-            Assert.Contains("no está soportado", Permissions.Deny(Permissions.Publish, eff));
-            Assert.Contains("no está soportado", Permissions.Deny(Permissions.Publish, Permissions.Effective(null, "RPWD")));
+            Assert.Contains("is not supported", Permissions.Deny(Permissions.Publish, eff));
+            Assert.Contains("is not supported", Permissions.Deny(Permissions.Publish, Permissions.Effective(null, "RPWD")));
         }
 
         [Fact]
@@ -50,7 +50,7 @@ namespace Bimbridge.Tests
             Assert.NotNull(Permissions.Deny(Permissions.ModifyProject, r));
             Assert.NotNull(Permissions.Deny(Permissions.DynamicCode, r));
             var rp = Permissions.Effective(null, "RP");
-            Assert.Null(Permissions.Deny(Permissions.ModifyProject, rp));      // llega a la cola retenida, como antes
+            Assert.Null(Permissions.Deny(Permissions.ModifyProject, rp));      // reaches the held queue, as before
             Assert.NotNull(Permissions.Deny(Permissions.DynamicCode, rp));
             Assert.NotNull(Permissions.Deny(Permissions.Save, rp));
             var rd = Permissions.Effective(null, "RD");

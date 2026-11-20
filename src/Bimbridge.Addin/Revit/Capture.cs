@@ -12,11 +12,11 @@ using Bimbridge.Addin.Revit.Writes;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// Captura de una vista como imagen para que la IA la vea (percepción del lienzo de Revit).
-    /// Sin cambios: exporta la vista tal cual (ExportImage nativo, sin tocar la pantalla del usuario).
-    /// Con resaltado, colores por categoría o encuadre: aplica sobrescrituras/recorte DENTRO de un grupo de transacciones,
-    /// exporta y revierte el grupo entero en el mismo tramo. El modelo queda idéntico, no aparece en Deshacer
-    /// y el registro de cambios lo ignora (prefijo "BIMBRIDGE temporal").
+    /// Captures a view as an image so the AI can see it (perception of the Revit canvas).
+    /// Without changes: exports the view as is (native ExportImage, without touching the user's screen).
+    /// With highlighting, colors by category or framing: applies overrides/crop INSIDE a transaction group,
+    /// exports and rolls back the whole group in the same slice. The model stays identical, does not appear in Undo
+    /// and the change log ignores it (prefix "BIMBRIDGE temporal").
     /// </summary>
     public sealed class Capture
     {
@@ -44,32 +44,32 @@ namespace Bimbridge.Addin.Revit
 
         public static string Folder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bimbridge", "capturas");
 
-        // Paleta pensada para distinguir lo que más se confunde en planos eléctricos (luminarias vs. tomas vs. interruptores).
+        // Palette meant to tell apart what is most often confused on electrical plans (fixtures vs. receptacles vs. switches).
         private static readonly Dictionary<BuiltInCategory, (byte r, byte g, byte b, string name)> Palette = new Dictionary<BuiltInCategory, (byte, byte, byte, string)>
         {
-            [BuiltInCategory.OST_LightingFixtures] = (255, 140, 0, "naranja"),
-            [BuiltInCategory.OST_LightingDevices] = (0, 160, 0, "verde"),
-            [BuiltInCategory.OST_ElectricalFixtures] = (0, 90, 255, "azul"),
+            [BuiltInCategory.OST_LightingFixtures] = (255, 140, 0, "orange"),
+            [BuiltInCategory.OST_LightingDevices] = (0, 160, 0, "green"),
+            [BuiltInCategory.OST_ElectricalFixtures] = (0, 90, 255, "blue"),
             [BuiltInCategory.OST_ElectricalEquipment] = (200, 0, 200, "magenta"),
-            [BuiltInCategory.OST_FireAlarmDevices] = (220, 0, 0, "rojo"),
-            [BuiltInCategory.OST_CommunicationDevices] = (0, 170, 190, "cian"),
-            [BuiltInCategory.OST_DataDevices] = (0, 170, 190, "cian"),
-            [BuiltInCategory.OST_TelephoneDevices] = (0, 170, 190, "cian"),
-            [BuiltInCategory.OST_SecurityDevices] = (0, 120, 140, "cian oscuro"),
-            [BuiltInCategory.OST_NurseCallDevices] = (0, 120, 140, "cian oscuro"),
-            [BuiltInCategory.OST_Conduit] = (140, 90, 40, "marrón"),
-            [BuiltInCategory.OST_ConduitFitting] = (140, 90, 40, "marrón"),
-            [BuiltInCategory.OST_CableTray] = (110, 110, 110, "gris"),
-            [BuiltInCategory.OST_CableTrayFitting] = (110, 110, 110, "gris"),
-            [BuiltInCategory.OST_MechanicalEquipment] = (128, 0, 255, "violeta"),
-            [BuiltInCategory.OST_PlumbingFixtures] = (0, 128, 128, "verde azulado"),
-            [BuiltInCategory.OST_Sprinklers] = (255, 0, 128, "rosa"),
+            [BuiltInCategory.OST_FireAlarmDevices] = (220, 0, 0, "red"),
+            [BuiltInCategory.OST_CommunicationDevices] = (0, 170, 190, "cyan"),
+            [BuiltInCategory.OST_DataDevices] = (0, 170, 190, "cyan"),
+            [BuiltInCategory.OST_TelephoneDevices] = (0, 170, 190, "cyan"),
+            [BuiltInCategory.OST_SecurityDevices] = (0, 120, 140, "dark cyan"),
+            [BuiltInCategory.OST_NurseCallDevices] = (0, 120, 140, "dark cyan"),
+            [BuiltInCategory.OST_Conduit] = (140, 90, 40, "brown"),
+            [BuiltInCategory.OST_ConduitFitting] = (140, 90, 40, "brown"),
+            [BuiltInCategory.OST_CableTray] = (110, 110, 110, "gray"),
+            [BuiltInCategory.OST_CableTrayFitting] = (110, 110, 110, "gray"),
+            [BuiltInCategory.OST_MechanicalEquipment] = (128, 0, 255, "violet"),
+            [BuiltInCategory.OST_PlumbingFixtures] = (0, 128, 128, "teal"),
+            [BuiltInCategory.OST_Sprinklers] = (255, 0, 128, "pink"),
         };
 
         private static readonly (byte r, byte g, byte b, string name)[] Extra =
         {
-            (160, 160, 0, "oliva"), (255, 90, 90, "salmón"), (90, 90, 255, "lavanda"), (0, 200, 120, "verde menta"),
-            (180, 100, 0, "ocre"), (100, 0, 160, "púrpura"), (0, 100, 0, "verde oscuro"), (0, 0, 140, "azul marino"),
+            (160, 160, 0, "olive"), (255, 90, 90, "salmon"), (90, 90, 255, "lavender"), (0, 200, 120, "mint green"),
+            (180, 100, 0, "ochre"), (100, 0, 160, "purple"), (0, 100, 0, "dark green"), (0, 0, 140, "navy blue"),
         };
 
         public static readonly Dictionary<string, (byte r, byte g, byte b)> Named = new Dictionary<string, (byte, byte, byte)>(StringComparer.OrdinalIgnoreCase)
@@ -86,15 +86,15 @@ namespace Bimbridge.Addin.Revit
             var total = Stopwatch.StartNew();
             var uidoc = DocTarget.ActiveUi(app, out var uiError);
             var doc = uidoc?.Document;
-            if (doc == null) { Error = uiError ?? "No hay ningún documento activo en Revit."; return true; }
+            if (doc == null) { Error = uiError ?? "There is no active document in Revit."; return true; }
             Rev = tracker.For(doc)?.Rev ?? 0;
 
             var view = ViewId.HasValue ? doc.GetElement(Ids.ToId(ViewId.Value)) as View : uidoc.ActiveView;
-            if (view == null) { Error = "vista " + ViewId + " no existe en este documento (catalog que=vistas)"; return true; }
-            if (view.IsTemplate) { Error = "'" + view.Name + "' es una plantilla de vista: capture una vista que la use"; return true; }
+            if (view == null) { Error = "view " + ViewId + " does not exist in this document (catalog que=vistas)"; return true; }
+            if (view.IsTemplate) { Error = "'" + view.Name + "' is a view template: capture a view that uses it"; return true; }
             bool printable;
             try { printable = view.CanBePrinted; } catch (Exception) { printable = false; }
-            if (!printable) { Error = "'" + view.Name + "' no se puede exportar como imagen (tipo " + view.ViewType + ")"; return true; }
+            if (!printable) { Error = "'" + view.Name + "' cannot be exported as an image (type " + view.ViewType + ")"; return true; }
 
             Info["vista"] = new Dictionary<string, object>
             {
@@ -102,7 +102,7 @@ namespace Bimbridge.Addin.Revit
                 ["escala"] = SafeScale(view),
             };
 
-            // Contenido visible (sólo el modelo propio; los vínculos no se cuentan): ayuda a leer la imagen sin adivinar.
+            // Visible content (own model only; links are not counted): helps read the image without guessing.
             var visible = new Dictionary<long, List<ElementId>>();
             var catOf = new Dictionary<long, Category>();
             var isSheetLike = view is ViewSheet || view.ViewType == ViewType.Schedule || view.ViewType == ViewType.Legend || view.ViewType == ViewType.DraftingView;
@@ -126,7 +126,7 @@ namespace Bimbridge.Addin.Revit
             }
 
             var wantsChanges = Groups.Any(g => g.Ids.Count > 0) || ColorByCategory || (FrameIds != null && FrameIds.Count > 0);
-            var canChange = wantsChanges && CanChange(doc, view, isSheetLike) && Engine.TrialGuard.MayOpenTemporaryGroup(doc.IsModified);   // P0: sin grupo temporal si hay cambios sin guardar
+            var canChange = wantsChanges && CanChange(doc, view, isSheetLike) && Engine.TrialGuard.MayOpenTemporaryGroup(doc.IsModified);   // P0: no temporary group if there are unsaved changes
 
             var dir = Folder;
             Directory.CreateDirectory(dir);
@@ -139,13 +139,13 @@ namespace Bimbridge.Addin.Revit
                 if (canChange)
                 {
                     using (tracker.Suspend())
-                    using (var tg = new TransactionGroup(doc, DocumentTracker.TemporaryPrefix + " captura"))
+                    using (var tg = new TransactionGroup(doc, DocumentTracker.TemporaryPrefix + " capture"))
                     {
                         tg.Start();
                         try
                         {
                             var prep = Stopwatch.StartNew();
-                            using (var t = new Transaction(doc, DocumentTracker.TemporaryPrefix + " captura"))
+                            using (var t = new Transaction(doc, DocumentTracker.TemporaryPrefix + " capture"))
                             {
                                 var fo = t.GetFailureHandlingOptions();
                                 fo.SetFailuresPreprocessor(new Quiet());
@@ -153,7 +153,7 @@ namespace Bimbridge.Addin.Revit
                                 t.SetFailureHandlingOptions(fo);
                                 t.Start();
                                 Apply(doc, view, visible, catOf);
-                                if (t.Commit() != TransactionStatus.Committed) _notes.Add("Revit rechazó el resaltado; se capturó sin él");
+                                if (t.Commit() != TransactionStatus.Committed) _notes.Add("Revit rejected the highlighting; captured without it");
                             }
                             prepMs = prep.ElapsedMilliseconds;
                             var ex = Stopwatch.StartNew();
@@ -165,7 +165,7 @@ namespace Bimbridge.Addin.Revit
                             if (tg.HasStarted() && !tg.HasEnded()) tg.RollBack();
                         }
                     }
-                    Info["temporal"] = "resaltado/encuadre aplicados sólo para la imagen y revertidos (el modelo no cambió)";
+                    Info["temporal"] = "highlighting/framing applied only for the image and rolled back (the model did not change)";
                 }
                 else
                 {
@@ -176,7 +176,7 @@ namespace Bimbridge.Addin.Revit
                 if (Error != null) return true;
 
                 var produced = Directory.GetFiles(tmp).OrderByDescending(f => new FileInfo(f).Length).FirstOrDefault();
-                if (produced == null) { Error = "Revit no generó la imagen (¿la vista está vacía o recortada fuera del modelo?)"; return true; }
+                if (produced == null) { Error = "Revit did not generate the image (is the view empty or cropped outside the model?)"; return true; }
                 var final = Path.Combine(dir, stamp + "_" + Safe(view.Name) + Path.GetExtension(produced).ToLowerInvariant());
                 System.IO.File.Move(produced, final);
                 File = final;
@@ -185,7 +185,7 @@ namespace Bimbridge.Addin.Revit
             }
             catch (Exception ex) when (!(ex is OutOfMemoryException))
             {
-                Error = "No se pudo exportar la imagen: " + ex.Message;
+                Error = "Could not export the image: " + ex.Message;
                 return true;
             }
             finally
@@ -203,8 +203,8 @@ namespace Bimbridge.Addin.Revit
         }
 
         /// <summary>
-        /// Lo que se ve de cada vínculo en esta vista (arquitectura, estructura…), por categoría. Revit 2023+ trae un colector
-        /// "elementos del vínculo visibles en la vista anfitriona"; en 2022 no existe y se indica.
+        /// What is visible of each link in this view (architecture, structure…), by category. Revit 2023+ has a collector
+        /// "link elements visible in the host view"; in 2022 it does not exist and this is reported.
         /// </summary>
         private void LinkContent(Document doc, View view)
         {
@@ -213,7 +213,7 @@ namespace Bimbridge.Addin.Revit
             var sw = Stopwatch.StartNew();
             foreach (var li in new FilteredElementCollector(doc).OfClass(typeof(RevitLinkInstance)).Cast<RevitLinkInstance>())
             {
-                if (sw.ElapsedMilliseconds > 1500) { _notes.Add("contenido de vínculos parcial (más de 1,5 s)"); break; }
+                if (sw.ElapsedMilliseconds > 1500) { _notes.Add("partial link content (more than 1.5 s)"); break; }
                 if (li.GetLinkDocument() == null) continue;
                 try { if (li.IsHidden(view)) continue; } catch (Exception) { }
                 var counts = new Dictionary<string, long>();
@@ -236,17 +236,17 @@ namespace Bimbridge.Addin.Revit
             }
             if (res.Count > 0) Info["contenido_vinculos"] = res;
 #else
-            _notes.Add("Revit 2022 no permite contar lo visible de los vínculos en una vista (2023+ sí)");
+            _notes.Add("Revit 2022 cannot count what is visible of links in a view (2023+ can)");
 #endif
         }
 
         private bool CanChange(Document doc, View view, bool isSheetLike)
         {
-            if (view is ViewSheet) { _notes.Add("en hojas no se resalta ni encuadra: capture la vista del viewport"); return false; }
-            if (view.ViewType == ViewType.Schedule) { _notes.Add("en tablas no se resalta"); return false; }
-            if (doc.IsReadOnly) { _notes.Add("documento de sólo lectura: captura sin resaltar"); return false; }
-            if (doc.IsModifiable) { _notes.Add("Revit está en medio de otra edición: captura sin resaltar"); return false; }
-            if (!view.AreGraphicsOverridesAllowed() && !isSheetLike) { _notes.Add("esta vista no admite sobrescrituras: captura sin resaltar"); return false; }
+            if (view is ViewSheet) { _notes.Add("sheets are not highlighted or framed: capture the viewport's view"); return false; }
+            if (view.ViewType == ViewType.Schedule) { _notes.Add("schedules are not highlighted"); return false; }
+            if (doc.IsReadOnly) { _notes.Add("read-only document: capture without highlighting"); return false; }
+            if (doc.IsModifiable) { _notes.Add("Revit is in the middle of another edit: capture without highlighting"); return false; }
+            if (!view.AreGraphicsOverridesAllowed() && !isSheetLike) { _notes.Add("this view does not allow overrides: capture without highlighting"); return false; }
             if (doc.IsWorkshared)
             {
                 try
@@ -254,7 +254,7 @@ namespace Bimbridge.Addin.Revit
                     var st = WorksharingUtils.GetCheckoutStatus(doc, view.Id, out var owner);
                     if (st == CheckoutStatus.OwnedByOtherUser)
                     {
-                        _notes.Add("la vista la tiene tomada " + owner + ": captura sin resaltar (no se toma prestada)");
+                        _notes.Add("the view is checked out by " + owner + ": capture without highlighting (not borrowed)");
                         return false;
                     }
                 }
@@ -298,8 +298,8 @@ namespace Bimbridge.Addin.Revit
                     legend[CatalogRunner.BicName(cat)] = col.name + " (" + kv.Value.Count + ")";
                 }
                 Info["leyenda"] = legend;
-                if (applied >= 30000) _notes.Add("más de 30000 elementos visibles: se colorearon los 30000 primeros por categoría");
-                _notes.Add("los colores por categoría se aplican al modelo propio; los vínculos se ven como siempre");
+                if (applied >= 30000) _notes.Add("more than 30000 visible elements: the first 30000 were colored by category");
+                _notes.Add("category colors apply to the own model; links look as usual");
             }
 
             if (Groups.Count > 0)
@@ -355,7 +355,7 @@ namespace Bimbridge.Addin.Revit
             return null;
         }
 
-        /// <summary>Recorte temporal a los elementos pedidos: plantas/secciones con el recorte de la vista, 3D con caja de sección.</summary>
+        /// <summary>Temporary crop to the requested elements: plans/sections with the view crop, 3D with a section box.</summary>
         private void Frame(Document doc, View view)
         {
             XYZ min = null, max = null;
@@ -373,7 +373,7 @@ namespace Bimbridge.Addin.Revit
                 max = max == null ? hi : new XYZ(Math.Max(max.X, hi.X), Math.Max(max.Y, hi.Y), Math.Max(max.Z, hi.Z));
                 used++;
             }
-            if (min == null) { _notes.Add("encuadre: ninguno de esos elementos tiene geometría"); return; }
+            if (min == null) { _notes.Add("framing: none of those elements has geometry"); return; }
             var size = max - min;
             var pad = Math.Max(3.0, Margin * Math.Max(size.X, Math.Max(size.Y, size.Z)));
             min = new XYZ(min.X - pad, min.Y - pad, min.Z - pad);
@@ -381,18 +381,18 @@ namespace Bimbridge.Addin.Revit
 
             if (view is View3D v3)
             {
-                if (v3.IsPerspective) { _notes.Add("encuadre: vista en perspectiva, se captura completa"); return; }
+                if (v3.IsPerspective) { _notes.Add("framing: perspective view, captured in full"); return; }
                 v3.SetSectionBox(new BoundingBoxXYZ { Min = min, Max = max });
                 v3.IsSectionBoxActive = true;
-                Info["encuadre"] = used + " elementos (caja de sección temporal)";
+                Info["encuadre"] = used + " elements (temporary section box)";
                 return;
             }
             if (!(view is ViewPlan) && !(view is ViewSection))
             {
-                _notes.Add("encuadre: sólo en plantas, techos, secciones, alzados y 3D");
+                _notes.Add("framing: only in floor plans, ceiling plans, sections, elevations and 3D");
                 return;
             }
-            // Una caja de referencia (scope box) bloquea el recorte: se quita sólo mientras dura la captura.
+            // A scope box locks the crop: it is removed only for the duration of the capture.
             var scope = view.get_Parameter(BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP);
             if (scope != null && !scope.IsReadOnly && scope.AsElementId() != ElementId.InvalidElementId) scope.Set(ElementId.InvalidElementId);
             var cb = view.CropBox;
@@ -407,7 +407,7 @@ namespace Bimbridge.Addin.Revit
             }
             view.CropBox = new BoundingBoxXYZ { Transform = cb.Transform, Min = new XYZ(x0, y0, cb.Min.Z), Max = new XYZ(x1, y1, cb.Max.Z) };
             view.CropBoxActive = true;
-            Info["encuadre"] = used + " elementos (recorte temporal de la vista)";
+            Info["encuadre"] = used + " elements (temporary view crop)";
         }
 
         private void Export(Document doc, View view, string tmp)
@@ -422,7 +422,7 @@ namespace Bimbridge.Addin.Revit
             var opt = new ImageExportOptions
             {
                 ExportRange = ExportRange.SetOfViews,
-                FilePath = Path.Combine(tmp, "captura"),
+                FilePath = Path.Combine(tmp, "capture"),
                 HLRandWFViewsFileType = ImageFileType.PNG,
                 ShadowViewsFileType = ImageFileType.PNG,
                 ImageResolution = ImageResolution.DPI_150,
@@ -434,7 +434,7 @@ namespace Bimbridge.Addin.Revit
             doc.ExportImage(opt);
         }
 
-        /// <summary>Si el PNG pesa demasiado para la IA (planos muy densos), se pasa a JPEG: misma imagen, ~4× menos bytes.</summary>
+        /// <summary>If the PNG is too heavy for the AI (very dense plans), it is converted to JPEG: same image, ~4× fewer bytes.</summary>
         private void Shrink()
         {
             try
@@ -449,7 +449,7 @@ namespace Bimbridge.Addin.Revit
                 }
                 var f = frame.Format;
                 if (f == System.Windows.Media.PixelFormats.Bgra32 || f == System.Windows.Media.PixelFormats.Pbgra32 || f == System.Windows.Media.PixelFormats.Prgba64 || f == System.Windows.Media.PixelFormats.Rgba64)
-                    return; // con transparencia el JPEG saldría negro; se deja el PNG
+                    return; // with transparency the JPEG would come out black; keep the PNG
                 var jpg = Path.ChangeExtension(File, ".jpg");
                 var enc = new System.Windows.Media.Imaging.JpegBitmapEncoder { QualityLevel = 85 };
                 enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(frame));
@@ -497,7 +497,7 @@ namespace Bimbridge.Addin.Revit
         private static string Safe(string s)
         {
             var bad = Path.GetInvalidFileNameChars();
-            var r = new string((s ?? "vista").Select(c => bad.Contains(c) ? '_' : c).ToArray()).Trim();
+            var r = new string((s ?? "view").Select(c => bad.Contains(c) ? '_' : c).ToArray()).Trim();
             return r.Length > 60 ? r.Substring(0, 60) : r;
         }
 
@@ -507,7 +507,7 @@ namespace Bimbridge.Addin.Revit
             catch (Exception) { return null; }
         }
 
-        /// <summary>Los avisos no abren diálogos; los errores revierten (y la captura sale sin resaltar).</summary>
+        /// <summary>Warnings do not open dialogs; errors roll back (and the capture comes out without highlighting).</summary>
         private sealed class Quiet : IFailuresPreprocessor
         {
             public FailureProcessingResult PreprocessFailures(FailuresAccessor a)
@@ -522,7 +522,7 @@ namespace Bimbridge.Addin.Revit
             }
         }
 
-        /// <summary>Color por nombre (rojo, azul…) o #RRGGBB.</summary>
+        /// <summary>Color by name (rojo, azul…) or #RRGGBB.</summary>
         public static bool TryNamedColor(string s, out Color c, out string name)
         {
             c = null; name = s;

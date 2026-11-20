@@ -12,7 +12,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Issues #3 y #4: identidad nominal obligatoria para operar y correlación de cada petición.</summary>
+    /// <summary>Issues #3 and #4: named identity is required to operate, and every request is correlated.</summary>
     public class AgentIdentityGateTests
     {
         private sealed class Recorder : IRequestHandler
@@ -21,7 +21,7 @@ namespace Bimbridge.Tests
             public Correlation LastCorrelation;
             public Dictionary<string, object> LastArgs;
             public Action<Session> SessionClosed;
-            /// <summary>Si se fija, ctx agente=… registra como lo hace el add-in (TryRegister sobre el registro de sesiones).</summary>
+            /// <summary>If set, ctx agente=… registers the way the add-in does (TryRegister on the session registry).</summary>
             public SessionRegistry Registry;
             public Dictionary<string, object> HelloInfo() => new Dictionary<string, object>();
             public Task<Response> HandleAsync(Session session, Request request, CancellationToken ct)
@@ -30,8 +30,8 @@ namespace Bimbridge.Tests
                 if (request.Op == Wire.OpContext && Registry != null && Arg.GetString(request.Args, "agente") is string ag)
                 {
                     var rr = Registry.TryRegister(session, ag, null, null, out _);
-                    if (rr == RegisterResult.Duplicate) return Task.FromResult(Response.Fail(request.Id, Status.Conflicto, "alias en uso"));
-                    if (rr == RegisterResult.Invalid) return Task.FromResult(Response.Fail(request.Id, Status.Invalido, "alias inválido"));
+                    if (rr == RegisterResult.Duplicate) return Task.FromResult(Response.Fail(request.Id, Status.Conflicto, "alias in use"));
+                    if (rr == RegisterResult.Invalid) return Task.FromResult(Response.Fail(request.Id, Status.Invalido, "invalid alias"));
                 }
                 var d = new Dictionary<string, object> { ["ok"] = true };
                 if (request.Op == Wire.OpCommit) d["plan_id"] = "P-0001";
@@ -70,7 +70,7 @@ namespace Bimbridge.Tests
                 using (var c = await Connect(pipe))
                 {
                     Assert.Equal(Status.Ok, (await Call(c, 2, Wire.OpPing)).Estado);
-                    // Lecturas anónimas: rechazadas (revisión PR #22). También ctx sin agente=, que devolvería datos del modelo.
+                    // Anonymous reads: refused (PR #22 review). Also ctx without agente=, which would return model data.
                     foreach (var op in new[] { Wire.OpQuery, Wire.OpSets, Wire.OpCheck, Wire.OpCatalog, Wire.OpParams, Wire.OpDocs, Wire.OpGeo, Wire.OpJob, Wire.OpContext,
                                                Wire.OpPlan, Wire.OpCommit, Wire.OpExec, Wire.OpFam, Wire.OpDoc, Wire.OpShow, Wire.OpCapture, Wire.OpTask, "desconocida" })
                     {
@@ -80,7 +80,7 @@ namespace Bimbridge.Tests
                     }
                 }
             }
-            Assert.Empty(h.Ops);   // nada anónimo llegó al manejador (a Revit)
+            Assert.Empty(h.Ops);   // nothing anonymous reached the handler (Revit)
         }
 
         [Fact]
@@ -99,7 +99,7 @@ namespace Bimbridge.Tests
                     using (var c = await Connect(pipe))
                     {
                         Assert.Equal(Status.Rechazado, (await Call(c, 2, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).Estado);
-                        // Alias vacío o ilegible: no es un registro válido; no da nombre ni abre lecturas.
+                        // Empty or unreadable alias: not a valid registration; it gives no name and does not unlock reads.
                         var bad = await Call(c, 3, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "\n" });
                         Assert.Contains(bad.Estado, new[] { Status.Rechazado, Status.Invalido });
                         Assert.Equal(Status.Rechazado, (await Call(c, 31, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).Estado);
@@ -117,7 +117,7 @@ namespace Bimbridge.Tests
                 Assert.Equal("Revisor QA", Arg.GetString(read, "agente"));
                 Assert.StartsWith("A-", Arg.GetString(read, "agent_id"));
                 Assert.EndsWith("#5", Arg.GetString(read, "request_id"));
-                Assert.Null(Arg.GetString(read, "identidad"));                 // atribuida: no lleva marca de anónima
+                Assert.Null(Arg.GetString(read, "identidad"));                 // attributed: carries no anonymous marker
             }
             finally { (journal as IDisposable)?.Dispose(); }
         }
@@ -142,7 +142,7 @@ namespace Bimbridge.Tests
                 {
                     Assert.Equal(Status.Ok, (await Call(a, 2, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "Modelador" })).Estado);
                     Assert.Equal(Status.Conflicto, (await Call(b, 2, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "modelador" })).Estado);
-                    Assert.Equal(Status.Rechazado, (await Call(b, 3, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).Estado);   // sigue sin nombre
+                    Assert.Equal(Status.Rechazado, (await Call(b, 3, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).Estado);   // still unnamed
                     Assert.Equal(Status.Ok, (await Call(b, 4, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "Revisor" })).Estado);
                     var qa = Call(a, 5, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" });
                     var qb = Call(b, 5, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" });
@@ -175,10 +175,10 @@ namespace Bimbridge.Tests
             var corr = h.LastCorrelation;
             Assert.NotNull(corr);
             Assert.StartsWith("A-", corr.AgentId);
-            Assert.Equal("trace-abc-123", corr.TraceId);                // la traza del cliente une procesos
+            Assert.Equal("trace-abc-123", corr.TraceId);                // the client's trace links processes
             Assert.EndsWith("#7", corr.RequestId);
             Assert.StartsWith(corr.SessionId + "#", corr.RequestId);
-            Assert.False(h.LastArgs.ContainsKey(Correlation.TraceArg)); // _traza es transporte: el manejador no lo ve
+            Assert.False(h.LastArgs.ContainsKey(Correlation.TraceArg)); // _traza is transport: the handler does not see it
         }
 
         [Fact]
@@ -189,7 +189,7 @@ namespace Bimbridge.Tests
             sessions.Describe(s, "1", "Codex", null, null, AgentIdentity.SourceConfig, "usuario");
             var req = new Request { Id = 3, Op = Wire.OpCommit, Args = new Dictionary<string, object> { ["plan_id"] = "P-9", [Correlation.TraceArg] = "x y" } };
             var corr = Correlation.For(s, req);
-            Assert.NotEqual("x y", corr.TraceId);                       // traza inválida → nueva
+            Assert.NotEqual("x y", corr.TraceId);                       // invalid trace → new one
             Assert.Equal(16, corr.TraceId.Length);
             corr.Complete(req, new Response { Estado = Status.Ok, Datos = new Dictionary<string, object> { ["job_id"] = "G-1" } });
             var j = new Dictionary<string, object>();
@@ -215,22 +215,22 @@ namespace Bimbridge.Tests
             var a = reg.Open("claude-code", 100); reg.Describe(a, "1", null, null, null, null, "ana");
             var b = reg.Open("codex", 200); reg.Describe(b, "1", null, null, null, null, "ana");
             Assert.Equal(RegisterResult.Ok, reg.TryRegister(a, "Revisor", null, null, out _));
-            Assert.Equal(RegisterResult.Duplicate, reg.TryRegister(b, "revisor", null, null, out var holder));   // suplantación / reasignación
+            Assert.Equal(RegisterResult.Duplicate, reg.TryRegister(b, "revisor", null, null, out var holder));   // impersonation / reassignment
             Assert.Same(a, holder);
             Assert.Null(b.AgentName);
-            Assert.Equal(RegisterResult.Invalid, reg.TryRegister(b, "  \n ", null, null, out _));                // alias ausente
+            Assert.Equal(RegisterResult.Invalid, reg.TryRegister(b, "  \n ", null, null, out _));                // missing alias
 
-            // La misma instancia del puente reconecta antes de que se cierre su sesión anterior: puede conservar el nombre.
+            // The same bridge instance reconnects before its previous session closes: it may keep the name.
             var a2 = reg.Open("claude-code", 100); reg.Describe(a2, "1", "Revisor", null, null, AgentIdentity.SourceRegister, "ana");
             Assert.Equal("Revisor", a2.AgentName);
             Assert.Equal(a.AgentId, a2.AgentId);
 
-            // Otro cliente que intenta entrar con ese alias en el saludo queda sin nombre y con el motivo.
+            // Another client trying to join with that alias in the hello stays unnamed and gets the reason.
             var c = reg.Open("otro", 300); reg.Describe(c, "1", "Revisor", null, null, AgentIdentity.SourceConfig, "ana");
             Assert.Null(c.AgentName);
             Assert.Contains("ya lo usa", c.IdentityNote);
 
-            // Al cerrarse el titular, el alias queda libre.
+            // When the holder closes, the alias becomes free.
             reg.Close(a); reg.Close(a2);
             Assert.Equal(RegisterResult.Ok, reg.TryRegister(b, "Revisor", null, null, out _));
         }
@@ -245,10 +245,10 @@ namespace Bimbridge.Tests
             Assert.Null(s.AgentName);
             Request R(string op, Dictionary<string, object> a = null) => new Request { Id = 1, Op = op, Args = a ?? new Dictionary<string, object>() };
             Assert.True(IdentityPolicy.RequiresIdentity(R(Wire.OpCommit)));
-            Assert.True(IdentityPolicy.RequiresIdentity(R(Wire.OpQuery)));                 // lectura: exige nombre
-            Assert.True(IdentityPolicy.RequiresIdentity(R(Wire.OpContext)));               // ctx sin agente=: exige nombre
+            Assert.True(IdentityPolicy.RequiresIdentity(R(Wire.OpQuery)));                 // read: requires a name
+            Assert.True(IdentityPolicy.RequiresIdentity(R(Wire.OpContext)));               // ctx without agente=: requires a name
             Assert.True(IdentityPolicy.RequiresIdentity(R(Wire.OpContext, new Dictionary<string, object> { ["agente"] = "  " })));
-            Assert.True(IdentityPolicy.RequiresIdentity(R(null)));                         // desconocida: fail-closed
+            Assert.True(IdentityPolicy.RequiresIdentity(R(null)));                         // unknown: fail-closed
             Assert.False(IdentityPolicy.RequiresIdentity(R(Wire.OpHello)));
             Assert.False(IdentityPolicy.RequiresIdentity(R(Wire.OpPing)));
             Assert.False(IdentityPolicy.RequiresIdentity(R(Wire.OpContext, new Dictionary<string, object> { ["agente"] = "Revisor" })));

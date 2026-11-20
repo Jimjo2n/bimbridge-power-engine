@@ -8,11 +8,11 @@ using System.Text.RegularExpressions;
 namespace Bimbridge.Engine.Tasks
 {
     /// <summary>
-    /// Recetas registradas por ARCHIVO (§5): sin una herramienta MCP por receta. Se buscan, en este orden:
-    /// 1. %LOCALAPPDATA%\Bimbridge\recetas\&lt;nombre&gt;.cs (las del usuario o del equipo; ganan);
-    /// 2. la carpeta recetas\ junto al add-in (las que trae el instalador).
-    /// Cada una se identifica por nombre + versión declarada + SHA-256 del archivo. La tarea guarda una copia exacta: si el archivo cambia
-    /// después, la tarea sigue con su copia y una tarea nueva tendrá otra huella.
+    /// Recipes registered by FILE (§5): no MCP tool per recipe. They are looked up, in this order:
+    /// 1. %LOCALAPPDATA%\Bimbridge\recetas\&lt;name&gt;.cs (the user's or the team's; these win);
+    /// 2. the recetas\ folder next to the add-in (the ones shipped by the installer).
+    /// Each is identified by name + declared version + file SHA-256. The task keeps an exact copy: if the file changes
+    /// later, the task continues with its copy and a new task will have another fingerprint.
     /// </summary>
     public sealed class RecipeRegistry
     {

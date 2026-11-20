@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-//! Interfaz C (FFI) del Rust Geometry Engine. Códigos de retorno: 0 OK, 1 INVALIDO, 2 CANCELADO, 3 ERROR_MOTOR (pánico capturado).
-//! El llamador (C#) reserva los búferes de salida; la única memoria que devuelve Rust (pares de segmentos) se libera con
-//! `pe_free_i32`. Ningún pánico cruza la frontera FFI.
+//! C interface (FFI) of the Rust Geometry Engine. Return codes: 0 OK, 1 INVALIDO, 2 CANCELADO, 3 ERROR_MOTOR (caught panic).
+//! The caller (C#) allocates the output buffers; the only memory Rust returns (segment pairs) is freed with
+//! `pe_free_i32`. No panic crosses the FFI boundary.
 
 use crate::kernels::{self, Cancel, PeError};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -29,7 +29,7 @@ unsafe fn cancel<'a>(flag: *const u8) -> Cancel<'a> {
     if flag.is_null() {
         Cancel(None)
     } else {
-        // u8 de C#: 0 = seguir, ≠0 = cancelar. AtomicBool tiene el mismo tamaño y alineación que u8.
+        // C# u8: 0 = continue, ≠0 = cancel. AtomicBool has the same size and alignment as u8.
         Cancel(Some(&*(flag as *const AtomicBool)))
     }
 }
@@ -47,7 +47,7 @@ pub extern "C" fn pe_protocol() -> u32 {
     crate::PROTOCOL
 }
 
-/// Versión como entero mayor*10000 + menor*100 + parche.
+/// Version as the integer major*10000 + minor*100 + patch.
 #[no_mangle]
 pub extern "C" fn pe_version() -> u32 {
     let v: Vec<u32> = crate::VERSION.split('.').map(|x| x.parse().unwrap_or(0)).collect();
@@ -55,14 +55,14 @@ pub extern "C" fn pe_version() -> u32 {
 }
 
 /// # Safety
-/// Punteros válidos para n*3 (xyz, out) y 12 (m) f64.
+/// Valid pointers for n*3 (xyz, out) and 12 (m) f64.
 #[no_mangle]
 pub unsafe extern "C" fn pe_transform3(xyz: *const f64, n: usize, m: *const f64, out: *mut f64, cancel_flag: *const u8) -> i32 {
     guard(|| code(kernels::transform3(sl(xyz, n * 3), sl(m, 12), slm(out, n * 3), &cancel(cancel_flag))))
 }
 
 /// # Safety
-/// Búferes de tamaño nq*dim, nr*dim, nq, nq.
+/// Buffers of size nq*dim, nr*dim, nq, nq.
 #[no_mangle]
 pub unsafe extern "C" fn pe_nearest(q: *const f64, nq: usize, r: *const f64, nr: usize, dim: usize, max_dist: f64,
                                     out_idx: *mut i32, out_dist: *mut f64, cancel_flag: *const u8) -> i32 {
@@ -70,22 +70,22 @@ pub unsafe extern "C" fn pe_nearest(q: *const f64, nq: usize, r: *const f64, nr:
 }
 
 /// # Safety
-/// Búferes de tamaño ne*dim, no*dim, ne.
+/// Buffers of size ne*dim, no*dim, ne.
 #[no_mangle]
 pub unsafe extern "C" fn pe_match(e: *const f64, ne: usize, o: *const f64, no: usize, dim: usize, tol: f64, out: *mut i32, cancel_flag: *const u8) -> i32 {
     guard(|| code(kernels::match_points(sl(e, ne * dim), sl(o, no * dim), dim, tol, slm(out, ne), &cancel(cancel_flag))))
 }
 
 /// # Safety
-/// Búferes de tamaño n*dim y n.
+/// Buffers of size n*dim and n.
 #[no_mangle]
 pub unsafe extern "C" fn pe_duplicates(p: *const f64, n: usize, dim: usize, tol: f64, out: *mut i32, cancel_flag: *const u8) -> i32 {
     guard(|| code(kernels::duplicates(sl(p, n * dim), dim, tol, slm(out, n), &cancel(cancel_flag))))
 }
 
-/// Pares en contacto: devuelve en *out un búfer de 3*count i32 (i, j, tipo) que el llamador libera con pe_free_i32(ptr, 3*count).
+/// Pairs in contact: returns in *out a buffer of 3*count i32 (i, j, type) that the caller frees with pe_free_i32(ptr, 3*count).
 /// # Safety
-/// s: n*4 f64; out y count no nulos.
+/// s: n*4 f64; out and count non-null.
 #[no_mangle]
 pub unsafe extern "C" fn pe_segment_contacts(s: *const f64, n: usize, eps: f64, out: *mut *mut i32, count: *mut usize, cancel_flag: *const u8) -> i32 {
     guard(|| {
@@ -112,7 +112,7 @@ pub unsafe extern "C" fn pe_segment_contacts(s: *const f64, n: usize, eps: f64, 
 }
 
 /// # Safety
-/// ptr devuelto por pe_segment_contacts con su longitud exacta.
+/// ptr returned by pe_segment_contacts, with its exact length.
 #[no_mangle]
 pub unsafe extern "C" fn pe_free_i32(ptr: *mut i32, len: usize) {
     if !ptr.is_null() && len > 0 {
@@ -121,7 +121,7 @@ pub unsafe extern "C" fn pe_free_i32(ptr: *mut i32, len: usize) {
 }
 
 /// # Safety
-/// edges: ne*2 i32; comp y deg: nodes i32.
+/// edges: ne*2 i32; comp and deg: nodes i32.
 #[no_mangle]
 pub unsafe extern "C" fn pe_components(nodes: usize, edges: *const i32, ne: usize, comp: *mut i32, deg: *mut i32) -> i32 {
     guard(|| code(kernels::components(nodes, sl(edges, ne * 2), slm(comp, nodes), slm(deg, nodes))))

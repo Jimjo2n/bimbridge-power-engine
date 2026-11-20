@@ -4,9 +4,9 @@ using Autodesk.Revit.DB;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// Conversión de ElementId ↔ long para todas las versiones (sección 5 bis de la factibilidad):
-    /// 2022–2023 usan IntegerValue; 2024 añade Value (Int64); 2026 elimina IntegerValue.
-    /// En el protocolo los ids siempre van como enteros de 64 bits.
+    /// ElementId ↔ long conversion for all versions (feasibility section 5 bis):
+    /// 2022–2023 use IntegerValue; 2024 adds Value (Int64); 2026 removes IntegerValue.
+    /// In the protocol ids always travel as 64-bit integers.
     /// </summary>
     public static class Ids
     {

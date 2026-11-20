@@ -13,8 +13,8 @@ using Xunit;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// 0.7.0-alpha1 en proceso: IR v2, validación del estado antes de recuperar (AH-03), exclusión y fencing (AH-04), conjunto vacío
-    /// (AH-05), cancelación, repetición y huella del documento. Cada "reinicio" crea objetos nuevos desde disco (modelo incluido).
+    /// 0.7.0-alpha1 in process: IR v2, state validation before recovery (AH-03), exclusion and fencing (AH-04), empty set
+    /// (AH-05), cancellation, repetition and document fingerprint. Each "restart" creates new objects from disk (model included).
     /// </summary>
     public class AgentHostAlphaTests
     {
@@ -54,10 +54,10 @@ namespace Bimbridge.Tests
             Assert.Equal(AH.Hash(p), vp.Hash);
             var op = vp.Ops[1];
             Assert.Throws<NotSupportedException>(() => ((IDictionary<string, object>)op.Params)["valor"] = 1L);
-            Assert.Equal(new[] { "escritura_modelo" }, op.Authorization);          // derivado, no declarado
+            Assert.Equal(new[] { "escritura_modelo" }, op.Authorization);          // derived, not declared
             Assert.Equal("convergente", op.Idempotency);
             Assert.NotEmpty(op.Postconditions);
-            // mutar el borrador después de validar no cambia el plan validado
+            // mutating the draft after validation does not change the validated plan
             p.Ops[1].Params["valor"] = 9999L;
             Assert.Equal(2700L, vp.Ops[1].Params["valor"]);
         }
@@ -71,11 +71,11 @@ namespace Bimbridge.Tests
             json["coordenadas"] = null;
             var ops = (List<object>)json["operaciones"];
             var set = (Dictionary<string, object>)ops[1];
-            set["estado"] = "verificada";                    // el agente no fija estados
+            set["estado"] = "verificada";                    // the agent does not set states
             set["autorizacion"] = new List<object> { "revit_modificar" };
             ((Dictionary<string, object>)set["parametros"]).Remove("unidades");
             set["fuente"] = new Dictionary<string, object> { ["fuente"] = "no-declarada", ["requisito"] = "REQ-9" };
-            ops.Add(new Dictionary<string, object>(set) { ["id"] = "op-copia" });   // duplicado semántico
+            ops.Add(new Dictionary<string, object>(set) { ["id"] = "op-copia" });   // semantic duplicate
             var errs = IrValidator.Validate(PlanDraft.FromJson(json));
             Assert.Contains(errs, e => e.Contains("campo_no_declarable: plan.autorizacion"));
             Assert.Contains(errs, e => e.Contains("campo_no_declarable estado"));
@@ -104,7 +104,7 @@ namespace Bimbridge.Tests
             Assert.Contains(IrValidator.Validate(PlanDraft.FromJson(json)), e => e.StartsWith("version_no_soportada"));
         }
 
-        // ---------------- huella del documento ----------------
+        // ---------------- document fingerprint ----------------
 
         [Fact]
         public void DocumentFingerprintMismatch_RefusesBeforeAnyExecution()
@@ -123,9 +123,9 @@ namespace Bimbridge.Tests
         private static void AssertRefused(string state, PlanDraft plan, string model, string code)
         {
             var r = Open(state, plan, model, out var diags);
-            Assert.True(r == null, "la recuperación debía rechazarse; diags: " + string.Join("; ", diags));
+            Assert.True(r == null, "recovery should have been refused; diags: " + string.Join("; ", diags));
             Assert.Contains(diags, d => d.Severity == "error" && d.Code == code);
-            Assert.Null(PlanLease.Peek(state) is var l && l != null && !l.Released ? "lease retenido" : null);
+            Assert.Null(PlanLease.Peek(state) is var l && l != null && !l.Released ? "lease held" : null);
         }
 
         [Fact]
@@ -133,7 +133,7 @@ namespace Bimbridge.Tests
         {
             var (state, model, plan) = RunToEnd();
             var j = Path.Combine(state, "diario.jsonl");
-            File.AppendAllText(j, "{\"ev\":\"transicion\",\"op\":\"op-x\",\"de\":\"valid");   // caída a mitad de escritura
+            File.AppendAllText(j, "{\"ev\":\"transicion\",\"op\":\"op-x\",\"de\":\"valid");   // crash in the middle of a write
             using (var r = Open(state, plan, model, out var diags))
             {
                 Assert.NotNull(r);
@@ -169,7 +169,7 @@ namespace Bimbridge.Tests
             }
         }
 
-        /// <summary>Un checkpoint con sello VÁLIDO que certifica algo que el diario no dice: se rechaza, no se cree.</summary>
+        /// <summary>A checkpoint with a VALID seal that certifies something the journal does not say: it is rejected, not trusted.</summary>
         [Fact]
         public void AH03_ForgedCheckpointClaimingCompletion_IsRejected()
         {
@@ -195,7 +195,7 @@ namespace Bimbridge.Tests
             var (state, model, plan) = RunToEnd();
             var j = Path.Combine(state, "diario.jsonl");
             var lines = File.ReadAllLines(j);
-            File.WriteAllLines(j, lines.Take(lines.Length - 3));   // se pierden registros confirmados
+            File.WriteAllLines(j, lines.Take(lines.Length - 3));   // committed records are lost
             AssertRefused(state, plan, model, "checkpoint_adelantado");
         }
 
@@ -231,7 +231,7 @@ namespace Bimbridge.Tests
             foreach (var (line, code) in cases)
             {
                 var state = Path.Combine(dir, "estado-" + code);
-                using (var r = Open(state, plan, model, out _, ttl: TimeSpan.FromMilliseconds(1))) Assert.NotNull(r);   // apertura + dueño f1
+                using (var r = Open(state, plan, model, out _, ttl: TimeSpan.FromMilliseconds(1))) Assert.NotNull(r);   // open + owner f1
                 if (!line.ContainsKey("f")) line["f"] = 1L;
                 Forge(state, line);
                 Thread.Sleep(5);
@@ -268,7 +268,7 @@ namespace Bimbridge.Tests
             AssertRefused(state, plan, model, "diario_esquema_no_soportado");
         }
 
-        // ---------------- AH-04 (en proceso: zombi) ----------------
+        // ---------------- AH-04 (in process: zombie) ----------------
 
         [Fact]
         public void AH04_ZombieOwnerAfterTakeover_CannotWriteModelOrJournal()
@@ -279,16 +279,16 @@ namespace Bimbridge.Tests
             var state = Path.Combine(dir, "estado");
             var zombie = Open(state, plan, model, out _, ttl: TimeSpan.FromMilliseconds(150));
             Assert.True(zombie.IsOwner);
-            Thread.Sleep(250);                                                   // el zombi deja de renovar
+            Thread.Sleep(250);                                                   // the zombie stops renewing
             using (var owner = Open(state, plan, model, out _, ttl: TimeSpan.FromSeconds(30)))
             {
                 Assert.True(owner.IsOwner);
                 Assert.Equal(2, owner.State.Fencing);
-                Assert.Throws<PlanLease.LeaseLostException>(() => zombie.Run());  // su lease ya no vale
+                Assert.Throws<PlanLease.LeaseLostException>(() => zombie.Run());  // its lease is no longer valid
                 Assert.Equal(0, DurableSimModel.Open(model).TxFor(plan.Ops[0].Id, AH.Hash(plan)).Count);
-                // y si se saltara el lease, el modelo lo rechaza por fencing
+                // and if it skipped the lease, the model rejects it by fencing
                 owner.Run();
-                var m = DurableSimModel.Open(model);   // modelo al día: el único obstáculo es el fencing
+                var m = DurableSimModel.Open(model);   // model up to date: the only obstacle is fencing
                 Assert.Throws<DurableSimModel.StaleFencingException>(() => m.Commit("op-zombi", AH.Hash(plan), 1, 0, "", new List<object[]>()));
             }
             Assert.All(plan.Ops, op => Assert.Equal(1, DurableSimModel.Open(model).TxFor(op.Id, AH.Hash(plan)).Count));
@@ -330,14 +330,14 @@ namespace Bimbridge.Tests
             Assert.Empty(IrValidator.Validate(AH.Plan(AH.Set("X", 1L, level: "L99")), out var vp));
             var b = new SimulatedBackend(model);
             var ctx = new ExecContext { PlanHash = vp.Hash, Fencing = 1, Attempt = 1 };
-            Assert.Equal(Effect.SinObjetivos, b.Observe(vp.Ops[0], ctx).Effect);                // nunca "aplicada" por 0 == 0
-            var r = b.Execute(vp.Ops[0], ctx);                                                  // defensa en profundidad
+            Assert.Equal(Effect.SinObjetivos, b.Observe(vp.Ops[0], ctx).Effect);                // never "applied" because 0 == 0
+            var r = b.Execute(vp.Ops[0], ctx);                                                  // defense in depth
             Assert.False(r.Ok);
             Assert.Equal(ErrorClass.SinObjetivos, r.ErrorClass);
             Assert.Equal(PostState.NoSatisfechas, b.CheckPostconditions(vp.Ops[0], ctx).State);
         }
 
-        // ---------------- cancelación, pausa, repetición, reintentos ----------------
+        // ---------------- cancellation, pause, repetition, retries ----------------
 
         [Fact]
         public void Cancellation_StopsBetweenOperations_AndCancelMarksTheRest()
@@ -351,7 +351,7 @@ namespace Bimbridge.Tests
             using (var r = Open(state, plan, model, out _, f))
             {
                 var n = 0;
-                // el token se cancela tras la 3.ª operación: el ejecutor termina la operación en curso y para entre operaciones
+                // the token is cancelled after the 3rd operation: the runner finishes the current operation and stops between operations
                 var first3 = plan.Ops.Select(o => o.Id).ToList();
                 r.State.CheckpointEvery = 1000;
                 var t = new Thread(() => { while (r.State.Ops.Values.Count(o => o.State == OpState.Verificada) < 3) Thread.Sleep(1); cts.Cancel(); });
@@ -445,7 +445,7 @@ namespace Bimbridge.Tests
             Assert.Contains(diags, d => d.Code == "escrituras_no_permitidas");
         }
 
-        // ---------------- modelo durable ----------------
+        // ---------------- durable model ----------------
 
         [Fact]
         public void Model_TornWalLine_IsNotCommitted_CorruptLineRefuses()

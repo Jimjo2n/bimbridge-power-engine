@@ -9,10 +9,10 @@ using Request = BimBridge.PowerEngine.PowerEngineContracts.Request;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Vigilancia de memoria del WorkerClient con un worker Python falso (contrato pe=1).</summary>
+    /// <summary>WorkerClient memory watchdog with a fake Python worker (contract pe=1).</summary>
     public sealed class WorkerMemoryTests : IDisposable
     {
-        // "comer": reserva ~200 MB y se cuelga; "comer_y_fallar": reserva ~200 MB y responde un error; "nada": responde OK.
+        // "comer": allocates ~200 MB and hangs; "comer_y_fallar": allocates ~200 MB and replies with an error; "nada": replies OK.
         private const string Fake = @"import sys,json,time
 keep=None
 for l in sys.stdin:
@@ -51,7 +51,7 @@ for l in sys.stdin:
             var r = w.Call(Job("comer"));
             sw.Stop();
             Assert.Equal(Codes.MemoryLimit, r.Code);
-            Assert.True(sw.ElapsedMilliseconds < 10000, "tardó " + sw.ElapsedMilliseconds + " ms");
+            Assert.True(sw.ElapsedMilliseconds < 10000, "took " + sw.ElapsedMilliseconds + " ms");
             var ok = w.Call(Job("nada"));
             Assert.True(ok.Ok, ok.Code + " " + ok.Error);
             Assert.Equal(1, w.Restarts);

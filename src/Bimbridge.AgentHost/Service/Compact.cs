@@ -11,9 +11,9 @@ using Bimbridge.Protocol;
 namespace Bimbridge.AgentHost
 {
     /// <summary>
-    /// Consultas compactas para Claude/Codex (P1 §6). Nunca devuelven el grafo completo: ids estables, recuentos, diferencias desde un
-    /// seq del diario y, para el detalle, un archivo local cuyo camino se devuelve como referencia. El agente decide sobre excepciones;
-    /// la contabilidad la hace este código.
+    /// Compact queries for Claude/Codex (P1 §6). They never return the full graph: stable ids, counts, differences since a
+    /// journal seq and, for the detail, a local file whose path is returned as a reference. The agent decides on exceptions;
+    /// this code does the bookkeeping.
     /// </summary>
     public static class Compact
     {
@@ -35,65 +35,65 @@ namespace Bimbridge.AgentHost
         public static Dictionary<string, int> Counts(ValidatedPlan plan, ExecJournal st) =>
             OpState.All.ToDictionary(s => s, s => st.Ops.Values.Count(r => r.State == s), StringComparer.Ordinal);
 
-        /// <summary>Una línea: recuentos, seq del diario y la siguiente operación accionable.</summary>
+        /// <summary>One line: counts, journal seq and the next actionable operation.</summary>
         public static string Summary(ValidatedPlan plan, ExecJournal st)
         {
             var c = Counts(plan, st);
             var sb = new StringBuilder();
-            sb.Append(c[OpState.Verificada]).Append('/').Append(plan.Ops.Count).Append(" verificadas");
+            sb.Append(c[OpState.Verificada]).Append('/').Append(plan.Ops.Count).Append(" verified");
             void Add(string s, string label) { if (c[s] > 0) sb.Append(" · ").Append(c[s]).Append(' ').Append(label); }
-            Add(OpState.Ensayada, "ensayadas (revertidas, no aplicadas)");
-            Add(OpState.EnEjecucion, "en curso");
-            Add(OpState.Fallida, "fallidas");
-            Add(OpState.RequiereVerificacion, "requieren verificación");
-            Add(OpState.RequiereReconciliar, "requieren reconciliar");
-            Add(OpState.Bloqueada, "bloqueadas");
-            Add(OpState.Cancelada, "canceladas");
+            Add(OpState.Ensayada, "trialed (reverted, not applied)");
+            Add(OpState.EnEjecucion, "in progress");
+            Add(OpState.Fallida, "failed");
+            Add(OpState.RequiereVerificacion, "need verification");
+            Add(OpState.RequiereReconciliar, "need reconciliation");
+            Add(OpState.Bloqueada, "blocked");
+            Add(OpState.Cancelada, "cancelled");
             var pend = c[OpState.Validada] + c[OpState.Ejecutada];
-            if (pend > 0) sb.Append(" · ").Append(pend).Append(" pendientes");
+            if (pend > 0) sb.Append(" · ").Append(pend).Append(" pending");
             if (st.PlanState != PlanRunState.Activo) sb.Append(" · plan ").Append(st.PlanState);
             sb.Append(" · seq ").Append(st.Seq);
             var next = Next(plan, st);
-            if (next != null) sb.Append(" · siguiente ").Append(next.Id);
+            if (next != null) sb.Append(" · next ").Append(next.Id);
             return sb.ToString();
         }
 
-        /// <summary>Siguiente operación accionable: no final y con todas sus dependencias verificadas.</summary>
+        /// <summary>Next actionable operation: not final and with all its dependencies verified.</summary>
         public static ValidatedOp Next(ValidatedPlan plan, ExecJournal st) =>
             plan.Order.Select(id => plan.ById[id]).FirstOrDefault(o => !OpState.IsFinal(st.Ops[o.Id].State) && o.DependsOn.All(d => st.Ops[d].State == OpState.Verificada));
 
         public static string NextText(ValidatedPlan plan, ExecJournal st)
         {
             var n = Next(plan, st);
-            if (n == null) return "ninguna";
+            if (n == null) return "none";
             var r = st.Ops[n.Id];
-            return Label(n) + " · " + r.State + (r.Attempt > 0 ? " intento " + r.Attempt : "");
+            return Label(n) + " · " + r.State + (r.Attempt > 0 ? " attempt " + r.Attempt : "");
         }
 
-        /// <summary>Excepciones que requieren razonamiento (fallida, requiere_*, bloqueada), una por línea, con tope.</summary>
+        /// <summary>Exceptions that need reasoning (fallida, requiere_*, bloqueada), one per line, capped.</summary>
         public static string Exceptions(ValidatedPlan plan, ExecJournal st, int limit = 20, bool includeBlocked = false)
         {
             var list = plan.Order.Select(id => (Op: plan.ById[id], Rec: st.Ops[id]))
                 .Where(x => OpState.Exceptions.Contains(x.Rec.State) && (includeBlocked || x.Rec.State != OpState.Bloqueada)).ToList();
-            if (list.Count == 0) return "sin excepciones";
+            if (list.Count == 0) return "no exceptions";
             var sb = new StringBuilder();
             foreach (var x in list.Take(limit))
                 sb.Append(x.Op.Id).Append(' ').Append(x.Rec.State).Append(x.Rec.Error != null ? "(" + x.Rec.Error + ")" : "").Append(": ").Append(Trim(x.Rec.Note, 140)).Append('\n');
-            if (list.Count > limit) sb.Append("+").Append(list.Count - limit).Append(" más\n");
+            if (list.Count > limit) sb.Append("+").Append(list.Count - limit).Append(" more\n");
             var blocked = st.Ops.Values.Count(r => r.State == OpState.Bloqueada);
-            if (!includeBlocked && blocked > 0) sb.Append(blocked).Append(" bloqueadas por dependencias (consecuencia de las anteriores)\n");
+            if (!includeBlocked && blocked > 0) sb.Append(blocked).Append(" blocked by dependencies (a consequence of the above)\n");
             return sb.ToString().TrimEnd('\n');
         }
 
-        /// <summary>Cambios desde un seq del diario: el estado más reciente de cada operación que cambió, y el seq actual para la próxima consulta.</summary>
+        /// <summary>Changes since a journal seq: the latest state of each operation that changed, and the current seq for the next query.</summary>
         public static string ChangesSince(ValidatedPlan plan, ExecJournal st, long since, int limit = 50)
         {
             var latest = new Dictionary<string, (long Seq, string To, string Err)>(StringComparer.Ordinal);
             foreach (var c in st.Changes) if (c.Seq > since) latest[c.Op] = (c.Seq, c.To, c.Error);
-            var sb = new StringBuilder("seq ").Append(st.Seq).Append(" · ").Append(latest.Count).Append(" operaciones cambiaron desde ").Append(since);
+            var sb = new StringBuilder("seq ").Append(st.Seq).Append(" · ").Append(latest.Count).Append(" operations changed since ").Append(since);
             foreach (var kv in latest.OrderBy(k => k.Value.Seq).Take(limit))
                 sb.Append('\n').Append(kv.Key).Append(' ').Append(kv.Value.To).Append(kv.Value.Err != null && kv.Value.To != OpState.Verificada ? "(" + kv.Value.Err + ")" : "");
-            if (latest.Count > limit) sb.Append("\n+").Append(latest.Count - limit).Append(" más");
+            if (latest.Count > limit) sb.Append("\n+").Append(latest.Count - limit).Append(" more");
             return sb.ToString();
         }
 
@@ -101,16 +101,16 @@ namespace Bimbridge.AgentHost
         {
             var list = plan.Order.Where(id => st.Ops[id].Error == ErrorClass.Verificacion || st.Ops[id].Error == ErrorClass.EvidenciaInsuficiente)
                                  .Where(id => st.Ops[id].State != OpState.Verificada).ToList();
-            if (list.Count == 0) return "sin fallos de verificación";
+            if (list.Count == 0) return "no verification failures";
             var sb = new StringBuilder();
             foreach (var id in list.Take(limit)) sb.Append(id).Append(' ').Append(st.Ops[id].State).Append(": ").Append(Trim(st.Ops[id].Note, 140)).Append('\n');
-            if (list.Count > limit) sb.Append('+').Append(list.Count - limit).Append(" más\n");
+            if (list.Count > limit) sb.Append('+').Append(list.Count - limit).Append(" more\n");
             return sb.ToString().TrimEnd('\n');
         }
 
         /// <summary>
-        /// Informe final: escribe el detalle completo en informe.json (en la carpeta del plan) y devuelve un resumen + la referencia.
-        /// Toda operación no verificada aparece en "sin_resolver" con su estado, clase de error, nota, dependencias y requisito de origen.
+        /// Final report: writes the full detail to informe.json (in the plan folder) and returns a summary + the reference.
+        /// Every unverified operation appears in "sin_resolver" with its state, error class, note, dependencies and source requirement.
         /// </summary>
         public static Dictionary<string, object> Report(string dir, ValidatedPlan plan, ExecJournal st)
         {

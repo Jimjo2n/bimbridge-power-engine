@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-//! Protocolo del worker IPC pe=1, ejecutando el binario real.
+//! pe=1 IPC worker protocol, running the real binary.
 use serde_json::{json, Value};
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -45,7 +45,7 @@ fn six_jobs_answer() {
     assert_eq!(t["resultado"]["xyz"][0], 6.0);
     let n = one("nearest", json!({"dim":2,"consulta":[0.,0.,50.,50.],"referencia":[1.,0.],"max_dist":5.}));
     assert_eq!(n["resultado"]["indice"], json!([0, -1]));
-    assert_eq!(n["resultado"]["distancia"][1], Value::Null, "sin vecino: NaN viaja como null");
+    assert_eq!(n["resultado"]["distancia"][1], Value::Null, "no neighbour: NaN travels as null");
     let m = one("match", json!({"dim":2,"esperados":[0.,0.],"observados":[0.,0.1],"tol":1.}));
     assert_eq!(m["resultado"]["pareja"], json!([0]));
     let d = one("duplicates", json!({"dim":3,"puntos":[0.,0.,0.,0.,0.,0.,9.,9.,9.],"tol":0.1}));
@@ -106,7 +106,7 @@ fn oversized_line_is_refused_and_does_not_hang() {
         .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().unwrap();
     let mut stdin = child.stdin.take().unwrap();
     let writer = std::thread::spawn(move || {
-        // El worker corta al superar 64 MiB: el error de tubería rota del escritor es esperado.
+        // The worker cuts off above 64 MiB: a broken-pipe error on the writer is expected.
         let chunk = vec![b' '; 1024 * 1024];
         for _ in 0..70 {
             if stdin.write_all(&chunk).is_err() { return; }

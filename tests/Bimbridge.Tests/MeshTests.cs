@@ -7,28 +7,28 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Mallas para rayos verticales: deben dar lo mismo que Solid.IntersectWithCurve en los casos de obra.</summary>
+    /// <summary>Meshes for vertical rays: they must give the same result as Solid.IntersectWithCurve in real project cases.</summary>
     public class MeshTests : IDisposable
     {
         private readonly bool _simd = TriMesh.SimdEnabled;
         public void Dispose() => TriMesh.SimdEnabled = _simd;
 
-        /// <summary>Caja con las 12 caras orientadas hacia afuera (las verticales se descartan solas).</summary>
+        /// <summary>Box with its 12 faces oriented outwards (the vertical ones are discarded on their own).</summary>
         internal static void Box(TriMeshBuilder b, double x0, double y0, double z0, double x1, double y1, double z1)
         {
-            // abajo (normal -z) y arriba (+z)
+            // bottom (normal -z) and top (+z)
             b.Add(x0, y0, z0, x0, y1, z0, x1, y1, z0);
             b.Add(x0, y0, z0, x1, y1, z0, x1, y0, z0);
             b.Add(x0, y0, z1, x1, y0, z1, x1, y1, z1);
             b.Add(x0, y0, z1, x1, y1, z1, x0, y1, z1);
-            // lados (verticales)
+            // sides (vertical)
             b.Add(x0, y0, z0, x1, y0, z0, x1, y0, z1);
             b.Add(x0, y0, z0, x1, y0, z1, x0, y0, z1);
             b.Add(x1, y1, z0, x0, y1, z0, x0, y1, z1);
             b.Add(x1, y1, z0, x0, y1, z1, x1, y1, z1);
         }
 
-        /// <summary>Rampa: losa de espesor t cuya cara inferior sube de z0 (en x0) a z0+rise (en x1).</summary>
+        /// <summary>Ramp: slab of thickness t whose underside rises from z0 (at x0) to z0+rise (at x1).</summary>
         internal static void Ramp(TriMeshBuilder b, double x0, double y0, double x1, double y1, double z0, double rise, double t)
         {
             double za = z0, zb = z0 + rise;
@@ -38,7 +38,7 @@ namespace Bimbridge.Tests
             b.Add(x0, y0, za + t, x1, y1, zb + t, x0, y1, za + t);
         }
 
-        /// <summary>Losa 0..10 × 0..10 con un hueco 4..6 × 4..6, triangulada como marco (8 triángulos por cara).</summary>
+        /// <summary>Slab 0..10 × 0..10 with a 4..6 × 4..6 opening, triangulated as a frame (8 triangles per face).</summary>
         internal static void SlabWithHole(TriMeshBuilder b, double z0, double z1)
         {
             var outer = new[] { (0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0) };
@@ -47,10 +47,10 @@ namespace Bimbridge.Tests
             {
                 var o0 = outer[i]; var o1 = outer[(i + 1) % 4];
                 var i0 = inner[i]; var i1 = inner[(i + 1) % 4];
-                // arriba: antihorario visto desde arriba
+                // top: counterclockwise seen from above
                 b.Add(o0.Item1, o0.Item2, z1, o1.Item1, o1.Item2, z1, i1.Item1, i1.Item2, z1);
                 b.Add(o0.Item1, o0.Item2, z1, i1.Item1, i1.Item2, z1, i0.Item1, i0.Item2, z1);
-                // abajo: horario
+                // bottom: clockwise
                 b.Add(o0.Item1, o0.Item2, z0, i1.Item1, i1.Item2, z0, o1.Item1, o1.Item2, z0);
                 b.Add(o0.Item1, o0.Item2, z0, i0.Item1, i0.Item2, z0, i1.Item1, i1.Item2, z0);
             }
@@ -95,7 +95,7 @@ namespace Bimbridge.Tests
             var b = new TriMeshBuilder();
             Box(b, 0, 0, 0, 10, 10, 1);
             var m = b.Build();
-            // Diagonal compartida por los dos triángulos de cada cara, una esquina y una arista exterior.
+            // Diagonal shared by the two triangles of each face, a corner and an outer edge.
             foreach (var (x, y) in new[] { (5.0, 5.0), (0.0, 0.0), (10.0, 10.0), (0.0, 5.0), (3.3, 3.3) })
             {
                 var s = Cast(m, x, y, out var r);
@@ -117,7 +117,7 @@ namespace Bimbridge.Tests
             var s = Cast(m, 2, 7, out r);
             Assert.Equal(RayResult.Ok, r);
             Assert.Equal(20, s[0].ZIn, 9);
-            // Justo en el borde del hueco: toca la losa (inclusivo, como Revit con tolerancia).
+            // Exactly on the edge of the opening: it touches the slab (inclusive, like Revit with tolerance).
             s = Cast(m, 4, 5, out r);
             Assert.Equal(RayResult.Ok, r);
         }
@@ -155,16 +155,16 @@ namespace Bimbridge.Tests
         [Fact]
         public void Wedge_SilhouetteGraze_IsNotAHit_RidgeIs()
         {
-            // Prisma triangular a lo largo de Y: base z=0 de x=0 a 2, cumbrera en x=1, z=1.
+            // Triangular prism along Y: base z=0 from x=0 to 2, ridge at x=1, z=1.
             var b = new TriMeshBuilder();
             for (var k = 0; k < 1; k++)
             {
                 double y0 = 0, y1 = 10;
-                b.Add(0, y0, 0, 0, y1, 0, 2, y1, 0);   // base (abajo)
+                b.Add(0, y0, 0, 0, y1, 0, 2, y1, 0);   // base (bottom)
                 b.Add(0, y0, 0, 2, y1, 0, 2, y0, 0);
-                b.Add(0, y0, 0, 1, y0, 1, 1, y1, 1);   // faldón izquierdo (normal arriba-izquierda)
+                b.Add(0, y0, 0, 1, y0, 1, 1, y1, 1);   // left slope (normal up-left)
                 b.Add(0, y0, 0, 1, y1, 1, 0, y1, 0);
-                b.Add(2, y0, 0, 2, y1, 0, 1, y1, 1);   // faldón derecho (normal arriba-derecha)
+                b.Add(2, y0, 0, 2, y1, 0, 1, y1, 1);   // right slope (normal up-right)
                 b.Add(2, y0, 0, 1, y1, 1, 1, y0, 1);
             }
             var m = b.Build();
@@ -192,7 +192,7 @@ namespace Bimbridge.Tests
         [Fact]
         public void Extent_GivesBodyTopAndBottom_AndMissesOutsideRoundBody()
         {
-            // "Puck" octogonal de 1 pie de diámetro: las esquinas de su caja quedan fuera del cuerpo.
+            // Octagonal "puck" 1 ft in diameter: the corners of its box fall outside the body.
             var b = new TriMeshBuilder();
             const int n = 8;
             double r0 = 0.5, zb = 9.5, zt = 9.75;
@@ -245,7 +245,7 @@ namespace Bimbridge.Tests
         [Fact]
         public void BruteForce_AgreesWithBvh()
         {
-            // Referencia lenta: probar todos los triángulos sin BVH (lo que hacían los scripts de pyRevit con cada sólido).
+            // Slow reference: test every triangle without a BVH (what the pyRevit scripts did with each solid).
             var rnd = new Random(99);
             var boxes = new List<double[]>();
             var b = new TriMeshBuilder();
@@ -263,7 +263,7 @@ namespace Bimbridge.Tests
                 double px = rnd.NextDouble() * 110, py = rnd.NextDouble() * 110;
                 var got = new List<Segment>();
                 m.Segments(px, py, -1e4, 1e4, 0, got, sc);
-                // Unión de intervalos de las cajas que contienen el punto.
+                // Union of the intervals of the boxes that contain the point.
                 var iv = boxes.Where(q => px >= q[0] && px <= q[3] && py >= q[1] && py <= q[4]).Select(q => (q[2], q[5])).OrderBy(t => t.Item1).ToList();
                 var merged = new List<(double, double)>();
                 foreach (var t in iv)

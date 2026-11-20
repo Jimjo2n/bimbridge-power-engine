@@ -11,9 +11,9 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// 0.9.1 (Bloque H): lectura de SOLO LECTURA para check name=model_health. Avisos del documento, elementos de las categorías
-    /// pedidas (posición, tipo, parámetros requeridos), conectores MEP, láminas y vistas. Por tramos para no bloquear el hilo de Revit
-    /// más que el presupuesto. Las reglas se aplican fuera, en Engine.Qa.ModelHealth.
+    /// 0.9.1 (Block H): READ-ONLY read for check name=model_health. Document warnings, elements of the requested
+    /// categories (position, type, required parameters), MEP connectors, sheets and views. In slices so as not to block the Revit thread
+    /// beyond the budget. The rules are applied outside, in Engine.Qa.ModelHealth.
     /// </summary>
     public sealed class ModelHealthProbe
     {
@@ -27,7 +27,7 @@ namespace Bimbridge.Addin.Revit
         private List<ElementId> _sheetIds, _viewIds;
         private readonly HashSet<long> _onSheet = new HashSet<long>();
 
-        /// <summary>Límites para modelos grandes: lo que excede se informa como truncado, nunca se omite en silencio.</summary>
+        /// <summary>Limits for large models: anything beyond them is reported as truncated, never silently omitted.</summary>
         public const int MaxWarnings = 20000, MaxElements = 150000, MaxSheets = 5000, MaxViews = 20000;
         public int WarningsTotal, ElementsTotal, SheetsTotal, ViewsTotal;
         public int Slices;
@@ -55,7 +55,7 @@ namespace Bimbridge.Addin.Revit
             _cats = new List<BuiltInCategory>();
             foreach (var n in names)
             {
-                if (!QueryRunner.TryCategory(n, out var bic)) { error = "no existe la categoría " + n; return; }
+                if (!QueryRunner.TryCategory(n, out var bic)) { error = "category " + n + " does not exist"; return; }
                 _cats.Add(bic);
             }
             if (_cats.Count == 0) _cats.AddRange(DefaultCategories);
@@ -65,17 +65,17 @@ namespace Bimbridge.Addin.Revit
         {
             var doc = DocTarget.Resolve(app, out var docError);
             if (doc == null) { Error = docError; return true; }
-            if (doc.IsFamilyDocument) { Error = Status.NoSoportado + ": model_health revisa proyectos"; return true; }
+            if (doc.IsFamilyDocument) { Error = Status.NoSoportado + ": model_health checks projects"; return true; }
             var deadline = sw.ElapsedMilliseconds + budgetMs;
-            // AUD-17: ninguna fase hace un trabajo proporcional al modelo sin mirar el presupuesto. Las llamadas indivisibles de Revit
-            // (GetWarnings, un colector de ids) van solas en su tramo y se cede el hilo después; lo demás se trocea y se limita.
+            // AUD-17: no phase does work proportional to the model without checking the budget. Indivisible Revit calls
+            // (GetWarnings, an id collector) go alone in their slice and the thread is yielded afterwards; everything else is chunked and limited.
             if (_phase == 0)
             {
                 Rev = tracker.For(doc)?.Rev ?? 0;
-                _rawWarnings = doc.GetWarnings();          // una llamada de Revit; no se puede trocear
+                _rawWarnings = doc.GetWarnings();          // one Revit call; cannot be chunked
                 WarningsTotal = _rawWarnings.Count;
                 _phase = -1;
-                return false;                              // ceder el hilo antes de procesarlos
+                return false;                              // yield the thread before processing them
             }
             if (_phase == -1)
             {
@@ -92,7 +92,7 @@ namespace Bimbridge.Addin.Revit
             if (_phase == -2)
             {
                 var filter = new ElementMulticategoryFilter(_cats.ToList());
-                _ids = new FilteredElementCollector(doc).WherePasses(filter).WhereElementIsNotElementType().ToElementIds().ToList();   // sólo ids: no expande elementos
+                _ids = new FilteredElementCollector(doc).WherePasses(filter).WhereElementIsNotElementType().ToElementIds().ToList();   // ids only: does not expand elements
                 ElementsTotal = _ids.Count;
                 if (_ids.Count > MaxElements) _ids.RemoveRange(MaxElements, _ids.Count - MaxElements);
                 _phase = 1;
@@ -106,8 +106,8 @@ namespace Bimbridge.Addin.Revit
                     var e = doc.GetElement(_ids[_next]);
                     if (e == null) continue;
                     var fi = e as FamilyInstance;
-                    // 0.9.1: metadatos de tipo y nivel UNA vez por id (antes: hasta 3 doc.GetElement(typeId) por instancia, más uno por
-                    // parámetro requerido que no fuera de instancia). La caché vive sólo esta revisión: un probe nuevo por consulta.
+                    // 0.9.1: type and level metadata ONCE per id (before: up to 3 doc.GetElement(typeId) per instance, plus one per
+                    // required parameter that was not an instance one). The cache lives only for this check: a new probe per query.
                     var tm = TypeMeta(doc, e, fi);
                     var row = new ModelHealth.Element { Id = Ids.ToLong(e.Id), Category = e.Category?.Name, Family = tm.Family, Type = tm.Name, Level = LevelName(doc, e.LevelId) };
                     if (e.Location is LocationPoint lp) { row.X = lp.Point.X; row.Y = lp.Point.Y; row.Z = lp.Point.Z; row.RotationDeg = lp.Rotation * 180 / Math.PI; }
@@ -115,7 +115,7 @@ namespace Bimbridge.Addin.Revit
                     else row.HasLocation = false;
                     foreach (var p in _required)
                     {
-                        // Instancia primero; si no la tiene, el valor de tipo (ya resuelto una vez por tipo: mismo valor para todas sus instancias).
+                        // Instance first; if it does not have it, the type value (resolved once per type: same value for all its instances).
                         var prm = e.LookupParameter(p);
                         if (prm != null) { row.Params[p] = prm.HasValue ? (prm.StorageType == StorageType.String ? prm.AsString() : prm.AsValueString()) ?? "" : ""; continue; }
                         if (tm.TypeParams.TryGetValue(p, out var tv)) { if (tv != null) row.Params[p] = tv; }
@@ -132,7 +132,7 @@ namespace Bimbridge.Addin.Revit
                     if (cm != null)
                         foreach (Connector c in cm.Connectors)
                         {
-                            if (c.ConnectorType == ConnectorType.Logical) continue;   // conectores lógicos (eléctricos de familia) no se «conectan» físicamente
+                            if (c.ConnectorType == ConnectorType.Logical) continue;   // logical connectors (family electrical ones) are not physically "connected"
                             Connectors.Add(new ModelHealth.Connector { ElementId = row.Id, Domain = c.Domain.ToString(), Connected = c.IsConnected, Category = row.Category });
                         }
                 }
@@ -141,7 +141,7 @@ namespace Bimbridge.Addin.Revit
             }
             if (_phase == 2)
             {
-                // Ids de láminas y vistas y tablas por lámina en UNA pasada (antes: un colector por lámina).
+                // Sheet and view ids and schedules per sheet in ONE pass (before: one collector per sheet).
                 _sheetIds = new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).ToElementIds().ToList();
                 _viewIds = new FilteredElementCollector(doc).OfClass(typeof(View)).ToElementIds().ToList();
                 SheetsTotal = _sheetIds.Count; ViewsTotal = _viewIds.Count;
@@ -190,18 +190,18 @@ namespace Bimbridge.Addin.Revit
 
         private readonly Dictionary<long, int> _schedulesBySheet = new Dictionary<long, int>();
 
-        /// <summary>Metadatos de un tipo, resueltos una vez por id de tipo durante este probe.</summary>
+        /// <summary>Metadata of a type, resolved once per type id during this probe.</summary>
         private sealed class TypeInfo
         {
             public Element Element;
             public string Family, Name;
-            /// <summary>Valor de cada parámetro requerido en el TIPO (null = el tipo no lo tiene).</summary>
+            /// <summary>Value of each required parameter on the TYPE (null = the type does not have it).</summary>
             public readonly Dictionary<string, string> TypeParams = new Dictionary<string, string>(StringComparer.Ordinal);
         }
 
         private readonly Dictionary<long, TypeInfo> _types = new Dictionary<long, TypeInfo>();
         private readonly Dictionary<long, string> _levels = new Dictionary<long, string>();
-        /// <summary>Aciertos y fallos (observados) de las cachés de tipo y nivel.</summary>
+        /// <summary>Hits and misses (observed) of the type and level caches.</summary>
         public long CacheHits, CacheMisses;
 
         private TypeInfo TypeMeta(Document doc, Element e, FamilyInstance fi)
@@ -217,7 +217,7 @@ namespace Bimbridge.Addin.Revit
                 Family = fi?.Symbol?.FamilyName ?? (te as ElementType)?.FamilyName,
                 Name = fi?.Symbol?.Name ?? te?.Name,
             };
-            // Sin tipo no se cachea por id (no hay id que compartir).
+            // Without a type it is not cached by id (there is no id to share).
             if (k != long.MinValue) _types[k] = t;
             return t;
         }
@@ -233,11 +233,11 @@ namespace Bimbridge.Addin.Revit
             return n;
         }
 
-        /// <summary>Lo que quedó fuera por los límites (vacío si se revisó todo).</summary>
+        /// <summary>What was left out by the limits (empty if everything was checked).</summary>
         public Dictionary<string, object> Truncation()
         {
             var d = new Dictionary<string, object>();
-            void T(string k, int total, int max) { if (total > max) d[k] = "revisados " + max + " de " + total; }
+            void T(string k, int total, int max) { if (total > max) d[k] = "checked " + max + " of " + total; }
             T("avisos", WarningsTotal, MaxWarnings); T("elementos", ElementsTotal, MaxElements); T("laminas", SheetsTotal, MaxSheets); T("vistas", ViewsTotal, MaxViews);
             return d;
         }

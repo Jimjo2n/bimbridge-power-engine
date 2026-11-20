@@ -3,7 +3,7 @@ using System.Reflection;
 
 namespace Bimbridge.AgentHost
 {
-    /// <summary>Metadatos de versión centralizados (rc1): InformationalVersion = "versión+commit" embebido por el build reproducible.</summary>
+    /// <summary>Centralized version metadata (rc1): InformationalVersion = "version+commit" embedded by the reproducible build.</summary>
     public static class BuildInfo
     {
         public static readonly string Informational =
