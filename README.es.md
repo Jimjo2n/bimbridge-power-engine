@@ -8,7 +8,7 @@
 
 ## Descarga BIMBRIDGE para Windows
 
-**[Descargar el instalador v0.9.3](https://github.com/Jimjo2n/bimbridge-power-engine/releases/download/v0.9.3/PDI.RevitMcp.Setup.exe)** · [Notas y SHA-256](https://github.com/Jimjo2n/bimbridge-power-engine/releases/tag/v0.9.3) · [Todas las versiones](https://github.com/Jimjo2n/bimbridge-power-engine/releases) · [Matriz completa de herramientas](docs/MATRIZ_CAPACIDADES.md)
+**[Descargar el instalador más reciente](https://github.com/Jimjo2n/bimbridge-power-engine/releases/latest)** · [Notas y SHA-256](https://github.com/Jimjo2n/bimbridge-power-engine/releases/tag/v0.9.4) · [Todas las versiones](https://github.com/Jimjo2n/bimbridge-power-engine/releases) · [Matriz completa de herramientas](docs/MATRIZ_CAPACIDADES.md)
 
 | Objetivos de compilación | Runtime del complemento |
 | --- | --- |
@@ -59,7 +59,7 @@ Las fichas describen contratos, componentes y operaciones del repositorio. Los v
 
 <img src="docs/assets/github-transport.svg" width="760" height="280" alt="Transporte MCP y despacho en Revit">
 
-`PDI.RevitMcp.Bridge` expone MCP por stdio y traduce las solicitudes a un protocolo local sobre canales con nombre de Windows. `PDI.RevitMcp.Addin` encola el acceso a la API y lo despacha en el hilo principal mediante `ExternalEvent`. `PDI.RevitMcp.Protocol` reúne los contratos compartidos. [Referencia técnica](docs/integrations/MCP.md)
+`Bimbridge.Bridge` expone MCP por stdio y traduce las solicitudes a un protocolo local sobre canales con nombre de Windows. `Bimbridge.Addin` encola el acceso a la API y lo despacha en el hilo principal mediante `ExternalEvent`. `Bimbridge.Protocol` reúne los contratos compartidos. [Referencia técnica](docs/integrations/MCP.md)
 
 ### 02. Consultas, snapshots y cursores
 
@@ -83,7 +83,7 @@ Las fichas describen contratos, componentes y operaciones del repositorio. Los v
 
 <img src="docs/assets/github-scripting.svg" width="760" height="280" alt="C# dinámico, Roslyn y utilidades BIM">
 
-`exec` ofrece consulta y ejecución de C# con modalidades transaccionales. `CompileCache` coordina solicitudes concurrentes con la misma clave mediante single-flight. `PDI.RevitMcp.Scripting` reúne utilidades `Bim.*` para montaje, visibilidad, grupos y control por manifiesto. [Referencia técnica](docs/0.9.0/DYNAMIC_CODE_EXECUTION_POLICY.md)
+`exec` ofrece consulta y ejecución de C# con modalidades transaccionales. `CompileCache` coordina solicitudes concurrentes con la misma clave mediante single-flight. `Bimbridge.Scripting` reúne utilidades `Bim.*` para montaje, visibilidad, grupos y control por manifiesto. [Referencia técnica](docs/0.9.0/DYNAMIC_CODE_EXECUTION_POLICY.md)
 
 ### 06. Despacho de Power Engine y workers
 

@@ -8,10 +8,10 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using PDI.RevitMcp.Engine;
-using PDI.RevitMcp.Engine.Qa;
-using PDI.RevitMcp.Engine.Workflows;
-using PDI.RevitMcp.Protocol;
+using Bimbridge.Engine;
+using Bimbridge.Engine.Qa;
+using Bimbridge.Engine.Workflows;
+using Bimbridge.Protocol;
 
 // Harness offline reproducible (0.9.1). Cada escenario BM-xx mide, con mediana, p95, throughput y bytes asignados, la parte de BIMBRIDGE
 // que corre FUERA del hilo de Revit. Lo que necesita Revit (lectura/escritura reales, MEP, familias, compilación dinámica) NO se mide

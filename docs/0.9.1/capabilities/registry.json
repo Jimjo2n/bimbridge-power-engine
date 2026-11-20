@@ -20,7 +20,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/DocRegistry.cs"
+      "src/Bimbridge.Addin/Revit/DocRegistry.cs"
     ],
     "test_ids": [
       "IdentityJournalTests"
@@ -54,7 +54,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Families/DocOps.cs"
+      "src/Bimbridge.Addin/Revit/Families/DocOps.cs"
     ],
     "test_ids": [
       "AgentHostRevitTests"
@@ -91,7 +91,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Families/DocOps.cs"
+      "src/Bimbridge.Addin/Revit/Families/DocOps.cs"
     ],
     "test_ids": [
       "WorksharedPolicyTests"
@@ -128,7 +128,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Families/DocOps.cs"
+      "src/Bimbridge.Addin/Revit/Families/DocOps.cs"
     ],
     "test_ids": [],
     "verifier": "el handle deja de existir",
@@ -162,7 +162,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -232,7 +232,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Families/DocOps.cs"
+      "src/Bimbridge.Addin/Revit/Families/DocOps.cs"
     ],
     "test_ids": [],
     "verifier": "archivos esperados presentes y no vac\u00EDos",
@@ -267,9 +267,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -306,9 +306,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -345,9 +345,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -385,9 +385,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -424,9 +424,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -465,7 +465,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -499,7 +499,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -533,7 +533,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -567,7 +567,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.cs"
     ],
     "test_ids": [
       "EndToEndTests"
@@ -601,7 +601,7 @@
     ],
     "status": "OFFLINE_VERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Engine/Sessions.cs"
+      "src/Bimbridge.Engine/Sessions.cs"
     ],
     "test_ids": [
       "DurabilityTests"
@@ -637,12 +637,12 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
-      "src/PDI.RevitMcp.Engine/ModelOps.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs",
+      "src/Bimbridge.Engine/ModelOps.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
     "test_ids": [
       "ModelOpsTests"
@@ -680,12 +680,12 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
-      "src/PDI.RevitMcp.Engine/ModelOps.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs",
+      "src/Bimbridge.Engine/ModelOps.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
     "test_ids": [
       "ModelOpsTests"
@@ -723,7 +723,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -757,9 +757,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -830,7 +830,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -867,9 +867,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -904,9 +904,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -941,9 +941,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -980,9 +980,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -1017,8 +1017,8 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/QueryRunner.cs",
-      "src/PDI.RevitMcp.Engine/ResultTable.cs"
+      "src/Bimbridge.Addin/Revit/QueryRunner.cs",
+      "src/Bimbridge.Engine/ResultTable.cs"
     ],
     "test_ids": [
       "QuerySnapshotTests",
@@ -1055,7 +1055,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -1091,7 +1091,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -1127,7 +1127,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -1163,12 +1163,12 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
-      "src/PDI.RevitMcp.Engine/ModelOps.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs",
+      "src/Bimbridge.Engine/ModelOps.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
     "test_ids": [
       "ModelOpsTests"
@@ -1208,7 +1208,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -1277,12 +1277,12 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
-      "src/PDI.RevitMcp.Engine/ModelOps.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs",
+      "src/Bimbridge.Engine/ModelOps.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
     "test_ids": [
       "ModelOpsTests"
@@ -1321,12 +1321,12 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
-      "src/PDI.RevitMcp.Engine/ModelOps.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs",
+      "src/Bimbridge.Engine/ModelOps.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
     "test_ids": [
       "ModelOpsTests"
@@ -1365,7 +1365,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -1400,9 +1400,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -1439,9 +1439,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "GeoComputeTests",
@@ -1478,7 +1478,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -1515,7 +1515,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -1551,7 +1551,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -1587,7 +1587,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -1623,12 +1623,12 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
-      "src/PDI.RevitMcp.Engine/ModelOps.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs",
+      "src/Bimbridge.Engine/ModelOps.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
     "test_ids": [
       "ModelOpsTests"
@@ -1664,7 +1664,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/QueryRunner.cs"
+      "src/Bimbridge.Addin/Revit/QueryRunner.cs"
     ],
     "test_ids": [
       "QuerySnapshotTests"
@@ -1767,7 +1767,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -1802,9 +1802,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -1845,7 +1845,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -1879,7 +1879,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -1917,7 +1917,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -1949,7 +1949,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Families/FamilyOps.cs"
+      "src/Bimbridge.Addin/Revit/Families/FamilyOps.cs"
     ],
     "test_ids": [
       "FamilyLibraryTests"
@@ -1986,7 +1986,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -2020,12 +2020,12 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
-      "src/PDI.RevitMcp.Engine/ModelOps.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs",
+      "src/Bimbridge.Engine/ModelOps.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
     "test_ids": [
       "ModelOpsTests"
@@ -2063,7 +2063,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -2097,12 +2097,12 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
-      "src/PDI.RevitMcp.Engine/ModelOps.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs",
+      "src/Bimbridge.Engine/ModelOps.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
     "test_ids": [
       "ModelOpsTests"
@@ -2140,7 +2140,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -2206,12 +2206,12 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
-      "src/PDI.RevitMcp.Engine/ModelOps.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs",
+      "src/Bimbridge.Engine/ModelOps.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
     "test_ids": [
       "ModelOpsTests"
@@ -2249,12 +2249,12 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
-      "src/PDI.RevitMcp.Engine/ModelOps.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs",
+      "src/Bimbridge.Engine/ModelOps.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
     "test_ids": [
       "ModelOpsTests"
@@ -2290,7 +2290,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -2328,12 +2328,12 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
-      "src/PDI.RevitMcp.Engine/ModelOps.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs",
+      "src/Bimbridge.Engine/ModelOps.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
     "test_ids": [
       "ModelOpsTests"
@@ -2372,12 +2372,12 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
-      "src/PDI.RevitMcp.Engine/ModelOps.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs",
+      "src/Bimbridge.Engine/ModelOps.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
     "test_ids": [
       "ModelOpsTests"
@@ -2413,7 +2413,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -2449,7 +2449,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -2483,7 +2483,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Engine/LightingAudit.cs"
+      "src/Bimbridge.Engine/LightingAudit.cs"
     ],
     "test_ids": [
       "LightingAuditTests"
@@ -2553,7 +2553,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -2585,7 +2585,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Families/FamilyOps.cs"
+      "src/Bimbridge.Addin/Revit/Families/FamilyOps.cs"
     ],
     "test_ids": [
       "FamilyLibraryTests"
@@ -2619,7 +2619,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Families/FamilyOps.cs"
+      "src/Bimbridge.Addin/Revit/Families/FamilyOps.cs"
     ],
     "test_ids": [
       "FamilyLibraryTests"
@@ -2653,7 +2653,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Families/FamilyOps.cs"
+      "src/Bimbridge.Addin/Revit/Families/FamilyOps.cs"
     ],
     "test_ids": [
       "FamilyLibraryTests"
@@ -2689,9 +2689,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -2731,7 +2731,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -2766,9 +2766,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -2807,9 +2807,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -2849,9 +2849,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -2889,9 +2889,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -2931,9 +2931,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -2970,9 +2970,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -3009,7 +3009,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Capture.cs"
+      "src/Bimbridge.Addin/Revit/Capture.cs"
     ],
     "test_ids": [
       "EndToEndTests"
@@ -3043,9 +3043,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -3082,9 +3082,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -3119,9 +3119,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "Draw2DTests",
@@ -3158,9 +3158,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "Draw2DTests",
@@ -3198,9 +3198,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "Draw2DTests",
@@ -3237,9 +3237,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "Draw2DTests",
@@ -3276,9 +3276,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "Draw2DTests",
@@ -3317,7 +3317,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -3353,12 +3353,12 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs",
-      "src/PDI.RevitMcp.Engine/ModelOps.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.Model.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.Model.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs",
+      "src/Bimbridge.Engine/ModelOps.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.Model.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.Model.cs"
     ],
     "test_ids": [
       "ModelOpsTests"
@@ -3394,7 +3394,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Families/ExportOps.cs"
+      "src/Bimbridge.Addin/Revit/Families/ExportOps.cs"
     ],
     "test_ids": [],
     "verifier": "archivo nuevo, tama\u00F1o, hash y l\u00EDneas frente a filas del cuerpo",
@@ -3428,9 +3428,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "SheetSetOpTests",
@@ -3467,9 +3467,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "SheetSetOpTests"
@@ -3503,9 +3503,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "SheetSetOpTests"
@@ -3541,7 +3541,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -3575,7 +3575,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -3612,7 +3612,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -3648,7 +3648,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -3719,10 +3719,10 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/CopyMonitorProbe.cs",
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.CopyMonitor.cs",
-      "src/PDI.RevitMcp.Engine/Workflows/CopyMonitorVerifier.cs",
-      "src/PDI.RevitMcp.Engine/Workflows/NativeCapabilities.cs"
+      "src/Bimbridge.Addin/Revit/CopyMonitorProbe.cs",
+      "src/Bimbridge.Addin/Revit/RequestHandler.CopyMonitor.cs",
+      "src/Bimbridge.Engine/Workflows/CopyMonitorVerifier.cs",
+      "src/Bimbridge.Engine/Workflows/NativeCapabilities.cs"
     ],
     "test_ids": [
       "NativeWorkflowTests"
@@ -3791,9 +3791,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "WorksharedPolicyTests",
@@ -3830,7 +3830,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -3864,9 +3864,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "AdvancedEnginesTests",
@@ -3906,7 +3906,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -3942,7 +3942,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -3978,7 +3978,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -4012,8 +4012,8 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Geo/GeoRunner.cs",
-      "src/PDI.RevitMcp.Engine/Geo/GeoSummary.cs"
+      "src/Bimbridge.Addin/Revit/Geo/GeoRunner.cs",
+      "src/Bimbridge.Engine/Geo/GeoSummary.cs"
     ],
     "test_ids": [
       "GeoComputeTests",
@@ -4086,7 +4086,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -4123,7 +4123,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Families/ExportOps.cs"
+      "src/Bimbridge.Addin/Revit/Families/ExportOps.cs"
     ],
     "test_ids": [],
     "verifier": "archivo nuevo, tama\u00F1o y hash; transacci\u00F3n revertida",
@@ -4160,7 +4160,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -4198,7 +4198,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -4230,9 +4230,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs",
-      "src/PDI.RevitMcp.Addin/Scripting/ScriptHost.cs",
-      "src/PDI.RevitMcp.Engine/CompileCache.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs",
+      "src/Bimbridge.Addin/Scripting/ScriptHost.cs",
+      "src/Bimbridge.Engine/CompileCache.cs"
     ],
     "test_ids": [
       "ScriptingTests",
@@ -4268,7 +4268,7 @@
     ],
     "status": "OFFLINE_VERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Engine/Tasks/TaskManager.cs"
+      "src/Bimbridge.Engine/Tasks/TaskManager.cs"
     ],
     "test_ids": [
       "TaskEngineTests",
@@ -4303,7 +4303,7 @@
     ],
     "status": "OFFLINE_VERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.AgentHost/Exec/PlanRunner.cs"
+      "src/Bimbridge.AgentHost/Exec/PlanRunner.cs"
     ],
     "test_ids": [
       "AgentHostProcessTests",
@@ -4339,7 +4339,7 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/recetas/qc_manifiesto.cs"
+      "src/Bimbridge.Addin/recetas/qc_manifiesto.cs"
     ],
     "test_ids": [
       "QcFixtureTests"
@@ -4373,7 +4373,7 @@
     ],
     "status": "OFFLINE_VERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Engine/Workflow/Traceability.cs"
+      "src/Bimbridge.Engine/Workflow/Traceability.cs"
     ],
     "test_ids": [
       "TraceabilityTests",
@@ -4408,8 +4408,8 @@
     ],
     "status": "OFFLINE_VERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Engine/Workflows/WorkflowReceipt.cs",
-      "src/PDI.RevitMcp.Engine/Workflows/NativeCapabilities.cs"
+      "src/Bimbridge.Engine/Workflows/WorkflowReceipt.cs",
+      "src/Bimbridge.Engine/Workflows/NativeCapabilities.cs"
     ],
     "test_ids": [
       "NativeWorkflowTests"
@@ -4443,7 +4443,7 @@
     ],
     "status": "OFFLINE_VERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Engine/Workflows/TargetBinding.cs"
+      "src/Bimbridge.Engine/Workflows/TargetBinding.cs"
     ],
     "test_ids": [
       "NativeWorkflowTests.TwoRevitInstances_RequireAnExplicitTarget_AndStaleHandlesCannotWrite"
@@ -4477,7 +4477,7 @@
     ],
     "status": "OFFLINE_VERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Engine/Workflows/TargetBinding.cs"
+      "src/Bimbridge.Engine/Workflows/TargetBinding.cs"
     ],
     "test_ids": [
       "NativeWorkflowTests.Diagnostics_SeparateClientRegistrationFromRevitAvailability"
@@ -4511,7 +4511,7 @@
     ],
     "status": "OFFLINE_VERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Engine/PowerEngine/Workflows/PdfToPlan.cs"
+      "src/Bimbridge.Engine/PowerEngine/Workflows/PdfToPlan.cs"
     ],
     "test_ids": [
       "PdfToModelWorkflowTests",
@@ -4546,7 +4546,7 @@
     ],
     "status": "OFFLINE_VERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Engine/AuditLog.cs"
+      "src/Bimbridge.Engine/AuditLog.cs"
     ],
     "test_ids": [
       "AuditRecoveryTests",
@@ -4583,7 +4583,7 @@
     ],
     "status": "OFFLINE_VERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Engine/QuerySnapshots.cs"
+      "src/Bimbridge.Engine/QuerySnapshots.cs"
     ],
     "test_ids": [
       "QuerySnapshotTests"
@@ -4617,8 +4617,8 @@
     ],
     "status": "OFFLINE_VERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Engine/Correlation.cs",
-      "src/PDI.RevitMcp.Engine/Sessions.cs"
+      "src/Bimbridge.Engine/Correlation.cs",
+      "src/Bimbridge.Engine/Sessions.cs"
     ],
     "test_ids": [
       "AgentIdentityGateTests"
@@ -4654,7 +4654,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -4692,7 +4692,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -4832,7 +4832,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -4869,7 +4869,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -4914,7 +4914,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -4987,9 +4987,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -5026,9 +5026,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -5067,7 +5067,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5143,7 +5143,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5186,7 +5186,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5227,7 +5227,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5269,7 +5269,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5306,7 +5306,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5344,7 +5344,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5412,7 +5412,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5448,7 +5448,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5518,7 +5518,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5596,7 +5596,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5633,7 +5633,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5703,9 +5703,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -5756,7 +5756,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5829,7 +5829,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5868,7 +5868,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5907,7 +5907,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5945,7 +5945,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -5984,7 +5984,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -6063,7 +6063,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -6144,7 +6144,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -6223,7 +6223,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -6313,7 +6313,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -6369,7 +6369,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -6420,7 +6420,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -6460,7 +6460,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -6498,7 +6498,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -6622,7 +6622,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -6658,7 +6658,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -6732,7 +6732,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -6807,7 +6807,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -6854,7 +6854,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -6890,7 +6890,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -6967,7 +6967,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -7004,7 +7004,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -7041,7 +7041,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -7206,7 +7206,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -7287,9 +7287,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -7326,9 +7326,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "Draw2DTests",
@@ -7408,7 +7408,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -7478,9 +7478,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -7519,7 +7519,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -7559,7 +7559,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -7598,7 +7598,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -7636,7 +7636,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -7676,7 +7676,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -7759,7 +7759,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -7832,7 +7832,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -7866,9 +7866,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -7905,9 +7905,9 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanBuilder.cs",
-      "src/PDI.RevitMcp.Addin/Revit/Writes/PlanApplier.cs",
-      "src/PDI.RevitMcp.Engine/OpCatalog.cs"
+      "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.cs",
+      "src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs",
+      "src/Bimbridge.Engine/OpCatalog.cs"
     ],
     "test_ids": [
       "PlanTests",
@@ -7979,7 +7979,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -8021,7 +8021,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -8102,7 +8102,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -8145,7 +8145,7 @@
     ],
     "status": "DYNAMIC_CSHARP_ONLY",
     "source_files": [
-      "src/PDI.RevitMcp.Addin/Revit/RequestHandler.Exec.cs"
+      "src/Bimbridge.Addin/Revit/RequestHandler.Exec.cs"
     ],
     "test_ids": [],
     "verifier": "ninguno tipado: el script debe devolver evidencia; pendiente de operaci\u00F3n tipada con verificador",
@@ -8256,8 +8256,8 @@
     ],
     "status": "IMPLEMENTED_UNVERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Engine/Qa/ModelHealth.cs",
-      "src/PDI.RevitMcp.Addin/Revit/ModelHealthProbe.cs"
+      "src/Bimbridge.Engine/Qa/ModelHealth.cs",
+      "src/Bimbridge.Addin/Revit/ModelHealthProbe.cs"
     ],
     "test_ids": [
       "ModelHealthTests"
@@ -8432,8 +8432,8 @@
     ],
     "status": "OFFLINE_VERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Engine/OperationHistory.cs",
-      "src/PDI.RevitMcp.Engine/Jobs.cs"
+      "src/Bimbridge.Engine/OperationHistory.cs",
+      "src/Bimbridge.Engine/Jobs.cs"
     ],
     "test_ids": [
       "OperationHistoryTests"
@@ -8467,7 +8467,7 @@
     ],
     "status": "OFFLINE_VERIFIED",
     "source_files": [
-      "src/PDI.RevitMcp.Engine/OperationScheduler.cs"
+      "src/Bimbridge.Engine/OperationScheduler.cs"
     ],
     "test_ids": [
       "OperationSchedulerTests"

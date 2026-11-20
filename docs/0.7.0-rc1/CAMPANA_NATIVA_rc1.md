@@ -11,7 +11,7 @@ Estado: `BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION`. Solo empieza
 - Add-in rc1 instalado con niveles RPW; Retener desactivado y cola vacía.
 
 ## Preflight (cada prueba)
-1. `set PDI_REVIT_NATIVO=AUTORIZADO`.
+1. `set BIMBRIDGE_REVIT_NATIVE=AUTORIZADO`.
 2. `agenthost revit instancias --revit-disponible` muestra un único PID de prueba.
 3. `agenthost revit identidad --revit-pid N --revit-disponible` debe dar:
    - la ruta igual a la copia desechable;

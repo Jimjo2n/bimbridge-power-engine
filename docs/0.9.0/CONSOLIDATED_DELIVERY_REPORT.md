@@ -31,7 +31,7 @@ Build reproducible con `build.ps1` en un worktree limpio (HEAD exacto, prioridad
 | Python worker (`unittest`) | 31 OK, 2 omitidas |
 | Add-ins Revit 2022, 2023, 2024 (net48) y 2025, 2026 (net8, ReadyToRun) | compilados contra los paquetes de referencia |
 | Suite .NET | **635/635** |
-| Instalador | `dist/PDI.RevitMcp.Setup.exe` generado |
+| Instalador | `dist/Bimbridge.Setup.exe` generado |
 
 El build del commit final se registra en el paquete de auditoría (`SHA256SUMS`, manifiesto y log). En un clon de desarrollo sin `build.ps1`, las pruebas de `ScriptingTests` y las de la librería Rust fallan porque falta compilar los add-ins de todos los años o la DLL nativa. Es un problema de entorno, y `build.ps1` lo resuelve.
 

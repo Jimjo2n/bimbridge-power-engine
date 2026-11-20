@@ -11,6 +11,6 @@ foreach (var g in new FilteredElementCollector(doc).OfClass(typeof(Grid)).Cast<G
     var a = l.GetEndPoint(0); var b = l.GetEndPoint(1);
     rectos.Add(new Dictionary<string, object> { ["nombre"] = g.Name, ["p"] = new List<object> { Math.Round(a.X, 6), Math.Round(a.Y, 6), Math.Round(b.X, 6), Math.Round(b.Y, 6) } });
 }
-var json = PDI.RevitMcp.Protocol.Json.Write(rectos);
+var json = Bimbridge.Protocol.Json.Write(rectos);
 var ruta = ctx.Artefacto("ejes_modelo_090.json", json);
 return new { ejes = rectos.Count, omitidos, ruta };

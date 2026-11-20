@@ -1,4 +1,4 @@
-# 0.7.0 — PDI.RevitMcp.AgentHost: fronteras iniciales
+# 0.7.0 — Bimbridge.AgentHost: fronteras iniciales
 
 Diseño mínimo para empezar la 0.7.0 sin usar capacidades que 0.6.1 deja restringidas. No se implementa en 0.6.1.
 

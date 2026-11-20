@@ -6,7 +6,7 @@
 
 - Sólo copias **desechables, locales y no workshared** de un modelo **público** (por ejemplo, una muestra de Autodesk). Nada corporativo, nada de ACC/BIM 360, ninguna central.
 - Nunca sobre el Revit de trabajo del operador: una instancia aparte, abierta por operator, con la copia; el PID se toma de `revit instancias` y lo confirma operator.
-- Cada comando lleva `PDI_REVIT_NATIVO=AUTORIZADO` y `--revit-disponible` (si falta, el arnés imprime el estado bloqueado y sale con código 3).
+- Cada comando lleva `BIMBRIDGE_REVIT_NATIVE=AUTORIZADO` y `--revit-disponible` (si falta, el arnés imprime el estado bloqueado y sale con código 3).
 - Los pasos de escritura exigen `--autorizo-persistente` y `--ruta-esperada` = la ruta real de la copia; si la ruta no coincide o el documento es workshared, el ítem queda BLOQUEADO sin enviar ningún paso.
 - No se guarda, sincroniza, cierra ni reinicia Revit salvo en los ítems que lo dicen (N8-12 exporta; N8-13 repite NRT-05, que guarda la copia).
 - Instalación: operator instala a mano `BIMBRIDGE-0.8.0-actualizacion.zip` con **BIMBRIDGE → Developer Tools → Actualizar desde ZIP** (sin firma: pedirá confirmación doble) o con el instalador. Esa instalación es en sí la prueba N8-13c.
@@ -16,8 +16,8 @@
 Comando base (PowerShell, desde la carpeta del AgentHost):
 
 ```
-$env:PDI_REVIT_NATIVO="AUTORIZADO"
-.\PDI.RevitMcp.AgentHost.exe revit campana080 --revit-disponible --revit-pid <PID> --ruta-esperada "<C:\...\copia.rvt>" --autorizo-persistente --pasos <N8-xx.json> --salida <C:\...\evidencia\N8-xx> [--var nombre=valor ...]
+$env:BIMBRIDGE_REVIT_NATIVE="AUTORIZADO"
+.\Bimbridge.AgentHost.exe revit campana080 --revit-disponible --revit-pid <PID> --ruta-esperada "<C:\...\copia.rvt>" --autorizo-persistente --pasos <N8-xx.json> --salida <C:\...\evidencia\N8-xx> [--var nombre=valor ...]
 ```
 
 | Ítem | Qué demuestra | Estado inicial distinto | Arnés | Criterio de aprobación |
@@ -34,7 +34,7 @@ $env:PDI_REVIT_NATIVO="AUTORIZADO"
 | N8-10 | Validación independiente | puertas con `Mark` sembrado: dos esperadas, una omitida (D-999), una extra justificada | `ejecutar N8-10_plan.json --revit-pid <PID> --escritura lectura` (clave y huella del N8-01) | estado `diferencias` con D-999 omitida; la excepción justificada no cuenta; si `fuente_construccion` = `fuente_id` → `no_independiente`; cero commits |
 | N8-11 | Visibilidad y representación | una vista con luminarias | `N8-11.json` (`--var vista=<id>`) | auditoría por vista y captura PNG sin error |
 | N8-12 | Entregables | después de N8-05; exportar permitido | `N8-12.json` (`--var carpeta_pdf=...`) | PDF creado; luego `DeliveryTrack`: páginas = láminas del conjunto, sha del archivo = sha del recibo |
-| N8-13 | Regresión del núcleo 0.7.0 | copia nueva | `revit nrt05`, `revit nrt06`, `revit nrt03` (mismos parámetros que rc1) + instalación por ZIP (N8-13c) | mismos resultados que rc1 sobre el build 0.8.0; auditoria.jsonl con intención y resultado de cada commit (cierra H2); sin temporales residuales en `%LOCALAPPDATA%\PDI.RevitMcp` |
+| N8-13 | Regresión del núcleo 0.7.0 | copia nueva | `revit nrt05`, `revit nrt06`, `revit nrt03` (mismos parámetros que rc1) + instalación por ZIP (N8-13c) | mismos resultados que rc1 sobre el build 0.8.0; auditoria.jsonl con intención y resultado de cada commit (cierra H2); sin temporales residuales en `%LOCALAPPDATA%\Bimbridge` |
 
 B0 nativo (opcional, dentro de N8-07): 586 elementos de una copia con al menos esa cantidad; uno a uno con la herramienta del puente frente a un plan de 3 lotes; y el mismo trabajo con un script de pyRevit para la comparación B1–B8. Hasta entonces B0 es MEDIDO_SIMULADO y B1–B8 NO_MEDIDO.
 

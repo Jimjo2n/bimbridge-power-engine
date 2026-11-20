@@ -4,12 +4,12 @@
 # pequeños), métricas, diario de operaciones (operaciones\) de los últimos 3 días, diagnóstico del instalador y addin.log.
 param([string[]]$Tareas = @(), [int]$Dias = 3, [int]$MaxMbArtefacto = 20)
 $ErrorActionPreference = "Stop"
-$home_ = Join-Path $env:LOCALAPPDATA "PDI.RevitMcp"
+$home_ = Join-Path $env:LOCALAPPDATA "Bimbridge"
 $stamp = Get-Date -Format "yyyyMMdd_HHmm"
 $out = Join-Path ([Environment]::GetFolderPath("Desktop")) ("evidencia_060_" + $stamp)
 New-Item -ItemType Directory -Force $out | Out-Null
 
-$setup = Join-Path $home_ "PDI.RevitMcp.Setup.exe"
+$setup = Join-Path $home_ "Bimbridge.Setup.exe"
 if (Test-Path $setup) { & $setup /diagnostico | Out-File -Encoding utf8 (Join-Path $out "diagnostico.json") }
 
 foreach ($t in $Tareas) {

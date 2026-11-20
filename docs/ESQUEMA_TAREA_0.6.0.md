@@ -1,7 +1,7 @@
 # Esquema de tarea y checkpoint (0.6.0, esquema 1)
 
-Todo vive en disco, fuera de la conversación: `%LOCALAPPDATA%\PDI.RevitMcp\tareas\<id>\`. Cualquier cliente (Claude, Codex) y cualquier
-proceso de Revit que abra el mismo documento puede leerla. Código: `src/PDI.RevitMcp.Engine/Tasks/` (TaskModel, TaskStore, TaskRunner).
+Todo vive en disco, fuera de la conversación: `%LOCALAPPDATA%\Bimbridge\tareas\<id>\`. Cualquier cliente (Claude, Codex) y cualquier
+proceso de Revit que abra el mismo documento puede leerla. Código: `src/Bimbridge.Engine/Tasks/` (TaskModel, TaskStore, TaskRunner).
 
 | Archivo | Escritura | Contenido |
 |---|---|---|

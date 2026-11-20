@@ -14,4 +14,4 @@ Client-specific direct integrations would couple tool definitions to individual 
 Different client profiles require explicit registration and schema compatibility. Client metadata remains declared.
 
 ## Evidence
-`src/PDI.RevitMcp.Bridge` in the verified a291cc6 source baseline, together with the current sanitized import.
+`src/Bimbridge.Bridge` in the verified a291cc6 source baseline, together with the current sanitized import.

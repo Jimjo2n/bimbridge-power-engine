@@ -24,60 +24,60 @@ Fecha: 2026-10-26 · Entorno: contenedor Linux, .NET 8.0, **sin Revit**. Todo lo
 
 ## Pruebas AgentHost (salida literal)
 ```
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.AH03_CheckpointAheadOfJournal_IsRejected [19 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.AH03_CorruptedMiddleRecord_RefusesRecovery [34 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.AH03_ForgedCheckpointClaimingCompletion_IsRejected [17 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.AH03_IllegalTransition_UnknownOperation_UnknownState_AreRejected [214 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.AH03_JournalOfAnotherSchemaVersion_IsRejected [8 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.AH03_MissingJournalWithCheckpoint_IsRejected [38 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.AH03_PlanFileTampered_OrDifferentPlan_IsRejected [16 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.AH03_TamperedCheckpoint_IsDiscarded_AndRebuiltFromJournal [29 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.AH03_TornLastJournalLine_IsTrimmed_AndRunContinues [22 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.AH04_ZombieOwnerAfterTakeover_CannotWriteModelOrJournal [274 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.AH05_EmptyTargetSet_ExplicitlyAllowed_IsVerifiedAsEmpty_NotAsModification [26 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.AH05_EmptyTargetSet_WriteFailsWithDiagnostic_NothingWritten [14 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.AH05_ObserveWithZeroTargets_IsDistinctFromApplied_AndBackendRefusesDirectly [6 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.Cancellation_StopsBetweenOperations_AndCancelMarksTheRest [31 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.DocumentFingerprintMismatch_RefusesBeforeAnyExecution [4 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.IR_DependencyCyclesAreRejected_WithTheirPath [6 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.IR_IdIncludesDocumentFingerprintAndSource_AndIsKeyOrderIndependent [< 1 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.IR_OldSchemaVersion1_IsRejectedWithoutBestEffort [< 1 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.IR_RejectsAgentDeclaredSystemFields_ImplicitUnits_DuplicatesAndBadSources [1 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.IR_ValidatedPlanIsImmutable_AndSurvivesJsonRoundTrip [3 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.Model_TornWalLine_IsNotCommitted_CorruptLineRefuses [6 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.Pause_PersistsAcrossRestart_ResumeContinues [60 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.PreconditionOnTargetCount_FailsBeforeWriting [16 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.RealModelBackend_WithWrites_IsRefusedInAlpha1 [2 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.RepeatedExecutionOfACompletedPlan_DoesNothing [42 ms]
-Passed PDI.RevitMcp.Tests.AgentHostAlphaTests.TransientRejections_RetriedOnlyUpToPolicy_RejectionsAreNotEffects [48 ms]
-Passed PDI.RevitMcp.Tests.AgentHostDocumentTests.DocumentInstructionsCannotGrantPermissions_NorDeclareSystemFields [12 ms]
-Passed PDI.RevitMcp.Tests.AgentHostDocumentTests.DuplicateRequirementIds_AreReportedAtExtraction [< 1 ms]
-Passed PDI.RevitMcp.Tests.AgentHostDocumentTests.Extraction_KeepsPageSectionIdAndOriginal_WithoutInterpreting [1 ms]
-Passed PDI.RevitMcp.Tests.AgentHostDocumentTests.Interpretation_ConvertsOnlyUnambiguous_AndPreservesTheRestForReview [9 ms]
-Passed PDI.RevitMcp.Tests.AgentHostDocumentTests.MountKernel_IsDeterministic_AndSerializationRoundTripsExactly [87 ms]
-Passed PDI.RevitMcp.Tests.AgentHostDocumentTests.PlanFromDocument_ExecutesAgainstSimulatedModel_WithTraceabilityInReport [30 ms]
-Passed PDI.RevitMcp.Tests.AgentHostDocumentTests.RevitAdapter_MapsToInstalledRecipes_DeterministicallyAndRefusesToExecute [7 ms]
-Passed PDI.RevitMcp.Tests.AgentHostDocumentTests.TamperedSourceDocument_IsDetected_AndChangesOperationIds [38 ms]
-Passed PDI.RevitMcp.Tests.AgentHostProcessTests.AH01_CrashAfterAllElementsCommitted_RecoveredFromModelEvidence_VerifiedWithoutRepeating [1 s]
-Passed PDI.RevitMcp.Tests.AgentHostProcessTests.AH01_CrashAfterCommitBeforeResultSaved_ResultReconstructed_NotRepeated [1 s]
-Passed PDI.RevitMcp.Tests.AgentHostProcessTests.AH01_CrashAfterFourOfFiveElements_RolledBack_ExecutedOnceOnResume [1 s]
-Passed PDI.RevitMcp.Tests.AgentHostProcessTests.AH01_CrashAfterUnexpectedNumberOfElements_VerificationFails_NotRepeated [1 s]
-Passed PDI.RevitMcp.Tests.AgentHostProcessTests.AH01_CrashAfterVerificationBeforeFinalRecord_ReverifiedOnly [1 s]
-Passed PDI.RevitMcp.Tests.AgentHostProcessTests.AH01_CrashDuringVerification_ReverifiedOnly [1 s]
-Passed PDI.RevitMcp.Tests.AgentHostProcessTests.AH01_EffectProvenButEvidenceCompacted_RequiresVerification_NeverVerifiedNorRepeated [1 s]
-Passed PDI.RevitMcp.Tests.AgentHostProcessTests.AH01_FailedVerificationAfterRecovery_IsFailure_NotSuccess [1 s]
-Passed PDI.RevitMcp.Tests.AgentHostProcessTests.AH01_TargetsChangedAfterCommit_PartialEffect_RequiresReconciliation [1 s]
-Passed PDI.RevitMcp.Tests.AgentHostProcessTests.AH02_ModelAndStateSurviveRealProcessDeath_CompletesWithoutDuplicates [1 s]
-Passed PDI.RevitMcp.Tests.AgentHostProcessTests.AH03_RestartDuringCheckpointWrite_RecoversFromJournal [1 s]
-Passed PDI.RevitMcp.Tests.AgentHostProcessTests.AH04_LeaseExpiresAfterCrash_NextProcessTakesOverWithHigherFencing [2 s]
-Passed PDI.RevitMcp.Tests.AgentHostProcessTests.AH04_TwoProcessesCompete_OnlyOneExecutes_NoDuplicates [875 ms]
-Passed PDI.RevitMcp.Tests.AgentHostScenarioTests.Measure_CompactMessageSizes_Bytes [2 s]
-Passed PDI.RevitMcp.Tests.AgentHostScenarioTests.Scenario1000_SevenForcedTerminations_CompletesSafely_WithFullReport [19 s]
-Passed PDI.RevitMcp.Tests.AgentHostServiceTests.Service_BoundedQueue_RejectsWhenFull [201 ms]
-Passed PDI.RevitMcp.Tests.AgentHostServiceTests.Service_GracefulShutdown_ThenNewHostRecoversOnStartup [6 s]
-Passed PDI.RevitMcp.Tests.AgentHostServiceTests.Service_PauseResumeCancel_ArePersistedAndRespected [1 s]
-Passed PDI.RevitMcp.Tests.AgentHostServiceTests.Service_ProcessKilled_NewServiceProcessRecoversWithoutDuplicates [4 s]
-Passed PDI.RevitMcp.Tests.AgentHostServiceTests.Service_SubmitRunInspectReport_Idempotent_StructuredErrors [2 s]
+Passed Bimbridge.Tests.AgentHostAlphaTests.AH03_CheckpointAheadOfJournal_IsRejected [19 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.AH03_CorruptedMiddleRecord_RefusesRecovery [34 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.AH03_ForgedCheckpointClaimingCompletion_IsRejected [17 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.AH03_IllegalTransition_UnknownOperation_UnknownState_AreRejected [214 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.AH03_JournalOfAnotherSchemaVersion_IsRejected [8 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.AH03_MissingJournalWithCheckpoint_IsRejected [38 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.AH03_PlanFileTampered_OrDifferentPlan_IsRejected [16 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.AH03_TamperedCheckpoint_IsDiscarded_AndRebuiltFromJournal [29 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.AH03_TornLastJournalLine_IsTrimmed_AndRunContinues [22 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.AH04_ZombieOwnerAfterTakeover_CannotWriteModelOrJournal [274 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.AH05_EmptyTargetSet_ExplicitlyAllowed_IsVerifiedAsEmpty_NotAsModification [26 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.AH05_EmptyTargetSet_WriteFailsWithDiagnostic_NothingWritten [14 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.AH05_ObserveWithZeroTargets_IsDistinctFromApplied_AndBackendRefusesDirectly [6 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.Cancellation_StopsBetweenOperations_AndCancelMarksTheRest [31 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.DocumentFingerprintMismatch_RefusesBeforeAnyExecution [4 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.IR_DependencyCyclesAreRejected_WithTheirPath [6 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.IR_IdIncludesDocumentFingerprintAndSource_AndIsKeyOrderIndependent [< 1 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.IR_OldSchemaVersion1_IsRejectedWithoutBestEffort [< 1 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.IR_RejectsAgentDeclaredSystemFields_ImplicitUnits_DuplicatesAndBadSources [1 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.IR_ValidatedPlanIsImmutable_AndSurvivesJsonRoundTrip [3 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.Model_TornWalLine_IsNotCommitted_CorruptLineRefuses [6 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.Pause_PersistsAcrossRestart_ResumeContinues [60 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.PreconditionOnTargetCount_FailsBeforeWriting [16 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.RealModelBackend_WithWrites_IsRefusedInAlpha1 [2 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.RepeatedExecutionOfACompletedPlan_DoesNothing [42 ms]
+Passed Bimbridge.Tests.AgentHostAlphaTests.TransientRejections_RetriedOnlyUpToPolicy_RejectionsAreNotEffects [48 ms]
+Passed Bimbridge.Tests.AgentHostDocumentTests.DocumentInstructionsCannotGrantPermissions_NorDeclareSystemFields [12 ms]
+Passed Bimbridge.Tests.AgentHostDocumentTests.DuplicateRequirementIds_AreReportedAtExtraction [< 1 ms]
+Passed Bimbridge.Tests.AgentHostDocumentTests.Extraction_KeepsPageSectionIdAndOriginal_WithoutInterpreting [1 ms]
+Passed Bimbridge.Tests.AgentHostDocumentTests.Interpretation_ConvertsOnlyUnambiguous_AndPreservesTheRestForReview [9 ms]
+Passed Bimbridge.Tests.AgentHostDocumentTests.MountKernel_IsDeterministic_AndSerializationRoundTripsExactly [87 ms]
+Passed Bimbridge.Tests.AgentHostDocumentTests.PlanFromDocument_ExecutesAgainstSimulatedModel_WithTraceabilityInReport [30 ms]
+Passed Bimbridge.Tests.AgentHostDocumentTests.RevitAdapter_MapsToInstalledRecipes_DeterministicallyAndRefusesToExecute [7 ms]
+Passed Bimbridge.Tests.AgentHostDocumentTests.TamperedSourceDocument_IsDetected_AndChangesOperationIds [38 ms]
+Passed Bimbridge.Tests.AgentHostProcessTests.AH01_CrashAfterAllElementsCommitted_RecoveredFromModelEvidence_VerifiedWithoutRepeating [1 s]
+Passed Bimbridge.Tests.AgentHostProcessTests.AH01_CrashAfterCommitBeforeResultSaved_ResultReconstructed_NotRepeated [1 s]
+Passed Bimbridge.Tests.AgentHostProcessTests.AH01_CrashAfterFourOfFiveElements_RolledBack_ExecutedOnceOnResume [1 s]
+Passed Bimbridge.Tests.AgentHostProcessTests.AH01_CrashAfterUnexpectedNumberOfElements_VerificationFails_NotRepeated [1 s]
+Passed Bimbridge.Tests.AgentHostProcessTests.AH01_CrashAfterVerificationBeforeFinalRecord_ReverifiedOnly [1 s]
+Passed Bimbridge.Tests.AgentHostProcessTests.AH01_CrashDuringVerification_ReverifiedOnly [1 s]
+Passed Bimbridge.Tests.AgentHostProcessTests.AH01_EffectProvenButEvidenceCompacted_RequiresVerification_NeverVerifiedNorRepeated [1 s]
+Passed Bimbridge.Tests.AgentHostProcessTests.AH01_FailedVerificationAfterRecovery_IsFailure_NotSuccess [1 s]
+Passed Bimbridge.Tests.AgentHostProcessTests.AH01_TargetsChangedAfterCommit_PartialEffect_RequiresReconciliation [1 s]
+Passed Bimbridge.Tests.AgentHostProcessTests.AH02_ModelAndStateSurviveRealProcessDeath_CompletesWithoutDuplicates [1 s]
+Passed Bimbridge.Tests.AgentHostProcessTests.AH03_RestartDuringCheckpointWrite_RecoversFromJournal [1 s]
+Passed Bimbridge.Tests.AgentHostProcessTests.AH04_LeaseExpiresAfterCrash_NextProcessTakesOverWithHigherFencing [2 s]
+Passed Bimbridge.Tests.AgentHostProcessTests.AH04_TwoProcessesCompete_OnlyOneExecutes_NoDuplicates [875 ms]
+Passed Bimbridge.Tests.AgentHostScenarioTests.Measure_CompactMessageSizes_Bytes [2 s]
+Passed Bimbridge.Tests.AgentHostScenarioTests.Scenario1000_SevenForcedTerminations_CompletesSafely_WithFullReport [19 s]
+Passed Bimbridge.Tests.AgentHostServiceTests.Service_BoundedQueue_RejectsWhenFull [201 ms]
+Passed Bimbridge.Tests.AgentHostServiceTests.Service_GracefulShutdown_ThenNewHostRecoversOnStartup [6 s]
+Passed Bimbridge.Tests.AgentHostServiceTests.Service_PauseResumeCancel_ArePersistedAndRespected [1 s]
+Passed Bimbridge.Tests.AgentHostServiceTests.Service_ProcessKilled_NewServiceProcessRecoversWithoutDuplicates [4 s]
+Passed Bimbridge.Tests.AgentHostServiceTests.Service_SubmitRunInspectReport_Idempotent_StructuredErrors [2 s]
 ```
 
 ## Escenario de 1 000 operaciones — log literal
@@ -86,26 +86,26 @@ Resultado esperado y obtenido: **944 verificadas · 15 fallidas · 41 bloqueadas
 ```
 $ agenthost escenario <dir>
 escenario 6d05df091eb3aecc8979 · 1000 operaciones · 988 escrituras · 1030 dependencias
-$ agenthost ejecutar … [PDI_AH_FALLO=runner.entre_operaciones#120] → código 137 (SIGKILL)
+$ agenthost ejecutar … [BIMBRIDGE_AH_FAULT=runner.entre_operaciones#120] → código 137 (SIGKILL)
 
   tras la caída: 115/1000 verificadas · 4 fallidas · 881 pendientes · seq 356 · siguiente op-64890752c1db45cb9bcf
-$ agenthost ejecutar … [PDI_AH_FALLO=backend.mitad_tx@op-514fdec779127df119c7:7] → código 137 (SIGKILL)
+$ agenthost ejecutar … [BIMBRIDGE_AH_FAULT=backend.mitad_tx@op-514fdec779127df119c7:7] → código 137 (SIGKILL)
   diag info:checkpoint_atrasado — checkpoint en seq 352, diario en 356; se usa el diario
   tras la caída: 154/1000 verificadas · 1 en curso · 5 fallidas · 1 bloqueadas · 839 pendientes · seq 479 · siguiente op-514fdec779127df119c7
-$ agenthost ejecutar … [PDI_AH_FALLO=backend.tras_commit@op-7e42e1147bce7753a976] → código 137 (SIGKILL)
+$ agenthost ejecutar … [BIMBRIDGE_AH_FAULT=backend.tras_commit@op-7e42e1147bce7753a976] → código 137 (SIGKILL)
   diag info:checkpoint_atrasado — checkpoint en seq 457, diario en 479; se usa el diario
   tras la caída: 211/1000 verificadas · 1 en curso · 7 fallidas · 5 bloqueadas · 776 pendientes · seq 665 · siguiente op-7e42e1147bce7753a976
-$ agenthost ejecutar … [PDI_AH_FALLO=runner.en_checkpoint#2] → código 137 (SIGKILL)
+$ agenthost ejecutar … [BIMBRIDGE_AH_FAULT=runner.en_checkpoint#2] → código 137 (SIGKILL)
   diag info:checkpoint_atrasado — checkpoint en seq 631, diario en 665; se usa el diario
   tras la caída: 243/1000 verificadas · 1 en curso · 8 fallidas · 6 bloqueadas · 742 pendientes · seq 767 · siguiente op-98772cf51a3ccd293035
-$ agenthost ejecutar … [PDI_AH_FALLO=runner.tras_ejecutar@op-a2516f862e1d8f1d2734] → código 137 (SIGKILL)
+$ agenthost ejecutar … [BIMBRIDGE_AH_FAULT=runner.tras_ejecutar@op-a2516f862e1d8f1d2734] → código 137 (SIGKILL)
   diag aviso:checkpoint_a_medias — estado.json.tmp-caida: escritura interrumpida, descartada
   diag info:checkpoint_atrasado — checkpoint en seq 717, diario en 767; se usa el diario
   tras la caída: 283/1000 verificadas · 1 en curso · 8 fallidas · 7 bloqueadas · 701 pendientes · seq 894 · siguiente op-a2516f862e1d8f1d2734
-$ agenthost ejecutar … [PDI_AH_FALLO=runner.en_verificacion@op-adafc66676d15cdf3409] → código 137 (SIGKILL)
+$ agenthost ejecutar … [BIMBRIDGE_AH_FAULT=runner.en_verificacion@op-adafc66676d15cdf3409] → código 137 (SIGKILL)
   diag info:checkpoint_atrasado — checkpoint en seq 869, diario en 894; se usa el diario
   tras la caída: 320/1000 verificadas · 9 fallidas · 11 bloqueadas · 660 pendientes · seq 1016 · siguiente op-adafc66676d15cdf3409
-$ agenthost ejecutar … [PDI_AH_FALLO=runner.tras_verificar@op-b31f23f33fe5e1ea0480] → código 137 (SIGKILL)
+$ agenthost ejecutar … [BIMBRIDGE_AH_FAULT=runner.tras_verificar@op-b31f23f33fe5e1ea0480] → código 137 (SIGKILL)
   diag info:checkpoint_atrasado — checkpoint en seq 996, diario en 1016; se usa el diario
   tras la caída: 361/1000 verificadas · 9 fallidas · 11 bloqueadas · 619 pendientes · seq 1140 · siguiente op-b31f23f33fe5e1ea0480
 $ agenthost ejecutar - (sin fallo, proceso 8) → código 2
@@ -121,7 +121,7 @@ caídas registradas:
   runner.tras_verificar@op-b31f23f33fe5e1ea0480
 tiempo total (8 procesos): 18465 ms
 $ agenthost estado <estado> informe
-  {"resumen":"944/1000 verificadas · 15 fallidas · 41 bloqueadas · seq 2936","sin_resolver":56,"por_estado":{"verificada":944,"fallida":15,"bloqueada":41},"por_error":{"verificacion":6,"dependencia":41,"rechazo_backend":3,"transitorio":2,"sin_objetivos":4},"detalle":"/tmp/pdi-esc1000-4334856788/estado/informe.json","sha256_detalle":"50a7fa000bd2391e4320afd63f195aea1bd2ef79ca4f63864e08d3237e94f6b4"}
+  {"resumen":"944/1000 verificadas · 15 fallidas · 41 bloqueadas · seq 2936","sin_resolver":56,"por_estado":{"verificada":944,"fallida":15,"bloqueada":41},"por_error":{"verificacion":6,"dependencia":41,"rechazo_backend":3,"transitorio":2,"sin_objetivos":4},"detalle":"/tmp/bimbridge-esc1000-4334856788/estado/informe.json","sha256_detalle":"50a7fa000bd2391e4320afd63f195aea1bd2ef79ca4f63864e08d3237e94f6b4"}
 $ agenthost estado <estado> excepciones
   op-4af6789bd8d3b9d395e8 fallida(sin_objetivos): el alcance no selecciona ningún elemento; no se escribió nada (permitir_vacio=false)
   op-a6d2d81662945b38cfb4 fallida(sin_objetivos): el alcance no selecciona ningún elemento; no se escribió nada (permitir_vacio=false)

@@ -6,8 +6,8 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
-using PDI.RevitMcp.Engine.Coverage;
-using PDI.RevitMcp.Protocol;
+using Bimbridge.Engine.Coverage;
+using Bimbridge.Protocol;
 
 // Benchmarks offline del índice de capacidades (0.9.1). Catálogos sintéticos de 500, 1.000, 5.000 y 10.000 entradas más el real.
 // Mide en este equipo: construcción del índice, búsquedas, memoria retenida y asignada, y bytes de la respuesta serializada como la

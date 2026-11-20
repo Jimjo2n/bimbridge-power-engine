@@ -8,7 +8,7 @@
 
 ## Get BIMBRIDGE for Windows
 
-**[Download Setup for v0.9.3](https://github.com/Jimjo2n/bimbridge-power-engine/releases/download/v0.9.3/PDI.RevitMcp.Setup.exe)** · [Release notes and SHA-256](https://github.com/Jimjo2n/bimbridge-power-engine/releases/tag/v0.9.3) · [All releases](https://github.com/Jimjo2n/bimbridge-power-engine/releases) · [Full tool matrix](docs/MATRIZ_CAPACIDADES.md)
+**[Download the latest Setup](https://github.com/Jimjo2n/bimbridge-power-engine/releases/latest)** · [Release notes and SHA-256](https://github.com/Jimjo2n/bimbridge-power-engine/releases/tag/v0.9.4) · [All releases](https://github.com/Jimjo2n/bimbridge-power-engine/releases) · [Full tool matrix](docs/MATRIZ_CAPACIDADES.md)
 
 | Revit build targets | Add-in runtime |
 | --- | --- |
@@ -19,6 +19,8 @@
 1. Close Revit, download the reviewed package and verify its SHA-256. Select your Revit releases and client in Setup. See the [installation guide](docs/getting-started/INSTALLATION.md).
 2. Connect through **Codex** or **Claude Code**, or configure the MCP stdio bridge in your client. The bridge offers compact and complete profiles with separate tool schemas. See [MCP setup](docs/integrations/MCP.md) and the [compact](docs/ESQUEMA_HERRAMIENTAS_compacto.json) and [complete](docs/ESQUEMA_HERRAMIENTAS_completo.json) contracts.
 3. Open an authorized test model. In the compact read tool, use `ctx` to identify the document, then `q LF f=id,type digest=true` to request a fingerprint of the filtered lighting fixtures. See [command examples](examples/README.md) and [workflow recipes](docs/RECETAS.md).
+
+**Updating from 0.9.x:** do it once by hand. Finish or cancel paused tasks, close Revit and double-click `Bimbridge.Setup.exe`; the 0.9.x Update button cannot find the renamed installer. Setup moves your data, settings, grants and client registrations to the new names. Afterwards, re-create Claude Code permission rules written for the previous MCP tool prefix as `mcp__bimbridge__*`, and re-assign Revit shortcuts and Quick Access Toolbar buttons. Later updates work from the ribbon again. See the [changelog](CHANGELOG.md).
 
 ## BIMBRIDGE at a glance
 
@@ -59,7 +61,7 @@ These plates describe the repository’s contracts, components and operations. D
 
 <img src="docs/assets/github-transport.svg" width="760" height="280" alt="MCP transport + Revit dispatch">
 
-`PDI.RevitMcp.Bridge` exposes MCP over stdio and translates requests into a local Windows named-pipe protocol. `PDI.RevitMcp.Addin` queues API access and dispatches it on Revit’s main thread through `ExternalEvent`. `PDI.RevitMcp.Protocol` holds the shared contracts. [Technical reference](docs/integrations/MCP.md)
+`Bimbridge.Bridge` exposes MCP over stdio and translates requests into a local Windows named-pipe protocol. `Bimbridge.Addin` queues API access and dispatches it on Revit’s main thread through `ExternalEvent`. `Bimbridge.Protocol` holds the shared contracts. [Technical reference](docs/integrations/MCP.md)
 
 ### 02. Queries, snapshots and cursors
 
@@ -83,7 +85,7 @@ These plates describe the repository’s contracts, components and operations. D
 
 <img src="docs/assets/github-scripting.svg" width="760" height="280" alt="Dynamic C# + Roslyn cache">
 
-`exec` exposes dynamic C# queries and execution with transaction modes. `CompileCache` coordinates concurrent requests for the same key with single-flight compilation. `PDI.RevitMcp.Scripting` provides `Bim.*` helpers for mounting, visibility, groups and manifest-based checks. [Technical reference](docs/0.9.0/DYNAMIC_CODE_EXECUTION_POLICY.md)
+`exec` exposes dynamic C# queries and execution with transaction modes. `CompileCache` coordinates concurrent requests for the same key with single-flight compilation. `Bimbridge.Scripting` provides `Bim.*` helpers for mounting, visibility, groups and manifest-based checks. [Technical reference](docs/0.9.0/DYNAMIC_CODE_EXECUTION_POLICY.md)
 
 ### 06. Power Engine dispatch and workers
 

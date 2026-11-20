@@ -496,7 +496,7 @@ $RECYCLE.BIN/
 
 # salida de build.sh / build.ps1
 dist/
-src/PDI.RevitMcp.Setup/payload.zip
+src/Bimbridge.Setup/payload.zip
 
 # 0.9.0 Power Engine: salidas de Rust y caches de Python
 native/power_engine/target/

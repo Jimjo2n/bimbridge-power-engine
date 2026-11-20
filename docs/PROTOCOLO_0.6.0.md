@@ -1,4 +1,4 @@
-# Protocolo PDI Revit MCP 0.6.0
+# Protocolo BIMBRIDGE 0.6.0
 
 Versión de cable: **2** (sin cambios de formato respecto a 0.5.0; 0.6.0 añade la operación `tarea` y campos nuevos, todos opcionales).
 Un cliente 0.5.0 sigue funcionando: ninguna operación existente cambió de nombre ni de significado.
@@ -7,9 +7,9 @@ Un cliente 0.5.0 sigue funcionando: ninguna operación existente cambió de nomb
 
 | Capa | Qué es | Dónde |
 |---|---|---|
-| IA ↔ puente | MCP por stdio. Perfil **compacto** (por defecto, 5 herramientas: `revit`, `plan`, `commit`, `exec`, `act`) o **completo** (20). | `PDI.RevitMcp.Bridge.exe` |
-| Puente ↔ add-in | JSON por línea en una tubería con nombre local por instancia de Revit (`instances\<pid>.json` la anuncia). | `PDI.RevitMcp.Protocol` |
-| Add-in ↔ Revit | Hilo principal de Revit (ExternalEvent + Idling por tramos con presupuesto). | `PDI.RevitMcp.Addin` |
+| IA ↔ puente | MCP por stdio. Perfil **compacto** (por defecto, 5 herramientas: `revit`, `plan`, `commit`, `exec`, `act`) o **completo** (20). | `Bimbridge.Bridge.exe` |
+| Puente ↔ add-in | JSON por línea en una tubería con nombre local por instancia de Revit (`instances\<pid>.json` la anuncia). | `Bimbridge.Protocol` |
+| Add-in ↔ Revit | Hilo principal de Revit (ExternalEvent + Idling por tramos con presupuesto). | `Bimbridge.Addin` |
 
 ## Petición y respuesta
 

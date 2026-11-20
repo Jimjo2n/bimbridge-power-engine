@@ -4,7 +4,7 @@ Nada de esto se ha corrido todavía. Se ejecuta en el equipo de prueba, Revit 20
 Cada paso dice qué se escribe a la IA (perfil compacto) y qué cuenta como aprobado. Si un paso falla, se anota el texto exacto de la respuesta.
 
 ## 0. Preparación
-1. Instalar `PDI.RevitMcp.Setup.exe` 0.5.0 (zip `PDI.RevitMcp.Setup_0.5.0.zip`). Comprobar el SHA-256 contra `MANIFIESTO_0.5.0.txt`.
+1. Instalar `Bimbridge.Setup.exe` 0.5.0 (zip `Bimbridge.Setup_0.5.0.zip`). Comprobar el SHA-256 contra `MANIFIESTO_0.5.0.txt`.
 2. Abrir Revit 2024 con el modelo de práctica. Modo **En vivo** (Retener rechaza exec y familias con `necesita_usuario`, a propósito).
 3. `revit "ctx"`: aprobado si muestra `addin 0.5.0`, `protocolo 2`, `runner auto`, la lista `capacidades` y la ruta del compilador sin error.
 

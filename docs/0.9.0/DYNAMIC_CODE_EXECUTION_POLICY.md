@@ -9,7 +9,7 @@ Estado: NATIVE_ACCEPTANCE_PENDING para esta revisión.
 | **Bloquear inyección de código C#** (cinta BIMBRIDGE, panel Autoridad) | desactivado | `exec` corre para los agentes locales autorizados |
 | Activado | — | Todo `exec` nuevo (consulta, ensayo, ejecutar) se rechaza con `inyeccion_csharp_bloqueada` antes de compilar |
 
-- Persiste en `%APPDATA%\PDI.RevitMcp\config.json` como `"bloquear_inyeccion_csharp": true|false`. Si el archivo está dañado, se trata como bloqueado (fail-closed).
+- Persiste en `%APPDATA%\Bimbridge\config.json` como `"bloquear_inyeccion_csharp": true|false`. Si el archivo está dañado, se trata como bloqueado (fail-closed).
 - Si no se puede guardar el cambio, el botón no lo aplica y lo dice.
 - Se aplica a las peticiones nuevas. No interrumpe lo que ya entró en el hilo de Revit.
 - Queda en la auditoría (`bloquear_inyeccion_csharp: bloqueado|permitido`), con la persona como autor.

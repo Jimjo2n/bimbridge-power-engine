@@ -1,4 +1,4 @@
-# PDI.RevitMcp 0.7.0-alpha1 — índice
+# Bimbridge 0.7.0-alpha1 — índice
 
 Solo backend simulado. Revit no fue tocado. Base v0.6.1-rc3 (7be12ad) sin cambios.
 
@@ -9,4 +9,4 @@ Solo backend simulado. Revit no fue tocado. Base v0.6.1-rc3 (7be12ad) sin cambio
 - LIMITACIONES_0.7.0.md, ROADMAP_0.7.0.md
 - evidencia/ — logs de dotnet test, escenario, diario e informe completos, banco del kernel, pipeline de documento
 
-Comandos (`dotnet PDI.RevitMcp.AgentHost.dll …`): validar, modelo crear|compactar, ejecutar, estado, pausar/reanudar/cancelar, servicio, cliente, documento, escenario, banco-kernel.
+Comandos (`dotnet Bimbridge.AgentHost.dll …`): validar, modelo crear|compactar, ejecutar, estado, pausar/reanudar/cancelar, servicio, cliente, documento, escenario, banco-kernel.

@@ -10,6 +10,6 @@
     <ServerGarbageCollection>false</ServerGarbageCollection>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\PDI.RevitMcp.Engine\PDI.RevitMcp.Engine.csproj" />
+    <ProjectReference Include="..\..\..\src\Bimbridge.Engine\Bimbridge.Engine.csproj" />
   </ItemGroup>
 </Project>

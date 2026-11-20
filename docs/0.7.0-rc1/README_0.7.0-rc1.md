@@ -1,4 +1,4 @@
-# PDI.RevitMcp 0.7.0-rc1 — candidato interno · NATIVE_ACCEPTANCE_PENDING
+# Bimbridge 0.7.0-rc1 — candidato interno · NATIVE_ACCEPTANCE_PENDING
 
 Rama `feature/0.7.0-rc1`, que nace de `v0.7.0-beta1.1` (c2aca78). **No hay tag `v0.7.0-rc1`**: se pone solo cuando la campaña nativa apruebe.
 Toda prueba contra Revit queda `BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION`.
@@ -24,4 +24,4 @@ Toda prueba contra Revit queda `BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHO
 
 ## Comandos nuevos
 - `agenthost revit nrt03 | nrt06`: arneses de campaña, ver `CAMPANA_NATIVA_rc1.md`.
-- Compuerta: todo `agenthost revit …` y `ejecutar --revit-pid` exigen `PDI_REVIT_NATIVO=AUTORIZADO` **y** `--revit-disponible`. Sin ambas, no conectan e imprimen el estado BLOCKED.
+- Compuerta: todo `agenthost revit …` y `ejecutar --revit-pid` exigen `BIMBRIDGE_REVIT_NATIVE=AUTORIZADO` **y** `--revit-disponible`. Sin ambas, no conectan e imprimen el estado BLOCKED.

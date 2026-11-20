@@ -45,9 +45,9 @@ Condiciones previas, en el equipo de prueba y con su autorización:
 Pasos:
 
 ```
-PDI.RevitMcp.AgentHost.exe revit instancias
-PDI.RevitMcp.AgentHost.exe revit identidad --revit-pid <PID de la 2.ª instancia>
-PDI.RevitMcp.AgentHost.exe revit nrt04 --revit-pid <PID> --salida %USERPROFILE%\Desktop\SAMPLE PROJECT\NRT_alpha3 --categoria <cat> --ids <3 a 5 ids> --parametro Comments --valor NRT04
+Bimbridge.AgentHost.exe revit instancias
+Bimbridge.AgentHost.exe revit identidad --revit-pid <PID de la 2.ª instancia>
+Bimbridge.AgentHost.exe revit nrt04 --revit-pid <PID> --salida %USERPROFILE%\Desktop\SAMPLE PROJECT\NRT_alpha3 --categoria <cat> --ids <3 a 5 ids> --parametro Comments --valor NRT04
 ```
 
 Qué hace el arnés:

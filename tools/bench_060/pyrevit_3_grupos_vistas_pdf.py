@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # -*- coding: utf-8 -*-
 # Benchmark 0.6.0 · carga 3 (grupos, vistas, láminas y exportación) · motor pyRevit. Equivalente de mcp_3_grupos_vistas_pdf.cs.
-# No cambia el modelo; exporta un PDF a %TEMP%\pdi_bench. Nota: el guardián de pyRevit puede bloquear la exportación desde scripts;
+# No cambia el modelo; exporta un PDF a %TEMP%\bimbridge_bench. Nota: el guardián de pyRevit puede bloquear la exportación desde scripts;
 # si la bloquea, anote "bloqueado" (es parte de la comparación, no un fallo del script).
 import time, json, os, datetime
 from Autodesk.Revit.DB import (FilteredElementCollector, Group, ViewPlan, ViewType, ViewSheet, PDFExportOptions, ElementId, FamilyInstance,
     PlanViewPlane, PlanViewRange, Level)
 from System.Collections.Generic import List
 HOJAS = 3
-CARPETA = os.path.expandvars(r"%TEMP%\pdi_bench")
+CARPETA = os.path.expandvars(r"%TEMP%\bimbridge_bench")
 doc = __revit__.ActiveUIDocument.Document
 t0 = time.time()
 grupos = list(FilteredElementCollector(doc).OfClass(Group))

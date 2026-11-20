@@ -1,6 +1,6 @@
-# PDI.RevitMcp 0.7.0-alpha1 — Arquitectura de ejecución autónoma
+# Bimbridge 0.7.0-alpha1 — Arquitectura de ejecución autónoma
 
-Base: v0.6.1-rc3 (commit 7be12ad). Rama: `feature/0.7.0-agenthost`. Nada de rc3 fue modificado (`git diff 7be12ad -- src/` solo toca `src/PDI.RevitMcp.AgentHost/`).
+Base: v0.6.1-rc3 (commit 7be12ad). Rama: `feature/0.7.0-agenthost`. Nada de rc3 fue modificado (`git diff 7be12ad -- src/` solo toca `src/Bimbridge.AgentHost/`).
 **Las escrituras van SOLO a un backend simulado. Revit no se toca; el adaptador Revit tiene escrituras deshabilitadas.**
 
 ## Capas
