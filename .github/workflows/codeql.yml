@@ -22,4 +22,4 @@ jobs:
         with:
           languages: csharp,python
       - run: dotnet build tests/Bimbridge.Tests/Bimbridge.Tests.csproj -c Release
-      - uses: github/codeql-action/analyze@b7b84b636b4f90c9b31da1bc5f72bfadd5b31410
+      - uses: github/codeql-action/analyze@d2aacf54c2fbc910db8d7ec338fdb54ea48c692d
