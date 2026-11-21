@@ -1,0 +1,72 @@
+ID,Priority,Module,Acceptance_tests,Status_0.5.0,Evidence,Missing
+R001,P0,Instructions,"A01,A02",Done,"Instructions of both profiles, guides and help window without exclusivity; real schema in docs/ESQUEMA_HERRAMIENTAS_*.json",
+R002,P0,Capabilities,"A01,A29","Done, without Revit",ctx returns capabilities by document type and year; docs/MATRIZ_CAPACIDADES.md is generated from the code (test Capabilities_DocMatchesCode),check ctx in Revit
+R003,P0,API runner,A02,"Done, without Revit","exec: general C# (expression, body, class) with Roslyn 4.8; ScriptingTests compile against RevitAPI 2022–2026",run it inside Revit
+R004,P0,Families,"A03,A04","Done, without Revit","fam, exec and 7 plan operations accept RFA; geo and chk answer no_soportado with an alternative",test with a real RFA
+R005,P0,Identity,"A06,A25","Done, without Revit",DocTarget pins the document across all slices; if it is closed → destino_no_disponible,test in Revit switching views mid-job
+R006,P0,Sets,A07,Partial,sets bound to doc dN and title; error if used in another document (test NamedSets_AreBoundToTheirDocument),generation and revision missing
+R007,P0,Reconnection,A08,"Done, untested",the bridge pins the pid after first contact; writes fail with destino_no_disponible if it disappears; reads only move to a single Revit of the same year and warn,automated bridge test with two instances
+R008,P0,Families,"A04,A05","Done, without Revit","open (EditFamily), connector/param in the RFA, save and load with separate transactions per document",washbasin case in Revit
+R009,P0,MEP connectors,A05,"Done, without Revit","act conector creates, adopts or reconciles by key (description); does not duplicate",washbasin case in Revit
+R010,P0,MEP connectors,A05,"Done, without Revit","verifies face, normal, radius, system, duplicates; flow pending if undecided",washbasin case in Revit
+R011,P1,API runner,"A02,A29","Done, without Revit",cache by hash of code+year+add-in+references; compilation off the Revit thread; measured 89–140 ms warm,measure inside Revit
+R012,P1,API runner,"A02,A22","Done, without Revit",diagnostics with the script line (test Errors_PointToTheUsersLine); JSON result; exception with line,serializer untested in Revit
+R013,P1,Python compatibility,"A02,A29",Pending,exec is C# only; no Python adapter or pyRevit helpers; declared in the matrix,decide whether it is needed (IronPython/CPython)
+R014,P1,Units,"A05,A17","Done, untested","fam requires an explicit unit and distinguishes radius, diameter, width and height; never assumes a value",unit test for LengthFeet (lives in the add-in)
+R015,P1,Families,"A03,A05","Done, without Revit","fam info: types, parameters, formulas, GUID, associations; fam param: value, formula, create, associate",
+R016,P1,Families,"A04,A23","Done, without Revit",load with IFamilyLoadOptions and re-read connectors from the project,
+R017,P1,Jobs,"A09,A11",Partial,clave= and tarea= with an on-disk journal; jobs with tarea are not cancelled on disconnect,checkpoints inside a long job missing
+R018,P1,Jobs,"A10,A11",Partial,"exec declares its real Undo (auto=1, grupo=1, ninguna=whatever the script does)",resumable jobs in slices
+R019,P1,Jobs,A10,Pending,,yield the thread between write units
+R020,P1,Jobs,"A10,A23",Pending,,scheduler with per-document barriers
+R021,P1,Cancellation,"A09,A10",Partial,ctx.Cancel / ThrowIfCancelled in exec; bridge deadline cancels inside Revit,acknowledgement with applied status per slice
+R022,P1,Recovery,"A09,A11","Done, unit test",operation without end → interrumpido; not repeated without reconciliar=si (Journal_InterruptedOperation_NeedsReconcile),test with Revit closed midway
+R023,P1,Recovery,"A09,A11",Partial,jobs and plans visible and applicable by another conversation with the same task,sets are still per connection
+R024,P1,Idempotency,"A05,A09,A11",Partial,semantic keys on connectors (description) and generic clave=,"semantic keys for fixtures, groups and sheets"
+R025,P1,Conflicts,A12,Done (0.4.0),plan/commit keeps diff and conflict; nothing removed,
+R026,P1,Authorization,A32,Partial,the instructions allow applying without per-batch confirmation if the task is authorized,no formal per-task authorization record
+R027,P1,Authorization,A33,"Done, without Revit","Pause is checked before each command (also exec, fam and doc); Hold returns necesita_usuario for exec and families",
+R028,P1,Documents,A23,"Done, without Revit","guardar / guardar_como verify file, date, size and SHA-256",
+R029,P1,Documents,A23,"Done, without Revit",sync confirms via the DocumentSynchronizedWithCentral event,
+R030,P1,Documents,A24,"Done, without Revit","pdf by set or sheets; verifies new file, hash and pages",
+R031,P1,Groups,"A13,A14",Unchanged in 0.5.0,group_* from 0.3.0; exec allows custom strategies,typed strategies per group type
+R032,P1,Groups,A15,Unchanged in 0.5.0,,Unit Grouping group profile
+R033,P1,Groups,A14,Unchanged in 0.5.0,,validated per-level copy
+R034,P1,Worksets,"A13,A14",Unchanged in 0.5.0,,group workset verification
+R035,P1,Hosting,A16,Unchanged in 0.5.0,place from 0.3.0,adapters per FamilyPlacementType
+R036,P1,Hosting,"A16,A18",Unchanged in 0.5.0,,
+R037,P1,Orientation,A16,Unchanged in 0.5.0,,validate physical front (the washbasin asks for it explicitly with frente=)
+R038,P1,Geometry,A17,Unchanged in 0.5.0,geo mounting with meshes (0.3.0),
+R039,P1,Geometry,"A16,A17",Pending,,
+R040,P1,Geometry,A17,Unchanged in 0.5.0,,
+R041,P1,Geometry,A18,"Done, without Revit",GeoIndex excludes and warns about a link whose transform fails,
+R042,P1,Cache,A18,Unchanged in 0.5.0,,
+R043,P1,QC,A22,Partial,commit re-reads what it touched; exec reports created/changed/deleted per document,exec postconditions
+R044,P1,QC,"A15,A35","Done, unit test",chk lighting_audit tags=uno|ninguno|ignorar (LightingAudit_TagRuleIsPerTask),
+R045,P1,QC,"A13,A22,A26","Done, E2E test",completado_con_diferencias; 'parcial:' per command; act stops after a failure,
+R046,P1,QC,"A20,A24",Unchanged in 0.5.0,,
+R047,P1,Templates,A20,Unchanged in 0.5.0,,
+R048,P1,Views,A20,Unchanged in 0.5.0,,
+R049,P1,Views,A20,Unchanged in 0.5.0,,
+R050,P1,Regions,A21,Unchanged in 0.5.0,filled_region from 0.3.0,
+R051,P1,Documentation,A24,Pending,,dimensions require an explicit operation
+R052,P1,Documentation,A15,"Done, unit test",per-task tag rule (R044); no tag by default,
+R053,P1,Documentation,A24,Unchanged in 0.5.0,sheet_create/sheet_place from 0.3.0,
+R054,P1,Resources,A19,"Done, unit test",responses >12000 characters are stored; res <id> desde= reads them in slices; plan limits raised to 200 ops / 20000 entries,real streaming
+R055,P1,Results,A27,"Done, unit test",r… handles kept 7 days on disk; the bridge's 'no changes' carries the handle,
+R056,P1,Results,A26,"Done, E2E test",status per line; IsError only if all fail,
+R057,P1,MCP metadata,"A01,A26",Done,revit is truly read-only (fam abrir/conector moved to act); exec/act/commit marked destructive,
+R058,P1,Warnings,A28,"Done, without Revit",FailureLog groups by FailureDefinitionId with ids,
+R059,P1,Multi-version,A29,Partial,compiles 2022–2026 and the scripts compile against each API,"not run on 2022, 2023, 2025, 2026"
+R060,P1,Multi-version,A29,Pending,,runtime method checks
+R061,P1,Build,A30,Done,build.ps1 checks $LASTEXITCODE at each step; build.sh uses set -e; tests after compiling the add-ins,
+R062,P1,Update,A31,"Done, unit test",update keeps enabled=false and the extra Codex keys (Update_KeepsMcpOff_AndCodexExtraKeys),
+R063,P1,Update,"A29,A31",Partial,MANIFIESTO with the SHA-256 of each file; protocol 2 in the handshake,coordinated bridge/add-in activation
+R064,P2,Sources,A34,Pending,,
+R065,P2,Sources,A34,Pending,,
+R066,P2,Sources,A34,Pending,,
+R067,P2,Tasks,"A27,A35",Pending,"the per-task journal stores operations, not decisions",
+R068,P2,Benchmark,"A02,A05,A24",Pending,without Revit there is no equivalent benchmark; only compilation and tool-size measurements,
+R069,P2,Benchmark,"A09,A24",Pending,,
+R070,P2,Documentation,"A01,A29","Done, unit test",matrix generated from Capabilities.cs and verified by a test,
+R071,P2,Delivery,"A29,A30",Done,"source code, binaries and SHA-256 in the package; limits in the report",

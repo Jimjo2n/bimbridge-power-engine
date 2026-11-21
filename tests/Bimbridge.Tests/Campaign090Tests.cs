@@ -22,7 +22,7 @@ namespace Bimbridge.Tests
         [Fact]
         public void StepFiles_AreBlocked_WellFormed_AndPlansValidate_WithJsonOps()
         {
-            var dir = Path.Combine(Root(), "tools", "aceptacion", "0.9.0");
+            var dir = Path.Combine(Root(), "tools", "acceptance", "0.9.0");
             var files = Directory.GetFiles(dir, "N9-*.json");
             Assert.Equal(6, files.Length);
             var ops = "[{\"op\":\"place\",\"type\":\"F: T\",\"level\":\"Level 1\",\"puntos\":[[1,2],[3,4]],\"montaje\":\"losa\"}]";

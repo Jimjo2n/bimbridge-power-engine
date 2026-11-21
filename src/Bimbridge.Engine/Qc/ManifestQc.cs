@@ -8,13 +8,13 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine.Qc
 {
     /// <summary>
-    /// QC contra un manifiesto de referencia (§7.4). Cruza lo esperado (de los planos: posición, tipo permitido, nivel, grupo, etiqueta,
-    /// montaje, fuente) con lo que hay en el modelo, UNO A UNO:
-    /// - un elemento del modelo sólo puede justificar una referencia (nunca se cuentan totales);
-    /// - proximidad sola no es identidad: si dos candidatos quedan casi igual de cerca, la referencia queda "ambigua" y NO se aprueba;
-    /// - faltantes, sobrantes y casi duplicados (dos elementos del mismo tipo casi en el mismo sitio) se informan siempre;
-    /// - separa la cobertura de interpretación del plano (campos no confirmados en el manifiesto) de la comprobación del modelo.
-    /// Unidades: mm y grados. Sin API de Revit: se prueba sin Revit y el add-in sólo junta los datos.
+    /// QC against a reference manifest (§7.4). Matches what is expected (from the drawings: position, allowed type, level, group, tag,
+    /// mounting, source) with what is in the model, ONE TO ONE:
+    /// - a model element can justify only one reference (totals are never counted);
+    /// - proximity alone is not identity: if two candidates are almost equally close, the reference is "ambiguous" and is NOT approved;
+    /// - missing, extra and near-duplicate elements (two elements of the same type almost in the same place) are always reported;
+    /// - keeps the drawing-interpretation coverage (fields not confirmed in the manifest) separate from the model check.
+    /// Units: mm and degrees. No Revit API: tested without Revit, and the add-in only gathers the data.
     /// </summary>
     public static class ManifestQc
     {
@@ -25,14 +25,14 @@ namespace Bimbridge.Engine.Qc
             public double? Z;
             public double? RotDeg;
             public string Level;
-            /// <summary>Tipos permitidos ("Familia: Tipo" o sólo "Tipo"); vacío = cualquiera.</summary>
+            /// <summary>Allowed types ("Family: Type" or just "Type"); empty = any.</summary>
             public List<string> Types = new List<string>();
-            /// <summary>true = exactamente una etiqueta; false = ninguna; null = no se comprueba.</summary>
+            /// <summary>true = exactly one tag; false = none; null = not checked.</summary>
             public bool? Tag;
             public string Group;
             public string Mounting;
             public string Source;
-            /// <summary>Campos que la lectura del plano no pudo confirmar (p. ej. "altura"): no se aprueban como comprobados.</summary>
+            /// <summary>Fields the drawing reading could not confirm (e.g. "altura"): not approved as checked.</summary>
             public List<string> Unconfirmed = new List<string>();
         }
 
@@ -56,9 +56,9 @@ namespace Bimbridge.Engine.Qc
             public double TolXY = 150;
             public double TolZ = 25;
             public double TolRot = 2;
-            /// <summary>Simetría del símbolo (180 = una regleta igual girada 180°; 90 = cuadrada; 0 = sin simetría).</summary>
+            /// <summary>Symbol symmetry (180 = a strip light that looks the same rotated 180°; 90 = square; 0 = no symmetry).</summary>
             public double Symmetry = 0;
-            /// <summary>Si el segundo candidato está a menos de este margen (mm) del primero, la referencia es ambigua.</summary>
+            /// <summary>If the second candidate is within this margin (mm) of the first, the reference is ambiguous.</summary>
             public double AmbiguityMargin = 50;
             public double NearDuplicate = 100;
             public bool SameLevel = true;
@@ -77,7 +77,7 @@ namespace Bimbridge.Engine.Qc
         {
             public int Expected, Model, Approved, WithDeviation, Ambiguous, Missing, Extra, NearDuplicates, Unconfirmed;
             public readonly List<Finding> Findings = new List<Finding>();
-            /// <summary>ref → id del modelo emparejado (sólo emparejamientos únicos, aprobados o con desviación).</summary>
+            /// <summary>ref → matched model id (unique matches only, approved or with deviation).</summary>
             public readonly Dictionary<string, long> Pairs = new Dictionary<string, long>(StringComparer.Ordinal);
             public bool Passed => Approved == Expected && Extra == 0 && NearDuplicates == 0 && Ambiguous == 0 && Missing == 0;
 
@@ -97,7 +97,7 @@ namespace Bimbridge.Engine.Qc
 
         private static double D2(double ax, double ay, double bx, double by) => Math.Sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
 
-        /// <summary>Diferencia de giro en [0, 180], reducida por la simetría del símbolo (180 = igual girado media vuelta).</summary>
+        /// <summary>Rotation difference in [0, 180], reduced by the symbol symmetry (180 = same when rotated half a turn).</summary>
         public static double RotDiff(double a, double b, double symmetry)
         {
             var d = Math.Abs(((a - b) % 360 + 540) % 360 - 180);
@@ -122,7 +122,7 @@ namespace Bimbridge.Engine.Qc
             o = o ?? new Options();
             var r = new Result { Expected = expected.Count, Model = model.Count };
 
-            // 1) Candidatos dentro de tolerancia en planta (y mismo nivel si se exige).
+            // 1) Candidates within tolerance in plan (and on the same level if required).
             var pairs = new List<Tuple<int, int, double>>();
             var candE = new Dictionary<int, List<Tuple<int, double>>>();
             var candA = new Dictionary<int, List<Tuple<int, double>>>();
@@ -137,7 +137,7 @@ namespace Bimbridge.Engine.Qc
                     (candA.TryGetValue(j, out var la) ? la : candA[j] = new List<Tuple<int, double>>()).Add(Tuple.Create(i, d));
                 }
 
-            // 2) Emparejamiento uno a uno por distancia creciente (cada elemento justifica una sola referencia).
+            // 2) One-to-one matching by increasing distance (each element justifies only one reference).
             var eTaken = new int?[expected.Count];
             var aTaken = new int?[model.Count];
             foreach (var p in pairs.OrderBy(p => p.Item3).ThenBy(p => p.Item1).ThenBy(p => p.Item2))
@@ -147,14 +147,14 @@ namespace Bimbridge.Engine.Qc
                 aTaken[p.Item2] = p.Item1;
             }
 
-            // 3) Cada referencia: ambigua, faltante, o emparejada con sus comprobaciones.
+            // 3) Each reference: ambiguous, missing, or matched with its checks.
             for (var i = 0; i < expected.Count; i++)
             {
                 var e = expected[i];
                 foreach (var f in e.Unconfirmed ?? new List<string>())
                 {
                     r.Unconfirmed++;
-                    r.Findings.Add(new Finding { Code = "no_confirmado", Ref = e.Ref, Detail = f + " sin confirmar en la fuente" + (e.Source != null ? " (" + e.Source + ")" : "") });
+                    r.Findings.Add(new Finding { Code = "no_confirmado", Ref = e.Ref, Detail = f + " not confirmed in the source" + (e.Source != null ? " (" + e.Source + ")" : "") });
                 }
                 if (!eTaken[i].HasValue)
                 {
@@ -163,16 +163,16 @@ namespace Bimbridge.Engine.Qc
                     r.Findings.Add(new Finding
                     {
                         Code = "faltante", Ref = e.Ref,
-                        Detail = "no hay elemento a ≤" + F(o.TolXY) + " mm" + (o.SameLevel && e.Level != null ? " en " + e.Level : "") +
-                                 (near != null ? "; el más cercano es #" + near.a.Id + " a " + F(near.d) + " mm" + (aTaken[near.j].HasValue ? " (ya asignado a " + expected[aTaken[near.j].Value].Ref + ")" : "") : ""),
+                        Detail = "no element within ≤" + F(o.TolXY) + " mm" + (o.SameLevel && e.Level != null ? " on " + e.Level : "") +
+                                 (near != null ? "; the closest is #" + near.a.Id + " at " + F(near.d) + " mm" + (aTaken[near.j].HasValue ? " (already assigned to " + expected[aTaken[near.j].Value].Ref + ")" : "") : ""),
                     });
                     continue;
                 }
                 var j0 = eTaken[i].Value;
                 var a0 = model[j0];
                 var d0 = D2(e.X, e.Y, a0.X, a0.Y);
-                // ¿Otro candidato casi igual de cerca (para esta referencia), u otra referencia casi igual de cerca de este elemento?
-                // Un rival sólo cuenta si no tiene claramente otra pareja mejor (si la tiene, no hay duda).
+                // Another candidate almost equally close (for this reference), or another reference almost equally close to this element?
+                // A rival counts only if it does not clearly have a better match of its own (if it does, there is no doubt).
                 double MatchDistE(int ei) => eTaken[ei].HasValue ? D2(expected[ei].X, expected[ei].Y, model[eTaken[ei].Value].X, model[eTaken[ei].Value].Y) : double.MaxValue;
                 double MatchDistA(int aj) => aTaken[aj].HasValue ? D2(expected[aTaken[aj].Value].X, expected[aTaken[aj].Value].Y, model[aj].X, model[aj].Y) : double.MaxValue;
                 var rivalA = candE[i].Where(c => c.Item1 != j0 && c.Item2 - d0 < o.AmbiguityMargin && !(MatchDistA(c.Item1) + o.AmbiguityMargin <= c.Item2)).ToList();
@@ -184,34 +184,34 @@ namespace Bimbridge.Engine.Qc
                     {
                         Code = "ambiguo", Ref = e.Ref, Id = a0.Id,
                         Detail = rivalA.Count > 0
-                            ? "candidatos #" + a0.Id + " (" + F(d0) + " mm) y " + string.Join(", ", rivalA.Select(c => "#" + model[c.Item1].Id + " (" + F(c.Item2) + " mm)")) + ": la cercanía no prueba cuál es"
-                            : "#" + a0.Id + " está casi igual de cerca de " + string.Join(", ", rivalE.Select(c => expected[c.Item1].Ref)) + ": no se aprueba por proximidad",
+                            ? "candidates #" + a0.Id + " (" + F(d0) + " mm) and " + string.Join(", ", rivalA.Select(c => "#" + model[c.Item1].Id + " (" + F(c.Item2) + " mm)")) + ": proximity does not prove which one it is"
+                            : "#" + a0.Id + " is almost equally close to " + string.Join(", ", rivalE.Select(c => expected[c.Item1].Ref)) + ": not approved on proximity",
                     });
                     continue;
                 }
                 var devs = new List<Finding>();
-                if (d0 > o.TolXY * 0.5) devs.Add(new Finding { Code = "posicion", Ref = e.Ref, Id = a0.Id, Detail = "desplazada " + F(d0) + " mm (tolerancia " + F(o.TolXY) + ")" });
+                if (d0 > o.TolXY * 0.5) devs.Add(new Finding { Code = "posicion", Ref = e.Ref, Id = a0.Id, Detail = "displaced " + F(d0) + " mm (tolerance " + F(o.TolXY) + ")" });
                 if (e.Z.HasValue && Math.Abs(a0.Z - e.Z.Value) > o.TolZ)
-                    devs.Add(new Finding { Code = "altura", Ref = e.Ref, Id = a0.Id, Detail = "z " + F(a0.Z) + " mm, esperada " + F(e.Z.Value) + " (±" + F(o.TolZ) + ")" });
+                    devs.Add(new Finding { Code = "altura", Ref = e.Ref, Id = a0.Id, Detail = "z " + F(a0.Z) + " mm, expected " + F(e.Z.Value) + " (±" + F(o.TolZ) + ")" });
                 if (e.RotDeg.HasValue && a0.RotDeg.HasValue && RotDiff(a0.RotDeg.Value, e.RotDeg.Value, o.Symmetry) > o.TolRot)
-                    devs.Add(new Finding { Code = "orientacion", Ref = e.Ref, Id = a0.Id, Detail = "giro " + F(a0.RotDeg.Value) + "°, esperado " + F(e.RotDeg.Value) + "°" });
+                    devs.Add(new Finding { Code = "orientacion", Ref = e.Ref, Id = a0.Id, Detail = "rotation " + F(a0.RotDeg.Value) + "°, expected " + F(e.RotDeg.Value) + "°" });
                 if (!TypeAllowed(e, a0))
-                    devs.Add(new Finding { Code = "tipo", Ref = e.Ref, Id = a0.Id, Detail = a0.FullType + " no está entre " + string.Join(" | ", e.Types) });
+                    devs.Add(new Finding { Code = "tipo", Ref = e.Ref, Id = a0.Id, Detail = a0.FullType + " is not among " + string.Join(" | ", e.Types) });
                 if (!o.SameLevel && !LevelOk(e, a0))
-                    devs.Add(new Finding { Code = "nivel", Ref = e.Ref, Id = a0.Id, Detail = a0.Level + ", esperado " + e.Level });
+                    devs.Add(new Finding { Code = "nivel", Ref = e.Ref, Id = a0.Id, Detail = a0.Level + ", expected " + e.Level });
                 if (e.Tag == true && a0.Tags == 0) devs.Add(new Finding { Code = "sin_etiqueta", Ref = e.Ref, Id = a0.Id });
-                if (e.Tag == true && a0.Tags > 1) devs.Add(new Finding { Code = "etiqueta_duplicada", Ref = e.Ref, Id = a0.Id, Detail = a0.Tags + " etiquetas" });
-                if (e.Tag == false && a0.Tags > 0) devs.Add(new Finding { Code = "etiqueta_sobra", Ref = e.Ref, Id = a0.Id, Detail = a0.Tags + " etiquetas y la regla dice ninguna" });
+                if (e.Tag == true && a0.Tags > 1) devs.Add(new Finding { Code = "etiqueta_duplicada", Ref = e.Ref, Id = a0.Id, Detail = a0.Tags + " tags" });
+                if (e.Tag == false && a0.Tags > 0) devs.Add(new Finding { Code = "etiqueta_sobra", Ref = e.Ref, Id = a0.Id, Detail = a0.Tags + " tags and the rule says none" });
                 if (!string.IsNullOrEmpty(e.Group) && !string.Equals(e.Group, a0.Group, StringComparison.OrdinalIgnoreCase))
-                    devs.Add(new Finding { Code = "grupo", Ref = e.Ref, Id = a0.Id, Detail = "en " + (a0.Group ?? "(sin grupo)") + ", esperado " + e.Group });
+                    devs.Add(new Finding { Code = "grupo", Ref = e.Ref, Id = a0.Id, Detail = "in " + (a0.Group ?? "(no group)") + ", expected " + e.Group });
                 if (!string.IsNullOrEmpty(e.Mounting) && !string.IsNullOrEmpty(a0.Mounting) && !string.Equals(e.Mounting, a0.Mounting, StringComparison.OrdinalIgnoreCase))
-                    devs.Add(new Finding { Code = "montaje", Ref = e.Ref, Id = a0.Id, Detail = a0.Mounting + ", esperado " + e.Mounting });
+                    devs.Add(new Finding { Code = "montaje", Ref = e.Ref, Id = a0.Id, Detail = a0.Mounting + ", expected " + e.Mounting });
                 r.Pairs[e.Ref] = a0.Id;
                 if (devs.Count == 0) r.Approved++;
                 else { r.WithDeviation++; r.Findings.AddRange(devs); }
             }
 
-            // 4) Sobrantes: elementos del alcance que no justifican ninguna referencia.
+            // 4) Extras: in-scope elements that justify no reference.
             for (var j = 0; j < model.Count; j++)
             {
                 if (aTaken[j].HasValue) continue;
@@ -221,11 +221,11 @@ namespace Bimbridge.Engine.Qc
                 r.Findings.Add(new Finding
                 {
                     Code = "sobrante", Id = a.Id,
-                    Detail = a.FullType + " en " + (a.Level ?? "?") + (near != null ? "; referencia más cercana " + near.e.Ref + " a " + F(near.d) + " mm" : ""),
+                    Detail = a.FullType + " on " + (a.Level ?? "?") + (near != null ? "; closest reference " + near.e.Ref + " at " + F(near.d) + " mm" : ""),
                 });
             }
 
-            // 5) Casi duplicados: mismo tipo casi en el mismo sitio (dos luminarias apiladas), emparejadas o no.
+            // 5) Near duplicates: same type almost in the same place (two stacked fixtures), matched or not.
             var grid = new Dictionary<Tuple<string, long, long>, List<int>>();
             var cell = Math.Max(1, o.NearDuplicate);
             for (var j = 0; j < model.Count; j++)
@@ -251,7 +251,7 @@ namespace Bimbridge.Engine.Qc
                             var d3 = Math.Sqrt(Math.Pow(a.X - b.X, 2) + Math.Pow(a.Y - b.Y, 2) + Math.Pow(a.Z - b.Z, 2));
                             if (d3 > o.NearDuplicate || !seen.Add(Tuple.Create(j, k))) continue;
                             r.NearDuplicates++;
-                            r.Findings.Add(new Finding { Code = "casi_duplicado", Id = a.Id, Detail = "#" + a.Id + " y #" + b.Id + " (" + a.FullType + ") a " + F(d3) + " mm" });
+                            r.Findings.Add(new Finding { Code = "casi_duplicado", Id = a.Id, Detail = "#" + a.Id + " and #" + b.Id + " (" + a.FullType + ") at " + F(d3) + " mm" });
                         }
                     }
             }
@@ -260,11 +260,11 @@ namespace Bimbridge.Engine.Qc
 
         private static string F(double v) => v.ToString("0.#", CultureInfo.InvariantCulture);
 
-        // ---------------- manifiesto desde JSON ----------------
+        // ---------------- manifest from JSON ----------------
 
         /// <summary>
-        /// Lee un manifiesto: {"tolerancias":{xy,z,giro,simetria,ambiguedad,duplicado,mismo_nivel},"elementos":[{ref,x,y,z,giro,nivel,tipos,
-        /// etiqueta,grupo,montaje,fuente,no_confirmado}]} (mm y grados).
+        /// Reads a manifest: {"tolerancias":{xy,z,giro,simetria,ambiguedad,duplicado,mismo_nivel},"elementos":[{ref,x,y,z,giro,nivel,tipos,
+        /// etiqueta,grupo,montaje,fuente,no_confirmado}]} (mm and degrees).
         /// </summary>
         public static List<Expected> Parse(Dictionary<string, object> json, out Options options)
         {
@@ -280,14 +280,14 @@ namespace Bimbridge.Engine.Qc
                 options.SameLevel = Arg.GetBool(t, "mismo_nivel") ?? options.SameLevel;
             }
             var list = new List<Expected>();
-            if (!(json.TryGetValue("elementos", out var ev) && ev is List<object> el)) throw new ArgumentException("el manifiesto necesita 'elementos': [...]");
+            if (!(json.TryGetValue("elementos", out var ev) && ev is List<object> el)) throw new ArgumentException("the manifest needs 'elementos': [...]");
             var n = 0;
             foreach (var o in el.OfType<Dictionary<string, object>>())
             {
                 n++;
                 var x = Num(o, "x");
                 var y = Num(o, "y");
-                if (!x.HasValue || !y.HasValue) throw new ArgumentException("el elemento " + n + " del manifiesto no tiene x/y (mm)");
+                if (!x.HasValue || !y.HasValue) throw new ArgumentException("manifest element " + n + " has no x/y (mm)");
                 var tipos = o.TryGetValue("tipos", out var tp) && tp is List<object> tl ? tl.Select(s => Convert.ToString(s, CultureInfo.InvariantCulture)).ToList()
                     : Arg.GetString(o, "tipo") is string one ? new List<string> { one } : new List<string>();
                 list.Add(new Expected
@@ -298,7 +298,7 @@ namespace Bimbridge.Engine.Qc
                 });
             }
             var dup = list.GroupBy(e => e.Ref).FirstOrDefault(g => g.Count() > 1);
-            if (dup != null) throw new ArgumentException("la referencia '" + dup.Key + "' aparece dos veces en el manifiesto");
+            if (dup != null) throw new ArgumentException("reference '" + dup.Key + "' appears twice in the manifest");
             return list;
         }
 
@@ -313,8 +313,8 @@ namespace Bimbridge.Engine.Qc
     }
 
     /// <summary>
-    /// Transformación afín 3D (rotación/espejo + traslación) para llevar coordenadas de un vínculo o de un grupo al anfitrión sin la API
-    /// de Revit. Columnas BasisX, BasisY, BasisZ y Origin como en Autodesk.Revit.DB.Transform.
+    /// 3D affine transform (rotation/mirror + translation) to bring coordinates from a link or a group into the host without the Revit
+    /// API. Columns BasisX, BasisY, BasisZ and Origin as in Autodesk.Revit.DB.Transform.
     /// </summary>
     public sealed class Xform
     {
@@ -339,7 +339,7 @@ namespace Bimbridge.Engine.Qc
             O[2] + X[2] * x + Y[2] * y + Z[2] * z,
         };
 
-        /// <summary>Composición: primero this y después <paramref name="after"/> (p. ej. instancia en el vínculo → vínculo en el anfitrión).</summary>
+        /// <summary>Composition: first this, then <paramref name="after"/> (e.g. instance in the link → link in the host).</summary>
         public Xform Then(Xform after)
         {
             var nx = after.Dir(X);
@@ -358,15 +358,15 @@ namespace Bimbridge.Engine.Qc
 
         public double Determinant => X[0] * (Y[1] * Z[2] - Z[1] * Y[2]) - Y[0] * (X[1] * Z[2] - Z[1] * X[2]) + Z[0] * (X[1] * Y[2] - Y[1] * X[2]);
 
-        /// <summary>Espejo = determinante negativo (la orientación de la familia se invierte).</summary>
+        /// <summary>Mirror = negative determinant (the family orientation is flipped).</summary>
         public bool Mirrored => Determinant < 0;
 
-        /// <summary>Giro en planta del eje X transformado (grados, 0–360).</summary>
+        /// <summary>Plan rotation of the transformed X axis (degrees, 0–360).</summary>
         public double RotationDeg => ((Math.Atan2(X[1], X[0]) * 180 / Math.PI) % 360 + 360) % 360;
 
         public Xform Inverse()
         {
-            // Rígida (ortonormal, con o sin espejo): la inversa de la parte lineal es su transpuesta.
+            // Rigid (orthonormal, with or without mirror): the inverse of the linear part is its transpose.
             var t = new Xform { X = new[] { X[0], Y[0], Z[0] }, Y = new[] { X[1], Y[1], Z[1] }, Z = new[] { X[2], Y[2], Z[2] } };
             var o = t.Dir(O);
             t.O = new[] { -o[0], -o[1], -o[2] };

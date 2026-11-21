@@ -1,42 +1,42 @@
-# Informe de pruebas rc1 — NATIVE_ACCEPTANCE_PENDING
+# rc1 test report — NATIVE_ACCEPTANCE_PENDING
 
-## Automatizadas (sin Revit)
-- **Suite: 389 pruebas** (367 de beta1.1 + 22 de rc1). Se hicieron 6 corridas completas tras los cambios: 4 limpias (389/389) y 2 con un fallo intermitente cada una (detalle abajo).
-- **Pruebas nuevas de rc1:**
-  - fail-closed con 5 banderas de context ausentes;
-  - lote con un valor por elemento y 1 commit;
-  - el validador del lote (ids desparejos, claves no numéricas, más de 200, valor vacío);
-  - un commit que dice ok y no aplica nunca queda verificado ni se reintenta;
-  - lectura paginada y cambio del modelo entre páginas detectado antes de escribir;
-  - QC de luminarias y etiquetas (4 casos);
-  - NRT-05 se detiene antes de guardar ante cualquier comprobación previa negativa;
-  - compuerta nativa;
-  - copia estable con modificación concurrente;
-  - lote con muerte real del proceso en 2 puntos;
-  - arneses NRT-03 y NRT-06 contra el FakeBim, y sus bloqueos;
-  - banco de lotes.
-- **Separación de fallos reales y de temporización:**
-  - **Real, corregido:** el arnés NRT-03 desechaba la conexión compartida al cerrar el backend de cada ronda. Una ronda veía `revit_no_disponible`. En la campaña nativa habría producido un falso FALLIDA.
-  - **De temporización, sin cambio:** `Service_ProcessKilled_NewServiceProcessRecoversWithoutDuplicates` y `HeldCommit_WaitsForUser_ThenApplies_AndDetectsConflicts`. Son pruebas antiguas y el código que ejercen no cambió. Fallaron una vez cada una, solo con la suite completa en paralelo, y pasaron 6 de 6 corridas aisladas. Son timeouts por contención de CPU en un contenedor de 4 núcleos.
+## Automated (without Revit)
+- **Suite: 389 tests** (367 from beta1.1 + 22 from rc1). 6 full runs were made after the changes: 4 clean (389/389) and 2 with one intermittent failure each (details below).
+- **New rc1 tests:**
+  - fail-closed with 5 missing context flags;
+  - batch with one value per element and 1 commit;
+  - the batch validator (mismatched ids, non-numeric keys, more than 200, empty value);
+  - a commit that says ok and does not apply is never verified nor retried;
+  - paged read and a model change between pages detected before writing;
+  - lighting fixture and tag QC (4 cases);
+  - NRT-05 stops before saving on any negative pre-check;
+  - native gate;
+  - stable copy with concurrent modification;
+  - batch with real process death at 2 points;
+  - NRT-03 and NRT-06 harnesses against FakeBim, and their blocks;
+  - batch bench.
+- **Separating real failures from timing failures:**
+  - **Real, fixed:** the NRT-03 harness disposed of the shared connection when closing each round's backend. One round saw `revit_no_disponible`. In the native campaign it would have produced a false FAILED.
+  - **Timing, unchanged:** `Service_ProcessKilled_NewServiceProcessRecoversWithoutDuplicates` and `HeldCommit_WaitsForUser_ThenApplies_AndDetectsConflicts`. They are old tests and the code they exercise did not change. They failed once each, only with the full suite in parallel, and passed 6 of 6 isolated runs. They are timeouts caused by CPU contention in a 4-core container.
 
-## Escenarios NRT-03 en simulación (contrato de estados de ejecución)
-| # | Escenario | Prueba |
+## NRT-03 scenarios in simulation (execution state contract)
+| # | Scenario | Test |
 |---|---|---|
-| 1 | Interrupción antes del envío | NRT-03 `backend.antes_enviar` (FakeBim y arnés) |
-| 2 | Interrupción durante la solicitud | AH-01 `backend.mitad_tx`, incluido el lote (procesos reales) |
-| 3 | Respuesta perdida tras un posible commit | `PersistentCommit_TimesOutAfterApplying_IsObserved_NotRepeated` y `backend.tras_commit` |
-| 4 | Caída antes de registrar el resultado | `runner.tras_ejecutar` y AH-01 |
-| 5 | Caída durante la observación o verificación | `runner.en_verificacion` |
-| 6 | Reanudación posterior del AgentHost | las 5 rondas y AH-02 (muerte real del proceso) |
-| 7 | Solicitudes repetidas con la misma clave | diario del add-in (pruebas existentes) y reanudación del mismo diario (0 commits) |
-| 8 | Operaciones concurrentes sobre un documento | AH-04 (dos procesos, un solo ejecutor, fencing) |
+| 1 | Interruption before sending | NRT-03 `backend.antes_enviar` (FakeBim and harness) |
+| 2 | Interruption during the request | AH-01 `backend.mitad_tx`, including the batch (real processes) |
+| 3 | Response lost after a possible commit | `PersistentCommit_TimesOutAfterApplying_IsObserved_NotRepeated` and `backend.tras_commit` |
+| 4 | Crash before recording the result | `runner.tras_ejecutar` and AH-01 |
+| 5 | Crash during observation or verification | `runner.en_verificacion` |
+| 6 | Later AgentHost resume | the 5 rounds and AH-02 (real process death) |
+| 7 | Repeated requests with the same key | add-in journal (existing tests) and resuming the same journal (0 commits) |
+| 8 | Concurrent operations on one document | AH-04 (two processes, a single runner, fencing) |
 
-Resultados desconocidos: `requiere_verificacion` o `requiere_reconciliar`; nunca se reintentan a ciegas.
+Unknown results: `requiere_verificacion` or `requiere_reconciliar`; never blindly retried.
 
-## Nativas
-| Prueba | Estado |
+## Native
+| Test | Status |
 |---|---|
-| NRT-03 nativa | BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION |
-| NRT-06 nativa | BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION |
-| Regresión de NRT-05 con rc1 | BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION |
-| Capacidades nuevas con la Revit API real (lote, QC, paginación, verificar_disco estable) | BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION |
+| Native NRT-03 | BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION |
+| Native NRT-06 | BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION |
+| NRT-05 regression with rc1 | BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION |
+| New capabilities with the real Revit API (batch, QC, paging, stable verificar_disco) | BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION |

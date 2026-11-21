@@ -9,7 +9,7 @@ using Bimbridge.Protocol;
 
 namespace Bimbridge.Setup
 {
-    /// <summary>Una Release publicada en GitHub con el instalador y su lista de hashes.</summary>
+    /// <summary>A Release published on GitHub with the installer and its hash list.</summary>
     public sealed class OnlineRelease
     {
         public string Repo, Tag, Name, Commit, SetupUrl, SumsUrl;
@@ -25,17 +25,17 @@ namespace Bimbridge.Setup
     }
 
     /// <summary>
-    /// 0.9.1: actualización en línea desde las Releases públicas del repositorio (sin cuenta ni token). Sólo lo dispara una persona
-    /// con el botón Actualizar; ninguna herramienta de los agentes llega aquí.
-    /// Garantías:
-    ///  - sólo HTTPS a api.github.com y a la URL de descarga de ESA release de ESE repositorio (se valida el prefijo exacto);
-    ///  - se ignoran borradores y, salvo que se pida, prereleases; la etiqueta debe ser vX.Y.Z;
-    ///  - el instalador se descarga a un archivo temporal con tamaño máximo, se calcula su SHA-256 y se compara con SHA256SUMS.txt
-    ///    de la misma release; además su versión interna debe coincidir con la etiqueta. Si algo no cuadra se borra y no se instala;
-    ///  - no instala nada: deja el instalador verificado en la carpeta de actualizaciones y el flujo existente (/actualizar, con
-    ///    reversión a la versión anterior) hace el resto cuando la persona lo confirma.
-    /// Límite declarado: el hash publicado junto al instalador protege contra descargas corruptas o truncadas, no contra una release
-    /// publicada por alguien con control del repositorio; la autenticidad descansa en HTTPS y en los permisos del repositorio.
+    /// 0.9.1: online update from the repository's public Releases (no account or token). Only a person triggers it
+    /// with the Update button; no agent tool reaches this code.
+    /// Guarantees:
+    ///  - HTTPS only, to api.github.com and to the download URL of THAT release of THAT repository (the exact prefix is validated);
+    ///  - drafts and, unless requested, prereleases are ignored; the tag must be vX.Y.Z;
+    ///  - the installer is downloaded to a temporary file with a maximum size, its SHA-256 is computed and compared with SHA256SUMS.txt
+    ///    from the same release; its internal version must also match the tag. If anything does not add up it is deleted and not installed;
+    ///  - it installs nothing: it leaves the verified installer in the updates folder and the existing workflow (/actualizar, with
+    ///    rollback to the previous version) does the rest when the person confirms.
+    /// Declared limit: the hash published next to the installer protects against corrupt or truncated downloads, not against a release
+    /// published by someone with control of the repository; authenticity rests on HTTPS and on the repository permissions.
     /// </summary>
     public static class OnlineUpdate
     {
@@ -45,9 +45,9 @@ namespace Bimbridge.Setup
         public const long MaxSetupBytes = 400L * 1024 * 1024;
         public const long MaxTextBytes = 2L * 1024 * 1024;
 
-        /// <summary>GET de texto (URL, máximo de bytes). Lanza si no es 200 o excede el máximo.</summary>
+        /// <summary>Text GET (URL, maximum bytes). Throws if not 200 or if it exceeds the maximum.</summary>
         public delegate string GetText(string url, long maxBytes);
-        /// <summary>Descarga a archivo (URL, destino, máximo de bytes). Lanza si no es 200 o excede el máximo.</summary>
+        /// <summary>Download to file (URL, destination, maximum bytes). Throws if not 200 or if it exceeds the maximum.</summary>
         public delegate void GetFile(string url, string destination, long maxBytes);
 
         private static readonly Regex RepoRx = new Regex("^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$", RegexOptions.CultureInvariant);
@@ -57,15 +57,15 @@ namespace Bimbridge.Setup
         public static string ValidRepo(string repo)
         {
             repo = string.IsNullOrWhiteSpace(repo) ? DefaultRepo : repo.Trim();
-            if (!RepoRx.IsMatch(repo) || repo.Contains("..")) throw new OnlineUpdateException("repositorio de actualización no válido: use propietario/nombre");
+            if (!RepoRx.IsMatch(repo) || repo.Contains("..")) throw new OnlineUpdateException("invalid update repository: use owner/name");
             return repo;
         }
 
         public static string ApiUrl(string repo) => "https://api.github.com/repos/" + ValidRepo(repo) + "/releases?per_page=15";
 
         /// <summary>
-        /// La release publicada más alta que cumpla todo (no borrador, etiqueta vX.Y.Z, con instalador y hashes, URLs del propio
-        /// repositorio). Null si no hay ninguna. <paramref name="skipped"/> explica por qué se descartó cada una.
+        /// The highest published release that meets every condition (not a draft, tag vX.Y.Z, with installer and hashes, URLs of the
+        /// repository itself). Null if there is none. <paramref name="skipped"/> explains why each one was discarded.
         /// </summary>
         public static OnlineRelease Pick(string releasesJson, string repo, bool allowPrerelease, out List<string> skipped)
         {
@@ -73,21 +73,21 @@ namespace Bimbridge.Setup
             skipped = new List<string>();
             object parsed;
             try { parsed = Json.Parse(releasesJson); }
-            catch (Exception ex) when (ex is FormatException || ex is InvalidOperationException || ex is ArgumentException) { throw new OnlineUpdateException("GitHub devolvió una respuesta que no es JSON válido"); }
+            catch (Exception ex) when (ex is FormatException || ex is InvalidOperationException || ex is ArgumentException) { throw new OnlineUpdateException("GitHub returned a response that is not valid JSON"); }
             if (!(parsed is List<object> list))
             {
                 var msg = parsed is Dictionary<string, object> d ? Arg.GetString(d, "message") : null;
-                throw new OnlineUpdateException("GitHub no devolvió la lista de releases" + (msg != null ? ": " + msg : ""));
+                throw new OnlineUpdateException("GitHub did not return the list of releases" + (msg != null ? ": " + msg : ""));
             }
             var ok = new List<OnlineRelease>();
             foreach (var item in list.OfType<Dictionary<string, object>>())
             {
                 var tag = Arg.GetString(item, "tag_name") ?? "";
-                if (Arg.GetBool(item, "draft") == true) { skipped.Add(tag + ": borrador"); continue; }
+                if (Arg.GetBool(item, "draft") == true) { skipped.Add(tag + ": draft"); continue; }
                 var pre = Arg.GetBool(item, "prerelease") == true;
-                if (pre && !allowPrerelease) { skipped.Add(tag + ": prerelease (no permitida)"); continue; }
+                if (pre && !allowPrerelease) { skipped.Add(tag + ": prerelease (not allowed)"); continue; }
                 var m = TagRx.Match(tag);
-                if (!m.Success) { skipped.Add(tag + ": la etiqueta no es vX.Y.Z"); continue; }
+                if (!m.Success) { skipped.Add(tag + ": the tag is not vX.Y.Z"); continue; }
                 var prefix = "https://github.com/" + repo + "/releases/download/" + tag + "/";
                 string setup = null, sums = null; long size = 0; var badUrl = false;
                 var assets = (item.TryGetValue("assets", out var av) ? av as List<object> : null) ?? new List<object>();
@@ -96,13 +96,13 @@ namespace Bimbridge.Setup
                     var name = Arg.GetString(a, "name");
                     var url = Arg.GetString(a, "browser_download_url") ?? "";
                     if (name != SetupAsset && name != SumsAsset) continue;
-                    // La URL debe ser exactamente la de esta release de este repositorio (nada de otros hosts ni rutas).
-                    if (!string.Equals(url, prefix + name, StringComparison.Ordinal)) { skipped.Add(tag + ": URL inesperada para " + name); badUrl = true; break; }
+                    // The URL must be exactly that of this release of this repository (no other hosts or paths).
+                    if (!string.Equals(url, prefix + name, StringComparison.Ordinal)) { skipped.Add(tag + ": unexpected URL for " + name); badUrl = true; break; }
                     if (name == SetupAsset) { setup = url; size = Arg.GetLong(a, "size") ?? 0; } else sums = url;
                 }
                 if (badUrl) continue;
-                if (setup == null || sums == null) { skipped.Add(tag + ": falta " + SetupAsset + " o " + SumsAsset); continue; }
-                if (size <= 0 || size > MaxSetupBytes) { skipped.Add(tag + ": tamaño del instalador fuera de rango"); continue; }
+                if (setup == null || sums == null) { skipped.Add(tag + ": missing " + SetupAsset + " or " + SumsAsset); continue; }
+                if (size <= 0 || size > MaxSetupBytes) { skipped.Add(tag + ": installer size out of range"); continue; }
                 var commit = Arg.GetString(item, "target_commitish");
                 ok.Add(new OnlineRelease
                 {
@@ -114,7 +114,7 @@ namespace Bimbridge.Setup
             return ok.OrderByDescending(r => r.Version).ThenBy(r => r.Prerelease).FirstOrDefault();
         }
 
-        /// <summary>Hash esperado de <paramref name="fileName"/> en un SHA256SUMS ("hash  nombre" por línea). Null si no está o es ambiguo.</summary>
+        /// <summary>Expected hash of <paramref name="fileName"/> in a SHA256SUMS ("hash  name" per line). Null if absent or ambiguous.</summary>
         public static string ExpectedHash(string sumsText, string fileName)
         {
             string found = null;
@@ -126,7 +126,7 @@ namespace Bimbridge.Setup
                 var name = line.Substring(64).Trim().TrimStart('*');
                 if (!string.Equals(name, fileName, StringComparison.Ordinal)) continue;
                 if (!Regex.IsMatch(hash, "^[0-9a-f]{64}$")) return null;
-                if (found != null && found != hash) return null;   // dos hashes distintos para el mismo archivo: no se confía en ninguno
+                if (found != null && found != hash) return null;   // two different hashes for the same file: neither is trusted
                 found = hash;
             }
             return found;
@@ -140,8 +140,8 @@ namespace Bimbridge.Setup
         }
 
         /// <summary>
-        /// "nueva": la release es una versión mayor. "mismo_version_otro_commit": misma versión, commit distinto del que corre (se puede
-        /// instalar a petición). "al_dia": misma versión y mismo commit (o commit desconocido). "anterior": la release es más antigua.
+        /// "nueva": the release is a higher version. "mismo_version_otro_commit": same version, different commit from the running one (can be
+        /// installed on request). "al_dia": same version and same commit (or unknown commit). "anterior": the release is older.
         /// </summary>
         public static string Compare(Version running, string runningCommit, OnlineRelease r)
         {
@@ -152,7 +152,7 @@ namespace Bimbridge.Setup
             return "al_dia";
         }
 
-        /// <summary>Commit con que se compiló un ensamblado, de su versión informativa "X.Y.Z+abcdef0" (null si no lo lleva).</summary>
+        /// <summary>Commit an assembly was built from, taken from its informational version "X.Y.Z+abcdef0" (null if it has none).</summary>
         public static string CommitOf(string informationalVersion)
         {
             if (string.IsNullOrEmpty(informationalVersion)) return null;
@@ -163,17 +163,17 @@ namespace Bimbridge.Setup
         }
 
         /// <summary>
-        /// Descarga y verifica el instalador de la release. Devuelve el candidato listo para el flujo de instalación existente.
-        /// Cualquier discrepancia borra lo descargado y lanza <see cref="OnlineUpdateException"/>: nunca queda un instalador sin verificar.
+        /// Downloads and verifies the release installer. Returns the candidate ready for the existing install workflow.
+        /// Any discrepancy deletes the download and throws <see cref="OnlineUpdateException"/>: an unverified installer is never left behind.
         /// </summary>
         public static UpdateCandidate Download(OnlineRelease r, string destinationExe, GetText getText, GetFile getFile)
         {
             if (r == null) throw new ArgumentNullException(nameof(r));
             var sums = getText(r.SumsUrl, MaxTextBytes);
             var expected = ExpectedHash(sums, SetupAsset);
-            if (expected == null) throw new OnlineUpdateException("la release " + r.Tag + " no publica un SHA-256 válido para " + SetupAsset);
+            if (expected == null) throw new OnlineUpdateException("release " + r.Tag + " does not publish a valid SHA-256 for " + SetupAsset);
             Directory.CreateDirectory(Path.GetDirectoryName(destinationExe));
-            // Si ya está descargado y verificado (mismo hash), no se vuelve a bajar.
+            // If it is already downloaded and verified (same hash), it is not downloaded again.
             if (File.Exists(destinationExe) && Sha256File(destinationExe) == expected)
                 return Candidate(r, destinationExe);
             var tmp = destinationExe + ".descarga-" + Guid.NewGuid().ToString("N").Substring(0, 8);
@@ -181,12 +181,12 @@ namespace Bimbridge.Setup
             {
                 getFile(r.SetupUrl, tmp, MaxSetupBytes);
                 var size = new FileInfo(tmp).Length;
-                if (size != r.SetupSize) throw new OnlineUpdateException("el instalador descargado mide " + size + " bytes y la release declara " + r.SetupSize + " (descarga incompleta)");
+                if (size != r.SetupSize) throw new OnlineUpdateException("the downloaded installer is " + size + " bytes and the release declares " + r.SetupSize + " (incomplete download)");
                 var actual = Sha256File(tmp);
-                if (actual != expected) throw new OnlineUpdateException("el SHA-256 del instalador descargado (" + actual + ") no coincide con el publicado (" + expected + "): no se instala");
+                if (actual != expected) throw new OnlineUpdateException("the SHA-256 of the downloaded installer (" + actual + ") does not match the published one (" + expected + "): not installing");
                 var ver = Updates.VersionReader(tmp);
-                if (ver == null) throw new OnlineUpdateException("el archivo descargado no es un instalador de BIMBRIDGE");
-                if (Updates.Normalize(ver) != r.Version) throw new OnlineUpdateException("el instalador dice ser la versión " + Updates.Format(ver) + " y la release es " + r.Tag + ": no se instala");
+                if (ver == null) throw new OnlineUpdateException("the downloaded file is not a BIMBRIDGE installer");
+                if (Updates.Normalize(ver) != r.Version) throw new OnlineUpdateException("the installer claims to be version " + Updates.Format(ver) + " and the release is " + r.Tag + ": not installing");
                 if (File.Exists(destinationExe)) File.Delete(destinationExe);
                 File.Move(tmp, destinationExe);
                 return Candidate(r, destinationExe);

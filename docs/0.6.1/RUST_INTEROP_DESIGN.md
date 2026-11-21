@@ -1,34 +1,34 @@
-# Interoperación C# + Rust (diseño, R10)
+# C# + Rust interoperation (design, R10)
 
-**Estado:** sólo diseño. No hay código Rust en 0.6.1 y no se autoriza implementarlo aquí. Este documento fija los contratos para que la 0.7.0 pueda añadir workers sin tocar la integración con Revit.
+**Status:** design only. There is no Rust code in 0.6.1 and implementing it here is not authorized. This document pins down the contracts so that 0.7.0 can add workers without touching the Revit integration.
 
-## 1. Reparto de responsabilidades
+## 1. Division of responsibilities
 
-| Responsabilidad | Dónde | Por qué |
+| Responsibility | Where | Why |
 |---|---|---|
-| Todo acceso a la API de Revit (lectura, transacciones, avisos, guardar/sync/exportar) | C# en el add-in | La API sólo existe en .NET y sólo es válida en el hilo de Revit; un segundo motor de transacciones duplicaría estados y auditoría. |
-| Leases, concesiones, auditoría, checkpoints, reconciliación | C# (Engine) | Ya están probados; un worker no decide autoridad ni persiste estado de tareas. |
-| Extracción de geometría (sólidos, mallas, transformaciones de vínculos) | C# en el hilo de Revit | Requiere objetos vivos; se convierte a buffers planos antes de salir. |
-| Cálculo puro sobre buffers: rayos contra mallas, índices espaciales (BVH/R-tree), choques, QC uno a uno sobre miles de elementos | Candidato a Rust | Sin estado de Revit, paralelizable, medible en igualdad de condiciones. |
-| Decidir qué escribir en el modelo | C# (receta + motor) | El worker sólo devuelve resultados; nunca órdenes de escritura. |
+| All Revit API access (reads, transactions, warnings, save/sync/export) | C# in the add-in | The API only exists in .NET and is only valid on the Revit thread; a second transaction engine would duplicate states and audit. |
+| Leases, grants, audit, checkpoints, reconciliation | C# (Engine) | Already tested; a worker neither decides authority nor persists task state. |
+| Geometry extraction (solids, meshes, link transforms) | C# on the Revit thread | Requires live objects; converted to flat buffers before leaving. |
+| Pure computation on buffers: rays against meshes, spatial indexes (BVH/R-tree), clashes, one-to-one QC over thousands of elements | Rust candidate | No Revit state, parallelizable, measurable on equal terms. |
+| Deciding what to write to the model | C# (recipe + engine) | The worker only returns results; never write commands. |
 
-## 2. Contrato
+## 2. Contract
 
 ```csharp
 public interface IComputeWorker : IDisposable
 {
-    WorkerInfo Info { get; }                       // nombre, versión del worker, versiones de contrato soportadas
+    WorkerInfo Info { get; }                       // name, worker version, supported contract versions
     Task<ComputeResult> RunAsync(ComputeRequest req, CancellationToken ct);
 }
 
 public sealed class ComputeRequest
 {
-    public int ContractVersion;                    // entero; el worker rechaza versiones que no conoce (sin "mejor esfuerzo")
+    public int ContractVersion;                    // integer; the worker rejects versions it does not know (no "best effort")
     public string Kernel;                          // "rayos_vertical", "choques_aabb", "manifiesto_qc"…
-    public string RequestId;                       // para auditoría y cancelación
-    public ReadOnlyMemory<byte> Payload;           // buffers planos (abajo)
-    public int MaxMs;                              // presupuesto; al superarlo devuelve "presupuesto_agotado" con lo hecho
-    public long MaxBytes;                          // tope de salida
+    public string RequestId;                       // for audit and cancellation
+    public ReadOnlyMemory<byte> Payload;           // flat buffers (below)
+    public int MaxMs;                              // budget; when exceeded it returns "presupuesto_agotado" with the work done
+    public long MaxBytes;                          // output cap
 }
 
 public sealed class ComputeResult
@@ -40,34 +40,34 @@ public sealed class ComputeResult
 }
 ```
 
-## 3. Datos transferibles
+## 3. Transferable data
 
-- **Sólo valores**, nunca objetos de Revit: `ElementId` como `long`, `UniqueId` como texto UTF-8, coordenadas como `double`.
-- **Unidades:** pies internos de Revit (las mismas que la API) en todo el contrato; la conversión a mm se hace sólo en la presentación. Un campo `units = "ft"` en la cabecera evita ambigüedad.
-- **Coordenadas:** del documento anfitrión. Las de vínculos se transforman en C# antes de enviar (la transformación está probada en `Xform`).
-- **Identidad estable:** cada fila lleva `UniqueId` (o su índice en una tabla de cadenas enviada una vez). El resultado se devuelve por índice; C# lo vuelve a mapear.
-- **Formato:** cabecera fija (magic, contract_version, kernel, recuentos) + bloques contiguos little-endian (`f64` vértices, `u32` triángulos, `u32` desplazamientos por elemento). Sin JSON en el camino caliente; JSON sólo para la respuesta de error.
+- **Values only**, never Revit objects: `ElementId` as `long`, `UniqueId` as UTF-8 text, coordinates as `double`.
+- **Units:** Revit internal feet (the same as the API) throughout the contract; conversion to mm happens only in presentation. A `units = "ft"` field in the header avoids ambiguity.
+- **Coordinates:** of the host document. Link coordinates are transformed in C# before sending (the transform is tested in `Xform`).
+- **Stable identity:** each row carries a `UniqueId` (or its index in a string table sent once). The result is returned by index; C# maps it back.
+- **Format:** fixed header (magic, contract_version, kernel, counts) + contiguous little-endian blocks (`f64` vertices, `u32` triangles, `u32` per-element offsets). No JSON on the hot path; JSON only for the error response.
 
-## 4. IPC, fallos y cancelación
+## 4. IPC, failures and cancellation
 
-- **Proceso aparte** (`bimbridge-compute.exe`), lanzado por el add-in bajo demanda. Un pánico de Rust no tumba Revit.
-- **Transporte:** named pipe por usuario con la misma ACL y la misma trama de 16 MB que el puente (`Frame`); el cliente verifica el PID del servidor, como en `PipeServerCheck`.
-- **Cancelación:** mensaje `cancel <RequestId>` por el mismo pipe; el worker comprueba entre bloques. El presupuesto `MaxMs` se aplica también en el lado C# (timeout + matar el proceso).
-- **Fallo del worker** → la receta usa la implementación C# de referencia (siempre presente). El resultado indica qué motor lo calculó.
-- **Auditoría:** cada petición registra `kernel`, `RequestId`, sha256 de entrada y salida (no los datos).
+- **Separate process** (`bimbridge-compute.exe`), launched by the add-in on demand. A Rust panic does not bring down Revit.
+- **Transport:** per-user named pipe with the same ACL and the same 16 MB frame as the bridge (`Frame`); the client verifies the server PID, as in `PipeServerCheck`.
+- **Cancellation:** a `cancel <RequestId>` message over the same pipe; the worker checks between blocks. The `MaxMs` budget is also enforced on the C# side (timeout + kill the process).
+- **Worker failure** → the recipe uses the reference C# implementation (always present). The result states which engine computed it.
+- **Audit:** each request records `kernel`, `RequestId`, sha256 of input and output (not the data).
 
-## 5. Costes y criterio de adopción
+## 5. Costs and adoption criterion
 
-- Serialización estimada: una malla de 1 000 triángulos son unos 36 KB (vértices f64 compartidos + índices u32). 10 000 elementos con unos 200 triángulos cada uno son unos 70 MB, por encima del tope de trama: se troceará por lotes de elementos.
-- Coste fijo por petición (lanzar proceso: una vez; ida y vuelta del pipe: <1 ms local medido para el puente) frente al ahorro de cálculo.
-- **Medición de partida (0.3.0, sin Revit):** el montaje en C# de 1 442 luminarias × 9 puntos tarda 5–15 ms. A ese tamaño Rust no aporta nada. Los candidatos reales son los choques de modelo completo y el QC de decenas de miles de elementos.
+- Estimated serialization: a 1,000-triangle mesh is about 36 KB (shared f64 vertices + u32 indices). 10,000 elements with about 200 triangles each are about 70 MB, above the frame cap: it will be split into element batches.
+- Fixed cost per request (launching the process: once; pipe round trip: <1 ms locally, measured for the bridge) versus the computation saved.
+- **Starting measurement (0.3.0, without Revit):** C# mounting for 1,442 lighting fixtures × 9 points takes 5–15 ms. At that size Rust adds nothing. The real candidates are full-model clashes and QC over tens of thousands of elements.
 
-## 6. Plan de benchmark comparativo
+## 6. Comparative benchmark plan
 
-1. Mismo kernel en C# (actual) y Rust, mismos buffers de entrada guardados en disco desde una copia de práctica.
-2. Tres tamaños: 1 000 / 10 000 / 100 000 elementos. Una corrida fría y 10 calientes; p50/p95, memoria máxima y bytes serializados.
-3. Aceptación: resultados idénticos (mismo conjunto de pares/índices) y p50 total (serializar + IPC + cálculo) ≥30 % mejor que C# en el tamaño objetivo. Si no, Rust no entra.
-4. La medición del tiempo de extracción en el hilo de Revit (que Rust no puede acelerar) es obligatoria antes del paso 1: si domina, se optimiza la extracción y no el cálculo.
+1. Same kernel in C# (current) and Rust, same input buffers saved to disk from a practice copy.
+2. Three sizes: 1,000 / 10,000 / 100,000 elements. One cold run and 10 warm; p50/p95, peak memory and serialized bytes.
+3. Acceptance: identical results (same set of pairs/indices) and total p50 (serialize + IPC + compute) ≥30 % better than C# at the target size. Otherwise, Rust does not go in.
+4. Measuring extraction time on the Revit thread (which Rust cannot speed up) is mandatory before step 1: if it dominates, extraction is optimized, not computation.
 
-## Adenda 0.7.0-alpha1 — candidato concreto
-Kernel identificado: `TriMesh.Extent` (rayo vertical punto→malla para montaje). Banco C# en `src/Bimbridge.AgentHost/Kernels/MountKernelBench.cs`, comando `agenthost banco-kernel`. Línea base y decisión en `docs/0.7.0/RENDIMIENTO_0.7.0.md`: ~1,2 µs/punto con SIMD; Rust no justificado hasta medir en Revit real. Formato de entrada binario determinista y digest sha256 para comparar una futura implementación byte a byte.
+## Addendum 0.7.0-alpha1 — concrete candidate
+Kernel identified: `TriMesh.Extent` (vertical point→mesh ray for mounting). C# bench in `src/Bimbridge.AgentHost/Kernels/MountKernelBench.cs`, command `agenthost banco-kernel`. Baseline and decision in `docs/0.7.0/RENDIMIENTO_0.7.0.md`: ~1.2 µs/point with SIMD; Rust not justified until measured in real Revit. Deterministic binary input format and sha256 digest to compare a future implementation byte for byte.

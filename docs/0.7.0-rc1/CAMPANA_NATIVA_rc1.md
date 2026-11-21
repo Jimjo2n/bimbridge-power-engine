@@ -1,39 +1,39 @@
-# Campaña nativa rc1 — preparada, NO ejecutada
+# rc1 native campaign — prepared, NOT run
 
-Estado: `BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION`. Solo empieza cuando operator diga explícitamente que Revit está disponible.
+Status: `BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION`. It only starts when operator explicitly says that Revit is available.
 
-## Requisitos del entorno
-- Instancia de Revit 2024 **dedicada** a la prueba, distinta de la de trabajo. La de trabajo no se toca ni se conecta.
-- Modelo **desechable**:
-  - copia local de `DynamoSample_2024.rvt`, no workshared y sin ACC ni BIM 360;
-  - una copia limpia por prueba: `NRT05_*.rvt`, `NRT03_*.rvt` y `NRT06_*.rvt`;
-  - IsModified=false al abrir, y al menos 5 puertas con Comments editable.
-- Add-in rc1 instalado con niveles RPW; Retener desactivado y cola vacía.
+## Environment requirements
+- A Revit 2024 instance **dedicated** to the test, separate from the working one. The working instance is neither touched nor connected.
+- **Disposable** model:
+  - local copy of `DynamoSample_2024.rvt`, not workshared and without ACC or BIM 360;
+  - one clean copy per test: `NRT05_*.rvt`, `NRT03_*.rvt` and `NRT06_*.rvt`;
+  - IsModified=false on opening, and at least 5 doors with an editable Comments parameter.
+- rc1 add-in installed with RPW levels; Hold disabled and queue empty.
 
-## Preflight (cada prueba)
+## Preflight (each test)
 1. `set BIMBRIDGE_REVIT_NATIVE=AUTORIZADO`.
-2. `agenthost revit instancias --revit-disponible` muestra un único PID de prueba.
-3. `agenthost revit identidad --revit-pid N --revit-disponible` debe dar:
-   - la ruta igual a la copia desechable;
-   - worksharing=false y modificado=false;
-   - la huella presente;
-   - la versión del add-in igual a `0.7.0-rc1+<commit>`.
+2. `agenthost revit instancias --revit-disponible` shows a single test PID.
+3. `agenthost revit identidad --revit-pid N --revit-disponible` must report:
+   - the path equal to the disposable copy;
+   - worksharing=false and modified=false;
+   - the fingerprint present;
+   - the add-in version equal to `0.7.0-rc1+<commit>`.
 
-## Pruebas (una corrida cada una; si falla, se corrige y se repite sin límite artificial)
-| Prueba | Comando | Criterio de APROBADA |
+## Tests (one run each; if it fails, it is fixed and repeated without an artificial limit)
+| Test | Command | PASSED criterion |
 |---|---|---|
-| NRT-05 regresión | `revit nrt05 --revit-pid N --ruta-esperada <NRT05.rvt> --autorizo-persistente --salida …\nrt05 --categoria Doors --ids a,b,c,d,e --revit-disponible` | 13/13 comprobaciones |
-| NRT-03 | `revit nrt03 … --ruta-esperada <NRT03.rvt> --autorizo-persistente --salida …\nrt03 --categoria Doors --ids a,b,c --revit-disponible` | En las 5 rondas (antes_enviar, tras_commit, runner.tras_ejecutar, en_verificacion, tras_verificar): cayó, quedó verificada y hubo exactamente 1 commit. El AgentHost "cae" por excepción inyectada; Revit nunca se mata. |
-| NRT-06 | `revit nrt06 … --ruta-esperada <NRT06.rvt> --autorizo-persistente --salida …\nrt06 --categoria Doors --ids a,b,c,d,e --revit-disponible` | Debe cumplir todo esto: plan válido; rechazo sin autorización; rechazo fuera de alcance sin commit; consulta, lote y fijar verificados; QC ejecutado con evidencia; exactamente 2 commits; relectura independiente correcta; reanudar sin escritura; sin guardar ni sync |
+| NRT-05 regression | `revit nrt05 --revit-pid N --ruta-esperada <NRT05.rvt> --autorizo-persistente --salida …\nrt05 --categoria Doors --ids a,b,c,d,e --revit-disponible` | 13/13 checks |
+| NRT-03 | `revit nrt03 … --ruta-esperada <NRT03.rvt> --autorizo-persistente --salida …\nrt03 --categoria Doors --ids a,b,c --revit-disponible` | In all 5 rounds (antes_enviar, tras_commit, runner.tras_ejecutar, en_verificacion, tras_verificar): it crashed, ended verified and there was exactly 1 commit. The AgentHost "crashes" through an injected exception; Revit is never killed. |
+| NRT-06 | `revit nrt06 … --ruta-esperada <NRT06.rvt> --autorizo-persistente --salida …\nrt06 --categoria Doors --ids a,b,c,d,e --revit-disponible` | Must meet all of this: valid plan; rejection without authorization; out-of-scope rejection without a commit; query, batch and set verified; QC run with evidence; exactly 2 commits; correct independent re-read; resume without writing; no save and no sync |
 
-Para el QC de NRT-06 se exige que **se ejecute y deje evidencia**, no que dé 0 desviaciones: el modelo de muestra puede tener luminarias sin etiqueta reales.
+For the NRT-06 QC it is required that it **runs and leaves evidence**, not that it gives 0 deviations: the sample model may have genuinely untagged lighting fixtures.
 
-## Reversión
-- NRT-03 y NRT-06 no guardan. Al terminar, el operador cierra la instancia de prueba **sin guardar**.
-- NRT-05 guarda solo su copia desechable.
-- Si algo queda incierto (`requiere_verificacion` o `requiere_reconciliar`), no se repite: se informa con el diario.
+## Rollback
+- NRT-03 and NRT-06 do not save. When finished, the operator closes the test instance **without saving**.
+- NRT-05 only saves its disposable copy.
+- If anything is left uncertain (`requiere_verificacion` or `requiere_reconciliar`), it is not repeated: it is reported with the journal.
 
-## Manifiesto de evidencias (por prueba, en `--salida`)
-- `<prueba>_informe.json`, `llamadas.jsonl` (ms y bytes por llamada), `plan_ir.json` y `estado*/diario.jsonl`.
-- En NRT-03, una carpeta `rondaN` por cada punto de caída.
-- Al final, `SHA256_campaña.txt` con el hash de cada archivo.
+## Evidence manifest (per test, in `--salida`)
+- `<test>_informe.json`, `llamadas.jsonl` (ms and bytes per call), `plan_ir.json` and `estado*/diario.jsonl`.
+- In NRT-03, one `rondaN` folder per crash point.
+- At the end, `SHA256_campaña.txt` with the hash of each file.

@@ -1,35 +1,35 @@
-# BIMBRIDGE 0.9.0 — registro de cambios de ingeniería
+# BIMBRIDGE 0.9.0 — engineering changelog
 
-## Revisión consolidada Power Engine (2026-11-09, base b944e6e)
+## Consolidated Power Engine revision (2026-11-09, base b944e6e)
 
-- **C# dinámico habilitado por defecto**, con el control único y persistente «Bloquear inyección de código C#». Se eliminan «Código confiable» (4 h) y la autorización por SHA en `exec`. Ver DYNAMIC_CODE_EXECUTION_POLICY.md.
-- **Rebranding visible a «BIMBRIDGE - Power Engine»:** diálogos, ventanas, cinta («Power Engine | Estado»), add-in, servidor MCP, Aplicaciones de Windows, instalador e historial de transacciones. El prefijo heredado sigue reconociéndose. 
-- **Identidad de agentes:** alias declarado (`BIMBRIDGE_AGENT` o `ctx agente=`), principal verificado (usuario de Windows), contadores por sesión, historial de desconectadas y atribución en el diario. Ver AGENT_IDENTITY_PROTOCOL.md.
-- **Nuevo panel Estado:** resumen, agentes, seguridad y recuperación, rendimiento (mediana y p95) y actividad atribuida, con exportación CSV y JSONL. Ver POWER_ENGINE_OBSERVABILITY.md.
-- **Rendimiento:** `commit ops=…` (plan + commit en un viaje), conteo rápido con `GetElementCount`, caché de nombres por consulta y `ctx` compacto.
-- **Pruebas:** la de extremo a extremo ya no lee el `config.json` real.
+- **Dynamic C# enabled by default**, with the single persistent control «Block C# code injection». «Trusted code» (4 h) and SHA authorization in `exec` are removed. See DYNAMIC_CODE_EXECUTION_POLICY.md.
+- **Visible rebranding to «BIMBRIDGE - Power Engine»:** dialogs, windows, ribbon («Power Engine | Status»), add-in, MCP server, Windows Apps, installer and transaction history. The legacy prefix is still recognized.
+- **Agent identity:** declared alias (`BIMBRIDGE_AGENT` or `ctx agente=`), verified principal (Windows user), per-session counters, history of disconnected sessions and attribution in the journal. See AGENT_IDENTITY_PROTOCOL.md.
+- **New Status panel:** summary, agents, security and recovery, performance (median and p95) and attributed activity, with CSV and JSONL export. See POWER_ENGINE_OBSERVABILITY.md.
+- **Performance:** `commit ops=…` (plan + commit in one round trip), fast count with `GetElementCount`, per-query name cache and compact `ctx`.
+- **Tests:** the end-to-end test no longer reads the real `config.json`.
 
-## Revisión consolidada (2026-11-05, base 208cb2f)
+## Consolidated revision (2026-11-05, base 208cb2f)
 
-Estado: NATIVE_ACCEPTANCE_PENDING.
+Status: NATIVE_ACCEPTANCE_PENDING.
 
-- Escritura fail-closed: `PlanStore.CheckWritable` lee el disco y bloquea commit, cola, exec, act, fam, doc y tarea iniciar/reanudar con evidencia sin reconciliar, archivos dañados o errores de lectura.
-- Intención durable antes de abrir el grupo (`BeginWrite`) y punto de control tras cada lote (`Checkpoint`). Sin disco no se escribe.
-- `job op=pendientes` y `job op=reconciliar`: liberan sólo con el modelo como evidencia y archivan en `reconciliados\`. Vía humana con Revit cerrado: `AgentHost plan-store`.
-- `PlanStore.Finish` devuelve y anota los fallos de disco. Una excepción al aplicar la cola ya no se declara revertida.
-- Ensayo: `clasificacion` con cuatro resultados. Commit informa `espera_cola_ms` y `revit_ms`.
-- Instalador: /quiet, /actualizar y la ventana exigen Revit cerrado y manifiesto; /quiet sobre una instalación existente da código 5 sin `/reemplazar`; el retorno sólo restaura la sección BIMBRIDGE de `.codex\config.toml`, con copia `.bak` antes de cambiarlo. Cambio de comportamiento: el botón Actualizar con Revit abierto ya no reemplaza archivos.
+- Fail-closed writes: `PlanStore.CheckWritable` reads the disk and blocks commit, queue, exec, act, fam, doc and tarea iniciar/reanudar when there is unreconciled evidence, damaged files or read errors.
+- Durable intent before opening the group (`BeginWrite`) and a checkpoint after each batch (`Checkpoint`). No disk, no write.
+- `job op=pendientes` and `job op=reconciliar`: release only with the model as evidence and archive into `reconciliados\`. Human path with Revit closed: `AgentHost plan-store`.
+- `PlanStore.Finish` returns and records disk failures. An exception while applying the queue is no longer declared rolled back.
+- Trial: `clasificacion` with four outcomes. Commit reports `espera_cola_ms` and `revit_ms`.
+- Installer: /quiet, /actualizar and the window require Revit closed and a manifest; /quiet over an existing installation gives exit code 5 without `/reemplazar`; rollback only restores the BIMBRIDGE section of `.codex\config.toml`, with a `.bak` copy before changing it. Behavior change: the Update button with Revit open no longer replaces files.
 
-### Tras la campaña nativa (2026-11-05)
+### After the native campaign (2026-11-05)
 
-- Instalación atómica vista desde fuera: si falla a mitad, vuelve sola al respaldo; si el puente está en uso, se detiene antes de cambiar nada.
-- Una escritura con la conexión perdida responde `desconocido`, no `revit_no_disponible`.
-- `job op=pendientes` sólo muestra el código de bloqueo cuando hay bloqueo.
+- Installation is atomic as seen from outside: if it fails midway, it rolls back to the backup on its own; if the bridge is in use, it stops before changing anything.
+- A write with a lost connection answers `desconocido`, not `revit_no_disponible`.
+- `job op=pendientes` only shows the block code when there is a block.
 
-## Mejoras de integración
+## Integration improvements
 
-- **D32 · Worker Windows.** Se resuelve un ejecutable real en PATH o desde la ruta configurada. Las rutas WindowsApps se descartan antes del arranque. El fallo de saludo informa fase, ejecutable por nombre, código de salida observado y hasta 2048 caracteres de stderr. El protocolo de Python escribe JSONL explícitamente en UTF-8.
-- **D33 · Consultas.** `q … digest=true` devuelve total y SHA-256 de todas las filas filtradas. El formato versionado conserva multiplicidad y textos completos y ordena filas para comparar corridas. `timing=true` desglosa el tiempo en el puente, el despacho, el hilo de Revit y el procesamiento de resultados. Conteos y agrupaciones omiten la lectura de campos de presentación innecesarios.
-- **D34 · PDF.** `pdf grids … sin_globo=true` habilita una inferencia optativa por rótulos en extremos de líneas largas. Exige cruces y se activa en páginas sin globos reconocidos. El modo estricto sigue siendo el predeterminado.
-- **D35 · Escritura reversible.** Se reutiliza el ensayo de planes tipados. La verificación temporal usa rollback en `finally`. Se comprueba el estado devuelto y los fallos inciertos se mantienen visibles como `desconocido`.
-- **D36 · Métricas.** El resumen CSV informa caracteres, estimación, tokens reales informados por el cliente y diferencia para pares comparables.
+- **D32 · Windows worker.** A real executable is resolved on PATH or from the configured path. WindowsApps paths are discarded before startup. A handshake failure reports the phase, the executable by name, the observed exit code and up to 2048 characters of stderr. The Python protocol explicitly writes JSONL in UTF-8.
+- **D33 · Queries.** `q … digest=true` returns the total and the SHA-256 of all filtered rows. The versioned format keeps multiplicity and full texts and sorts rows to compare runs. `timing=true` breaks the time down into bridge, dispatch, Revit thread and result processing. Counts and groupings skip reading unnecessary presentation fields.
+- **D34 · PDF.** `pdf grids … sin_globo=true` enables an optional inference from labels at the ends of long lines. It requires intersections and activates on pages without recognized bubbles. Strict mode remains the default.
+- **D35 · Reversible writes.** The typed plan trial is reused. Temporary verification uses rollback in `finally`. The returned status is checked and uncertain failures remain visible as `desconocido`.
+- **D36 · Metrics.** The CSV summary reports characters, estimate, real tokens reported by the client and the difference for comparable pairs.

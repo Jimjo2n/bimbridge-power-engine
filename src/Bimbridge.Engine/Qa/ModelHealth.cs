@@ -7,8 +7,8 @@ using System.Linq;
 namespace Bimbridge.Engine.Qa
 {
     /// <summary>
-    /// 0.9.1 (Bloque H): reglas de salud del modelo sobre datos ya leídos (sin Revit). El add-in lee avisos, elementos, conectores,
-    /// láminas y vistas; aquí se agrupa y se decide. Cada hallazgo lleva ids para poder actuar sobre él.
+    /// 0.9.1 (Block H): model health rules over already-read data (without Revit). The add-in reads warnings, elements, connectors,
+    /// sheets and views; this class groups and decides. Each finding carries ids so it can be acted on.
     /// </summary>
     public static class ModelHealth
     {
@@ -24,7 +24,7 @@ namespace Bimbridge.Engine.Qa
         public sealed class Sheet { public long Id; public string Number, Name; public int Viewports; public int Schedules; }
         public sealed class View { public long Id; public string Name, Kind; public bool OnSheet, IsTemplate, IsDependent; }
 
-        public const double DuplicateTolerance = 0.003;   // pies (~1 mm)
+        public const double DuplicateTolerance = 0.003;   // feet (~1 mm)
         public const int MaxSample = 20;
 
         private static Dictionary<string, object> Bucket(IEnumerable<long> ids, string extra = null)
@@ -36,16 +36,16 @@ namespace Bimbridge.Engine.Qa
             return d;
         }
 
-        /// <summary>Grupos de elementos coincidentes: misma categoría, familia, tipo y nivel, en la misma posición y giro (dentro de la tolerancia).</summary>
+        /// <summary>Groups of coincident elements: same category, family, type and level, at the same position and rotation (within tolerance).</summary>
         public static List<List<long>> Duplicates(IEnumerable<Element> elements, double tol = DuplicateTolerance)
         {
             var groups = new List<List<long>>();
-            // 0.9.1: coordenadas no finitas o fuera de rango de cuantización se excluyen (Math.Floor(x/tol) desbordaría long).
+            // 0.9.1: non-finite coordinates or ones outside the quantization range are excluded (Math.Floor(x/tol) would overflow long).
             const double MaxQuant = 1e9;
             bool Finite(double v) => !double.IsNaN(v) && !double.IsInfinity(v) && Math.Abs(v) < MaxQuant;
             foreach (var g in elements.Where(e => e.HasLocation && Finite(e.X) && Finite(e.Y) && Finite(e.Z) && Finite(e.RotationDeg)).GroupBy(e => (e.Category ?? "") + "|" + e.Family + "|" + e.Type + "|" + e.Level, StringComparer.Ordinal))
             {
-                // Rejilla espacial: cada celda de tamaño tol; se comparan vecinos de las celdas adyacentes (O(n) esperado, no O(n²)).
+                // Spatial grid: each cell is tol in size; neighbors in adjacent cells are compared (O(n) expected, not O(n²)).
                 var cell = new Dictionary<(long, long, long), List<Element>>();
                 (long, long, long) Key(Element e) => ((long)Math.Floor(e.X / tol), (long)Math.Floor(e.Y / tol), (long)Math.Floor(e.Z / tol));
                 foreach (var e in g) { var k = Key(e); if (!cell.TryGetValue(k, out var l)) cell[k] = l = new List<Element>(); l.Add(e); }
@@ -55,7 +55,7 @@ namespace Bimbridge.Engine.Qa
                     if (seen.Contains(e.Id)) continue;
                     var (cx, cy, cz) = Key(e);
                     var grp = new List<long> { e.Id };
-                    var inGrp = new HashSet<long> { e.Id };   // pertenencia O(1): en grupos muy densos List.Contains era cuadrático
+                    var inGrp = new HashSet<long> { e.Id };   // O(1) membership: in very dense groups List.Contains was quadratic
                     for (var dx = -1; dx <= 1; dx++) for (var dy = -1; dy <= 1; dy++) for (var dz = -1; dz <= 1; dz++)
                     {
                         if (!cell.TryGetValue((cx + dx, cy + dy, cz + dz), out var near)) continue;
@@ -95,7 +95,7 @@ namespace Bimbridge.Engine.Qa
                 missing[p] = new Dictionary<string, object> { ["sin_parametro"] = Bucket(absent), ["vacio"] = Bucket(empty) };
             }
             var disconnected = connectors.Where(c => !c.Connected).GroupBy(c => c.Domain ?? "desconocido").OrderBy(g => g.Key, StringComparer.Ordinal)
-                .ToDictionary(g => g.Key, g => (object)Bucket(g.Select(c => c.ElementId), g.Count() + " conectores libres"));
+                .ToDictionary(g => g.Key, g => (object)Bucket(g.Select(c => c.ElementId), g.Count() + " free connectors"));
 
             var emptySheets = sheets.Where(s => s.Viewports == 0 && s.Schedules == 0).Select(s => s.Id);
             var unplaced = views.Where(v => !v.IsTemplate && !v.OnSheet && (v.Kind == "FloorPlan" || v.Kind == "CeilingPlan" || v.Kind == "Section" || v.Kind == "Elevation" || v.Kind == "Detail" || v.Kind == "DraftingView" || v.Kind == "EngineeringPlan" || v.Kind == "AreaPlan"))
@@ -121,7 +121,7 @@ namespace Bimbridge.Engine.Qa
                 {
                     ["laminas_vacias"] = Bucket(emptySheets), ["vistas_sin_lamina"] = Bucket(unplaced), ["nombres_de_vista_repetidos"] = Bucket(dupViewNames),
                 },
-                ["nota"] = "Sólo lectura. Duplicado = misma categoría, familia, tipo y nivel en la misma posición y giro (±" + (DuplicateTolerance * 304.8).ToString("0.#", CultureInfo.InvariantCulture) + " mm, ±0,5°).",
+                ["nota"] = "Read only. Duplicate = same category, family, type and level at the same position and rotation (±" + (DuplicateTolerance * 304.8).ToString("0.#", CultureInfo.InvariantCulture) + " mm, ±0.5°).",
             };
         }
     }

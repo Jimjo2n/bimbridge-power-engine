@@ -74,15 +74,15 @@ namespace Bimbridge.Tests
                 var s1 = Submit(pipe, plan);
                 Assert.True((bool)s1["ok"], Json.Write(s1));
                 var id = Arg.GetString(s1, "plan");
-                var final = WaitFor(pipe, id, t => t.StartsWith("3/3 verificadas"));
+                var final = WaitFor(pipe, id, t => t.StartsWith("3/3 verified"));
                 _out.WriteLine(final);
                 var s2 = Submit(pipe, plan);                                   // same plan: not duplicated
                 Assert.True((bool)s2["ok"]); Assert.True((bool)s2["ya_existia"]);
                 Thread.Sleep(300);
                 var model = DurableSimModel.Open(Path.Combine(root, "planes", id, "modelo"));
                 Assert.Equal(1, model.TxFor(plan.Ops[1].Id, id).Count);
-                Assert.Equal("sin excepciones", Text(Call(pipe, "excepciones", new Dictionary<string, object> { ["plan"] = id })));
-                Assert.Equal("ninguna", Text(Call(pipe, "siguiente", new Dictionary<string, object> { ["plan"] = id })));
+                Assert.Equal("no exceptions", Text(Call(pipe, "excepciones", new Dictionary<string, object> { ["plan"] = id })));
+                Assert.Equal("none", Text(Call(pipe, "siguiente", new Dictionary<string, object> { ["plan"] = id })));
                 Assert.StartsWith("seq ", Text(Call(pipe, "cambios", new Dictionary<string, object> { ["plan"] = id, ["desde"] = 0L })));
                 var rep = Call(pipe, "informe", new Dictionary<string, object> { ["plan"] = id });
                 Assert.Equal(0L, Arg.GetLong(rep, "sin_resolver"));
@@ -133,15 +133,15 @@ namespace Bimbridge.Tests
                 var id = Arg.GetString(Submit(pipe, plan, config: new Dictionary<string, object> { ["retardo_ms"] = 30L }), "plan");
                 WaitFor(pipe, id, t => !t.StartsWith("0/"));
                 Assert.True((bool)Call(pipe, "pausar", new Dictionary<string, object> { ["plan"] = id })["ok"]);
-                var paused = WaitFor(pipe, id, t => t.Contains("plan pausado") && !t.Contains("ejecutando"));
+                var paused = WaitFor(pipe, id, t => t.Contains("plan pausado") && !t.Contains("running"));
                 Thread.Sleep(300);
                 Assert.Equal(paused.Split('·')[0], Text(Call(pipe, "resumen", new Dictionary<string, object> { ["plan"] = id })).Split('·')[0]);   // does not advance while paused
                 Assert.True((bool)Call(pipe, "reanudar", new Dictionary<string, object> { ["plan"] = id })["ok"]);
-                WaitFor(pipe, id, t => !t.Contains("pausado") && t.Contains("ejecutando"));
+                WaitFor(pipe, id, t => !t.Contains("pausado") && t.Contains("running"));
                 Assert.True((bool)Call(pipe, "cancelar", new Dictionary<string, object> { ["plan"] = id })["ok"]);
-                var done = WaitFor(pipe, id, t => t.Contains("plan cancelado") && !t.Contains("ejecutando") && !t.Contains("pendientes"));
+                var done = WaitFor(pipe, id, t => t.Contains("plan cancelado") && !t.Contains("running") && !t.Contains("pending"));
                 _out.WriteLine(done);
-                Assert.Contains("canceladas", done);
+                Assert.Contains("cancelled", done);
                 var model = DurableSimModel.Open(Path.Combine(root, "planes", id, "modelo"));
                 Assert.All(plan.Ops, op => Assert.InRange(model.TxFor(op.Id, id).Count, 0, 1));
             }
@@ -171,7 +171,7 @@ namespace Bimbridge.Tests
             var host2 = StartHost(root, pipe2, workers: 1);
             try
             {
-                var final = WaitFor(pipe2, id, t => t.StartsWith("120/120 verificadas"));
+                var final = WaitFor(pipe2, id, t => t.StartsWith("120/120 verified"));
                 _out.WriteLine(final);
             }
             finally { host2.StopAsync().GetAwaiter().GetResult(); host2.Dispose(); }
@@ -211,7 +211,7 @@ namespace Bimbridge.Tests
             var s2 = Start(pipe2);
             try
             {
-                var final = WaitFor(pipe2, id, t => t.StartsWith("40/40 verificadas"), 90000);
+                var final = WaitFor(pipe2, id, t => t.StartsWith("40/40 verified"), 90000);
                 _out.WriteLine(final);
                 Assert.Equal(0L, Arg.GetLong(Call(pipe2, "informe", new Dictionary<string, object> { ["plan"] = id }), "sin_resolver"));
                 Call(pipe2, "apagar");

@@ -120,7 +120,7 @@ Después de REQ-001.
             using (var r = PlanRunner.Open(state, b.Plan, new SimulatedBackend(DurableSimModel.Open(model)), new RunnerOptions(), out var diags))
             {
                 Assert.NotNull(r);
-                Assert.StartsWith("3/3 verificadas", r.Run());
+                Assert.StartsWith("3/3 verified", r.Run());
                 var rep = Compact.Report(state, r.Plan, r.State);
                 var full = Json.ParseObject(File.ReadAllText(Arg.GetString(rep, "detalle")));
                 var first = (Dictionary<string, object>)((List<object>)full["operaciones"])[0];

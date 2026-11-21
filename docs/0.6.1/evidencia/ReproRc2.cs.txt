@@ -10,8 +10,8 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// Reproducción de los hallazgos de la revisión sobre el código de rc2 (0222b6e). Cada prueba afirma el comportamiento CORRECTO:
-    /// que falle aquí demuestra el defecto.
+    /// Reproduction of the review findings on the rc2 code (0222b6e). Each test asserts the CORRECT behavior:
+    /// a failure here demonstrates the defect.
     public class ReproRc2
     {
         const string D = "archivo:c:\\practica.rvt";
@@ -52,7 +52,7 @@ namespace Bimbridge.Tests
                 Args = new Dictionary<string, object> { ["n"] = 3L }, Docs = new List<TaskDoc> { new TaskDoc { Key = D, Title = "p", Generation = "inst#1" } },
                 Policy = new Dictionary<string, object> { ["requiere"] = new List<object> { Capability.Modificar } } };
             mgr.Start(draft, "//", "p"); await mgr.Completion("x");
-            Assert.Equal(0, Counting.Enumerations); // en rc2 el backend enumera (Preparar + MoveNext de la receta) antes de autorizar
+            Assert.Equal(0, Counting.Enumerations); // in rc2 the backend enumerates (the recipe's Preparar + MoveNext) before authorizing
         }
 
         [Fact] public void P1_Audit_LastRecordEditedSameSize_Detected()
@@ -84,9 +84,9 @@ namespace Bimbridge.Tests
         [Fact] public void P1_AuditGate_OutcomeFailure_NotReturnedAsNormal()
         {
             var a = new AuditLog(Path.Combine(R(), "a.jsonl")); var n = 0;
-            a.FaultBeforeWrite = _ => { if (++n == 2) throw new IOException("lleno"); };
+            a.FaultBeforeWrite = _ => { if (++n == 2) throw new IOException("full"); };
             var r = AuditGate.Apply(a, "s", "op", "doc", null, () => "aplicado", x => x, w => w, _ => { });
-            Assert.NotEqual("aplicado", r); // en rc2 vuelve como resultado normal
+            Assert.NotEqual("aplicado", r); // in rc2 it comes back as a normal result
         }
 
         [Fact] public void P1_Print_MissingCurrentPrint_DoesNotWiden()

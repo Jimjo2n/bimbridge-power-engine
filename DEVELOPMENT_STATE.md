@@ -24,7 +24,7 @@ Offline tests and native acceptance are separate. Historical reports under `docs
 
 The repository preparation verified Rust unit/IPC tests, Python document-worker tests and a selected C# regression suite. A full distribution build, hosted CI and native acceptance remain release requirements. Current evidence and limitations must be recorded against the exact source commit.
 
-Native acceptance uses an isolated Revit instance and disposable, authorized models. Procedures: [native validation](docs/0.9.0/NATIVE_VALIDATION.md) and [0.9.0 acceptance](tools/aceptacion/0.9.0/PROCEDIMIENTO_0.9.0.md).
+Native acceptance uses an isolated Revit instance and disposable, authorized models. Procedures: [native validation](docs/0.9.0/NATIVE_VALIDATION.md) and [0.9.0 acceptance](tools/acceptance/0.9.0/PROCEDURE_0.9.0.md).
 
 ## Open work
 

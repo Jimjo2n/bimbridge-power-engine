@@ -1,0 +1,33 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N9-01",
+ "titulo": "Identity, version and pinned document",
+ "estado_inicial": "Disposable LOCAL copy, not workshared, of an authorized public or synthetic model (e.g. an Autodesk sample) with named straight grids and a OneLevelBased lighting fixture family loaded. Revit 2024 with BIMBRIDGE 0.9.0 installed; config.json levels RPW, lab profile with the copy's folder in laboratorio.carpetas and carpetas_documentos with the test PDF folder. NEVER the user's working model.",
+ "estado": "BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION",
+ "variables": {},
+ "pasos": [
+  {
+   "nombre": "context",
+   "op": "context",
+   "args": {},
+   "contiene": [
+    "0.9.0"
+   ]
+  },
+  {
+   "nombre": "documents",
+   "op": "docs",
+   "args": {}
+  },
+  {
+   "nombre": "fixtures before",
+   "op": "query",
+   "args": {
+    "cat": [
+     "LightingFixtures"
+    ],
+    "count": true
+   }
+  }
+ ]
+}

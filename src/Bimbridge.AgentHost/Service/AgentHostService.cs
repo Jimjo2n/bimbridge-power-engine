@@ -29,23 +29,23 @@ namespace Bimbridge.AgentHost
     }
 
     /// <summary>
-    /// Servicio de ejecución persistente (P1 §3), alojado con Microsoft.Extensions.Hosting y ejecutable desde la consola (no instala un
-    /// servicio de Windows ni toca el sistema). Cola acotada, N trabajadores, cada plan con su lease (dos servicios no ejecutan el mismo
-    /// plan), pausa/reanudación/cancelación persistidas en el diario del plan, recuperación al arrancar, apagado ordenado (para ENTRE
-    /// operaciones y deja checkpoint), errores estructurados, salud y consultas compactas. No depende de ninguna conversación: todo lo que
-    /// necesita está en la carpeta raíz.
+    /// Persistent execution service (P1 §3), hosted with Microsoft.Extensions.Hosting and runnable from the console (it does not install a
+    /// Windows service or touch the system). Bounded queue, N workers, each plan with its lease (two services never run the same
+    /// plan), pause/resume/cancel persisted in the plan journal, recovery at startup, orderly shutdown (stops BETWEEN
+    /// operations and leaves a checkpoint), structured errors, health and compact queries. It depends on no conversation: everything it
+    /// needs is in the root folder.
     ///
-    /// Raíz: planes/&lt;hash&gt;/ (plan.json, diario.jsonl, estado.json, control/, modelo/ simulado) y servicio.jsonl (registro del servicio).
-    /// Transporte: named pipe local (PipeOptions.CurrentUserOnly), una línea JSON por petición y por respuesta.
+    /// Root: planes/&lt;hash&gt;/ (plan.json, diario.jsonl, estado.json, control/, simulated modelo/) and servicio.jsonl (service log).
+    /// Transport: local named pipe (PipeOptions.CurrentUserOnly), one JSON line per request and per response.
     /// </summary>
     public sealed class AgentHostService : BackgroundService
     {
-        /// <summary>rc1: versión y commit salen del ensamblado (Directory.Build.props + SourceRevisionId); nunca un literal.</summary>
+        /// <summary>rc1: version and commit come from the assembly (Directory.Build.props + SourceRevisionId); never a literal.</summary>
         public static readonly string Version = BuildInfo.Version;
         private readonly ServiceOptions _o;
         private readonly IHostApplicationLifetime _life;
         private readonly ConcurrentDictionary<string, Slot> _slots = new ConcurrentDictionary<string, Slot>(StringComparer.Ordinal);
-        private readonly PlanQueue _pq;   // alpha3 (P1-B), ver PlanQueue
+        private readonly PlanQueue _pq;   // alpha3 (P1-B), see PlanQueue
         private readonly object _logLock = new object();
         private readonly DateTime _started = DateTime.UtcNow;
         private CancellationToken _stopping;
@@ -53,7 +53,7 @@ namespace Bimbridge.AgentHost
         private sealed class Slot
         {
             public CancellationTokenSource Cts;
-            public string After;   // "pausar" | "cancelar" | null: lo que se hace al terminar la operación en curso
+            public string After;   // "pausar" | "cancelar" | null: what to do when the current operation finishes
         }
 
         public AgentHostService(ServiceOptions o, IHostApplicationLifetime life)
@@ -73,13 +73,13 @@ namespace Bimbridge.AgentHost
             lock (_logLock) File.AppendAllText(Path.Combine(_o.Root, "servicio.jsonl"), Json.Write(d) + "\n");
         }
 
-        // ---------------- ciclo de vida ----------------
+        // ---------------- lifecycle ----------------
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             _stopping = stoppingToken;
             Log("inicio", new Dictionary<string, object> { ["version"] = Version, ["pid"] = (long)Process.GetCurrentProcess().Id, ["tuberia"] = _o.Pipe, ["cola"] = (long)_o.QueueCapacity, ["trabajadores"] = (long)_o.Workers });
-            // recuperación al arrancar: todo plan activo con trabajo pendiente vuelve a la cola
+            // recovery at startup: every active plan with pending work goes back to the queue
             foreach (var d in Directory.GetDirectories(PlansDir).OrderBy(x => x, StringComparer.Ordinal))
             {
                 var id = Path.GetFileName(d);
@@ -102,7 +102,7 @@ namespace Bimbridge.AgentHost
         private void RunPlan(string id, CancellationToken stop)
         {
             var slot = new Slot { Cts = CancellationTokenSource.CreateLinkedTokenSource(stop) };
-            if (!_slots.TryAdd(id, slot)) return;    // ya se está ejecutando en este servicio
+            if (!_slots.TryAdd(id, slot)) return;    // already running in this service
             try
             {
                 var model = DurableSimModel.Open(Path.Combine(PlanDir(id), "modelo"));
@@ -111,7 +111,7 @@ namespace Bimbridge.AgentHost
                     if (r == null) { Log("plan_rechazado", new Dictionary<string, object> { ["plan"] = id, ["diag"] = string.Join("; ", diags) }); return; }
                     if (!r.IsOwner)
                     {
-                        // otro proceso lo tiene: reintentar cuando venza su lease (si sigue vivo, lo renovará y volveremos a ceder)
+                        // another process holds it: retry when its lease expires (if it is still alive, it will renew it and we will yield again)
                         var wait = Expiry(r.Holder) - DateTime.UtcNow + TimeSpan.FromMilliseconds(100);
                         Log("plan_en_uso", new Dictionary<string, object> { ["plan"] = id, ["dueno"] = r.Holder?.Owner, ["reintento_ms"] = (long)Math.Max(0, wait.TotalMilliseconds) });
                         _ = Task.Delay(wait > TimeSpan.Zero ? wait : TimeSpan.FromMilliseconds(100), stop).ContinueWith(t => { if (!t.IsCanceled) Enqueue(id); }, TaskScheduler.Default);
@@ -146,7 +146,7 @@ namespace Bimbridge.AgentHost
             return (plan, st);
         }
 
-        // ---------------- peticiones ----------------
+        // ---------------- requests ----------------
 
         public static Dictionary<string, object> Error(string cls, string msg) => new Dictionary<string, object> { ["ok"] = false, ["error"] = new Dictionary<string, object> { ["clase"] = cls, ["mensaje"] = msg } };
 
@@ -181,18 +181,18 @@ namespace Bimbridge.AgentHost
                     case "apagar":
                         Log("apagado_pedido");
                         _life.StopApplication();
-                        return new Dictionary<string, object> { ["ok"] = true, ["detalle"] = "parando entre operaciones" };
+                        return new Dictionary<string, object> { ["ok"] = true, ["detalle"] = "stopping between operations" };
                     case "pausar": case "cancelar": return Control(id, cmd);
                     case "reanudar": return Resume(id);
                 }
-                if (id == null) return Error("peticion_invalida", "falta plan (o orden desconocida: " + cmd + ")");
+                if (id == null) return Error("peticion_invalida", "missing plan (or unknown command: " + cmd + ")");
                 if (!Directory.Exists(PlanDir(id))) return Error("plan_desconocido", id);
                 var view = Inspect(id, out var diags);
                 if (view == null) return Error(ErrorClass.EstadoCorrupto, string.Join("; ", diags.Where(d => d.Severity == "error")));
                 var (plan, st) = view.Value;
                 switch (cmd)
                 {
-                    case "resumen": return Ok(Compact.Summary(plan, st) + (_slots.ContainsKey(id) ? " · ejecutando" : ""));
+                    case "resumen": return Ok(Compact.Summary(plan, st) + (_slots.ContainsKey(id) ? " · running" : ""));
                     case "siguiente": return Ok(Compact.NextText(plan, st));
                     case "excepciones": return Ok(Compact.Exceptions(plan, st, (int)(Arg.GetLong(req, "max") ?? 20)));
                     case "cambios": return Ok(Compact.ChangesSince(plan, st, Arg.GetLong(req, "desde") ?? 0, (int)(Arg.GetLong(req, "max") ?? 50)));
@@ -212,12 +212,12 @@ namespace Bimbridge.AgentHost
 
         private static Dictionary<string, object> Ok(string text) => new Dictionary<string, object> { ["ok"] = true, ["texto"] = text };
 
-        /// <summary>Recibe un plan IR (objeto JSON) y el modelo simulado sobre el que ejecutarlo. Idempotente por hash del plan.</summary>
+        /// <summary>Receives an IR plan (JSON object) and the simulated model to run it on. Idempotent by plan hash.</summary>
         private Dictionary<string, object> Submit(Dictionary<string, object> req)
         {
-            if (!(req.TryGetValue("ir", out var p) && p is Dictionary<string, object> pd)) return Error("peticion_invalida", "falta ir (el plan)");
+            if (!(req.TryGetValue("ir", out var p) && p is Dictionary<string, object> pd)) return Error("peticion_invalida", "missing ir (the plan)");
             var errs = IrValidator.Validate(PlanDraft.FromJson(pd), out var vp);
-            if (errs.Count > 0) return new Dictionary<string, object> { ["ok"] = false, ["error"] = new Dictionary<string, object> { ["clase"] = "plan_invalido", ["mensaje"] = errs.Count + " errores" }, ["errores"] = errs.Take(20).Cast<object>().ToList() };
+            if (errs.Count > 0) return new Dictionary<string, object> { ["ok"] = false, ["error"] = new Dictionary<string, object> { ["clase"] = "plan_invalido", ["mensaje"] = errs.Count + " errors" }, ["errores"] = errs.Take(20).Cast<object>().ToList() };
             var dir = PlanDir(vp.Hash);
             var existed = File.Exists(PlanFile.PathIn(dir));
             if (!existed)
@@ -226,13 +226,13 @@ namespace Bimbridge.AgentHost
                 var mdir = Path.Combine(dir, "modelo");
                 if (!File.Exists(Path.Combine(mdir, "modelo.json")))
                 {
-                    if (!(req.TryGetValue("modelo", out var m) && m is Dictionary<string, object> md)) return Error("peticion_invalida", "falta modelo (simulado: elementos y config)");
+                    if (!(req.TryGetValue("modelo", out var m) && m is Dictionary<string, object> md)) return Error("peticion_invalida", "missing modelo (simulated: elementos and config)");
                     DurableSimModel.Create(mdir, vp.DocKey, Arg.GetString(md, "huella") ?? vp.DocPrint, Arg.GetStringList(md, "elementos"), md.TryGetValue("config", out var c) ? c as Dictionary<string, object> : null);
                 }
                 PlanFile.Write(dir, vp);
                 Log("plan_recibido", new Dictionary<string, object> { ["plan"] = vp.Hash, ["operaciones"] = (long)vp.Ops.Count });
             }
-            if (!Enqueue(vp.Hash)) return Error("cola_llena", "la cola admite " + _o.QueueCapacity + " planes; reintente más tarde");
+            if (!Enqueue(vp.Hash)) return Error("cola_llena", "the queue holds " + _o.QueueCapacity + " plans; retry later");
             return new Dictionary<string, object> { ["ok"] = true, ["plan"] = vp.Hash, ["ya_existia"] = existed, ["operaciones"] = (long)vp.Ops.Count };
         }
 
@@ -242,14 +242,14 @@ namespace Bimbridge.AgentHost
             if (_slots.TryGetValue(id, out var slot))
             {
                 slot.After = cmd;
-                slot.Cts.Cancel();     // se detiene ENTRE operaciones; el trabajador aplica la orden con el lease que ya tiene
-                return new Dictionary<string, object> { ["ok"] = true, ["detalle"] = cmd + " al terminar la operación en curso" };
+                slot.Cts.Cancel();     // stops BETWEEN operations; the worker applies the command with the lease it already holds
+                return new Dictionary<string, object> { ["ok"] = true, ["detalle"] = cmd + " when the current operation finishes" };
             }
             var model = DurableSimModel.Open(Path.Combine(PlanDir(id), "modelo"));
             using (var r = PlanRunner.Open(PlanDir(id), null, new SimulatedBackend(model), new RunnerOptions { LeaseTtl = _o.LeaseTtl }, out var diags))
             {
                 if (r == null) return Error(ErrorClass.EstadoCorrupto, string.Join("; ", diags));
-                if (!r.IsOwner) return Error(ErrorClass.PlanEnUso, "otro proceso es dueño del plan");
+                if (!r.IsOwner) return Error(ErrorClass.PlanEnUso, "another process owns the plan");
                 if (cmd == "pausar") r.Pause(); else r.Cancel();
                 return Ok(Compact.Summary(r.Plan, r.State));
             }
@@ -260,22 +260,22 @@ namespace Bimbridge.AgentHost
             if (id == null || !Directory.Exists(PlanDir(id))) return Error("plan_desconocido", id);
             if (_slots.TryGetValue(id, out var running))
             {
-                if (running.After == "cancelar") return Error("cancelacion_en_curso", "el plan se está cancelando; no se reanuda");
-                running.After = null;          // anula un "pausar" pendiente
-                Enqueue(id);                   // se repite al terminar la operación en curso
-                return Ok("ya se está ejecutando; continuará");
+                if (running.After == "cancelar") return Error("cancelacion_en_curso", "the plan is being cancelled; not resuming");
+                running.After = null;          // cancels a pending "pausar"
+                Enqueue(id);                   // repeats when the current operation finishes
+                return Ok("already running; it will continue");
             }
             var model = DurableSimModel.Open(Path.Combine(PlanDir(id), "modelo"));
             using (var r = PlanRunner.Open(PlanDir(id), null, new SimulatedBackend(model), new RunnerOptions { LeaseTtl = _o.LeaseTtl }, out var diags))
             {
                 if (r == null) return Error(ErrorClass.EstadoCorrupto, string.Join("; ", diags));
-                if (!r.IsOwner) return Error(ErrorClass.PlanEnUso, "otro proceso es dueño del plan");
+                if (!r.IsOwner) return Error(ErrorClass.PlanEnUso, "another process owns the plan");
                 r.Resume();
             }
-            return Enqueue(id) ? Ok("reanudado") : Error("cola_llena", "reanudado pero la cola está llena; reintente");
+            return Enqueue(id) ? Ok("resumed") : Error("cola_llena", "resumed but the queue is full; retry");
         }
 
-        // ---------------- transporte ----------------
+        // ---------------- transport ----------------
 
         private async Task PipeLoop(CancellationToken stop)
         {
@@ -320,7 +320,7 @@ namespace Bimbridge.AgentHost
 
     public static class ServiceMain
     {
-        /// <summary>Construye el host (para la consola y para las pruebas).</summary>
+        /// <summary>Builds the host (for the console and for the tests).</summary>
         public static IHost Build(ServiceOptions o) =>
             new HostBuilder()
                 .ConfigureServices(s =>
@@ -342,7 +342,7 @@ namespace Bimbridge.AgentHost
                 Root = Path.GetFullPath(root), Pipe = pipe, QueueCapacity = capacity, Workers = workers,
                 LeaseTtl = ttl == null ? (TimeSpan?)null : TimeSpan.FromMilliseconds(double.Parse(ttl, CultureInfo.InvariantCulture)),
             };
-            Console.WriteLine("agenthost " + AgentHostService.Version + " · raíz " + o.Root + " · tubería " + pipe + " · Ctrl+C para parar entre operaciones");
+            Console.WriteLine("agenthost " + AgentHostService.Version + " · root " + o.Root + " · pipe " + pipe + " · Ctrl+C to stop between operations");
             Build(o).Run();
             return 0;
         }
@@ -359,7 +359,7 @@ namespace Bimbridge.AgentHost
                 var r = new StreamReader(c, new UTF8Encoding(false), false, 4096, true);
                 w.WriteLine(json.Replace("\r", "").Replace("\n", " "));
                 var line = r.ReadLine();
-                return line ?? Json.Write(AgentHostService.Error("sin_respuesta", "el servicio cerró la conexión"));
+                return line ?? Json.Write(AgentHostService.Error("sin_respuesta", "the service closed the connection"));
             }
         }
 

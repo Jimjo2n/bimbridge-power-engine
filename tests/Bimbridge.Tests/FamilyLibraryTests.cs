@@ -30,7 +30,7 @@ namespace Bimbridge.Tests
             project[0] = Port("desague", "DomesticColdWater", "entrada", 25);
             Assert.Collection(FamilyPortAudit.Compare(source, project),
                 row => Assert.Contains("sistema", row), row => Assert.Contains("flujo", row), row => Assert.Contains("radio", row));
-            Assert.Contains("sin instancia", Assert.Single(FamilyPortAudit.Compare(source, null)));
+            Assert.Contains("no placed instance", Assert.Single(FamilyPortAudit.Compare(source, null)));
         }
 
         private static string Rfa(string dir, string name, int? version, params string[] catalogTypes)
@@ -84,15 +84,15 @@ namespace Bimbridge.Tests
             var inside = Rfa(root, "INSIDE", 2024);
             var lib = new FamilyLibrary(new[] { root });
             lib.Refresh();
-            Assert.Null(lib.ResolveForLoad(outside, out var e1)); Assert.Contains("autorizada", e1);
-            Assert.Null(lib.ResolveForLoad(Path.Combine(root, "..", Path.GetFileName(Path.GetDirectoryName(outside)), "OUTSIDE.rfa"), out var e2)); Assert.Contains("autorizada", e2);
+            Assert.Null(lib.ResolveForLoad(outside, out var e1)); Assert.Contains("authorized", e1);
+            Assert.Null(lib.ResolveForLoad(Path.Combine(root, "..", Path.GetFileName(Path.GetDirectoryName(outside)), "OUTSIDE.rfa"), out var e2)); Assert.Contains("authorized", e2);
             var ok = lib.ResolveForLoad(inside, out var e3);
             Assert.Null(e3); Assert.Equal(64, ok.Sha256.Length);
             var late = Rfa(root, "LATE", 2024);
-            Assert.Null(lib.ResolveForLoad(late, out var e4)); Assert.Contains("índice", e4);
+            Assert.Null(lib.ResolveForLoad(late, out var e4)); Assert.Contains("index", e4);
             File.AppendAllText(inside, "x");
             File.SetLastWriteTimeUtc(inside, DateTime.UtcNow.AddMinutes(1));
-            Assert.Null(lib.ResolveForLoad(inside, out var e5)); Assert.Contains("cambió", e5);
+            Assert.Null(lib.ResolveForLoad(inside, out var e5)); Assert.Contains("changed", e5);
         }
 
         [Fact]

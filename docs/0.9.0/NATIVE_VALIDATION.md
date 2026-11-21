@@ -1,61 +1,61 @@
-# BIMBRIDGE 0.9.0 Native Validation: integración y retorno
+# BIMBRIDGE 0.9.0 Native Validation: integration and rollback
 
-Estado: **NATIVE_ACCEPTANCE_PENDING**. Build de laboratorio. No usar en modelos de producción.
-Instalar, abrir Revit o conectarse a él exige autorización específica de instalación, instancia y copia desechable.
+Status: **NATIVE_ACCEPTANCE_PENDING**. Lab build. Do not use on production models.
+Installing, opening Revit or connecting to it requires specific authorization for the installation, the instance and the disposable copy.
 
-## Requisitos del laboratorio
+## Lab requirements
 
-- Revit cerrado durante la instalación y el retorno.
-- CPython real, fuera de WindowsApps. **No se empaqueta**: es un prerrequisito. Se indica en `%APPDATA%\Bimbridge\config.json`: `"power_engine": { "python": "C:\\ruta\\python.exe" }`. Sin él, las funciones de PDF quedan no disponibles con un diagnóstico.
-- Copia local desechable, no workshared.
+- Revit closed during installation and rollback.
+- A real CPython, outside WindowsApps. **It is not packaged**: it is a prerequisite. It is set in `%APPDATA%\Bimbridge\config.json`: `"power_engine": { "python": "C:\\path\\python.exe" }`. Without it, PDF features are unavailable with a diagnostic.
+- Disposable local copy, not workshared.
 
-## Bloqueo por operaciones no reconciliadas
+## Block due to unreconciled operations
 
-Con evidencia pendiente, un archivo de evidencia dañado o un error al leerla, las escrituras sobre ese documento se rechazan con `documento_bloqueado_reconciliacion`. El bloqueo está en disco y sobrevive a reinicios.
+With pending evidence, a damaged evidence file or an error reading it, writes to that document are rejected with `documento_bloqueado_reconciliacion`. The block is on disk and survives restarts.
 
-- `job op=pendientes doc=…` muestra el bloqueo.
-- `job op=reconciliar plan_id=… doc=…` compara la evidencia con el modelo. Libera sólo con `revertido_verificado` o `aplicado_verificado`, y archiva la evidencia en `reconciliados\`. El plan queda `reconciliado` y no se repite.
-- Si no se puede demostrar, una persona revisa el modelo y, con Revit cerrado: `AgentHost plan-store resolver --doc "clave" --plan P-x --autor nombre --motivo "qué revisé" --confirmo-revision-humana`. Para un archivo dañado, `--archivo P-x.json`: va a `cuarentena\`, no se borra.
+- `job op=pendientes doc=…` shows the block.
+- `job op=reconciliar plan_id=… doc=…` compares the evidence with the model. It releases only with `revertido_verificado` or `aplicado_verificado`, and archives the evidence into `reconciliados\`. The plan becomes `reconciliado` and is not repeated.
+- If it cannot be proven, a person reviews the model and, with Revit closed: `AgentHost plan-store resolver --doc "key" --plan P-x --autor name --motivo "what I reviewed" --confirmo-revision-humana`. For a damaged file, `--archivo P-x.json`: it goes to `cuarentena\`, it is not deleted.
 
-## Códigos de salida de /quiet
+## /quiet exit codes
 
-0 bien, 1 error, 2 Revit abierto, 5 ya hay una instalación (repita con `/reemplazar` sólo en un perfil de laboratorio; se crea respaldo).
+0 success, 1 error, 2 Revit open, 5 an installation already exists (repeat with `/reemplazar` only in a lab profile; a backup is created).
 
-## Instalar
+## Install
 
 ```
 Bimbridge.Setup.exe /quiet /revit=2024 /niveles=RPW
 ```
 
-Antes de copiar nada, el instalador verifica el manifiesto y guarda un respaldo en `%LOCALAPPDATA%\Bimbridge\respaldos\<id>\` si ya había una instalación. Conserva los 3 últimos.
+Before copying anything, the installer verifies the manifest and saves a backup in `%LOCALAPPDATA%\Bimbridge\respaldos\<id>\` if there was already an installation. It keeps the last 3.
 
-## Volver atrás
+## Roll back
 
 ```
 Bimbridge.Setup.exe /restaurar
-Bimbridge.Setup.exe /restaurar="<carpeta del respaldo>"
+Bimbridge.Setup.exe /restaurar="<backup folder>"
 ```
 
-- Devuelve el código 2 si Revit está abierto, y no toca nada.
-- Verifica los hashes del respaldo antes de tocar nada.
-- Restaura el add-in y su `.addin` de cada versión, `bin\` (puente, AgentHost, Power Engine), `config.json`, `install.json`, la copia del instalador y `.codex\config.toml`. Lo que no existía se borra. Los add-ins ajenos, como pyRevit, no se tocan.
-- Guarda antes el estado actual e imprime cómo deshacer el retorno. Si falla a medias, intenta dejar el estado anterior.
-- `.codex\config.toml` se restaura completo: los cambios hechos en él después del respaldo se pierden.
-- Fuera del alcance: las tareas y diarios de `%LOCALAPPDATA%\Bimbridge` y los modelos.
+- Returns code 2 if Revit is open, and touches nothing.
+- Verifies the backup hashes before touching anything.
+- Restores the add-in and its `.addin` for each version, `bin\` (bridge, AgentHost, Power Engine), `config.json`, `install.json`, the installer copy and `.codex\config.toml`. Whatever did not exist is deleted. Third-party add-ins, such as pyRevit, are not touched.
+- Saves the current state first and prints how to undo the rollback. If it fails midway, it tries to leave the previous state.
+- `.codex\config.toml` is restored in full: changes made to it after the backup are lost.
+- Out of scope: the tasks and journals in `%LOCALAPPDATA%\Bimbridge` and the models.
 
-## Prueba offline
+## Offline test
 
-Con `BIMBRIDGE_SETUP_SANDBOX=<carpeta>`, todas las rutas caen dentro de esa carpeta, y no se toca el registro de Windows ni Claude. Sirve para probar instalación y retorno sin afectar a la cuenta.
+With `BIMBRIDGE_SETUP_SANDBOX=<folder>`, all paths fall inside that folder, and neither the Windows registry nor Claude is touched. It is used to test installation and rollback without affecting the account.
 
-## Reconciliación
+## Reconciliation
 
-Un plan cuyo resultado no está confirmado queda en estado `desconocido`, no se vuelve a aplicar y conserva su evidencia en `P-<id>.json`, dentro de la carpeta del documento. `PlanStore.LoadPersisted` lo recupera tras reiniciar y `job plan_id=` lo muestra. Revise el modelo antes de repetir.
+A plan whose result is not confirmed stays in the `desconocido` state, is not applied again and keeps its evidence in `P-<id>.json`, inside the document folder. `PlanStore.LoadPersisted` recovers it after a restart and `job plan_id=` shows it. Review the model before repeating.
 
-## Comportamiento de un plan
+## Plan behavior
 
-| Resultado | `estado` | Evidencia |
+| Result | `estado` | Evidence |
 |---|---|---|
-| Ensayo correcto y restaurado | `ensayado` | No queda; el plan sigue listo |
-| Fallo funcional, restauración confirmada | `revertido` | No queda |
-| Reversión sin confirmar o restauración no comprobada | `desconocido` | Se conserva en disco |
-| Interrumpido después de empezar a escribir | `desconocido` | Se conserva; no vuelve a listo |
+| Successful and restored trial | `ensayado` | None left; the plan stays ready |
+| Functional failure, restoration confirmed | `revertido` | None left |
+| Unconfirmed rollback or unchecked restoration | `desconocido` | Kept on disk |
+| Interrupted after starting to write | `desconocido` | Kept; does not return to ready |

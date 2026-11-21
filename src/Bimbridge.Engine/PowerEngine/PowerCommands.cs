@@ -203,7 +203,7 @@ namespace BimBridge.PowerEngine
             return result;
         }
 
-        /// <summary>red ruta=conductos.json: runs read from Revit (tools/aceptacion/0.9.0/conductos_090.cs) → three-layer analysis.</summary>
+        /// <summary>red ruta=conductos.json: runs read from Revit (tools/acceptance/0.9.0/conduits_090.cs) → three-layer analysis.</summary>
         private static Dictionary<string, object> Network(PowerEngineDispatcher pe, IList<string> folders, Dictionary<string, object> a)
         {
             var ruta = Arg.GetString(a, "ruta");

@@ -20,26 +20,26 @@ namespace BimBridge.PowerEngine.Workflows
         public string FamilyType, Host;
         public double X, Y, RotDeg;
         public double? ElevFt;
-        public bool? Visible;              // visible en la vista de entrega (null = no comprobado)
-        public bool? SupportOk;            // contacto con el soporte comprobado por geo (null = no comprobado)
+        public bool? Visible;              // visible in the delivery view (null = not checked)
+        public bool? SupportOk;            // contact with the host checked by geo (null = not checked)
     }
 
     public sealed class PlacementVerifyOptions
     {
         public double PositionTolFt = 0.5 / 12.0;   // 1/2"
-        public double SearchRadiusFt = 3.0;         // más allá: omitido/adicional; dentro pero fuera de tolerancia: desplazado
+        public double SearchRadiusFt = 3.0;         // beyond: missing/extra; inside but out of tolerance: displaced
         public double RotationTolDeg = 1.0;
         public double ElevTolFt = 1.0 / 96.0;       // 1/8"
         public double DuplicateTolFt = 0.25;
-        public bool RotationSymmetric180 = true;    // una tira girada 180° es la misma tira
-        public int MaxListed = 50;                  // el informe compacto lista como mucho esto por tipo de diferencia
+        public bool RotationSymmetric180 = true;    // a strip rotated 180° is the same strip
+        public int MaxListed = 50;                  // the compact report lists at most this many per difference kind
     }
 
     /// <summary>
-    /// Verificación independiente de una colocación: compara lo esperado (de una fuente INDEPENDIENTE de la que guió la construcción,
-    /// comprobado con SHA-256 y linaje por IndependentVerifier.CheckIndependence) con lo observado en el modelo, y clasifica:
-    /// omitido, adicional, duplicado, tipo incorrecto, desplazado, giro incorrecto, altura incorrecta, soporte inválido, no visible.
-    /// Informe compacto: conteos + como mucho MaxListed casos por clase.
+    /// Independent verification of a placement: compares the expected items (from a source INDEPENDENT of the one that guided the build,
+    /// checked by SHA-256 and lineage via IndependentVerifier.CheckIndependence) with what is observed in the model, and classifies:
+    /// missing, extra, duplicate, wrong type, displaced, wrong rotation, wrong elevation, invalid host, not visible.
+    /// Compact report: counts + at most MaxListed cases per class.
     /// </summary>
     public static class PlacementVerifier
     {
@@ -54,12 +54,12 @@ namespace BimBridge.PowerEngine.Workflows
             };
             var gate = IndependentVerifier.CheckIndependence(ind, out var proof);
             if (gate.HasValue)
-                return new Dictionary<string, object> { ["estado"] = gate.Value.Estado, ["motivo"] = gate.Value.Motivo, ["nota"] = "sin fuente independiente no se emite un veredicto de QA/QC" };
+                return new Dictionary<string, object> { ["estado"] = gate.Value.Estado, ["motivo"] = gate.Value.Motivo, ["nota"] = "no QA/QC verdict is issued without an independent source" };
 
             var diffs = new Dictionary<string, List<Dictionary<string, object>>>(StringComparer.Ordinal);
             void Add(string kind, Dictionary<string, object> d) { if (!diffs.TryGetValue(kind, out var l)) diffs[kind] = l = new List<Dictionary<string, object>>(); l.Add(d); }
 
-            // duplicados en lo observado (mismo tipo, muy cerca)
+            // duplicates among the observed items (same type, very close)
             var opts = new double[observed.Count * 2];
             for (var i = 0; i < observed.Count; i++) { opts[2 * i] = observed[i].X; opts[2 * i + 1] = observed[i].Y; }
             var dg = observed.Count > 1 ? (engine != null ? engine.Duplicates(opts, 2, o.DuplicateTolFt) : GeometryKernels.Duplicates(opts, 2, o.DuplicateTolFt)) : new int[observed.Count];
@@ -72,7 +72,7 @@ namespace BimBridge.PowerEngine.Workflows
                 }
             var obsIdx = Enumerable.Range(0, observed.Count).Where(i => !dupOf.Contains(i)).ToList();
 
-            // emparejamiento 1-a-1 dentro del radio de búsqueda (voraz global determinista; C# o Rust)
+            // 1-to-1 matching within the search radius (deterministic global greedy; C# or Rust)
             var e = new double[expected.Count * 2];
             for (var i = 0; i < expected.Count; i++) { e[2 * i] = expected[i].X; e[2 * i + 1] = expected[i].Y; }
             var ob = new double[obsIdx.Count * 2];
@@ -100,7 +100,7 @@ namespace BimBridge.PowerEngine.Workflows
                 { bad = true; Add("altura_incorrecta", new Dictionary<string, object> { ["clave"] = x.Key, ["id"] = y.Id, ["esperado_ft"] = x.ElevFt.Value, ["observado_ft"] = y.ElevFt }); }
                 if (x.Host != null && !string.Equals(x.Host, y.Host, StringComparison.OrdinalIgnoreCase))
                 { bad = true; Add("soporte_invalido", new Dictionary<string, object> { ["clave"] = x.Key, ["id"] = y.Id, ["esperado"] = x.Host, ["observado"] = y.Host }); }
-                else if (y.SupportOk == false) { bad = true; Add("soporte_invalido", new Dictionary<string, object> { ["clave"] = x.Key, ["id"] = y.Id, ["motivo"] = "sin contacto con el soporte (geo montaje)" }); }
+                else if (y.SupportOk == false) { bad = true; Add("soporte_invalido", new Dictionary<string, object> { ["clave"] = x.Key, ["id"] = y.Id, ["motivo"] = "no contact with the host (geo montaje)" }); }
                 if (y.Visible == false) { bad = true; Add("no_visible", new Dictionary<string, object> { ["clave"] = x.Key, ["id"] = y.Id }); }
                 if (!bad) okCount++;
             }
@@ -108,9 +108,9 @@ namespace BimBridge.PowerEngine.Workflows
                 Add("adicional", new Dictionary<string, object> { ["id"] = observed[oi].Id, ["tipo"] = observed[oi].FamilyType, ["xy_ft"] = XY(observed[oi].X, observed[oi].Y) });
 
             var notChecked = new List<object>();
-            if (observed.Any(y => y.Visible == null)) notChecked.Add("visibilidad (sin dato de vista)");
-            if (observed.Any(y => y.SupportOk == null) && expected.All(x => x.Host == null)) notChecked.Add("soporte físico (sin geo montaje)");
-            if (expected.All(x => x.ElevFt == null)) notChecked.Add("altura (la fuente no la da)");
+            if (observed.Any(y => y.Visible == null)) notChecked.Add("visibility (no view data)");
+            if (observed.Any(y => y.SupportOk == null) && expected.All(x => x.Host == null)) notChecked.Add("physical host (no geo montaje)");
+            if (expected.All(x => x.ElevFt == null)) notChecked.Add("elevation (not given by the source)");
             var total = diffs.Values.Sum(l => l.Count);
             return new Dictionary<string, object>
             {

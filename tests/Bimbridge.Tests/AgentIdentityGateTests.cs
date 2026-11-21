@@ -228,7 +228,7 @@ namespace Bimbridge.Tests
             // Another client trying to join with that alias in the hello stays unnamed and gets the reason.
             var c = reg.Open("otro", 300); reg.Describe(c, "1", "Revisor", null, null, AgentIdentity.SourceConfig, "ana");
             Assert.Null(c.AgentName);
-            Assert.Contains("ya lo usa", c.IdentityNote);
+            Assert.Contains("is already used by", c.IdentityNote);
 
             // When the holder closes, the alias becomes free.
             reg.Close(a); reg.Close(a2);

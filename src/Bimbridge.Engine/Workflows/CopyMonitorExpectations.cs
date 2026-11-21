@@ -8,11 +8,11 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine.Workflows
 {
     /// <summary>
-    /// AUD-20: lo que un intento de Copy/Monitor espera conseguir, congelado en el preflight: anfitrión, vínculo y su revisión,
-    /// elementos de origen, transformación, mapeo de tipos, exclusiones y categoría. La verificación posterior se hace contra ESTAS
-    /// expectativas; si al verificar alguna condición ha cambiado (el vínculo se recargó con otros aparatos, se movió, o se pide otro
-    /// mapeo), se devuelve conflicto: una verificación nueva nunca sustituye en silencio el objetivo original.
-    /// La correspondencia origen→copia sigue siendo inferida por tipo y posición; congelar el origen no la convierte en identidad.
+    /// AUD-20: what a Copy/Monitor attempt expects to achieve, frozen at preflight: host, link and its revision,
+    /// source elements, transform, type mapping, exclusions and category. Later verification runs against THESE
+    /// expectations; if any condition has changed at verification time (the link was reloaded with other fixtures, moved, or a
+    /// different mapping is requested), a conflict is returned: a new verification never silently replaces the original target.
+    /// The source→copy correspondence is still inferred by type and position; freezing the source does not make it an identity.
     /// </summary>
     public sealed class CopyMonitorExpectations
     {
@@ -28,7 +28,7 @@ namespace Bimbridge.Engine.Workflows
         private static string SourceLine(SourceFixture s) =>
             string.Join("|", s.UniqueId ?? "", s.Category ?? "", s.Family ?? "", s.Type ?? "", s.Level ?? "", N(s.X), N(s.Y), N(s.Z), N(s.RotationDeg));
 
-        /// <summary>Huella de los elementos de origen (orden estable por UniqueId): cambia si se añade, quita, mueve o cambia de tipo alguno.</summary>
+        /// <summary>Fingerprint of the source elements (stable order by UniqueId): changes if any is added, removed, moved or changes type.</summary>
         public string SourceFingerprint => Home.Sha256Hex(string.Join("\n", Source.OrderBy(s => s.UniqueId, StringComparer.Ordinal).Select(SourceLine)), 32);
 
         public string TransformText => N(Transform.Dx) + "," + N(Transform.Dy) + "," + N(Transform.Dz) + ";" + N(Transform.RotationDeg) + ";" + V(Transform.BasisX) + ";" + V(Transform.BasisY) + ";" + V(Transform.BasisZ);
@@ -39,38 +39,38 @@ namespace Bimbridge.Engine.Workflows
         public string MappingText => string.Join(";", MapLines(false));
         public string ExclusionText => string.Join(";", MapLines(true));
 
-        /// <summary>Huella de todas las expectativas.</summary>
+        /// <summary>Fingerprint of all expectations.</summary>
         public string Fingerprint => Home.Sha256Hex(string.Join("\n", HostIdentity ?? "", LinkIdentity ?? "", LinkRevision ?? "", (Category ?? "").ToLowerInvariant(),
             TransformText, MappingText.ToLowerInvariant(), ExclusionText.ToLowerInvariant(), SourceFingerprint), 32);
 
         /// <summary>
-        /// Diferencias de <paramref name="now"/> respecto a estas expectativas congeladas (vacío = nada que altere el objetivo).
-        /// La revisión del vínculo sólo cuenta si ambas se conocen; los elementos de origen se comparan siempre.
+        /// Differences of <paramref name="now"/> from these frozen expectations (empty = nothing that alters the target).
+        /// The link revision only counts if both are known; the source elements are always compared.
         /// </summary>
         public List<string> Diff(CopyMonitorExpectations now)
         {
             var d = new List<string>();
-            if (!string.Equals(HostIdentity, now.HostIdentity, StringComparison.Ordinal)) d.Add("anfitrión distinto");
-            if (!string.Equals(LinkIdentity, now.LinkIdentity, StringComparison.Ordinal)) d.Add("vínculo distinto");
-            if (!string.Equals(Category, now.Category, StringComparison.OrdinalIgnoreCase)) d.Add("categoría: " + Category + " → " + now.Category);
-            if (TransformText != now.TransformText) d.Add("transformación del vínculo cambiada (el vínculo se movió, giró o reflejó)");
-            if (!string.Equals(MappingText, now.MappingText, StringComparison.OrdinalIgnoreCase)) d.Add("mapeo de tipos distinto: «" + MappingText + "» → «" + now.MappingText + "»");
-            if (!string.Equals(ExclusionText, now.ExclusionText, StringComparison.OrdinalIgnoreCase)) d.Add("exclusiones distintas: «" + ExclusionText + "» → «" + now.ExclusionText + "»");
+            if (!string.Equals(HostIdentity, now.HostIdentity, StringComparison.Ordinal)) d.Add("different host");
+            if (!string.Equals(LinkIdentity, now.LinkIdentity, StringComparison.Ordinal)) d.Add("different link");
+            if (!string.Equals(Category, now.Category, StringComparison.OrdinalIgnoreCase)) d.Add("category: " + Category + " → " + now.Category);
+            if (TransformText != now.TransformText) d.Add("link transform changed (the link was moved, rotated or mirrored)");
+            if (!string.Equals(MappingText, now.MappingText, StringComparison.OrdinalIgnoreCase)) d.Add("different type mapping: «" + MappingText + "» → «" + now.MappingText + "»");
+            if (!string.Equals(ExclusionText, now.ExclusionText, StringComparison.OrdinalIgnoreCase)) d.Add("different exclusions: «" + ExclusionText + "» → «" + now.ExclusionText + "»");
             if (SourceFingerprint != now.SourceFingerprint)
             {
                 var a = Source.ToDictionary(s => s.UniqueId ?? "", SourceLine, StringComparer.Ordinal);
                 var b = now.Source.GroupBy(s => s.UniqueId ?? "").ToDictionary(g => g.Key, g => SourceLine(g.First()), StringComparer.Ordinal);
                 var added = b.Keys.Count(k => !a.ContainsKey(k)); var removed = a.Keys.Count(k => !b.ContainsKey(k));
                 var changed = a.Count(kv => b.TryGetValue(kv.Key, out var l) && l != kv.Value);
-                d.Add("elementos de origen cambiados: +" + added + " −" + removed + " modificados " + changed);
+                d.Add("source elements changed: +" + added + " −" + removed + " modified " + changed);
             }
             else if (!string.IsNullOrEmpty(LinkRevision) && !string.IsNullOrEmpty(now.LinkRevision) && LinkRevision != now.LinkRevision)
-                d.Add("el vínculo tiene otra revisión guardada (sus aparatos de esta categoría no cambiaron)");
+                d.Add("the link has a different saved revision (its fixtures of this category did not change)");
             return d;
         }
 
-        /// <summary>¿La diferencia altera el objetivo? Una revisión nueva del vínculo sin cambios en los aparatos no lo altera: se informa pero no bloquea.</summary>
-        public static bool Blocking(string difference) => !difference.StartsWith("el vínculo tiene otra revisión", StringComparison.Ordinal);
+        /// <summary>Does the difference alter the target? A new link revision without fixture changes does not: it is reported but does not block.</summary>
+        public static bool Blocking(string difference) => !difference.StartsWith("the link has a different saved revision", StringComparison.Ordinal);
 
         public string ToText() => Json.Write(new Dictionary<string, object>
         {
@@ -89,13 +89,13 @@ namespace Bimbridge.Engine.Workflows
         private static double[] Arr(object o) => o is List<object> l ? l.Select(x => Convert.ToDouble(x, CultureInfo.InvariantCulture)).ToArray() : null;
         private static double D(object o) => Convert.ToDouble(o, CultureInfo.InvariantCulture);
 
-        /// <summary>Lee expectativas guardadas. Lanza InvalidDataException si no cuadran con su propia huella.</summary>
+        /// <summary>Reads saved expectations. Throws InvalidDataException if they do not match their own fingerprint.</summary>
         public static CopyMonitorExpectations FromText(string text)
         {
             try
             {
                 var d = Json.ParseObject(text);
-                if (Arg.GetString(d, "esquema") != Schema) throw new System.IO.InvalidDataException("expectativas con esquema desconocido");
+                if (Arg.GetString(d, "esquema") != Schema) throw new System.IO.InvalidDataException("expectations with unknown schema");
                 var t = (Dictionary<string, object>)d["transformacion"];
                 var e = new CopyMonitorExpectations
                 {
@@ -107,12 +107,12 @@ namespace Bimbridge.Engine.Workflows
                         UniqueId = (string)r[0], Category = (string)r[1], Family = (string)r[2], Type = (string)r[3], Level = (string)r[4], X = D(r[5]), Y = D(r[6]), Z = D(r[7]), RotationDeg = D(r[8]),
                     }).ToList(),
                 };
-                if (e.Fingerprint != Arg.GetString(d, "huella")) throw new System.IO.InvalidDataException("las expectativas guardadas no coinciden con su huella");
+                if (e.Fingerprint != Arg.GetString(d, "huella")) throw new System.IO.InvalidDataException("the saved expectations do not match their fingerprint");
                 return e;
             }
             catch (Exception ex) when (ex is FormatException || ex is InvalidCastException || ex is KeyNotFoundException || ex is ArgumentException || ex is InvalidOperationException)
             {
-                throw new System.IO.InvalidDataException("expectativas ilegibles: " + ex.GetType().Name);
+                throw new System.IO.InvalidDataException("unreadable expectations: " + ex.GetType().Name);
             }
         }
     }

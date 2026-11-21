@@ -13,7 +13,7 @@ namespace Bimbridge.Tests
 {
     /// <summary>
     /// Task engine with a FAKE model (not Revit): tests ordering, batches, checkpoints, resume, barriers, cancellation and the
-    /// commit->journal window with fault injection. Acceptance inside Revit is in tools/aceptacion (not yet run).
+    /// commit->journal window with fault injection. Acceptance inside Revit is in tools/acceptance (not yet run).
     /// </summary>
     public class TaskEngineTests
     {

@@ -249,7 +249,7 @@ namespace Bimbridge.Tests
             }));
             var v = AuditLog.Verify(p);
             Assert.False(v.Ok);
-            Assert.Contains(v.Errors, e => e.Contains("por detrás"));
+            Assert.Contains(v.Errors, e => e.Contains("behind"));
             var b = new AuditLog(p);
             Assert.Single(b.Quarantined);                                                    // the tampering detection is kept
         }

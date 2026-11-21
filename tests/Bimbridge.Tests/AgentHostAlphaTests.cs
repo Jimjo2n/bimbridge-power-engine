@@ -80,9 +80,9 @@ namespace Bimbridge.Tests
             Assert.Contains(errs, e => e.Contains("campo_no_declarable: plan.autorizacion"));
             Assert.Contains(errs, e => e.Contains("campo_no_declarable estado"));
             Assert.Contains(errs, e => e.Contains("campo_no_declarable autorizacion"));
-            Assert.Contains(errs, e => e.Contains("coordenadas explícitas"));
+            Assert.Contains(errs, e => e.Contains("explicit coordenadas"));
             Assert.Contains(errs, e => e.Contains("unidades_no_explicitas"));
-            Assert.Contains(errs, e => e.Contains("no declarada en el plan"));
+            Assert.Contains(errs, e => e.Contains("not declared in the plan"));
             Assert.Contains(errs, e => e.Contains("duplicado_semantico"));
             Assert.Contains(errs, e => e.Contains("id_no_determinista"));
         }
@@ -93,7 +93,7 @@ namespace Bimbridge.Tests
             var p = AH.Plan(AH.Set("A", 1L), AH.Set("B", 2L, deps: new[] { "#0" }), AH.Set("C", 3L, deps: new[] { "#1" }));
             p.Ops[0].DependsOn.Add(p.Ops[2].Id);   // A → C → B → A
             var errs = IrValidator.Validate(p);
-            Assert.Contains(errs, e => e.StartsWith("ciclo:") && e.Contains(p.Ops[0].Id) && e.Contains(p.Ops[2].Id));
+            Assert.Contains(errs, e => e.StartsWith("cycle:") && e.Contains(p.Ops[0].Id) && e.Contains(p.Ops[2].Id));
         }
 
         [Fact]

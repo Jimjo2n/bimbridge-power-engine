@@ -1,50 +1,50 @@
-# Bimbridge 0.7.0-alpha1 — Arquitectura de ejecución autónoma
+# Bimbridge 0.7.0-alpha1 — Autonomous execution architecture
 
-Base: v0.6.1-rc3 (commit 7be12ad). Rama: `feature/0.7.0-agenthost`. Nada de rc3 fue modificado (`git diff 7be12ad -- src/` solo toca `src/Bimbridge.AgentHost/`).
-**Las escrituras van SOLO a un backend simulado. Revit no se toca; el adaptador Revit tiene escrituras deshabilitadas.**
+Base: v0.6.1-rc3 (commit 7be12ad). Branch: `feature/0.7.0-agenthost`. Nothing in rc3 was modified (`git diff 7be12ad -- src/` only touches `src/Bimbridge.AgentHost/`).
+**Writes go ONLY to a simulated backend. Revit is not touched; the Revit adapter has writes disabled.**
 
-## Capas
+## Layers
 
 ```
-documento (no confiable) ─► RequirementExtractor ─► RequirementInterpreter ─► PlanBuilder ─► PlanDraft (no confiable)
-                                                                                              │ IrValidator (catálogo OpSpec)
+document (untrusted) ─► RequirementExtractor ─► RequirementInterpreter ─► PlanBuilder ─► PlanDraft (untrusted)
+                                                                                              │ IrValidator (OpSpec catalog)
                                                                                               ▼
-                                                                                   ValidatedPlan (inmutable, hash)
+                                                                                   ValidatedPlan (immutable, hash)
                                                                                               │
-           AgentHostService (cola acotada, tubería CurrentUserOnly) ──► PlanRunner ──► IExecutionBackend
-                                                                         │   │             ├─ SimulatedBackend → DurableSimModel (WAL + snapshot, en disco)
-                                                                         │   │             └─ RevitTaskAdapter (mapea a recetas rc3; escribir = rechazado)
-                                                                         │   └─ PlanLease (= TaskStore/lease de Engine rc3, con fencing)
-                                                                         └─ ExecJournal: diario.jsonl (autoridad, cadena hash) + estado.json (checkpoint sellado)
+           AgentHostService (bounded queue, CurrentUserOnly pipe) ──► PlanRunner ──► IExecutionBackend
+                                                                         │   │             ├─ SimulatedBackend → DurableSimModel (WAL + snapshot, on disk)
+                                                                         │   │             └─ RevitTaskAdapter (maps to rc3 recipes; write = rejected)
+                                                                         │   └─ PlanLease (= rc3 Engine TaskStore/lease, with fencing)
+                                                                         └─ ExecJournal: diario.jsonl (authority, hash chain) + estado.json (sealed checkpoint)
 ```
 
-## IR (esquema 2) — `Ir.cs`, `IrValidator.cs`, `PlanGraph.cs`
-- Plan inmutable (`ValidatedPlan`/`ValidatedOp`, diccionarios congelados en profundidad). Solo el estado de ejecución es mutable.
-- Id de operación = `op-` + 20 hex de sha256(doc, huella, alcance, operación, parámetros, identidad de fuente). Misma intención con otra fuente ⇒ otro id. Clave semántica detecta duplicados.
-- Autorización, postcondiciones, idempotencia y clase de reintento se **derivan** del catálogo OpSpec; el plan no puede declararlas (`campo_no_declarable`).
-- Unidades de longitud y sistema de coordenadas obligatorios; un valor numérico exige `unidades`.
-- Dependencias: orden de Kahn determinista; ciclos rechazados.
-- Precondición soportada: `objetivos` min/max. `permitir_vacio` explícito (AH-05). Reintentos 0–3.
+## IR (schema 2) — `Ir.cs`, `IrValidator.cs`, `PlanGraph.cs`
+- Immutable plan (`ValidatedPlan`/`ValidatedOp`, deeply frozen dictionaries). Only the execution state is mutable.
+- Operation id = `op-` + 20 hex of sha256(doc, fingerprint, scope, operation, parameters, source identity). Same intent with a different source ⇒ different id. A semantic key detects duplicates.
+- Authorization, postconditions, idempotency and retry class are **derived** from the OpSpec catalog; the plan cannot declare them (`campo_no_declarable`).
+- Length units and coordinate system are mandatory; a numeric value requires `unidades`.
+- Dependencies: deterministic Kahn order; cycles rejected.
+- Supported precondition: `objetivos` min/max. Explicit `permitir_vacio` (AH-05). Retries 0–3.
 
-## Ejecución durable — `Exec/`
-- **Diario** (`ChainLog`): JSONL encadenado (seq, prev, h), cada línea con WriteThrough + Flush(true). Cola rota ⇒ se recorta; corrupción en medio ⇒ error `estado_corrupto`, no se recupera (AH-03).
-- **Checkpoint** `estado.json`: derivado y sellado; si no coincide con el diario se descarta y manda el diario.
-- Validación previa a la recuperación (AH-03): fencing, transiciones legales, ops conocidas, estados conocidos, esquema, plan/documento.
-- **Recuperación con postcondiciones (AH-01)**: una operación encontrada `en_ejecucion`/`ejecutada` tras una caída se observa en el modelo (`Observe` → Observado/NoObservado/Parcial/Incierto/SinObjetivos). Solo se marca `verificada` si `CheckPostconditions` las satisface; efecto parcial o incierto ⇒ `requiere_reconciliar`; efecto probado sin evidencia ⇒ `requiere_verificacion`. Nunca se re-ejecuta algo ya confirmado.
-- **Propiedad exclusiva (AH-04)**: `PlanLease` reutiliza el lease de Engine rc3 (`TaskStore`, id "plan"), TTL por defecto 30 s, renovación a TTL/3. Cada dueño recibe un fencing creciente que se escribe en el diario y que el modelo exige en cada commit; un zombi con fencing viejo es rechazado.
-- **Conjunto vacío (AH-05)**: sin objetivos ⇒ `fallida(sin_objetivos)` sin escribir, salvo `permitir_vacio=true` ⇒ verificada con evidencia "0 objetivos".
+## Durable execution — `Exec/`
+- **Journal** (`ChainLog`): chained JSONL (seq, prev, h), each line with WriteThrough + Flush(true). Broken tail ⇒ trimmed; corruption in the middle ⇒ `estado_corrupto` error, not recovered (AH-03).
+- **Checkpoint** `estado.json`: derived and sealed; if it does not match the journal it is discarded and the journal wins.
+- Validation before recovery (AH-03): fencing, legal transitions, known ops, known states, schema, plan/document.
+- **Recovery with postconditions (AH-01)**: an operation found `en_ejecucion`/`ejecutada` after a crash is observed in the model (`Observe` → Observado/NoObservado/Parcial/Incierto/SinObjetivos). It is only marked `verificada` if `CheckPostconditions` is satisfied; partial or uncertain effect ⇒ `requiere_reconciliar`; proven effect without evidence ⇒ `requiere_verificacion`. Something already committed is never re-run.
+- **Exclusive ownership (AH-04)**: `PlanLease` reuses the rc3 Engine lease (`TaskStore`, id "plan"), default TTL 30 s, renewal at TTL/3. Each owner receives an increasing fencing token that is written to the journal and that the model requires on every commit; a zombie with an old fencing token is rejected.
+- **Empty set (AH-05)**: no targets ⇒ `fallida(sin_objetivos)` without writing, unless `permitir_vacio=true` ⇒ verified with evidence "0 targets".
 
-## Modelo simulado durable (AH-02) — `Sim/`
-`modelo.json` (snapshot sellado, gen, tx por op, fencing) + `modelo.<gen>.wal` (una línea por transacción). Sobrevive a procesos hijos reales (las pruebas lanzan `dotnet AgentHost.dll` y lo matan con SIGKILL). Fallos configurables: rechazar, transitorio, desviaciones de QC, retardo.
+## Durable simulated model (AH-02) — `Sim/`
+`modelo.json` (sealed snapshot, gen, tx per op, fencing) + `modelo.<gen>.wal` (one line per transaction). Survives real child processes (the tests launch `dotnet AgentHost.dll` and kill it with SIGKILL). Configurable faults: reject, transient, QC deviations, delay.
 
-## Servicio — `Service/`
-`BackgroundService` (.NET Generic Host, no servicio de Windows) con `Channel` acotado, N trabajadores, tubería con nombre `CurrentUserOnly`, JSON por línea. Comandos: salud, enviar, lista, resumen, siguiente, excepciones, cambios, fallos, informe, pausar, reanudar, cancelar, apagar. Al arrancar re-encola los planes activos con trabajo pendiente. Apagado ordenado: termina la operación en curso, checkpoint, libera lease.
+## Service — `Service/`
+`BackgroundService` (.NET Generic Host, not a Windows service) with a bounded `Channel`, N workers, a `CurrentUserOnly` named pipe, line-delimited JSON. Commands: salud, enviar, lista, resumen, siguiente, excepciones, cambios, fallos, informe, pausar, reanudar, cancelar, apagar. On startup it re-queues active plans with pending work. Orderly shutdown: finishes the operation in progress, checkpoints, releases the lease.
 
-## Documentos — `Documents/DocumentPipeline.cs`
-El contenido del documento es dato no confiable. Se extraen requisitos con página/sección/texto original y sha256. Solo lo inequívoco se convierte; lo demás queda en revisión con motivo (`lenguaje_ambiguo`, `unidades_no_explicitas`, `contenido_sospechoso`, `categoria_desconocida`, `dependencia_no_ejecutable`, `duplicado_de`, `alcance_sin_nivel`). `VerifySources` detecta fuente alterada.
+## Documents — `Documents/DocumentPipeline.cs`
+Document content is untrusted data. Requirements are extracted with page/section/original text and sha256. Only unambiguous ones are converted; the rest stays under review with a reason (`lenguaje_ambiguo`, `unidades_no_explicitas`, `contenido_sospechoso`, `categoria_desconocida`, `dependencia_no_ejecutable`, `duplicado_de`, `alcance_sin_nivel`). `VerifySources` detects an altered source.
 
-## Adaptador Revit — `Revit/RevitTaskAdapter.cs`
-Traduce operaciones validadas a `TaskSubmission` de las recetas rc3 (`parametro_por_lote`, `qc_manifiesto`, …) con clave de idempotencia = id de op y concesión requerida `revit_modificar`. `WritesEnabled=false`; `Execute` devuelve `sin_conexion_alpha1`. No hay acceso a objetos de la API de Revit.
+## Revit adapter — `Revit/RevitTaskAdapter.cs`
+Translates validated operations into `TaskSubmission`s of the rc3 recipes (`parametro_por_lote`, `qc_manifiesto`, …) with idempotency key = op id and required grant `revit_modificar`. `WritesEnabled=false`; `Execute` returns `sin_conexion_alpha1`. There is no access to Revit API objects.
 
-## Kernel candidato (P2) — `Kernels/MountKernelBench.cs`
-Ver RENDIMIENTO_0.7.0.md. No se implementó Rust.
+## Candidate kernel (P2) — `Kernels/MountKernelBench.cs`
+See RENDIMIENTO_0.7.0.md. Rust was not implemented.

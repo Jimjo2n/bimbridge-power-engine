@@ -32,7 +32,7 @@ namespace Bimbridge.Tests
                 Assert.Equal("discrepancias", r["veredicto"]);
                 Assert.Single((List<object>)r["toca_sin_conectar"]);
                 Assert.Single((List<object>)r["conectado_con_hueco"]);
-                Assert.Contains((List<object>)r["incompatibles"], x => ((string)((Dictionary<string, object>)x)["motivo"]).StartsWith("diámetro"));
+                Assert.Contains((List<object>)r["incompatibles"], x => ((string)((Dictionary<string, object>)x)["motivo"]).StartsWith("diameter"));
                 var near = (List<object>)r["cerca_sin_conectar"];
                 Assert.Single(near);
                 Assert.Equal(new List<object> { "c3", "c4" }, ((Dictionary<string, object>)near[0])["tramos"]);

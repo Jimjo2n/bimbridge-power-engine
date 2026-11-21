@@ -1,14 +1,14 @@
-# Hoja de ruta (corregida según la revisión técnica del 2026-10-28)
+# Roadmap (corrected after the technical review of 2026-10-28)
 
-C#/.NET es el motor principal **de forma definitiva**: AgentHost, Revit API, transacciones, seguridad y diario. No se migrarán el AgentHost ni el diario a Rust, y no se creará un orquestador paralelo en Python.
+C#/.NET is the main engine **for good**: AgentHost, Revit API, transactions, security and journal. Neither the AgentHost nor the journal will be migrated to Rust, and no parallel orchestrator will be built in Python.
 
-| Versión | Contenido | Criterio de salida |
+| Version | Content | Exit criterion |
 |---|---|---|
-| **0.7.0-alpha3** (actual) | AgentHost conectado a Revit por la ruta tipada; ensayo reversible; P1 corregidos; P0 IsModified en el add-in | NRT-04 estándar (copia no workshared, sin excepciones) y NRT-04N (rechazo con IsModified=true) aprobadas en nativo |
-| **0.7.0-beta1** | Estabilización y escritura persistente controlada en modelos desechables | NRT-04 persistente con reconciliación verificada en nativo |
-| **0.7.0-beta2** | Recuperación nativa NRT-03 y escritura autónoma autorizada | NRT-03 nativo aprobado |
-| **0.8.0** | Inteligencia documental: PDF/DOCX y extracción de requisitos. Python solo si aporta ventajas medidas | Benchmarks que lo justifiquen |
-| **0.9.0** | Rendimiento geométrico y paralelismo. Rust frente a C# solo mediante benchmarks | Mejora medida frente a C# |
-| **1.0.0** | Candidata a evaluación corporativa | Aceptación nativa y revisión de TI |
+| **0.7.0-alpha3** (current) | AgentHost connected to Revit through the typed path; reversible trial; P1 fixed; P0 IsModified in the add-in | Standard NRT-04 (non-workshared copy, no exceptions) and NRT-04N (rejection with IsModified=true) passed natively |
+| **0.7.0-beta1** | Stabilization and controlled persistent writes on disposable models | Persistent NRT-04 with reconciliation verified natively |
+| **0.7.0-beta2** | Native NRT-03 recovery and authorized autonomous writes | Native NRT-03 passed |
+| **0.8.0** | Document intelligence: PDF/DOCX and requirement extraction. Python only if it brings measured advantages | Benchmarks that justify it |
+| **0.9.0** | Geometric performance and parallelism. Rust versus C# only through benchmarks | Measured improvement over C# |
+| **1.0.0** | Candidate for corporate evaluation | Native acceptance and IT review |
 
-Sin versiones alpha intermedias: alpha3 se corrige en su rama y pasa directamente a beta1.
+No intermediate alpha versions: alpha3 is fixed on its branch and goes straight to beta1.

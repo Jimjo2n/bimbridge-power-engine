@@ -1,19 +1,19 @@
-# Limitaciones conocidas de alpha3
+# Known limitations of alpha3
 
-1. **NRT-04 no se ha ejecutado aún en Revit.** Todo lo nativo de alpha3 se ha probado contra un add-in simulado (FakeBim) que habla el protocolo real por named pipe. La aceptación nativa queda pendiente en el equipo de prueba con una copia desechable.
-2. **NRT-03 nativo queda pendiente para beta2.** La versión simulada (caída del AgentHost en 5 puntos) pasa. En nativo sólo se debe matar el AgentHost, nunca Revit.
-3. **El catálogo real cubre sólo `consultar` y `fijar_parametro`.** `fijar_parametro` acepta sólo `unidades=texto` y como máximo 30 objetivos, porque el diff del add-in devuelve 30 filas. `verificar_qc` no está soportado contra Revit.
-4. **El modo `persistente` está implementado y probado sólo con el simulador.** No se usará sobre modelos reales hasta beta1, y siempre sobre copias locales que no sean workshared.
-5. **La identidad del documento depende de `clave_doc` y `huella_doc` del add-in.** Si dos copias tienen la misma ruta y la misma huella, no se distinguen. Mitigación: el arnés usa el PID y comprueba que el documento no sea workshared.
-6. **La clave de concesiones sigue en Base64 bajo la ACL del perfil.** DPAPI queda para beta1.
-7. **El nivel del add-in en el PC es RPW.** Reducirlo a R cuando no se escribe (mínimo privilegio) depende de la decisión del operador.
-8. **El candado `clave.bin.lock` queda como archivo vacío en la carpeta de autorizaciones.** Es inocuo, porque el bloqueo lo libera el sistema operativo.
-9. **`exec ensayo` sigue ejecutando código C# arbitrario.** Se revierte siempre, pero no sustituye a una operación tipada y no se usa en NRT-04.
-10. **Revertir un TransactionGroup deja `IsModified=false`** (observado en NRT-04 run4). Corrección P0:
-    - `commit modo=ensayo` y `exec modo=ensayo` se rechazan en el add-in, en el hilo de Revit y antes de abrir el grupo, si el documento tiene `IsModified=true` (`TrialGuard`). Vale para cualquier cliente MCP.
-    - La captura temporal (`cap`) y el QC de tarea ya no abren su grupo temporal si hay cambios sin guardar.
-    - Ruta no evitable: un commit **real** que falla y se revierte sobre un documento modificado. No se puede bloquear sin impedir el trabajo normal, así que se informa con `marca_cambios_sin_guardar_perdida` y un aviso.
-    - Sigue sin protección: los fallos de `exec ejecutar` y de los pasos de tarea con transacción.
-    - No se ha verificado en nativo si revertir **una transacción suelta** (no un grupo) también borra la marca.
-    - Nunca se escribe `IsModified`; hay una prueba que lo comprueba.
-11. **El `rev` del add-in sube con transacciones revertidas** (cuenta `DocumentChanged`; solo invalida cachés). El criterio revisado es `rev_no_retrocede`. run4 sigue FALLIDA en el historial, porque el criterio se cambió después.
+1. **NRT-04 has not run in Revit yet.** Everything native in alpha3 was tested against a simulated add-in (FakeBim) that speaks the real protocol over a named pipe. Native acceptance is pending on the test machine with a disposable copy.
+2. **Native NRT-03 is pending for beta2.** The simulated version (AgentHost crash at 5 points) passes. Natively, only the AgentHost may be killed, never Revit.
+3. **The real catalog only covers `consultar` and `fijar_parametro`.** `fijar_parametro` only accepts `unidades=texto` and at most 30 targets, because the add-in's diff returns 30 rows. `verificar_qc` is not supported against Revit.
+4. **`persistente` mode is implemented and tested only with the simulator.** It will not be used on real models until beta1, and always on local copies that are not workshared.
+5. **Document identity depends on the add-in's `clave_doc` and `huella_doc`.** If two copies have the same path and the same fingerprint, they cannot be told apart. Mitigation: the harness uses the PID and checks that the document is not workshared.
+6. **The grant key is still Base64 under the profile ACL.** DPAPI is left for beta1.
+7. **The add-in level on the PC is RPW.** Reducing it to R when not writing (least privilege) depends on the operator's decision.
+8. **The `clave.bin.lock` lock is left as an empty file in the authorizations folder.** It is harmless, because the operating system releases the lock.
+9. **`exec ensayo` still runs arbitrary C# code.** It is always rolled back, but it does not replace a typed operation and is not used in NRT-04.
+10. **Rolling back a TransactionGroup leaves `IsModified=false`** (observed in NRT-04 run4). P0 fix:
+    - `commit modo=ensayo` and `exec modo=ensayo` are rejected in the add-in, on the Revit thread and before opening the group, if the document has `IsModified=true` (`TrialGuard`). This applies to any MCP client.
+    - Temporary capture (`cap`) and task QC no longer open their temporary group if there are unsaved changes.
+    - Unavoidable path: a **real** commit that fails and is rolled back on a modified document. It cannot be blocked without preventing normal work, so it is reported with `marca_cambios_sin_guardar_perdida` and a warning.
+    - Still unprotected: failures of `exec ejecutar` and of task steps with a transaction.
+    - It has not been verified natively whether rolling back **a standalone transaction** (not a group) also clears the flag.
+    - `IsModified` is never written; a test checks this.
+11. **The add-in's `rev` increases with rolled-back transactions** (it counts `DocumentChanged`; it only invalidates caches). The revised criterion is `rev_no_retrocede`. run4 remains FAILED in the history, because the criterion was changed afterwards.

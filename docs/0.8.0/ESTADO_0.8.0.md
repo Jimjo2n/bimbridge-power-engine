@@ -1,70 +1,70 @@
-# BIMBRIDGE 0.8.0 — estado del candidato interno
+# BIMBRIDGE 0.8.0 — internal candidate status
 
-**Estado de versión:** candidato interno **NATIVE_ACCEPTANCE_PENDING**. Rama `feature/0.8.0` desde `v0.7.0-rc1` (14ec21d). Sin tag hasta que la campaña nativa apruebe. Nada de 0.8.0 se ha ejecutado en Revit: la aceptación requiere una instancia de prueba aislada y un alcance aprobado (`BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION`).
+**Release status:** internal candidate **NATIVE_ACCEPTANCE_PENDING**. Branch `feature/0.8.0` from `v0.7.0-rc1` (14ec21d). No tag until the native campaign passes. Nothing in 0.8.0 has run in Revit: acceptance requires an isolated test instance and an approved scope (`BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION`).
 
-Este documento es el único informe de 0.8.0: estado, pruebas, rendimiento, seguridad, limitaciones y hoja de ruta. La matriz está en [MATRIZ_TRAZABILIDAD_0.8.0.md](MATRIZ_TRAZABILIDAD_0.8.0.md) y la campaña en `tools/aceptacion/0.8.0/PROCEDIMIENTO_0.8.0.md`.
+This document is the only 0.8.0 report: status, tests, performance, security, limitations and roadmap. The matrix is in [MATRIZ_TRAZABILIDAD_0.8.0.md](MATRIZ_TRAZABILIDAD_0.8.0.md) and the campaign in `tools/acceptance/0.8.0/PROCEDURE_0.8.0.md`.
 
-## 1. Qué cambió desde rc1
+## 1. What changed since rc1
 
-| Paquete | Commit | Contenido |
+| Package | Commit | Content |
 |---|---|---|
-| A1 | 974f1db | Cierre técnico de 0.7.0: cada commit persistente deja intención y resultado en `auditoria.jsonl` (H2 de rc1); `Home.WriteAtomic` reintenta y no deja temporales; arnés NRT-07 (respuesta IPC perdida tras commit). |
-| A2–A3 | ca3e4e1, 65099e7 | Requisitos con procedencia y autoridad (OBSERVED/INFERRED/UNKNOWN; una inferencia nunca es OBSERVED); `verificar_independiente` (fuente independiente → modelo → diferencias; misma fuente que la construcción = `no_independiente`); 12 estados de entrega con recibos; handoff estructurado. |
-| C1–C2 | 099724f, dfc2b0e | Núcleo 2D sin Revit (`Draw2D`) y 7 operaciones nuevas: `detail_line`, `detail_rect`, `detail_polygon`, `detail_arc`, `detail_component`, `dimension`, `sheet_set`; `view_create tipo=dibujo`. Catálogo: 34 operaciones. |
-| D1 | d9925fc | Biblioteca de familias: `fam buscar` indexa sólo `carpetas_familias`; `fam cargar_archivo` carga un RFA indexado y sin cambios, con sha-256. |
-| E1 | ec979fe | **BIMBRIDGE → Developer Tools → Actualizar desde ZIP** (detalle en §4). Pestaña de la cinta renombrada a BIMBRIDGE. |
-| E2 | 45ac7e9 | Tokens ESTIMADOS (caracteres/4) en las métricas; benchmark B0 reproducible; catálogo B1–B8. |
-| E3 | 426132c | Permisos separados en 10 clases, aplicados en el add-in antes de despachar. |
-| F1 | 8ec9c51 | Registro único de capacidades y matriz de trazabilidad generada desde código. |
-| G1 | 40b2c43 | Campaña nativa de 13 ítems con arnés `revit campana080`. |
+| A1 | 974f1db | Technical close-out of 0.7.0: each persistent commit leaves an intent and a result in `auditoria.jsonl` (rc1 H2); `Home.WriteAtomic` retries and leaves no temp files; NRT-07 harness (IPC response lost after commit). |
+| A2–A3 | ca3e4e1, 65099e7 | Requirements with provenance and authority (OBSERVED/INFERRED/UNKNOWN; an inference is never OBSERVED); `verificar_independiente` (independent source → model → differences; same source as the construction = `no_independiente`); 12 delivery states with receipts; structured handoff. |
+| C1–C2 | 099724f, dfc2b0e | 2D core without Revit (`Draw2D`) and 7 new operations: `detail_line`, `detail_rect`, `detail_polygon`, `detail_arc`, `detail_component`, `dimension`, `sheet_set`; `view_create tipo=dibujo`. Catalog: 34 operations. |
+| D1 | d9925fc | Family library: `fam buscar` only indexes `carpetas_familias`; `fam cargar_archivo` loads an indexed and unchanged RFA, with sha-256. |
+| E1 | ec979fe | **BIMBRIDGE → Developer Tools → Update from ZIP** (details in §4). Ribbon tab renamed to BIMBRIDGE. |
+| E2 | 45ac7e9 | ESTIMATED tokens (characters/4) in the metrics; reproducible B0 benchmark; B1–B8 catalog. |
+| E3 | 426132c | Permissions split into 10 classes, enforced in the add-in before dispatching. |
+| F1 | 8ec9c51 | Single capability registry and traceability matrix generated from code. |
+| G1 | 40b2c43 | 13-item native campaign with the `revit campana080` harness. |
 
-## 2. Pruebas
+## 2. Tests
 
-| Conjunto | Resultado |
+| Set | Result |
 |---|---|
-| Suite completa (sin Revit) | **440/440** en la última corrida. En una corrida anterior del mismo árbol falló una vez `EndToEndTests.HeldCommit_WaitsForUser_ThenApplies_AndDetectsConflicts` por tiempo (12 s bajo carga) y pasó al repetirla: inestable, no regresión. |
-| Nuevas de 0.8.0 | ZipUpdate 12, Permissions 3, Traceability 2, Campaign080 4, SheetSetOp 1, FamilyLibrary 3, Draw2D 12, Workflow 9, V080 (AgentHost) 4, Bench B0 1 |
-| Add-in | compila sin errores para Revit 2022–2026 |
-| Nativas de 0.8.0 | **0 ejecutadas**. 13 ítems BLOCKED (ver procedimiento). |
-| Nativas previas (otro build) | rc1 14ec21d en Revit 2024, copias desechables: NRT-03 15/15, NRT-05, NRT-06 11/11. No cuentan para 0.8.0. |
+| Full suite (without Revit) | **440/440** in the last run. In an earlier run of the same tree, `EndToEndTests.HeldCommit_WaitsForUser_ThenApplies_AndDetectsConflicts` failed once on timing (12 s under load) and passed on repeat: flaky, not a regression. |
+| New in 0.8.0 | ZipUpdate 12, Permissions 3, Traceability 2, Campaign080 4, SheetSetOp 1, FamilyLibrary 3, Draw2D 12, Workflow 9, V080 (AgentHost) 4, Bench B0 1 |
+| Add-in | compiles without errors for Revit 2022–2026 |
+| 0.8.0 native | **0 run**. 13 items BLOCKED (see procedure). |
+| Earlier native (another build) | rc1 14ec21d on Revit 2024, disposable copies: NRT-03 15/15, NRT-05, NRT-06 11/11. They do not count for 0.8.0. |
 
-## 3. Rendimiento y tokens
+## 3. Performance and tokens
 
-Todas las cifras son **MEDIDO_SIMULADO**: add-in falso por la tubería real, sin Revit. Los tokens son **ESTIMADOS** (caracteres/4). Reproducir: `BIMBRIDGE_BENCH_OUT=<carpeta> dotnet test --filter Bench_B0`.
+All figures are **MEDIDO_SIMULADO** (measured, simulated): fake add-in over the real pipe, without Revit. Tokens are **ESTIMATED** (characters/4). To reproduce: `BIMBRIDGE_BENCH_OUT=<folder> dotnet test --filter Bench_B0`.
 
-| B0 · 586 elementos (leer y cambiar un parámetro) | Uno a uno | Plan BIMBRIDGE |
+| B0 · 586 elements (read and change one parameter) | One by one | BIMBRIDGE plan |
 |---|---|---|
-| Llamadas del agente | 1.172 | 3 |
-| Llamadas por cable | 1.759 | 16 |
-| Commits | 586 | 3 (lotes de ≤200) |
-| Caracteres que ve el agente | 254.762 | 12.799 |
-| Tokens estimados del agente | 63.691 | 3.200 |
+| Agent calls | 1,172 | 3 |
+| Wire calls | 1,759 | 16 |
+| Commits | 586 | 3 (batches of ≤200) |
+| Characters the agent sees | 254,762 | 12,799 |
+| Agent estimated tokens | 63,691 | 3,200 |
 
-Reducción: 99,74 % de llamadas del agente y 94,98 % de tokens estimados. Coincide con la hipótesis del informe (1.172 → 3), ahora medida en simulación; el tiempo de Revit no está medido. B1–B8 (comparación con pyRevit): **NO_MEDIDO**, con el escenario y el arnés definidos en `Benchmarks.Catalog`.
+Reduction: 99.74 % of agent calls and 94.98 % of estimated tokens. It matches the report's hypothesis (1,172 → 3), now measured in simulation; Revit time is not measured. B1–B8 (comparison with pyRevit): **NO_MEDIDO** (not measured), with the scenario and harness defined in `Benchmarks.Catalog`.
 
-## 4. Seguridad
+## 4. Security
 
-| Tema | Estado en 0.8.0 |
+| Topic | Status in 0.8.0 |
 |---|---|
-| Documento equivocado | El AgentHost fija pid, clave y huella; la campaña inyecta el documento del preflight en cada paso (un paso no puede elegir otro, salvo los negativos marcados). Fail-closed si falta una bandera de contexto (rc1). |
-| Permisos | 10 clases: leer, modificar_proyecto, modificar_familia, cargar_archivo, guardar, sincronizar, exportar, publicar, codigo_dinamico, interfaz. `permisos` en config.json restringe; vacío = derivado de los niveles R/P/W/D (mismo comportamiento que antes). Publicar no existe y se deniega siempre. El gate está en el add-in, por donde pasan el puente y el AgentHost. |
-| Código dinámico (nivel B) | `exec ejecutar/ensayo` exige W, runner=auto, la clase codigo_dinamico y queda en diario y auditoría; con Retener activo se rechaza; DLL extra sólo de la carpeta del add-in o por SHA-256 salvo «Código confiable». **Riesgo residual:** con W + En vivo no hay revisión humana por llamada y el código corre con los privilegios del usuario dentro de Revit. Para producción se recomienda una lista `permisos` sin codigo_dinamico. |
-| Interfaz (nivel C) | Sólo `show` y `capture`. No hay clics automatizados. |
-| Discos y familias | `fam buscar` sólo recorre carpetas configuradas, sin seguir enlaces y con límite de archivos; `cargar_archivo` rechaza rutas fuera de ellas o cambiadas desde el índice. No se editan RFA corporativos: las ediciones de familia exigen modificar_familia. |
-| Actualizar desde ZIP | Sólo lo pulsa una persona (la IA no tiene herramienta). Inspección: manifiesto, entradas sin rutas peligrosas, límite de tamaño, exactamente los archivos del manifiesto con su SHA-256, firma RSA-SHA256 contra claves de confianza, compatibilidad de versión y años de Revit. Muestra versión instalada y nueva y pide confirmación (doble si no hay firma). Prepara y re-verifica en disco; un proceso aparte espera a que el usuario cierre Revit (nunca lo cierra), re-verifica, instala, verifica y, si falla, vuelve a la versión anterior. Sin hot reload. **Pendiente de IT:** la clave de firma; mientras no haya claves configuradas, los paquetes se aceptan sin firma sólo con confirmación explícita. |
-| Datos | Sin secretos en el repositorio ni en el paquete. Benchmarks y pruebas con datos sintéticos. |
+| Wrong document | The AgentHost pins pid, key and fingerprint; the campaign injects the preflight document into each step (a step cannot choose another, except the marked negative ones). Fail-closed if a context flag is missing (rc1). |
+| Permissions | 10 classes: leer, modificar_proyecto, modificar_familia, cargar_archivo, guardar, sincronizar, exportar, publicar, codigo_dinamico, interfaz. `permisos` in config.json restricts; empty = derived from the R/P/W/D levels (same behavior as before). Publish does not exist and is always denied. The gate is in the add-in, which both the bridge and the AgentHost go through. |
+| Dynamic code (level B) | `exec ejecutar/ensayo` requires W, runner=auto, the codigo_dinamico class and is recorded in the journal and the audit; with Hold active it is rejected; extra DLLs only from the add-in folder or by SHA-256 unless «Trusted code». **Residual risk:** with W + Live there is no per-call human review and the code runs with the user's privileges inside Revit. For production, a `permisos` list without codigo_dinamico is recommended. |
+| UI (level C) | Only `show` and `capture`. There are no automated clicks. |
+| Disks and families | `fam buscar` only walks configured folders, without following links and with a file limit; `cargar_archivo` rejects paths outside them or changed since indexing. Corporate RFAs are not edited: family edits require modificar_familia. |
+| Update from ZIP | Only a person can press it (the AI has no tool). Inspection: manifest, entries without dangerous paths, size limit, exactly the files in the manifest with their SHA-256, RSA-SHA256 signature against trusted keys, version and Revit year compatibility. Shows the installed and new versions and asks for confirmation (double if unsigned). Stages and re-verifies on disk; a separate process waits for the user to close Revit (never closes it), re-verifies, installs, verifies and, if it fails, rolls back to the previous version. No hot reload. **Pending IT:** the signing key; while no keys are configured, unsigned packages are accepted only with explicit confirmation. |
+| Data | No secrets in the repository or the package. Benchmarks and tests use synthetic data. |
 
-## 5. Limitaciones conocidas
+## 5. Known limitations
 
-- Ninguna operación nueva se ha ejecutado en Revit; el comportamiento real de `sheet_set` (PrintManager), `dimension`, `detail_component` y `cargar_archivo` puede diferir por versión.
-- `sheet_set` no controla el orden de impresión (lo decide Revit) y deja `PrintRange=Select` en el documento.
-- `dimension` sólo acota líneas de detalle ya existentes (no `@n` del mismo plan).
-- La verificación del PDF exportado compara páginas y sha del recibo; no hay lector de contenido PDF.
-- Tokens: estimación por caracteres; el tokenizador real lo conoce el cliente.
-- Pendientes de rc1 sin evidencia nativa nueva: reapertura real en NRT-05 (H1), lentitud intermitente de Revit, temporal residual (corregido en código, sin comprobar en Revit).
-- El ZIP de esta entrega va sin firma (no hay clave de IT).
+- No new operation has run in Revit; the real behavior of `sheet_set` (PrintManager), `dimension`, `detail_component` and `cargar_archivo` may differ by version.
+- `sheet_set` does not control print order (Revit decides it) and leaves `PrintRange=Select` in the document.
+- `dimension` only dimensions existing detail lines (not `@n` from the same plan).
+- Verification of the exported PDF compares pages and the receipt sha; there is no PDF content reader.
+- Tokens: character-based estimate; the real tokenizer is known only to the client.
+- Pending from rc1 without new native evidence: real reopen in NRT-05 (H1), intermittent Revit slowness, leftover temp file (fixed in code, not checked in Revit).
+- The ZIP in this delivery is unsigned (there is no IT key).
 
-## 6. Hoja de ruta
+## 6. Roadmap
 
-- **0.8.0 → aprobada:** campaña nativa de 13 ítems con autorización del operador; B0 nativo y primer par contra pyRevit.
-- **0.9.0:** registro plano–modelo (CAP-009), cobertura de grupos (CAP-010), routing físico (CAP-011), grafo de riser (CAP-012), legibilidad en papel (CAP-013), adaptadores de fuentes PDF/tablas (CAP-008), eventos mínimos (CAP-015). Rust sólo si una medición lo justifica; el núcleo sigue en C#/.NET.
+- **0.8.0 → approved:** 13-item native campaign with operator authorization; native B0 and first pair against pyRevit.
+- **0.9.0:** drawing–model registration (CAP-009), group coverage (CAP-010), physical routing (CAP-011), riser graph (CAP-012), legibility on paper (CAP-013), PDF/table source adapters (CAP-008), minimal events (CAP-015). Rust only if a measurement justifies it; the core stays in C#/.NET.

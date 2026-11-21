@@ -1,29 +1,29 @@
 # Bimbridge 0.7.0-alpha3
 
-Esta versión conecta el AgentHost con un Revit real a través de la cadena tipada que ya existía, sin crear un segundo motor de transacciones:
+This version connects the AgentHost to a real Revit through the typed chain that already existed, without creating a second transaction engine:
 
-`BIM Task IR → AgentHost (PlanRunner) → RevitBackend → RevitConnection (IPC tipado del Bridge) → Add-in (plan/commit) → Revit API → verificación → auditoría`
+`BIM Task IR → AgentHost (PlanRunner) → RevitBackend → RevitConnection (Bridge typed IPC) → Add-in (plan/commit) → Revit API → verification → audit`
 
-## Qué hay de nuevo
+## What is new
 
-- **Lectura y escritura separadas en `exec`.**
-  - `modo=consulta` se ejecuta sin transacción, así que Revit rechaza cualquier cambio.
-  - El nuevo `modo=ensayo` envuelve el script en un grupo con transacción que siempre se revierte. Exige nivel W y se clasifica como escritura.
-- **Ensayo tipado reversible (`commit modo=ensayo`).**
-  - Usa el mismo PlanApplier: aplica, verifica dentro del grupo, hace `RollBack()` y guarda el estado literal de la transacción.
-  - Después relee cada valor original y comprueba que no persiste ningún elemento creado.
-  - El plan no se consume.
-- **AgentHost con backend real (`RevitBackend`).**
-  - Fija una instancia por PID y nunca elige una sesión por su cuenta.
-  - Hace handshake, comprueba el PID del servidor de la tubería y la identidad del documento (`clave_doc`, `huella_doc`) y aplica timeouts.
-  - Un timeout de escritura se trata como efecto incierto: se observa el modelo y nunca se repite a ciegas.
-- **Catálogo limitado a `consultar` y `fijar_parametro`** (con `unidades=texto` y como máximo 30 objetivos). Las verificaciones QC no se ofrecen porque aún no se pueden demostrar en nativo.
-- **Las escrituras reales necesitan la autorización del operador.** `--escritura ensayo|persistente` se fija en la línea de comandos y debe coincidir con el modo del backend; la petición del agente no basta.
-- **Arnés NRT-04:** `Bimbridge.AgentHost.exe revit nrt04 ...`, descrito en `TEST_REPORT_alpha3.md`.
-- **Correcciones P1:** la carrera de la clave de concesiones, la cola del servicio y la memoria al abrir diarios grandes.
-- **NRT-03 preparado sin Revit:** caídas del AgentHost en 5 puntos críticos, nunca de Revit.
+- **Separate read and write in `exec`.**
+  - `modo=consulta` runs without a transaction, so Revit rejects any change.
+  - The new `modo=ensayo` wraps the script in a group with a transaction that is always rolled back. It requires level W and is classified as a write.
+- **Reversible typed trial (`commit modo=ensayo`).**
+  - Uses the same PlanApplier: applies, verifies inside the group, calls `RollBack()` and saves the literal transaction status.
+  - Then re-reads each original value and checks that no created element persists.
+  - The plan is not consumed.
+- **AgentHost with a real backend (`RevitBackend`).**
+  - Pins one instance by PID and never chooses a session on its own.
+  - Performs the handshake, checks the pipe server PID and the document identity (`clave_doc`, `huella_doc`) and applies timeouts.
+  - A write timeout is treated as an uncertain effect: the model is observed and it is never blindly repeated.
+- **Catalog limited to `consultar` and `fijar_parametro`** (with `unidades=texto` and at most 30 targets). QC verifications are not offered because they cannot yet be demonstrated natively.
+- **Real writes need the operator's authorization.** `--escritura ensayo|persistente` is set on the command line and must match the backend mode; the agent's request is not enough.
+- **NRT-04 harness:** `Bimbridge.AgentHost.exe revit nrt04 ...`, described in `TEST_REPORT_alpha3.md`.
+- **P1 fixes:** the grant key race, the service queue and memory when opening large journals.
+- **NRT-03 prepared without Revit:** AgentHost crashes at 5 critical points, never Revit.
 
-## Comandos
+## Commands
 
 ```
 Bimbridge.AgentHost.exe revit instancias
@@ -32,4 +32,4 @@ Bimbridge.AgentHost.exe revit nrt04 --revit-pid 45440 --salida C:\...\NRT04 --ca
 Bimbridge.AgentHost.exe ejecutar --plan p.json --dir estado --revit-pid 45440 --escritura ensayo --llamadas llamadas.jsonl
 ```
 
-`persistente` sólo se acepta sobre un documento local, que no sea workshared, ni de sólo lectura, ni de la nube, y sin cola Retener. No se usa en alpha3.
+`persistente` is only accepted on a local document that is not workshared, not read-only, not in the cloud, and without a Hold queue. It is not used in alpha3.

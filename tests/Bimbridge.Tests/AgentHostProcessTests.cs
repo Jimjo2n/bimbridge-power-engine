@@ -116,7 +116,7 @@ namespace Bimbridge.Tests
             var st = AH.Read(c.State, out _, out _);
             Assert.Equal(OpState.Fallida, st.Ops[c.SetOp].State);
             Assert.Equal(ErrorClass.Verificacion, st.Ops[c.SetOp].Error);
-            Assert.Contains("esperado 5, obtenido 6", st.Ops[c.SetOp].Note);
+            Assert.Contains("expected 5, got 6", st.Ops[c.SetOp].Note);
             Assert.Equal(OpState.Bloqueada, st.Ops[c.QcOp].State);
         }
 

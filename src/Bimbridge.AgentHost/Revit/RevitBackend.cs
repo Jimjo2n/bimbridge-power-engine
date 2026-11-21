@@ -13,10 +13,10 @@ using Bimbridge.Protocol;
 namespace Bimbridge.AgentHost
 {
     /// <summary>
-    /// Transporte tipado hacia UN Revit elegido por el operador (alpha3). Reutiliza la conexión del puente (<see cref="RevitConnection"/>:
-    /// saludo de protocolo, comprobación de que el servidor del pipe es el Revit anunciado, latido, timeouts que NO se confunden con
-    /// "no aplicado"). Nunca elige un Revit por su cuenta: pid explícito, o un pipe de prueba explícito.
-    /// Cada llamada se registra (op, ms, bytes, estado) para la evidencia.
+    /// Typed transport to ONE Revit chosen by the operator (alpha3). Reuses the bridge connection (<see cref="RevitConnection"/>:
+    /// protocol handshake, check that the pipe server is the announced Revit, heartbeat, timeouts that are NOT mistaken for
+    /// "not applied"). It never picks a Revit on its own: explicit pid, or an explicit test pipe.
+    /// Every call is recorded (op, ms, bytes, status) as evidence.
     /// </summary>
     public sealed class RevitLink : IDisposable
     {
@@ -25,17 +25,17 @@ namespace Bimbridge.AgentHost
         public TimeSpan ReadTimeout = TimeSpan.FromSeconds(60);
         public TimeSpan WriteTimeout = TimeSpan.FromSeconds(180);
         public readonly List<Dictionary<string, object>> Calls = new List<Dictionary<string, object>>();
-        /// <summary>Se llama tras cada respuesta (para volcar evidencia a disco al momento).</summary>
+        /// <summary>Called after every response (to flush evidence to disk immediately).</summary>
         public Action<Dictionary<string, object>> OnCall;
 
-        /// <summary>Issue #4: traza de esta ejecución del AgentHost; cada llamada la envía en _traza y el diario del add-in la registra.</summary>
+        /// <summary>Issue #4: trace of this AgentHost run; every call sends it in _traza and the add-in journal records it.</summary>
         public readonly string TraceId = "ah-" + Correlation.NewTraceId();
 
         private RevitLink(int pid, string pipe, InstanceDescriptor d)
         {
             ExpectedPid = pid;
             _c.FixedTarget = (pipe, d);
-            // Issue #3: el AgentHost es un agente con nombre. Sin BIMBRIDGE_AGENT se declara por configuración como "AgentHost <pid>".
+            // Issue #3: the AgentHost is a named agent. Without BIMBRIDGE_AGENT it declares itself by configuration as "AgentHost <pid>".
             if (string.IsNullOrWhiteSpace(_c.AgentName))
             {
                 _c.AgentName = "AgentHost " + Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture);
@@ -43,26 +43,26 @@ namespace Bimbridge.AgentHost
             }
         }
 
-        /// <summary>Por pid: debe existir un descriptor de instancia con ese pid (el add-in cargado en ESE Revit).</summary>
+        /// <summary>By pid: an instance descriptor with that pid must exist (the add-in loaded in THAT Revit).</summary>
         public static RevitLink ForPid(int pid, out string error)
         {
             error = null;
-            if (pid <= 0) { error = "falta --revit-pid: el AgentHost nunca elige un Revit por su cuenta"; return null; }
+            if (pid <= 0) { error = "missing --revit-pid: the AgentHost never picks a Revit on its own"; return null; }
             var d = InstanceDescriptor.ReadAll().FirstOrDefault(x => x.Pid == pid);
             if (d == null)
             {
                 var all = InstanceDescriptor.ReadAll();
-                error = "no hay un Revit con el add-in cargado y pid " + pid + ". Abiertos con add-in: " +
-                        (all.Count == 0 ? "ninguno" : string.Join(", ", all.Select(x => x.Pid + " (" + x.RevitVersion + ")")));
+                error = "there is no Revit with the add-in loaded and pid " + pid + ". Open with add-in: " +
+                        (all.Count == 0 ? "none" : string.Join(", ", all.Select(x => x.Pid + " (" + x.RevitVersion + ")")));
                 return null;
             }
             return new RevitLink(pid, d.PipeName, d);
         }
 
-        /// <summary>Pruebas sin Revit: pipe explícito y el pid que el servidor dirá tener en context.</summary>
+        /// <summary>Tests without Revit: explicit pipe and the pid the server will report in context.</summary>
         public static RevitLink ForTestPipe(string pipe, int pidInContext) => new RevitLink(pidInContext, pipe, null);
 
-        /// <summary>Reintentos de una lectura ante revit_ocupado (5 → hasta 6 intentos, ~40 s en total con la espera del add-in).</summary>
+        /// <summary>Retries of a read on revit_ocupado (5 → up to 6 attempts, ~40 s in total with the add-in wait).</summary>
         public int ReadBusyRetries { get; set; } = 5;
 
         public Response Call(string op, Dictionary<string, object> args, bool write)
@@ -70,9 +70,9 @@ namespace Bimbridge.AgentHost
             var sw = Stopwatch.StartNew();
             var reqBytes = Json.Write(args ?? new Dictionary<string, object>()).Length;
             args = new Dictionary<string, object>(args ?? new Dictionary<string, object>()) { [Correlation.TraceArg] = TraceId };
-            // rc1.1: Revit en reposo a veces tarda >5 s en atender el ExternalEvent (medido en la campaña nativa rc1).
-            // Solo las LECTURAS se reintentan ante revit_ocupado: no cambian nada, así que repetirlas es seguro.
-            // Las escrituras nunca se reintentan aquí; su incertidumbre la resuelve el runner leyendo el modelo.
+            // rc1.1: an idle Revit sometimes takes >5 s to service the ExternalEvent (measured in the rc1 native campaign).
+            // Only READS are retried on revit_ocupado: they change nothing, so repeating them is safe.
+            // Writes are never retried here; their uncertainty is resolved by the runner reading the model.
             var intentos = 0;
             Response r;
             while (true)
@@ -99,17 +99,17 @@ namespace Bimbridge.AgentHost
     }
 
     /// <summary>
-    /// Backend REAL de AgentHost (alpha3): BIM Task IR → <see cref="RevitLink"/> → add-in → motor tipado plan/commit EXISTENTE.
-    /// No hay motor de transacciones nuevo ni código C# libre: fijar_parametro = plan set_param + commit (modo ensayo o aplicar).
+    /// REAL AgentHost backend (alpha3): BIM Task IR → <see cref="RevitLink"/> → add-in → EXISTING typed plan/commit engine.
+    /// There is no new transaction engine and no free-form C# code: fijar_parametro = plan set_param + commit (trial or apply mode).
     ///
-    /// Garantías:
-    /// - identidad: pid del context = pid pedido; clave y huella del documento = las del plan; el plan ve SOLO su documento (doc=dN);
-    /// - alcance: los ids que el add-in planifica deben ser exactamente los objetivos resueltos (si no, no se confirma nada);
-    /// - autorización: el modo (ensayo/persistente) lo fija el operador al lanzar; el add-in exige además su nivel W;
-    ///   persistente sólo sobre un documento local, no workshared, no de sólo lectura, y sin cola retenida;
-    /// - incertidumbre: timeout o conexión perdida en un commit ⇒ <see cref="UncertainEffectException"/> (el ejecutor observa, no repite);
-    /// - ensayo: Ok sólo si el add-in devuelve grupo RolledBack + restauración, Y una relectura independiente coincide con la línea base.
-    /// Catálogo alpha3: consultar; fijar_parametro con valores de texto. verificar_qc y valores con unidades: no soportados aquí (se dice).
+    /// Guarantees:
+    /// - identity: context pid = requested pid; document key and fingerprint = those of the plan; the plan sees ONLY its document (doc=dN);
+    /// - scope: the ids the add-in plans must be exactly the resolved targets (otherwise nothing is committed);
+    /// - authorization: the mode (ensayo/persistente) is set by the operator at launch; the add-in also requires its W level;
+    ///   persistente only on a local, non-workshared, non-read-only document with no held queue;
+    /// - uncertainty: timeout or lost connection during a commit ⇒ <see cref="UncertainEffectException"/> (the executor observes, does not repeat);
+    /// - trial: Ok only if the add-in returns group RolledBack + restoration, AND an independent re-read matches the baseline.
+    /// alpha3 catalog: consultar; fijar_parametro with text values. verificar_qc and values with units: not supported here (stated).
     /// </summary>
     public sealed class RevitBackend : IExecutionBackend, IDisposable
     {
@@ -117,14 +117,14 @@ namespace Bimbridge.AgentHost
         private readonly Dictionary<string, Baseline> _baselines = new Dictionary<string, Baseline>(StringComparer.Ordinal);
         private readonly Dictionary<string, Dictionary<string, object>> _trialEvidence = new Dictionary<string, Dictionary<string, object>>(StringComparer.Ordinal);
         private string _docHandle;
-        /// <summary>Puntos de caída para NRT-03 (sólo pruebas; por defecto inertes).</summary>
+        /// <summary>Crash points for NRT-03 (tests only; inert by default).</summary>
         public Faults Faults = new Faults();
-        /// <summary>El plan del add-in devuelve hasta 30 filas de diff; alpha3 exige ver todas para comprobar el alcance.</summary>
-        /// <summary>rc1: 200 = una página del add-in; el diff del plan se comprueba fila a fila en una sola respuesta (medido en PERFORMANCE_rc1).</summary>
+        /// <summary>The add-in plan returns up to 30 diff rows; alpha3 requires seeing all of them to check the scope.</summary>
+        /// <summary>rc1: 200 = one add-in page; the plan diff is checked row by row in a single response (measured in PERFORMANCE_rc1).</summary>
         public const int MaxTargets = 200;
-        /// <summary>Páginas máximas de una lectura de alcance (observación/postcondiciones): 50 × 200 = 10 000 elementos.</summary>
+        /// <summary>Maximum pages of a scope read (observation/postconditions): 50 × 200 = 10,000 elements.</summary>
         public const int MaxPages = 50;
-        /// <summary>Límite de page_size del add-in (CatalogRunner.MaxPageSize). NRT-04 run3 (2026-10-28) falló por pedir 1000.</summary>
+        /// <summary>Add-in page_size limit (CatalogRunner.MaxPageSize). NRT-04 run3 (2026-10-28) failed by requesting 1000.</summary>
         public const int AddinMaxPageSize = 200;
 
         public sealed class Baseline
@@ -143,39 +143,39 @@ namespace Bimbridge.AgentHost
 
         private RevitBackend(RevitLink link, string mode) { _link = link; WriteMode = mode; }
 
-        /// <summary>Conecta y fija identidad. mode: "ensayo" | "persistente" | "lectura".</summary>
+        /// <summary>Connects and pins identity. mode: "ensayo" | "persistente" | "lectura".</summary>
         public static RevitBackend Open(RevitLink link, string mode, out string error)
         {
             error = null;
-            if (mode != "ensayo" && mode != "persistente" && mode != "lectura") { error = "modo debe ser lectura, ensayo o persistente"; return null; }
+            if (mode != "ensayo" && mode != "persistente" && mode != "lectura") { error = "mode must be lectura, ensayo or persistente"; return null; }
             var b = new RevitBackend(link, mode);
             var r = link.Call(Wire.OpContext, new Dictionary<string, object>(), false);
             if (r.Estado != Status.Ok || !(r.Datos is Dictionary<string, object> d)) { error = "context: " + r.Estado + " " + r.Aviso; return null; }
             b.Context = d;
             var pid = Arg.GetLong(d, "pid");
-            if (pid != link.ExpectedPid) { error = "el Revit que respondió tiene pid " + pid + ", no " + link.ExpectedPid + "; no se continúa"; return null; }
+            if (pid != link.ExpectedPid) { error = "the Revit that answered has pid " + pid + ", not " + link.ExpectedPid + "; not continuing"; return null; }
             b.DocKey = Arg.GetString(d, "clave_doc");
             b.DocPrint = Arg.GetString(d, "huella_doc");
             b._docHandle = Arg.GetString(d, "doc");
-            if (b.DocKey == null || b._docHandle == null) { error = "el add-in no informó la identidad del documento activo (clave_doc/doc): add-in anterior a alpha3 o sin documento"; return null; }
+            if (b.DocKey == null || b._docHandle == null) { error = "the add-in did not report the active document identity (clave_doc/doc): add-in older than alpha3 or no document"; return null; }
             if (mode != "lectura")
             {
-                // rc1 P0 fail-closed: una bandera ausente o no booleana NO es "seguro"; se exige el valor explícito.
+                // rc1 P0 fail-closed: a missing or non-boolean flag is NOT "safe"; the explicit value is required.
                 foreach (var flag in new[] { "worksharing", "solo_lectura", "modificado", "retener" })
-                    if (Arg.GetBool(d, flag) == null) { error = "el add-in no informó «" + flag + "» como booleano; sin ese dato no se escribe (fail-closed)"; return null; }
-                if (string.IsNullOrEmpty(b.DocPrint)) { error = "el add-in no informó la huella del documento; sin identidad fuerte no se escribe"; return null; }
+                    if (Arg.GetBool(d, flag) == null) { error = "the add-in did not report '" + flag + "' as a boolean; without it nothing is written (fail-closed)"; return null; }
+                if (string.IsNullOrEmpty(b.DocPrint)) { error = "the add-in did not report the document fingerprint; without strong identity nothing is written"; return null; }
                 var niveles = Arg.GetString(d, "niveles_mcp") ?? "";
-                if (niveles.IndexOf('W') < 0) { error = "el add-in de ese Revit no permite cambios (niveles " + niveles + "); lo decide el usuario"; return null; }
+                if (niveles.IndexOf('W') < 0) { error = "the add-in of that Revit does not allow changes (levels " + niveles + "); the user decides that"; return null; }
             }
             if (mode == "persistente")
             {
-                if (Arg.GetBool(d, "worksharing") != false) { error = "persistente rechazado: el documento es workshared"; return null; }
-                if (Arg.GetBool(d, "solo_lectura") != false) { error = "persistente rechazado: documento de sólo lectura"; return null; }
+                if (Arg.GetBool(d, "worksharing") != false) { error = "persistente rejected: the document is workshared"; return null; }
+                if (Arg.GetBool(d, "solo_lectura") != false) { error = "persistente rejected: read-only document"; return null; }
                 var ruta = Arg.GetString(d, "ruta") ?? "";
                 if (ruta.Length == 0 || ruta.StartsWith("BIM 360", StringComparison.OrdinalIgnoreCase) || ruta.StartsWith("Autodesk Docs", StringComparison.OrdinalIgnoreCase) || b.DocKey.StartsWith("nube:", StringComparison.OrdinalIgnoreCase))
-                { error = "persistente rechazado: el documento no es un archivo local (" + ruta + ")"; return null; }
+                { error = "persistente rejected: the document is not a local file (" + ruta + ")"; return null; }
                 if (Arg.GetBool(d, "retener") != false || (Arg.GetLong(d, "cola_retenida") ?? 0) > 0)
-                { error = "persistente rechazado: Retener/cola activa en Revit (el usuario aplicaría el cambio después; no se puede reconciliar)"; return null; }
+                { error = "persistente rejected: Hold/queue active in Revit (the user would apply the change later; it cannot be reconciled)"; return null; }
             }
             return b;
         }
@@ -186,7 +186,7 @@ namespace Bimbridge.AgentHost
 
         private static bool IsWrite(ValidatedOp op) => op.Operation == "fijar_parametro" || op.Operation == "fijar_parametro_lote";
 
-        /// <summary>Valor esperado por id: el mismo para fijar_parametro; el del mapa para fijar_parametro_lote.</summary>
+        /// <summary>Expected value per id: the same one for fijar_parametro; the one from the map for fijar_parametro_lote.</summary>
         private static Func<long, string> Expected(ValidatedOp op)
         {
             if (op.Operation == "fijar_parametro_lote")
@@ -198,7 +198,7 @@ namespace Bimbridge.AgentHost
             return _ => value;
         }
 
-        /// <summary>QC de luminarias y etiquetas (check lighting_audit del add-in, sólo lectura): desviaciones = sin tag + huérfanos + duplicados sobrantes.</summary>
+        /// <summary>Lighting fixture and tag QC (add-in check lighting_audit, read-only): deviations = untagged + orphaned + surplus duplicates.</summary>
         private ExecResult RunQc(ValidatedOp op, out long deviations)
         {
             deviations = -1;
@@ -208,7 +208,7 @@ namespace Bimbridge.AgentHost
             if (r.Estado != Status.Ok || !(r.Datos is Dictionary<string, object> d)) return ExecResult.Fail(ErrorClass.Rechazo, "check: " + r.Estado + " " + r.Aviso);
             long N(string k, string f = "n") => d.TryGetValue(k, out var v) && v is Dictionary<string, object> b ? (Arg.GetLong(b, f) ?? -1) : -1;
             var sinTag = N("sin_tag"); var huerf = N("tags_huerfanos"); var dup = N("tags_duplicados", "sobrantes");
-            if (sinTag < 0 || huerf < 0 || dup < 0) return ExecResult.Fail(ErrorClass.Rechazo, "check: respuesta incompleta del add-in (sin_tag/tags_huerfanos/tags_duplicados); no se certifica");
+            if (sinTag < 0 || huerf < 0 || dup < 0) return ExecResult.Fail(ErrorClass.Rechazo, "check: incomplete add-in response (sin_tag/tags_huerfanos/tags_duplicados); not certified");
             deviations = sinTag + huerf + dup;
             var ok = new ExecResult { Ok = true };
             ok.Data["desviaciones"] = deviations; ok.Data["sin_tag"] = sinTag; ok.Data["tags_huerfanos"] = huerf; ok.Data["tags_duplicados_sobrantes"] = dup;
@@ -228,18 +228,18 @@ namespace Bimbridge.AgentHost
             {
                 case "consultar": return null;
                 case "fijar_parametro":
-                    if (op.Param("unidades") != "texto") return "no_soportado_alpha3: fijar_parametro contra Revit sólo con unidades=texto (los valores con unidades se comparan en alpha2/beta1)";
-                    if (op.Params.ContainsKey("tolerancia")) return "no_soportado_alpha3: tolerancia no aplica a texto";
+                    if (op.Param("unidades") != "texto") return "no_soportado_alpha3: fijar_parametro against Revit only with unidades=texto (values with units are compared in alpha2/beta1)";
+                    if (op.Params.ContainsKey("tolerancia")) return "no_soportado_alpha3: tolerancia does not apply to text";
                     return null;
-                case "fijar_parametro_lote": return null;   // valores de texto por id (validados por IrValidator)
+                case "fijar_parametro_lote": return null;   // text values per id (validated by IrValidator)
                 case "verificar_qc":
-                    return op.Param("receta") == QcLightingTags ? null : "no_soportado_rc1: verificar_qc contra Revit sólo con receta=" + QcLightingTags + " (sólo lectura)";
+                    return op.Param("receta") == QcLightingTags ? null : "no_soportado_rc1: verificar_qc against Revit only with receta=" + QcLightingTags + " (read-only)";
                 case "verificar_independiente": return null;
-                default: return "no_soportado_rc1: " + op.Operation + " no está en el catálogo de Revit de alpha3";
+                default: return "no_soportado_rc1: " + op.Operation + " is not in the alpha3 Revit catalog";
             }
         }
 
-        /// <summary>Lee (ids, valor del parámetro) del alcance de la operación. Sólo lectura.</summary>
+        /// <summary>Reads (ids, parameter value) from the operation scope. Read-only.</summary>
         private List<(long Id, string Value)> Read(ValidatedOp op, out string error)
         {
             var rows = ReadRows(op, new[] { op.Param("parametro") }, out error);
@@ -247,11 +247,11 @@ namespace Bimbridge.AgentHost
             var res = rows.Select(r => (r.Id, r.Values[0])).ToList();
             var ids = ScopeIds(op);
             if (ids != null && (res.Count != ids.Count || res.Any(x => !ids.Contains(x.Item1))))
-            { error = "alcance.ids: el documento no contiene exactamente esos elementos con ese filtro (" + res.Count + "/" + ids.Count + ")"; return null; }
+            { error = "alcance.ids: the document does not contain exactly those elements with that filter (" + res.Count + "/" + ids.Count + ")"; return null; }
             return res;
         }
 
-        /// <summary>0.8.0: lectura paginada genérica de varios campos del alcance (sólo lectura, fail-closed si el total cambia).</summary>
+        /// <summary>0.8.0: generic paged read of several scope fields (read-only, fail-closed if the total changes).</summary>
         private List<(long Id, string[] Values)> ReadRows(ValidatedOp op, string[] fields, out string error)
         {
             error = null;
@@ -264,13 +264,13 @@ namespace Bimbridge.AgentHost
             var r = _link.Call(Wire.OpQuery, a, false);
             if (r.Estado != Status.Ok || !(r.Datos is Dictionary<string, object> d)) { error = "query: " + r.Estado + " " + r.Aviso; return null; }
             var total = Arg.GetLong(d, "total");
-            if (total == null) { error = "query: el add-in no informó total; no se puede comprobar que se leyó todo (fail-closed)"; return null; }
+            if (total == null) { error = "query: the add-in did not report total; cannot check that everything was read (fail-closed)"; return null; }
             var rows = d.TryGetValue("rows", out var rv) && rv is List<object> rl ? new List<object>(rl) : new List<object>();
-            // rc1: paginación tipada. Se piden las páginas siguientes hasta tener EXACTAMENTE total filas; si el total cambia entre páginas, se aborta.
+            // rc1: typed paging. Following pages are requested until there are EXACTLY total rows; if the total changes between pages, abort.
             var pages = Arg.GetLong(d, "pages") ?? 1;
-            if (pages > MaxPages) { error = "el alcance ocupa " + pages + " páginas (máximo " + MaxPages + "); acótelo"; return null; }
-            // Issue #2: con cursor, las páginas siguientes salen de la misma lectura (misma revisión) sin volver al hilo de Revit.
-            // Sin cursor (add-in anterior o instantánea demasiado grande) se mantiene la paginación clásica con control de total.
+            if (pages > MaxPages) { error = "the scope spans " + pages + " pages (maximum " + MaxPages + "); narrow it"; return null; }
+            // Issue #2: with a cursor, following pages come from the same read (same revision) without going back to the Revit thread.
+            // Without a cursor (older add-in or snapshot too large) classic paging with a total check is kept.
             var cursor = Arg.GetString(d, "cursor");
             for (var pg = 2; pg <= pages && rows.Count < total; pg++)
             {
@@ -278,11 +278,11 @@ namespace Bimbridge.AgentHost
                     ? new Dictionary<string, object> { [Wire.DocArg] = _docHandle, ["cursor"] = cursor, ["page"] = (long)pg }
                     : new Dictionary<string, object>(a) { ["page"] = (long)pg };
                 var r2 = _link.Call(Wire.OpQuery, a2, false);
-                if (r2.Estado != Status.Ok || !(r2.Datos is Dictionary<string, object> d2)) { error = "query página " + pg + ": " + r2.Estado + " " + r2.Aviso; return null; }
-                if (Arg.GetLong(d2, "total") != total) { error = "el total cambió entre páginas (" + total + " → " + Arg.GetLong(d2, "total") + "): el modelo se modificó durante la lectura"; return null; }
+                if (r2.Estado != Status.Ok || !(r2.Datos is Dictionary<string, object> d2)) { error = "query page " + pg + ": " + r2.Estado + " " + r2.Aviso; return null; }
+                if (Arg.GetLong(d2, "total") != total) { error = "the total changed between pages (" + total + " → " + Arg.GetLong(d2, "total") + "): the model was modified during the read"; return null; }
                 if (d2.TryGetValue("rows", out var rv2) && rv2 is List<object> rl2) rows.AddRange(rl2);
             }
-            if (total != rows.Count) { error = "el alcance tiene " + total + " elementos y la lectura devolvió " + rows.Count; return null; }
+            if (total != rows.Count) { error = "the scope has " + total + " elements and the read returned " + rows.Count; return null; }
             var res = new List<(long, string[])>();
             foreach (var row in rows.OfType<List<object>>())
             {
@@ -294,8 +294,8 @@ namespace Bimbridge.AgentHost
         }
 
         /// <summary>
-        /// 0.8.0 (CAP-008): verificar_independiente. Lo esperado viene de una fuente independiente declarada en el plan; lo observado se
-        /// lee del modelo. Se rechaza si la fuente esperada es la misma que guió la construcción. Sólo lectura.
+        /// 0.8.0 (CAP-008): verificar_independiente. The expected values come from an independent source declared in the plan; the observed
+        /// values are read from the model. Rejected if the expected source is the same one that guided the build. Read-only.
         /// </summary>
         private static List<string> SplitList(string s) =>
             string.IsNullOrWhiteSpace(s) ? new List<string>() : s.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
@@ -328,7 +328,7 @@ namespace Bimbridge.AgentHost
             {
                 var it = new Engine.Workflow.IndependentVerifier.Item { Key = string.IsNullOrEmpty(row.Values[0]) ? null : row.Values[0], ElementId = row.Id };
                 if (attr != null) it.Attrs[attr] = row.Values[1];
-                if (it.Key == null) { it.Key = "(sin " + keyParam + ") #" + row.Id.ToString(CultureInfo.InvariantCulture); }
+                if (it.Key == null) { it.Key = "(no " + keyParam + ") #" + row.Id.ToString(CultureInfo.InvariantCulture); }
                 input.Observed.Add(it);
             }
             var v = Engine.Workflow.IndependentVerifier.Verify(input);
@@ -351,10 +351,10 @@ namespace Bimbridge.AgentHost
                 return new Preflight { Targets = (int)(Arg.GetLong(d, "total") ?? 0) };
             }
             if (op.Operation == "verificar_qc" || op.Operation == "verificar_independiente") return new Preflight { Targets = 1 };
-            if (WriteMode == "lectura") return new Preflight { Error = "escrituras no autorizadas por el operador (modo lectura)" };
+            if (WriteMode == "lectura") return new Preflight { Error = "writes not authorized by the operator (lectura mode)" };
             var rows = Read(op, out var err);
             if (rows == null) return new Preflight { Error = err };
-            if (rows.Count > MaxTargets) return new Preflight { Error = "máximo " + MaxTargets + " objetivos por operación (el diff del plan se comprueba fila a fila); hay " + rows.Count };
+            if (rows.Count > MaxTargets) return new Preflight { Error = "maximum " + MaxTargets + " targets per operation (the plan diff is checked row by row); there are " + rows.Count };
             return new Preflight { Targets = rows.Count };
         }
 
@@ -372,34 +372,34 @@ namespace Bimbridge.AgentHost
             if (op.Operation == "verificar_independiente") return RunIndependent(op, out _);
             var param = op.Param("parametro");
             var expected = Expected(op);
-            // 1. línea base (antes de cualquier escritura): valores y relaciones que el ensayo debe restaurar
+            // 1. baseline (before any write): values and relations the trial must restore
             var rows = Read(op, out var err);
             if (rows == null) return ExecResult.Fail(ErrorClass.Precondicion, err);
             var bl = new Baseline { Ids = rows.Select(x => x.Id).ToList(), Values = rows.ToDictionary(x => x.Id, x => x.Value) };
             _baselines[op.Id] = bl;
-            if (bl.Ids.Count == 0) return ExecResult.Fail(ErrorClass.SinObjetivos, "sin objetivos al ejecutar");
+            if (bl.Ids.Count == 0) return ExecResult.Fail(ErrorClass.SinObjetivos, "no targets at run time");
 
-            // 2. plan tipado (no escribe; el add-in valida tipo de parámetro, sólo lectura, permisos de edición)
-            // rc1: un plan con una operación set_param por valor distinto (lote = varios valores, un solo commit/TransactionGroup).
+            // 2. typed plan (does not write; the add-in validates parameter type, read-only, edit permissions)
+            // rc1: one plan with one set_param operation per distinct value (batch = several values, a single commit/TransactionGroup).
             var groups = bl.Ids.GroupBy(i => expected(i)).ToList();
-            if (groups.Any(g => g.Key == null)) return ExecResult.Fail(ErrorClass.Precondicion, "fijar_parametro_lote: hay objetivos sin valor en el mapa");
+            if (groups.Any(g => g.Key == null)) return ExecResult.Fail(ErrorClass.Precondicion, "fijar_parametro_lote: there are targets with no value in the map");
             var opsJson = groups.Select(g => (object)new Dictionary<string, object> { ["op"] = "set_param", ["ids"] = string.Join(",", g), ["name"] = param, ["value"] = g.Key }).ToList();
             var pr = _link.Call(Wire.OpPlan, new Dictionary<string, object>
             {
                 [Wire.DocArg] = _docHandle, ["ops"] = opsJson,
-                ["summary"] = "AgentHost " + ctx.PlanHash + " " + op.Id + " intento " + ctx.Attempt + " (" + WriteMode + ")",
+                ["summary"] = "AgentHost " + ctx.PlanHash + " " + op.Id + " attempt " + ctx.Attempt + " (" + WriteMode + ")",
             }, false);
             if (pr.Estado != Status.Ok || !(pr.Datos is Dictionary<string, object> pd)) return ExecResult.Fail(ErrorClass.Rechazo, "plan: " + pr.Estado + " " + pr.Aviso);
             var planId = Arg.GetString(pd, "plan_id");
             List<long> planned;
             try { planned = PlannedIds(pd); }
             catch (InvalidOperationException ex) { Drop(planId); return ExecResult.Fail(ErrorClass.Precondicion, ex.Message); }
-            // 3. alcance: lo planificado son EXACTAMENTE los objetivos (ni uno más); si Revit omitió alguno, se dice y no se confirma
-            if (planned.Except(bl.Ids).Any()) { Drop(planId); return ExecResult.Fail(ErrorClass.Precondicion, "el plan del add-in toca elementos fuera del alcance: " + string.Join(",", planned.Except(bl.Ids).Take(5))); }
+            // 3. scope: what is planned is EXACTLY the targets (not one more); if Revit omitted any, say so and do not commit
+            if (planned.Except(bl.Ids).Any()) { Drop(planId); return ExecResult.Fail(ErrorClass.Precondicion, "the add-in plan touches elements outside the scope: " + string.Join(",", planned.Except(bl.Ids).Take(5))); }
             var unchanged = bl.Ids.Where(i => bl.Values[i] == expected(i)).ToList();
             var expectChanged = bl.Ids.Count - unchanged.Count;
             if (planned.Count != expectChanged)
-            { Drop(planId); return ExecResult.Fail(ErrorClass.Precondicion, "el add-in planificó " + planned.Count + " cambios y se esperaban " + expectChanged + " (" + Arg.GetString(pd, "detalle") + ")"); }
+            { Drop(planId); return ExecResult.Fail(ErrorClass.Precondicion, "the add-in planned " + planned.Count + " changes and " + expectChanged + " were expected" + " (" + Arg.GetString(pd, "detalle") + ")"); }
             if (expectChanged == 0)
             {
                 Drop(planId);
@@ -409,15 +409,15 @@ namespace Bimbridge.AgentHost
                 return same;
             }
 
-            // 4. commit (ensayo o aplicar). Desde aquí, un fallo de transporte = efecto incierto.
+            // 4. commit (trial or apply). From here on, a transport failure = uncertain effect.
             var args = new Dictionary<string, object> { ["plan_id"] = planId };
             if (WriteMode == "ensayo") args["modo"] = "ensayo";
             else args[Wire.KeyArg] = op.Id + "#" + ctx.Fencing.ToString(CultureInfo.InvariantCulture);
             Faults.Hit("backend.antes_enviar", op.Id);
             var cr = _link.Call(Wire.OpCommit, args, true);
-            Faults.Hit("backend.tras_commit", op.Id);   // el add-in pudo aplicar y el AgentHost cae antes de registrar
-            if (Faults.Fire("backend.respuesta_perdida", op.Id))   // NRT-07: el add-in aplicó, pero la respuesta IPC se pierde
-                cr = Response.Fail(cr.Id, Status.Desconocido, "simulado: respuesta del commit perdida en la tubería (el efecto real se desconoce)");
+            Faults.Hit("backend.tras_commit", op.Id);   // the add-in may have applied and the AgentHost crashes before recording
+            if (Faults.Fire("backend.respuesta_perdida", op.Id))   // NRT-07: the add-in applied, but the IPC response is lost
+                cr = Response.Fail(cr.Id, Status.Desconocido, "simulated: commit response lost in the pipe (the real effect is unknown)");
             var cd = cr.Datos as Dictionary<string, object>;
             if (WriteMode == "ensayo")
             {
@@ -434,8 +434,8 @@ namespace Bimbridge.AgentHost
                     return res;
                 }
                 if (cr.Estado == Status.Conflicto || cr.Estado == Status.Revertido || cr.Estado == Status.Invalido || cr.Estado == Status.Rechazado)
-                    return ExecResult.Fail(cr.Estado == Status.Conflicto ? ErrorClass.Precondicion : ErrorClass.Rechazo, "commit ensayo: " + cr.Estado + " " + cr.Aviso);
-                throw new UncertainEffectException("commit ensayo: " + cr.Estado + " " + cr.Aviso);
+                    return ExecResult.Fail(cr.Estado == Status.Conflicto ? ErrorClass.Precondicion : ErrorClass.Rechazo, "commit trial: " + cr.Estado + " " + cr.Aviso);
+                throw new UncertainEffectException("commit trial: " + cr.Estado + " " + cr.Aviso);
             }
             if (cr.Estado == Status.Ok && cd != null)
             {
@@ -458,7 +458,7 @@ namespace Bimbridge.AgentHost
                 foreach (var row in rows.OfType<List<object>>())
                     if (row.Count > 0 && row[0] is long l) ids.Add(l);
             var total = Arg.GetLong(pd, "cambios") ?? ids.Count;
-            if (total != ids.Count) throw new InvalidOperationException("el plan devolvió " + total + " cambios pero sólo " + ids.Count + " filas (filas_omitidas); alpha3 exige ver todas");
+            if (total != ids.Count) throw new InvalidOperationException("the plan returned " + total + " changes but only " + ids.Count + " rows (filas_omitidas); alpha3 requires seeing all of them");
             return ids;
         }
 
@@ -468,37 +468,37 @@ namespace Bimbridge.AgentHost
             try { _link.Call(Wire.OpJob, new Dictionary<string, object> { ["plan_id"] = planId, ["op"] = "drop" }, false); } catch (Exception) { }
         }
 
-        /// <summary>Recuperación: qué hay en el modelo AHORA para esta operación. Sólo lectura.</summary>
+        /// <summary>Recovery: what is in the model NOW for this operation. Read-only.</summary>
         public Observation Observe(ValidatedOp op, ExecContext ctx)
         {
-            if (!IsWrite(op)) return new Observation { Effect = Effect.NoObservado, Detail = "lectura: sin efecto" };
+            if (!IsWrite(op)) return new Observation { Effect = Effect.NoObservado, Detail = "read: no effect" };
             List<(long Id, string Value)> rows;
             try { rows = Read(op, out var err); if (rows == null) return new Observation { Effect = Effect.Incierto, Detail = err }; }
-            catch (Exception ex) { return new Observation { Effect = Effect.Incierto, Detail = "no se pudo leer el modelo: " + ex.Message }; }
+            catch (Exception ex) { return new Observation { Effect = Effect.Incierto, Detail = "could not read the model: " + ex.Message }; }
             var expected = Expected(op);
-            if (rows.Count == 0) return new Observation { Effect = Effect.SinObjetivos, Detail = "el alcance no selecciona elementos" };
+            if (rows.Count == 0) return new Observation { Effect = Effect.SinObjetivos, Detail = "the scope selects no elements" };
             var have = rows.Count(x => x.Value == expected(x.Id));
             _baselines.TryGetValue(op.Id, out var bl);
             if (WriteMode == "ensayo")
             {
-                // un ensayo nunca deja efecto: si la línea base existe y coincide, no hubo efecto persistente.
-                if (bl != null && rows.All(x => bl.Values.TryGetValue(x.Id, out var b0) && b0 == x.Value)) return new Observation { Effect = Effect.NoObservado, Detail = "ensayo: el modelo coincide con la línea base" };
-                if (bl == null && have == 0) return new Observation { Effect = Effect.NoObservado, Detail = "ensayo: ningún objetivo tiene el valor temporal" };
-                return new Observation { Effect = Effect.Incierto, Detail = "ensayo: " + have + "/" + rows.Count + " objetivos tienen el valor temporal o difieren de la línea base" };
+                // a trial never leaves an effect: if the baseline exists and matches, there was no persistent effect.
+                if (bl != null && rows.All(x => bl.Values.TryGetValue(x.Id, out var b0) && b0 == x.Value)) return new Observation { Effect = Effect.NoObservado, Detail = "trial: the model matches the baseline" };
+                if (bl == null && have == 0) return new Observation { Effect = Effect.NoObservado, Detail = "trial: no target has the temporary value" };
+                return new Observation { Effect = Effect.Incierto, Detail = "trial: " + have + "/" + rows.Count + " targets have the temporary value or differ from the baseline" };
             }
-            if (have == rows.Count) return new Observation { Effect = Effect.Observado, Detail = "todos los objetivos tienen el valor (" + rows.Count + ")" };
-            if (have == 0) return new Observation { Effect = Effect.NoObservado, Detail = "ningún objetivo tiene el valor" };
-            return new Observation { Effect = Effect.Parcial, Detail = have + "/" + rows.Count + " objetivos tienen el valor" };
+            if (have == rows.Count) return new Observation { Effect = Effect.Observado, Detail = "all targets have the value (" + rows.Count + ")" };
+            if (have == 0) return new Observation { Effect = Effect.NoObservado, Detail = "no target has the value" };
+            return new Observation { Effect = Effect.Parcial, Detail = have + "/" + rows.Count + " targets have the value" };
         }
 
         public PostcheckResult CheckPostconditions(ValidatedOp op, ExecContext ctx)
         {
-            if (op.Operation == "consultar") return new PostcheckResult { State = PostState.Satisfechas, Detail = "consulta" };
+            if (op.Operation == "consultar") return new PostcheckResult { State = PostState.Satisfechas, Detail = "query" };
             if (op.Operation == "verificar_qc" || op.Operation == "verificar_independiente")
             {
                 var q = op.Operation == "verificar_qc" ? RunQc(op, out var dev) : RunIndependent(op, out dev);
-                if (!q.Ok) return new PostcheckResult { State = PostState.NoEvaluables, Detail = q.Error ?? "check sin datos" };
-                var pq = new PostcheckResult { State = dev == 0 ? PostState.Satisfechas : PostState.NoSatisfechas, Detail = "desviaciones = " + dev };
+                if (!q.Ok) return new PostcheckResult { State = PostState.NoEvaluables, Detail = q.Error ?? "check without data" };
+                var pq = new PostcheckResult { State = dev == 0 ? PostState.Satisfechas : PostState.NoSatisfechas, Detail = "deviations = " + dev };
                 foreach (var kv in q.Data) pq.Evidence[kv.Key] = kv.Value;
                 return pq;
             }
@@ -510,7 +510,7 @@ namespace Bimbridge.AgentHost
             if (WriteMode == "ensayo")
             {
                 if (!_baselines.TryGetValue(op.Id, out var bl) || !_trialEvidence.TryGetValue(op.Id, out var ev))
-                    return new PostcheckResult { State = PostState.NoEvaluables, Detail = "sin línea base ni evidencia del ensayo en este proceso (se reinició): no se certifica" };
+                    return new PostcheckResult { State = PostState.NoEvaluables, Detail = "no baseline or trial evidence in this process (it restarted): not certified" };
                 var restored = rows.Count(x => bl.Values.TryGetValue(x.Id, out var b0) && b0 == x.Value);
                 post.Evidence["restaurados_relectura"] = (long)restored;
                 post.Evidence["linea_base"] = bl.Ids.Select(i => (object)(i + "=" + (bl.Values[i] ?? "<null>"))).ToList();
@@ -521,14 +521,14 @@ namespace Bimbridge.AgentHost
                 var restOk = ev.TryGetValue("restauracion_ok", out var ro) && ro is bool rb && rb;
                 var ok = restored == rows.Count && rows.Count == bl.Ids.Count && (sinCambios || (grupo == "RolledBack" && tempOk && restOk));
                 post.State = ok ? PostState.Satisfechas : PostState.NoSatisfechas;
-                post.Detail = ok ? (sinCambios ? "sin cambios necesarios; modelo intacto" : "temporal verificado por el add-in, grupo " + grupo + ", relectura independiente = línea base (" + restored + "/" + rows.Count + ")")
-                                 : "grupo " + (grupo ?? "?") + ", temporal_ok " + tempOk + ", restauración add-in " + restOk + ", relectura " + restored + "/" + rows.Count;
+                post.Detail = ok ? (sinCambios ? "no changes needed; model intact" : "temporary value verified by the add-in, group " + grupo + ", independent re-read = baseline (" + restored + "/" + rows.Count + ")")
+                                 : "group " + (grupo ?? "?") + ", temporal_ok " + tempOk + ", add-in restoration " + restOk + ", re-read " + restored + "/" + rows.Count;
                 return post;
             }
             var have = rows.Count(x => x.Value == expected(x.Id));
             post.Evidence["con_valor"] = (long)have;
             post.State = have == rows.Count ? PostState.Satisfechas : PostState.NoSatisfechas;
-            post.Detail = have + "/" + rows.Count + " objetivos con " + op.Param("parametro") + " = valor esperado";
+            post.Detail = have + "/" + rows.Count + " targets with " + op.Param("parametro") + " = expected value";
             return post;
         }
 

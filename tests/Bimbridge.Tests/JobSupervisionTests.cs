@@ -27,7 +27,7 @@ namespace Bimbridge.Tests
             Assert.True(j.IsFinal);
             Assert.Equal(Status.Desconocido, j.Estado);
             Assert.Contains("InvalidOperationException", j.Error);
-            Assert.Contains("reconcilie", j.Error);
+            Assert.Contains("reconcile", j.Error);
         }
 
         [Fact]

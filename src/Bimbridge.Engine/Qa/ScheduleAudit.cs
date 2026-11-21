@@ -6,7 +6,7 @@ using Bimbridge.Protocol;
 
 namespace Bimbridge.Engine.Qa
 {
-    /// <summary>Contrasta la población, configuración y celdas de una tabla contra expectativas externas.</summary>
+    /// <summary>Checks a schedule's population, configuration and cells against external expectations.</summary>
     public sealed class ScheduleAudit
     {
         public sealed class Cell
@@ -26,25 +26,25 @@ namespace Bimbridge.Engine.Qa
             if (args.TryGetValue("ids_esperados", out var ids))
             {
                 if (!(ids is List<object> list) || list.Any(x => !(x is long id) || id <= 0))
-                    throw new QueryException("ids_esperados exige una lista JSON de IDs positivos");
+                    throw new QueryException("ids_esperados requires a JSON list of positive IDs");
                 _ids = new HashSet<long>(list.Cast<long>());
-                if (_ids.Count != list.Count) throw new QueryException("ids_esperados contiene duplicados");
+                if (_ids.Count != list.Count) throw new QueryException("ids_esperados contains duplicates");
             }
             if (args.TryGetValue("cantidad_esperada", out var count))
             {
-                if (!(count is long n) || n < 0) throw new QueryException("cantidad_esperada exige un entero no negativo");
+                if (!(count is long n) || n < 0) throw new QueryException("cantidad_esperada requires a non-negative integer");
                 _count = n;
             }
             if (args.TryGetValue("filtros_esperados", out var filters))
             {
                 _filters = filters as List<object>;
                 if (_filters == null || _filters.Any(f => !(f is Dictionary<string, object>)))
-                    throw new QueryException("filtros_esperados exige una lista JSON de contratos de filtro");
+                    throw new QueryException("filtros_esperados requires a JSON list of filter contracts");
             }
             if (args.TryGetValue("celdas_esperadas", out var cells))
             {
                 if (!(cells is List<object> list) || list.Count > 200)
-                    throw new QueryException("celdas_esperadas exige una lista JSON de hasta 200 celdas");
+                    throw new QueryException("celdas_esperadas requires a JSON list of up to 200 cells");
                 var seen = new HashSet<(int, int)>();
                 foreach (var item in list)
                 {
@@ -52,8 +52,8 @@ namespace Bimbridge.Engine.Qa
                         !cell.TryGetValue("fila", out var rawRow) || !(rawRow is long row) || row < 0 || row > int.MaxValue ||
                         !cell.TryGetValue("columna", out var rawColumn) || !(rawColumn is long col) || col < 0 || col > int.MaxValue ||
                         !cell.TryGetValue("texto", out var rawText) || !(rawText is string value))
-                        throw new QueryException("cada celda exige fila, columna (desde cero) y texto");
-                    if (!seen.Add(((int)row, (int)col))) throw new QueryException("celdas_esperadas contiene coordenadas duplicadas");
+                        throw new QueryException("each cell requires fila, columna (zero-based) and texto");
+                    if (!seen.Add(((int)row, (int)col))) throw new QueryException("celdas_esperadas contains duplicate coordinates");
                     Cells.Add(new Cell { Row = (int)row, Column = (int)col, Text = value });
                 }
             }

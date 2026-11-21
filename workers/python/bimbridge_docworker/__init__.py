@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""BIMBRIDGE Power Engine — Python Worker (inteligencia documental).
+"""BIMBRIDGE Power Engine — Python Worker (document intelligence).
 
-Proceso aislado de Revit: recibe trabajos documentales explícitos por stdin (JSON por líneas, contrato Power Engine v1) y
-devuelve datos estructurados. No llama a Revit API, no orquesta nada, no abre rutas no autorizadas y no usa la red.
-Distingue EXTRACCIÓN TEXTUAL, EXTRACCIÓN GEOMÉTRICA e INTERPRETACIÓN: nunca presenta texto extraído como comprensión del plano.
+Process isolated from Revit: receives explicit document jobs on stdin (JSON lines, Power Engine contract v1) and
+returns structured data. It does not call the Revit API, orchestrates nothing, opens no unauthorized paths and does not use the network.
+It distinguishes TEXT EXTRACTION, GEOMETRIC EXTRACTION and INTERPRETATION: it never presents extracted text as understanding of the drawing.
 """
 __version__ = "0.9.0"
 PROTOCOL = 1

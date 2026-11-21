@@ -9,9 +9,9 @@ using Bimbridge.Protocol;
 namespace Bimbridge.AgentHost
 {
     /// <summary>
-    /// Backend simulado sobre <see cref="DurableSimModel"/>. Configuración de pruebas (persistida en el propio modelo, campo config):
-    /// <c>rechazar</c>: [op] que el backend rechaza sin aplicar; <c>transitorio</c>: {op: n} rechazos transitorios en los n primeros intentos;
-    /// <c>qc_desviaciones</c>: {op: n}; <c>retardo_ms</c>: espera por operación (contención de leases).
+    /// Simulated backend over <see cref="DurableSimModel"/>. Test configuration (persisted in the model itself, config field):
+    /// <c>rechazar</c>: [op] that the backend rejects without applying; <c>transitorio</c>: {op: n} transient rejections on the first n attempts;
+    /// <c>qc_desviaciones</c>: {op: n}; <c>retardo_ms</c>: wait per operation (lease contention).
     /// </summary>
     public sealed class SimulatedBackend : IExecutionBackend
     {
@@ -42,8 +42,8 @@ namespace Bimbridge.AgentHost
         {
             var delay = _m.Config.TryGetValue("retardo_ms", out var dv) ? Convert.ToInt32(dv, CultureInfo.InvariantCulture) : 0;
             if (delay > 0) Thread.Sleep(delay);
-            if (ConfigList("rechazar", op.Id)) return ExecResult.Fail(ErrorClass.Rechazo, "el backend rechazó la operación (simulado); nada se aplicó");
-            if (ctx.Attempt <= ConfigMap("transitorio", op.Id)) return ExecResult.Fail(ErrorClass.Transitorio, "rechazo transitorio (simulado, intento " + ctx.Attempt + "); nada se aplicó");
+            if (ConfigList("rechazar", op.Id)) return ExecResult.Fail(ErrorClass.Rechazo, "the backend rejected the operation (simulated); nothing was applied");
+            if (ctx.Attempt <= ConfigMap("transitorio", op.Id)) return ExecResult.Fail(ErrorClass.Transitorio, "transient rejection (simulated, attempt " + ctx.Attempt + "); nothing was applied");
             switch (op.Operation)
             {
                 case "consultar":
@@ -54,11 +54,11 @@ namespace Bimbridge.AgentHost
                 case "fijar_parametro_lote":
                     return SetParameter(op, ctx);
                 default:
-                    return ExecResult.Fail(ErrorClass.Rechazo, "operación no soportada por el backend simulado: " + op.Operation);
+                    return ExecResult.Fail(ErrorClass.Rechazo, "operation not supported by the simulated backend: " + op.Operation);
             }
         }
 
-        /// <summary>rc1: valor esperado por objetivo (mismo valor, o el del mapa de fijar_parametro_lote).</summary>
+        /// <summary>rc1: expected value per target (same value, or the one from the fijar_parametro_lote map).</summary>
         private static Func<long, object> ValueFor(ValidatedOp op)
         {
             if (op.Operation == "fijar_parametro_lote")
@@ -77,15 +77,15 @@ namespace Bimbridge.AgentHost
             var targets = _m.Targets(op.Scope);
             if (targets.Count == 0)
             {
-                if (!op.AllowEmpty) return ExecResult.Fail(ErrorClass.SinObjetivos, "el alcance no selecciona ningún elemento; nada se aplicó");
+                if (!op.AllowEmpty) return ExecResult.Fail(ErrorClass.SinObjetivos, "the scope selects no element; nothing was applied");
                 return new ExecResult { Ok = true, Data = { ["elementos"] = 0L, ["cambiados"] = 0L, ["vacio"] = true } };
             }
-            // "transacción": se preparan los cambios en memoria; sólo el Commit (una línea en el WAL con fsync) los confirma.
+            // "transaction": changes are staged in memory; only the Commit (one WAL line with fsync) commits them.
             var staged = new List<object[]>();
             foreach (var id in targets)
             {
                 var v = vf(id);
-                if (v == null) return ExecResult.Fail(ErrorClass.Precondicion, "fijar_parametro_lote: el objetivo " + id + " no tiene valor en el lote; nada se aplicó");
+                if (v == null) return ExecResult.Fail(ErrorClass.Precondicion, "fijar_parametro_lote: target " + id + " has no value in the batch; nothing was applied");
                 var old = _m.Get(id, p);
                 if (old != null && Values.Same(old, v)) continue;
                 staged.Add(new object[] { id, p, old, v });
@@ -98,24 +98,24 @@ namespace Bimbridge.AgentHost
 
         public Observation Observe(ValidatedOp op, ExecContext ctx)
         {
-            if (!op.Writes) return new Observation { Effect = Effect.NoObservado, Detail = "lectura: no deja efecto; repetirla es inocuo" };
+            if (!op.Writes) return new Observation { Effect = Effect.NoObservado, Detail = "read: leaves no effect; repeating it is harmless" };
             var (count, detailed) = _m.TxFor(op.Id, ctx.PlanHash);
             var targets = _m.Targets(op.Scope);
             if (count == 0)
                 return targets.Count == 0
-                    ? new Observation { Effect = Effect.SinObjetivos, Detail = "sin transacción y sin objetivos" }
-                    : new Observation { Effect = Effect.NoObservado, Detail = "ninguna transacción confirmada de esta operación" };
-            if (count > 1) return new Observation { Effect = Effect.Incierto, Transactions = count, Detail = "la operación tiene " + count + " transacciones confirmadas" };
+                    ? new Observation { Effect = Effect.SinObjetivos, Detail = "no transaction and no targets" }
+                    : new Observation { Effect = Effect.NoObservado, Detail = "no committed transaction for this operation" };
+            if (count > 1) return new Observation { Effect = Effect.Incierto, Transactions = count, Detail = "the operation has " + count + " committed transactions" };
             if (detailed.Count == 0)
-                return new Observation { Effect = Effect.Observado, Transactions = 1, Detail = "transacción confirmada pero compactada: no hay detalle para reconstruir el resultado" };
+                return new Observation { Effect = Effect.Observado, Transactions = 1, Detail = "transaction committed but compacted: no detail to reconstruct the result" };
             var r = detailed[0];
             var nowHash = DurableSimModel.IdsHash(targets);
             if (Arg.GetString(r, "objs_h") != nowHash)
-                return new Observation { Effect = Effect.Parcial, Transactions = 1, Detail = "la transacción " + Arg.GetString(r, "tx") + " cubrió " + Arg.GetLong(r, "obj") + " objetivos; el alcance ahora selecciona " + targets.Count + " (otros elementos)" };
+                return new Observation { Effect = Effect.Parcial, Transactions = 1, Detail = "transaction " + Arg.GetString(r, "tx") + " covered " + Arg.GetLong(r, "obj") + " targets; the scope now selects " + targets.Count + " (other elements)" };
             var changes = r.TryGetValue("cambios", out var ch) && ch is List<object> cl ? cl.Count : 0;
             return new Observation
             {
-                Effect = Effect.Observado, Transactions = 1, Detail = "transacción " + Arg.GetString(r, "tx"),
+                Effect = Effect.Observado, Transactions = 1, Detail = "transaction " + Arg.GetString(r, "tx"),
                 Reconstructed = new Dictionary<string, object>(StringComparer.Ordinal)
                 {
                     ["elementos"] = Arg.GetLong(r, "obj") ?? 0, ["cambiados"] = (long)changes, ["tx"] = Arg.GetString(r, "tx"), ["recuperada"] = true,
@@ -137,22 +137,22 @@ namespace Bimbridge.AgentHost
                     if (targets.Count == 0)
                     {
                         res.State = op.AllowEmpty ? PostState.Satisfechas : PostState.NoSatisfechas;
-                        res.Detail = op.AllowEmpty ? "conjunto vacío permitido por el plan" : "el alcance no selecciona ningún elemento";
+                        res.Detail = op.AllowEmpty ? "empty set allowed by the plan" : "the scope selects no element";
                         return res;
                     }
                     var ok = targets.Count(id => { var x = _m.Get(id, p); var v = vf(id); return x != null && v != null && Values.Same(x, v); });
                     res.Evidence["conformes"] = (long)ok;
                     res.State = ok == targets.Count ? PostState.Satisfechas : PostState.NoSatisfechas;
-                    res.Detail = ok + "/" + targets.Count + " objetivos con " + p + " = valor esperado";
+                    res.Detail = ok + "/" + targets.Count + " targets with " + p + " = expected value";
                     return res;
                 }
                 case "verificar_qc":
                 {
                     var dev = ConfigMap("qc_desviaciones", op.Id);
-                    return new PostcheckResult { State = dev == 0 ? PostState.Satisfechas : PostState.NoSatisfechas, Detail = "desviaciones = " + dev, Evidence = { ["desviaciones"] = dev } };
+                    return new PostcheckResult { State = dev == 0 ? PostState.Satisfechas : PostState.NoSatisfechas, Detail = "deviations = " + dev, Evidence = { ["desviaciones"] = dev } };
                 }
                 default:
-                    return new PostcheckResult { State = PostState.Satisfechas, Detail = "sin postcondiciones aplicables", Evidence = { ["aplicables"] = 0L } };
+                    return new PostcheckResult { State = PostState.Satisfechas, Detail = "no applicable postconditions", Evidence = { ["aplicables"] = 0L } };
             }
         }
     }

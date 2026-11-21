@@ -79,7 +79,7 @@ fn invalid_inputs_fail_closed_and_worker_keeps_serving() {
         assert_eq!(r["codigo"], "INVALIDO", "{job} {args}: {r}");
     }
     let r = exchange(&[
-        "{no es json".into(),
+        "{not json".into(),
         json!({"pe":1,"id":"a","trabajo":"inventado"}).to_string(),
         json!({"pe":1,"id":"b","trabajo":"components","args":{"nodos":1,"aristas":[]}}).to_string(),
     ]);

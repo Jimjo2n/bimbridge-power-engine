@@ -13,7 +13,7 @@ namespace Bimbridge.Engine.Qa
         {
             if (!args.TryGetValue("expectativas", out var value)) return;
             if (!(value is List<object> rows) || rows.Count == 0 || rows.Count > 100)
-                throw new QueryException("expectativas exige 1 a 100 objetos de vista y elemento");
+                throw new QueryException("expectativas requires 1 to 100 view-and-element objects");
             var pairs = new HashSet<(long, long)>();
             foreach (var item in rows)
             {
@@ -21,7 +21,7 @@ namespace Bimbridge.Engine.Qa
                     !row.TryGetValue("vista", out var viewValue) || !(viewValue is long view) || !views.Contains(view) ||
                     !row.TryGetValue("id", out var idValue) || !(idValue is long id) || !elements.Contains(id) ||
                     row.Count < 3 || !pairs.Add((view, id)))
-                    throw new QueryException("expectativas: indique un par vista e id único del alcance y sus comprobaciones");
+                    throw new QueryException("expectativas: give a vista and a unique in-scope id pair and its checks");
                 var hasFilter = row.ContainsKey("filtro_id");
                 foreach (var entry in row)
                 {
@@ -35,7 +35,7 @@ namespace Bimbridge.Engine.Qa
                         "linea_proyeccion" => entry.Value is List<object> rgb && rgb.Count == 3 && rgb.All(c => c is long n && n >= 0 && n <= 255),
                         _ => false,
                     };
-                    if (!valid) throw new QueryException("expectativas: campo o valor inválido para " + entry.Key);
+                    if (!valid) throw new QueryException("expectativas: invalid field or value for " + entry.Key);
                 }
                 _expected.Add(row);
             }

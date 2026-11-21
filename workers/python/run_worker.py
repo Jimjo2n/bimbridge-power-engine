@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Punto de entrada del Python Worker. Se lanza con `python -I -B run_worker.py` (modo aislado:
-sin PYTHONPATH, sin site de usuario, sin el directorio actual). Añade SOLO su propia carpeta."""
+"""Python Worker entry point. Launched with `python -I -B run_worker.py` (isolated mode:
+no PYTHONPATH, no user site, no current directory). Adds ONLY its own folder."""
 import os
 import sys
 

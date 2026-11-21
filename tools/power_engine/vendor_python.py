@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Arma la carpeta del Python Document Worker para dist/: código del worker + dependencias puras verificadas por SHA-256.
+"""Builds the Python Document Worker folder for dist/: worker code + pure dependencies verified by SHA-256.
 
-uso: python3 -I tools/power_engine/vendor_python.py <destino>
+usage: python3 -I tools/power_engine/vendor_python.py <target>
 
-- Sólo ruedas py3-none-any (sin binarios de una plataforma concreta).
-- 'cryptography' no se empaqueta (tiene binarios): se instala un sustituto que sólo falla si un PDF usa cifrado AES; si el equipo
-  tiene la biblioteca real, la del sistema gana (vendor va al FINAL de sys.path).
+- Only py3-none-any wheels (no platform-specific binaries).
+- 'cryptography' is not bundled (it has binaries): a stub is installed that only fails if a PDF uses AES encryption; if the machine
+  has the real library, the system one wins (vendor goes at the END of sys.path).
 """
 import hashlib
 import os
@@ -18,15 +18,15 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 SRC = os.path.join(ROOT, "workers", "python")
 WHEELS = os.path.join(SRC, "wheels")
 
-STUB = '''"""Sustituto empaquetado de cryptography: el worker no trae binarios. Sólo los PDF con cifrado AES lo necesitan."""
+STUB = '''"""Bundled cryptography stub: the worker ships no binaries. Only AES-encrypted PDFs need it."""
 
 
 class _NoCrypto(object):
     def __init__(self, *a, **k):
-        raise NotImplementedError("PDF con cifrado AES: no soportado por el Python Worker empaquetado (instale 'cryptography' en el equipo)")
+        raise NotImplementedError("AES-encrypted PDF: not supported by the bundled Python Worker (install 'cryptography' on the machine)")
 
     def __getattr__(self, name):
-        raise NotImplementedError("PDF con cifrado AES: no soportado por el Python Worker empaquetado")
+        raise NotImplementedError("AES-encrypted PDF: not supported by the bundled Python Worker")
 
 
 def default_backend():
@@ -63,22 +63,22 @@ def main(dest):
         p = os.path.join(WHEELS, name)
         got = sha256(p)
         if got != want:
-            sys.exit("hash distinto en %s: %s (esperado %s)" % (name, got, want))
+            sys.exit("hash mismatch in %s: %s (expected %s)" % (name, got, want))
         if not name.endswith("-py3-none-any.whl"):
-            sys.exit("sólo ruedas puras: " + name)
+            sys.exit("pure wheels only: " + name)
         with zipfile.ZipFile(p) as z:
             for m in z.namelist():
                 if ".dist-info/" in m and not m.endswith(("LICENSE", "METADATA")) and "licenses/" not in m:
                     continue
                 target = os.path.realpath(os.path.join(vendor, m))
                 if not target.startswith(os.path.realpath(vendor) + os.sep):
-                    sys.exit("entrada fuera del destino en " + name + ": " + m)
+                    sys.exit("entry outside the target in " + name + ": " + m)
                 z.extract(m, vendor)
     pkg = os.path.join(vendor, "cryptography")
     for sub in ("", "hazmat", os.path.join("hazmat", "backends"), os.path.join("hazmat", "primitives"), os.path.join("hazmat", "primitives", "ciphers")):
         os.makedirs(os.path.join(pkg, sub), exist_ok=True)
         with open(os.path.join(pkg, sub, "__init__.py"), "w", encoding="utf-8") as f:
-            f.write(STUB if sub.endswith("backends") or sub.endswith("ciphers") else '"""sustituto empaquetado (ver hazmat)"""\n')
+            f.write(STUB if sub.endswith("backends") or sub.endswith("ciphers") else '"""bundled stub (see hazmat)"""\n')
     print("python worker -> " + dest)
 
 

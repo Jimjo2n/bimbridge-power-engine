@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace BimBridge.PowerEngine.Workflows
 {
-    /// <summary>Un ancla: el mismo punto en la página (pt, espacio visible) y en el modelo (pies internos).</summary>
+    /// <summary>An anchor: the same point on the page (pt, visible space) and in the model (internal feet).</summary>
     public sealed class Anchor
     {
         public string Name;
@@ -18,17 +18,17 @@ namespace BimBridge.PowerEngine.Workflows
 
     public sealed class RegistrationOptions
     {
-        /// <summary>"semejanza" (escala uniforme + giro + traslación; lo normal en un plano a escala) o "afin" (6 parámetros).</summary>
+        /// <summary>"semejanza" (uniform scale + rotation + translation; the usual case for a scaled drawing) or "afin" (6 parameters).</summary>
         public string Mode = "semejanza";
-        /// <summary>Residuo máximo aceptable por ancla, en pies (por defecto 3").</summary>
+        /// <summary>Maximum acceptable residual per anchor, in feet (default 3").</summary>
         public double TolFt = 0.25;
-        /// <summary>Escala de Revit esperada (96 = 1/8"=1'-0") leída del cajetín; null = no se contrasta.</summary>
+        /// <summary>Expected Revit scale (96 = 1/8"=1'-0") read from the titleblock; null = not cross-checked.</summary>
         public double? ExpectedRevitScale;
         public double ScaleTolerance = 0.02;
-        /// <summary>Unidad de usuario del PDF (pt de página → pt reales).</summary>
+        /// <summary>PDF user unit (page pt → real pt).</summary>
         public double UserUnit = 1.0;
         public bool AllowReflection;
-        /// <summary>Transformación del vínculo (modelo del vínculo → anfitrión), 3×4; null = el plano se registra contra el anfitrión.</summary>
+        /// <summary>Link transform (link model → host), 3×4; null = the drawing is registered against the host.</summary>
         public double[] LinkTransform;
     }
 
@@ -42,7 +42,7 @@ namespace BimBridge.PowerEngine.Workflows
     public sealed class RegistrationResult
     {
         public string Estado = "ok", Motivo;
-        /// <summary>Página (pt, visible) → modelo (pies) como 3×4 (z se conserva). Incluye el vínculo si se dio.</summary>
+        /// <summary>Page (pt, visible) → model (feet) as 3×4 (z is preserved). Includes the link if one was given.</summary>
         public double[] M;
         public double FtPerPt, RotationDeg, Tx, Ty, RevitScale;
         public bool Reflected;
@@ -64,16 +64,16 @@ namespace BimBridge.PowerEngine.Workflows
     }
 
     /// <summary>
-    /// Registro plano–modelo. Calcula, por mínimos cuadrados, la transformación de puntos de página (pt, espacio visible del PDF) a
-    /// coordenadas del modelo (pies internos), mide el residuo de cada ancla, descarta anclas inválidas (una a una, la peor, mientras
-    /// queden más de las mínimas), comprueba la escala contra la del cajetín y compone con la transformación del vínculo.
-    /// Regla: un punto de página nunca se usa como coordenada de Revit sin pasar por aquí.
+    /// Drawing–model registration. Computes, by least squares, the transform from page points (pt, visible PDF space) to
+    /// model coordinates (internal feet), measures each anchor's residual, discards invalid anchors (one at a time, the worst, while
+    /// more than the minimum remain), checks the scale against the titleblock scale and composes with the link transform.
+    /// Rule: a page point is never used as a Revit coordinate without going through here.
     /// </summary>
     public static class Registration
     {
         public const double PtPerInch = 72.0;
 
-        /// <summary>Pies de modelo por punto de papel a una escala de Revit (96 → 1 pt = 96/864 ft).</summary>
+        /// <summary>Model feet per paper point at a Revit scale (96 → 1 pt = 96/864 ft).</summary>
         public static double FtPerPtAtScale(double revitScale, double userUnit = 1.0) => userUnit * revitScale / (PtPerInch * 12.0);
 
         public static RegistrationResult Solve(IList<Anchor> anchors, RegistrationOptions o = null)
@@ -84,10 +84,10 @@ namespace BimBridge.PowerEngine.Workflows
             var res = new RegistrationResult();
             var list = (anchors ?? new List<Anchor>()).Where(a => a != null).ToList();
             foreach (var a in list)
-                if (!Finite(a.Px, a.Py, a.Mx, a.My)) return Fail(res, "ancla_invalida", "el ancla " + a.Name + " tiene coordenadas no finitas");
+                if (!Finite(a.Px, a.Py, a.Mx, a.My)) return Fail(res, "ancla_invalida", "anchor " + a.Name + " has non-finite coordinates");
             var dupNames = list.GroupBy(a => a.Name ?? "").Where(g => g.Count() > 1 && g.Key.Length > 0).Select(g => g.Key).ToList();
-            if (dupNames.Count > 0) return Fail(res, "ancla_invalida", "anclas repetidas: " + string.Join(", ", dupNames));
-            if (list.Count < min) return Fail(res, "anclas_insuficientes", "hacen falta al menos " + min + " anclas (" + o.Mode + "); hay " + list.Count);
+            if (dupNames.Count > 0) return Fail(res, "ancla_invalida", "repeated anchors: " + string.Join(", ", dupNames));
+            if (list.Count < min) return Fail(res, "anclas_insuficientes", "at least " + min + " anchors are needed (" + o.Mode + "); there are " + list.Count);
 
             var used = new List<Anchor>(list);
             var outliers = new HashSet<Anchor>();
@@ -100,7 +100,7 @@ namespace BimBridge.PowerEngine.Workflows
                 if (m == null) return Fail(res, "degenerado", err);
                 var worst = used.OrderByDescending(a => Residual(m, a)).First();
                 var wr = Residual(m, worst);
-                // con el mínimo exacto de anclas el residuo es 0 por construcción: no se puede detectar un ancla mala
+                // with exactly the minimum number of anchors the residual is 0 by construction: a bad anchor cannot be detected
                 if (wr <= o.TolFt || used.Count <= min + 1) break;
                 used.Remove(worst); outliers.Add(worst);
             }
@@ -115,28 +115,28 @@ namespace BimBridge.PowerEngine.Workflows
             res.RevitScale = res.FtPerPt * PtPerInch * 12.0 / o.UserUnit;
             res.RotationDeg = Math.Atan2(m[4], m[0]) * 180.0 / Math.PI;
             res.Tx = m[3]; res.Ty = m[7];
-            if (affine && Math.Abs(sx - sy) / Math.Max(sx, sy) > 0.01) res.Warnings.Add("escala distinta en x e y (" + (sx / sy).ToString("0.####", CultureInfo.InvariantCulture) + "): plano deformado o anclas mal emparejadas");
-            if (used.Count == min) res.Warnings.Add("sólo " + min + " anclas: sin redundancia, un ancla mala no se detectaría");
-            if (outliers.Count > 0) res.Warnings.Add("anclas inválidas descartadas: " + string.Join(", ", outliers.Select(a => a.Name)));
-            if (refl) res.Warnings.Add("la mejor solución es un reflejo: la página o el modelo están en espejo");
+            if (affine && Math.Abs(sx - sy) / Math.Max(sx, sy) > 0.01) res.Warnings.Add("different scale in x and y (" + (sx / sy).ToString("0.####", CultureInfo.InvariantCulture) + "): distorted drawing or mismatched anchors");
+            if (used.Count == min) res.Warnings.Add("only " + min + " anchors: no redundancy, a bad anchor would not be detected");
+            if (outliers.Count > 0) res.Warnings.Add("invalid anchors discarded: " + string.Join(", ", outliers.Select(a => a.Name)));
+            if (refl) res.Warnings.Add("the best solution is a reflection: the page or the model is mirrored");
 
-            if (res.MaxFt > o.TolFt) Fail(res, "residuo_excesivo", "residuo máximo " + res.MaxFt.ToString("0.###", CultureInfo.InvariantCulture) + " ft > " + o.TolFt.ToString("0.###", CultureInfo.InvariantCulture) + " ft con " + used.Count + " anclas");
+            if (res.MaxFt > o.TolFt) Fail(res, "residuo_excesivo", "maximum residual " + res.MaxFt.ToString("0.###", CultureInfo.InvariantCulture) + " ft > " + o.TolFt.ToString("0.###", CultureInfo.InvariantCulture) + " ft with " + used.Count + " anchors");
             else if (o.ExpectedRevitScale.HasValue && Math.Abs(res.RevitScale / o.ExpectedRevitScale.Value - 1) > o.ScaleTolerance)
-                Fail(res, "escala_incoherente", "escala medida 1:" + res.RevitScale.ToString("0.##", CultureInfo.InvariantCulture) + " frente a 1:" + o.ExpectedRevitScale.Value.ToString("0.##", CultureInfo.InvariantCulture) + " del cajetín: anclas mal emparejadas o lámina no a escala");
+                Fail(res, "escala_incoherente", "measured scale 1:" + res.RevitScale.ToString("0.##", CultureInfo.InvariantCulture) + " versus 1:" + o.ExpectedRevitScale.Value.ToString("0.##", CultureInfo.InvariantCulture) + " from the titleblock: mismatched anchors or sheet not to scale");
             res.M = o.LinkTransform != null ? BimBridge.PowerEngine.GeometryKernels.Compose(o.LinkTransform, m) : m;
             return res;
         }
 
-        /// <summary>Verificación con anclas que NO se usaron para calcular (control independiente).</summary>
+        /// <summary>Verification with anchors that were NOT used in the fit (independent control).</summary>
         public static List<AnchorResidual> Check(RegistrationResult r, IEnumerable<Anchor> control) =>
             control.Select(a => new AnchorResidual { Name = a.Name, ResidualFt = Residual(r.M, a), Used = false }).ToList();
 
-        /// <summary>Empareja intersecciones de ejes de la página y del modelo por nombre ("A/1"). Sólo nombres presentes en ambos.</summary>
+        /// <summary>Pairs page and model grid intersections by name ("A/1"). Only names present in both.</summary>
         public static List<Anchor> AnchorsByName(IDictionary<string, (double X, double Y)> page, IDictionary<string, (double X, double Y)> model) =>
             page.Keys.Where(model.ContainsKey).OrderBy(k => k, StringComparer.Ordinal)
                 .Select(k => new Anchor(k, page[k].X, page[k].Y, model[k].X, model[k].Y)).ToList();
 
-        /// <summary>Intersecciones con nombre de ejes del modelo (cada eje: nombre y segmento en pies). Nombre "LETRA/NÚMERO".</summary>
+        /// <summary>Named intersections of model grids (each grid: name and segment in feet). Name "LETTER/NUMBER".</summary>
         public static Dictionary<string, (double X, double Y)> GridIntersections(IEnumerable<(string Name, double X0, double Y0, double X1, double Y1)> grids, double minAngleDeg = 20)
         {
             var g = grids.ToList();
@@ -155,7 +155,7 @@ namespace BimBridge.PowerEngine.Workflows
             return r;
         }
 
-        // ---------------- ajustes ----------------
+        // ---------------- fits ----------------
 
         private static double[] FitSimilarity(List<Anchor> a, bool allowReflection, out bool reflected, out string err)
         {
@@ -167,7 +167,7 @@ namespace BimBridge.PowerEngine.Workflows
             return m;
         }
 
-        /// <summary>Umeyama 2D: escala uniforme, giro y traslación de mínimos cuadrados (forma cerrada).</summary>
+        /// <summary>Umeyama 2D: least-squares uniform scale, rotation and translation (closed form).</summary>
         private static double[] Similarity(List<Anchor> a, bool reflect, out string err)
         {
             err = null;
@@ -179,7 +179,7 @@ namespace BimBridge.PowerEngine.Workflows
                 double dx = x.Px - pcx, dy = (reflect ? -x.Py : x.Py) - pcy, ex = x.Mx - mcx, ey = x.My - mcy;
                 sa += dx * ex + dy * ey; sb += dx * ey - dy * ex; sp += dx * dx + dy * dy; sm += ex * ex + ey * ey;
             }
-            if (sp < 1e-6 * n || sm < 1e-9 * n) { err = "las anclas coinciden (sin separación en la página o en el modelo): no definen escala ni giro"; return null; }
+            if (sp < 1e-6 * n || sm < 1e-9 * n) { err = "the anchors coincide (no separation on the page or in the model): they define neither scale nor rotation"; return null; }
             double c = sa / sp, s = sb / sp;
             var f = reflect ? -1.0 : 1.0;
             // x' = c·px − s·(f·py) + tx ; y' = s·px + c·(f·py) + ty
@@ -190,7 +190,7 @@ namespace BimBridge.PowerEngine.Workflows
         private static double[] FitAffine(List<Anchor> a, out string err)
         {
             err = null;
-            // normales: [Σxx Σxy Σx; Σxy Σyy Σy; Σx Σy n]·[a b c] = [Σx·X Σy·X ΣX]
+            // normal equations: [Σxx Σxy Σx; Σxy Σyy Σy; Σx Σy n]·[a b c] = [Σx·X Σy·X ΣX]
             double sxx = 0, sxy = 0, syy = 0, sx = 0, sy = 0, n = a.Count, sxX = 0, syX = 0, sX = 0, sxY = 0, syY = 0, sY = 0;
             foreach (var p in a)
             {
@@ -200,7 +200,7 @@ namespace BimBridge.PowerEngine.Workflows
             var A = new[,] { { sxx, sxy, sx }, { sxy, syy, sy }, { sx, sy, n } };
             var det = Det3(A);
             var scale = Math.Max(1, sxx + syy);
-            if (Math.Abs(det) < 1e-9 * scale * scale * n) { err = "anclas alineadas: un ajuste afín necesita 3 anclas no colineales"; return null; }
+            if (Math.Abs(det) < 1e-9 * scale * scale * n) { err = "collinear anchors: an affine fit needs 3 non-collinear anchors"; return null; }
             var r1 = Solve3(A, new[] { sxX, syX, sX }); var r2 = Solve3(A, new[] { sxY, syY, sY });
             return new[] { r1[0], r1[1], 0, r1[2], r2[0], r2[1], 0, r2[2], 0, 0, 1, 0 };
         }

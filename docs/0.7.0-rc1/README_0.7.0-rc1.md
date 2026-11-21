@@ -1,27 +1,27 @@
-# Bimbridge 0.7.0-rc1 — candidato interno · NATIVE_ACCEPTANCE_PENDING
+# Bimbridge 0.7.0-rc1 — internal candidate · NATIVE_ACCEPTANCE_PENDING
 
-Rama `feature/0.7.0-rc1`, que nace de `v0.7.0-beta1.1` (c2aca78). **No hay tag `v0.7.0-rc1`**: se pone solo cuando la campaña nativa apruebe.
-Toda prueba contra Revit queda `BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION`.
+Branch `feature/0.7.0-rc1`, branched from `v0.7.0-beta1.1` (c2aca78). **There is no `v0.7.0-rc1` tag**: it is only applied when the native campaign passes.
+Every test against Revit is `BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION`.
 
-## Matriz de funcionalidades
-| Capacidad | Operación IR / comando | Riesgo | Validación sin Revit | Validación nativa |
+## Feature matrix
+| Capability | IR operation / command | Risk | Validation without Revit | Native validation |
 |---|---|---|---|---|
-| Consulta tipada con conteo | `consultar` | Lectura | FakeBim | NRT-06 (pendiente) |
-| Lectura paginada del alcance (hasta 50×200) con detección de cambios entre páginas | interna de RevitBackend | Lectura | FakeBim (2 por página, total que cambia) | NRT-06 (pendiente) |
-| Escritura de un parámetro (texto) | `fijar_parametro` | Escritura persistente | FakeBim + simulador | NRT-05 run2 APROBADA (beta1.1); regresión pendiente |
-| **Escritura por lotes** (valor distinto por id, 1 plan y 1 commit, ≤200) | `fijar_parametro_lote` | Escritura persistente | FakeBim, simulador, muerte del proceso en 2 puntos | NRT-06 (pendiente) |
-| **QC de luminarias y etiquetas** (sin tag + huérfanas + duplicadas sobrantes = 0) | `verificar_qc receta=qc_luminarias_tags` | Lectura (`check lighting_audit` existente) | FakeBim (4 casos) | NRT-06 (pendiente) |
-| Plan multi-operación con dependencias y postcondiciones por operación | PlanRunner (existente) | — | FakeBim + simulador | NRT-06 (pendiente) |
-| Autorización por documento y operación | GrantStore + `RealWrites` del operador + huella del documento | — | FakeBim | NRT-06 (pendiente) |
-| Cancelación, pausa y reanudación | PlanRunner/servicio (existente) | — | pruebas existentes | — |
-| Reconciliación de resultados inciertos | Observe → `requiere_verificacion`/`requiere_reconciliar` | — | simulador + FakeBim | NRT-03 (pendiente) |
-| Idempotencia tras reiniciar el AgentHost | diario + clave `opId#fencing` + diario del add-in | — | 5 puntos de caída (FakeBim), procesos reales (simulador) | NRT-03 (pendiente) |
-| Persistencia en disco | `doc verificar_disco` con copia estable | Lectura de archivo | archivos sintéticos con modificación concurrente | NRT-05 (pendiente de regresión) |
+| Typed query with count | `consultar` | Read | FakeBim | NRT-06 (pending) |
+| Paged read of the scope (up to 50×200) with change detection between pages | internal to RevitBackend | Read | FakeBim (2 per page, changing total) | NRT-06 (pending) |
+| Write of one parameter (text) | `fijar_parametro` | Persistent write | FakeBim + simulator | NRT-05 run2 PASSED (beta1.1); regression pending |
+| **Batch write** (different value per id, 1 plan and 1 commit, ≤200) | `fijar_parametro_lote` | Persistent write | FakeBim, simulator, process death at 2 points | NRT-06 (pending) |
+| **Lighting fixture and tag QC** (untagged + orphans + extra duplicates = 0) | `verificar_qc receta=qc_luminarias_tags` | Read (existing `check lighting_audit`) | FakeBim (4 cases) | NRT-06 (pending) |
+| Multi-operation plan with dependencies and per-operation postconditions | PlanRunner (existing) | — | FakeBim + simulator | NRT-06 (pending) |
+| Per-document and per-operation authorization | GrantStore + the operator's `RealWrites` + document fingerprint | — | FakeBim | NRT-06 (pending) |
+| Cancellation, pause and resume | PlanRunner/service (existing) | — | existing tests | — |
+| Reconciliation of uncertain results | Observe → `requiere_verificacion`/`requiere_reconciliar` | — | simulator + FakeBim | NRT-03 (pending) |
+| Idempotency after restarting the AgentHost | journal + `opId#fencing` key + add-in journal | — | 5 crash points (FakeBim), real processes (simulator) | NRT-03 (pending) |
+| Persistence on disk | `doc verificar_disco` with a stable copy | File read | synthetic files with concurrent modification | NRT-05 (regression pending) |
 
-**Existen en el add-in pero el AgentHost no las ejecuta en rc1:** etiquetado tipado, `parametro_por_lote` y `qc_manifiesto` (recetas del motor de tareas), y la exportación (`doc pdf`). `RevitTaskAdapter` las mapea de forma determinista y se niega a ejecutarlas. Conectarlas exige ampliar contratos con validación nativa inmediata, así que pasan a 0.7.0 estable o 0.8.0 según la campaña. `fijar_parametro_lote` cubre en IR el caso de `parametro_por_lote` para parámetros de texto.
+**They exist in the add-in but the AgentHost does not run them in rc1:** typed tagging, `parametro_por_lote` and `qc_manifiesto` (task engine recipes), and export (`doc pdf`). `RevitTaskAdapter` maps them deterministically and refuses to run them. Connecting them requires widening contracts with immediate native validation, so they move to 0.7.0 stable or 0.8.0 depending on the campaign. `fijar_parametro_lote` covers the `parametro_por_lote` case in IR for text parameters.
 
-**No incluido:** ejecución arbitraria de C# como sustituto de lo tipado, un segundo motor de transacciones, Python y Rust.
+**Not included:** arbitrary C# execution as a substitute for typed operations, a second transaction engine, Python and Rust.
 
-## Comandos nuevos
-- `agenthost revit nrt03 | nrt06`: arneses de campaña, ver `CAMPANA_NATIVA_rc1.md`.
-- Compuerta: todo `agenthost revit …` y `ejecutar --revit-pid` exigen `BIMBRIDGE_REVIT_NATIVE=AUTORIZADO` **y** `--revit-disponible`. Sin ambas, no conectan e imprimen el estado BLOCKED.
+## New commands
+- `agenthost revit nrt03 | nrt06`: campaign harnesses, see `CAMPANA_NATIVA_rc1.md`.
+- Gate: every `agenthost revit …` and `ejecutar --revit-pid` require `BIMBRIDGE_REVIT_NATIVE=AUTORIZADO` **and** `--revit-disponible`. Without both, they do not connect and print the BLOCKED status.

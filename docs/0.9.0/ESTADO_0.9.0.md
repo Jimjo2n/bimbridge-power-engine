@@ -1,88 +1,88 @@
-# BIMBRIDGE 0.9.0 — estado
+# BIMBRIDGE 0.9.0 — status
 
-**Estado:** candidato interno **NATIVE_ACCEPTANCE_PENDING**. Rama `feature/0.9.0` desde 0.8.0 (2413aec), que también sigue NATIVE_ACCEPTANCE_PENDING. Nada de 0.8.0 ni de 0.9.0 se ha ejecutado en Revit: toda prueba nativa está **BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION**. Los números de este documento salen de pruebas sin Revit o de mediciones en un contenedor Linux; ninguno es evidencia nativa.
+**Status:** internal candidate **NATIVE_ACCEPTANCE_PENDING**. Branch `feature/0.9.0` from 0.8.0 (2413aec), which is also still NATIVE_ACCEPTANCE_PENDING. Nothing in 0.8.0 or 0.9.0 has run in Revit: every native test is **BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION**. The numbers in this document come from tests without Revit or from measurements in a Linux container; none is native evidence.
 
-Arquitectura: [POWER_ENGINE_ARCHITECTURE.md](POWER_ENGINE_ARCHITECTURE.md). Trazabilidad: [MATRIZ_TRAZABILIDAD_0.9.0.md](MATRIZ_TRAZABILIDAD_0.9.0.md). Campaña nativa: `tools/aceptacion/0.9.0/PROCEDIMIENTO_0.9.0.md`.
+Architecture: [POWER_ENGINE_ARCHITECTURE.md](POWER_ENGINE_ARCHITECTURE.md). Traceability: [MATRIZ_TRAZABILIDAD_0.9.0.md](MATRIZ_TRAZABILIDAD_0.9.0.md). Native campaign: `tools/acceptance/0.9.0/PROCEDURE_0.9.0.md`.
 
-## 1. Correcciones de 0.8.0
+## 1. Fixes to 0.8.0
 
-| Id | Corrección | Prueba |
+| Id | Fix | Test |
 |---|---|---|
-| P0-1 | Actualizaciones con procedencia criptográfica (RSA-SHA256 contra claves de confianza) obligatoria en producción; la firma y los hashes se re-verifican antes de instalar | ZipUpdateTests (16) |
-| P0-2 | Paquete sin firma sólo en el perfil de laboratorio con `actualizacion_sin_firma` explícito; un paquete preparado en laboratorio se rechaza en producción | ZipUpdateTests |
-| P0-3 | Independencia QA/QC demostrable: SHA-256 y linaje distintos de la construcción; si no, `no_independiente` | Hardening090Tests, PdfToModelWorkflowTests |
-| P0-4 | Recibos críticos de exportación y entrega con revisión, origen y evidencia COMPROBADO | Hardening090Tests |
-| P1-5 | Draw2D: geometría degenerada y tramos colineales superpuestos rechazados | Hardening090Tests |
-| P1-6 | Prueba intermitente de Retener (HeldCommit) estabilizada | suite completa |
-| P1-7 | Referencias B1/B8 corregidas frente al procedimiento | Hardening090Tests |
+| P0-1 | Updates with mandatory cryptographic provenance (RSA-SHA256 against trusted keys) in production; the signature and hashes are re-verified before installing | ZipUpdateTests (16) |
+| P0-2 | Unsigned package only in the lab profile with explicit `actualizacion_sin_firma`; a package staged in the lab is rejected in production | ZipUpdateTests |
+| P0-3 | Demonstrable QA/QC independence: SHA-256 and lineage different from the construction; otherwise `no_independiente` | Hardening090Tests, PdfToModelWorkflowTests |
+| P0-4 | Critical export and delivery receipts with revision, origin and COMPROBADO (verified) evidence | Hardening090Tests |
+| P1-5 | Draw2D: degenerate geometry and overlapping collinear segments rejected | Hardening090Tests |
+| P1-6 | Flaky Hold test (HeldCommit) stabilized | full suite |
+| P1-7 | B1/B8 references corrected against the procedure | Hardening090Tests |
 
-Cambio de comportamiento: en producción, `exec ejecutar/ensayo` exige el SHA-256 del código en `codigo_autorizado`.
+Behavior change: in production, `exec ejecutar/ensayo` requires the SHA-256 of the code in `codigo_autorizado`.
 
-## 2. Nuevo en 0.9.0
+## 2. New in 0.9.0
 
-- **Power Engine** (C# núcleo, Python documentos, Rust geometría) con contrato pe=1, despachador por coste medido, registro de capacidades y degradación controlada.
+- **Power Engine** (C# core, Python documents, Rust geometry) with the pe=1 contract, a dispatcher by measured cost, a capability registry and controlled degradation.
 - **Python Document Worker**: `pdf_info`, `pdf_extract`, `pdf_tables`, `pdf_symbols`, `pdf_grids`, `docx_extract`.
-- **Rust Geometry Engine** por FFI (DLL) e IPC (proceso): `transform3`, `nearest`, `match`, `duplicates`, `segment_contacts`, `components`.
-- **Flujo PDF → modelo**: ejes y anclas, registro plano–modelo, plan de colocación determinista, ops `place` para `plan`→`commit`, verificación independiente.
-- **Motores**: red MEP en tres capas, montantes (diagrama ≠ físico), grupos y variantes, distribución de etiquetas.
-- **Herramienta `power`** en el perfil compacto: `cap`, `estado`, `pdf …`, `docx`, `flujo`, `red`. No cambia el modelo.
+- **Rust Geometry Engine** via FFI (DLL) and IPC (process): `transform3`, `nearest`, `match`, `duplicates`, `segment_contacts`, `components`.
+- **PDF → model workflow**: grids and anchors, drawing–model registration, deterministic placement plan, `place` ops for `plan`→`commit`, independent verification.
+- **Engines**: three-layer MEP network, risers (diagram ≠ physical), groups and variants, tag distribution.
+- **`power` tool** in the compact profile: `cap`, `estado`, `pdf …`, `docx`, `flujo`, `red`. It does not change the model.
 - **AgentHost**: `power-engine estado | flujo-pdf | bench | calibrar`.
-- **Instalador y build**: DLL y exe de Rust para Windows y Python Worker con dependencias puras fijadas por SHA-256 se instalan junto al puente, verificados por hash.
+- **Installer and build**: Rust DLL and exe for Windows and the Python Worker with pure dependencies pinned by SHA-256 are installed next to the bridge, verified by hash.
 
-## 3. Pruebas
+## 3. Tests
 
-| Conjunto | Resultado |
+| Set | Result |
 |---|---|
-| C# (xUnit, sin Revit) | **505/505** |
-| Python Worker (unittest, subproceso real) | **30/30** |
+| C# (xUnit, without Revit) | **505/505** |
+| Python Worker (unittest, real subprocess) | **30/30** |
 | Rust (cargo test) | **6/6** |
-| Add-in | compila para Revit 2022–2026; los scripts `*_090.cs` compilan contra los 5 años |
-| Nativas 0.9.0 | **0 ejecutadas**. N9-01…N9-06 y benchmark en el PC: BLOCKED |
-| BIMBRIDGE frente a pyRevit (B1–B8) | DEFERRED: comparación reproducible pendiente en un entorno aislado |
+| Add-in | compiles for Revit 2022–2026; the `*_090.cs` scripts compile against all 5 years |
+| 0.9.0 native | **0 run**. N9-01…N9-06 and the benchmark on the PC: BLOCKED |
+| BIMBRIDGE versus pyRevit (B1–B8) | DEFERRED: reproducible comparison pending in an isolated environment |
 
-## 4. Rendimiento medido (contenedor Linux x64, 4 CPU; no es el equipo de prueba)
+## 4. Measured performance (Linux x64 container, 4 CPUs; not the test machine)
 
-Mediana de 5 rondas, ms. Archivo completo: `bench_power_engine_2026-11-04_linux4cpu.json`.
+Median of 5 rounds, ms. Full file: `bench_power_engine_2026-11-04_linux4cpu.json`.
 
-| Trabajo | n | C# | Rust FFI | Rust IPC | FFI frente a C# |
+| Job | n | C# | Rust FFI | Rust IPC | FFI vs C# |
 |---|---|---|---|---|---|
-| nearest | 1 000 | 1,33 | 0,16 | 2,20 | ×8,1 |
-| nearest | 100 000 | 85,0 | 13,2 | — | ×6,5 |
-| match | 100 000 | 66,6 | 19,3 | — | ×3,5 |
-| duplicates | 100 000 | 87,1 | 35,3 | — | ×2,5 |
-| segment_contacts | 20 000 | 37,6 | 3,3 | 32,6 | ×11,3 |
-| transform3 | 100 000 | 1,87 | 2,21 | — | ×0,85 |
-| components | 100 000 | 4,6 | 3,6 | — | ×1,3 |
+| nearest | 1,000 | 1.33 | 0.16 | 2.20 | ×8.1 |
+| nearest | 100,000 | 85.0 | 13.2 | — | ×6.5 |
+| match | 100,000 | 66.6 | 19.3 | — | ×3.5 |
+| duplicates | 100,000 | 87.1 | 35.3 | — | ×2.5 |
+| segment_contacts | 20,000 | 37.6 | 3.3 | 32.6 | ×11.3 |
+| transform3 | 100,000 | 1.87 | 2.21 | — | ×0.85 |
+| components | 100,000 | 4.6 | 3.6 | — | ×1.3 |
 
-- Coste fijo por llamada: C# 0,0002 ms, Rust FFI 0,0002 ms, Rust IPC 0,14 ms. IPC sólo compensa para aislar un fallo, no por velocidad.
-- Calibración por defecto (medida, 3 campañas): Rust FFI desde n=100 en nearest, match, duplicates y segment_contacts; transform3 y components se quedan en C# (Rust no gana en todos los tamaños). En el PC se recalibra con `power-engine calibrar`.
-- Documentos: DOCX .NET 0,19 ms frente a Python 0,92 ms (el despachador usa .NET si no hay Python); arranque de Python más primer trabajo 71 ms; PDF sintético de una lámina 28–34 ms por trabajo.
-- Flujo PDF→plan completo (dos trabajos Python + registro + plan) en las pruebas: segundos de suite, sin medición aislada en el PC.
+- Fixed cost per call: C# 0.0002 ms, Rust FFI 0.0002 ms, Rust IPC 0.14 ms. IPC only pays off to isolate a failure, not for speed.
+- Default calibration (measured, 3 campaigns): Rust FFI from n=100 for nearest, match, duplicates and segment_contacts; transform3 and components stay in C# (Rust does not win at every size). On the PC it is recalibrated with `power-engine calibrar`.
+- Documents: DOCX .NET 0.19 ms versus Python 0.92 ms (the dispatcher uses .NET if there is no Python); Python startup plus first job 71 ms; synthetic single-sheet PDF 28–34 ms per job.
+- Full PDF→plan workflow (two Python jobs + registration + plan) in the tests: seconds of suite time, no isolated measurement on the PC.
 
-## 5. Eficiencia de tokens (ESTIMADOS = caracteres/4; no son tokens reales del cliente)
+## 5. Token efficiency (ESTIMATED = characters/4; not real client tokens)
 
-| Caso | Antes | Ahora | Reducción |
+| Case | Before | Now | Reduction |
 |---|---|---|---|
-| Descubrimiento: catálogo completo frente a búsqueda + una ficha | 2 253 | 402 | 82 % |
-| Colocar 72 luminarias: 72 órdenes sueltas frente a un lote | 10 260 caracteres, 72 llamadas | 959 caracteres, 1 llamada | 91 % de caracteres, 99 % de llamadas |
-| `power flujo`: respuesta sin ítems uno a uno (sólo resumen, ambiguos y ops) | — | < 20 000 caracteres para 72 elementos | — |
-| Coste fijo de la herramienta `power` en la lista de herramientas | 6 778 caracteres | ≈ 7 400 | +9 % |
+| Discovery: full catalog versus search + one card | 2,253 | 402 | 82 % |
+| Placing 72 lighting fixtures: 72 separate commands versus one batch | 10,260 characters, 72 calls | 959 characters, 1 call | 91 % of characters, 99 % of calls |
+| `power flujo`: response without one-by-one items (summary, ambiguous items and ops only) | — | < 20,000 characters for 72 elements | — |
+| Fixed cost of the `power` tool in the tool list | 6,778 characters | ≈ 7,400 | +9 % |
 
-La verificación no se recorta para ahorrar tokens: el diff es compacto, pero cada diferencia se comprueba.
+Verification is not trimmed to save tokens: the diff is compact, but every difference is checked.
 
-## 6. Limitaciones
+## 6. Limitations
 
-- Ninguna operación se ha ejecutado en Revit 0.9.0; colocación, etiquetas y lecturas nativas pueden diferir por versión.
-- PDF: sólo vectoriales. Escaneados → `SIN_CONTENIDO` (interpretación por visión requiere autorización). Tablas sin reglas no se detectan. Símbolos son candidatos, no luminarias confirmadas.
-- Registro: necesita ejes con burbuja y nombre igual en plano y modelo; ejes curvos no son anclas.
-- `mep.riser`, `groups.variants` y `annot.layout` sólo como biblioteca (sin orden `power` todavía); `annot.layout` es EXPERIMENTAL.
-- El intérprete de Python no se empaqueta; PDF con cifrado AES requiere `cryptography` en el equipo.
-- Benchmarks medidos en Linux; el PC con Windows puede dar otros umbrales.
-- B1–B8 frente a pyRevit: NO_MEDIDO.
+- No operation has run in Revit for 0.9.0; placement, tags and native reads may differ by version.
+- PDF: vector only. Scanned → `SIN_CONTENIDO` (vision-based interpretation requires authorization). Tables without rules are not detected. Symbols are candidates, not confirmed lighting fixtures.
+- Registration: needs grids with bubbles and the same name in the drawing and the model; curved grids are not anchors.
+- `mep.riser`, `groups.variants` and `annot.layout` only as a library (no `power` command yet); `annot.layout` is EXPERIMENTAL.
+- The Python interpreter is not packaged; AES-encrypted PDFs require `cryptography` on the machine.
+- Benchmarks measured on Linux; the Windows PC may give other thresholds.
+- B1–B8 versus pyRevit: NO_MEDIDO (not measured).
 
-## 7. Siguiente fase
+## 7. Next phase
 
-1. Con autorización: campaña N9 en una copia desechable y benchmark en el PC.
-2. Órdenes `power` para montantes, grupos y anotaciones, y lectura nativa de ejes y conduit integrada en `flujo`.
-3. Tablas sin reglas y lectura de leyendas multilínea.
-4. B1–B8 frente a pyRevit requieren un entorno aislado, versiones identificadas y cargas comparables.
+1. With authorization: N9 campaign on a disposable copy and benchmark on the PC.
+2. `power` commands for risers, groups and annotations, and native reading of grids and conduit integrated into `flujo`.
+3. Tables without rules and reading of multi-line legends.
+4. B1–B8 versus pyRevit require an isolated environment, identified versions and comparable workloads.

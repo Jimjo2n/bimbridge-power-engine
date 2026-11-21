@@ -17,13 +17,13 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Bench
 {
     /// <summary>
-    /// Auditoría de eficiencia sin Revit. Mide lo que es del MCP (motor, formato, lo que ve la IA) sobre un edificio sintético
-    /// del tamaño de SAMPLE PROJECT. Lo que depende de Revit (extraer sólidos, exportar imágenes) NO se mide aquí: se mide en la PC
-    /// con el diario del add-in.
+    /// Efficiency audit without Revit. Measures what belongs to the MCP (engine, format, what the AI sees) on a synthetic building
+    /// the size of SAMPLE PROJECT. What depends on Revit (extracting solids, exporting images) is NOT measured here: it is measured on the PC
+    /// with the add-in journal.
     /// </summary>
     public static class Program
     {
-        private const double CharsPerToken = 3.2; // estimación única para todo (JSON/código en español); sólo importan las proporciones
+        private const double CharsPerToken = 3.2; // single estimate for everything (JSON/code); only the ratios matter
 
         public static async Task<int> Main(string[] args)
         {
@@ -52,13 +52,13 @@ namespace Bimbridge.Bench
         }
 
         // =====================================================================================================
-        // Geometría: edificio sintético + 1442 luminarias, montaje en 9 puntos
+        // Geometry: synthetic building + 1442 fixtures, mounting at 9 points
         // =====================================================================================================
 
         private sealed class Scene
         {
             public readonly List<GeoBody> Bodies = new List<GeoBody>();
-            public readonly List<double[]> Raw = new List<double[]>();   // triángulos de cada cuerpo (para la fuerza bruta)
+            public readonly List<double[]> Raw = new List<double[]>();   // triangles of each body (for brute force)
             public readonly List<GeoTarget> Targets = new List<GeoTarget>();
             public readonly List<TriMeshBuilder> Builders = new List<TriMeshBuilder>();
             public readonly List<TriMeshBuilder> TargetBuilders = new List<TriMeshBuilder>();
@@ -85,13 +85,13 @@ namespace Bimbridge.Bench
                 ["generar_ms"] = sw.ElapsedMilliseconds,
             };
 
-            // 1) Mallas → BVH (en Revit esto se hace una vez por cuerpo y queda en caché)
+            // 1) Meshes → BVH (in Revit this is done once per body and stays cached)
             sw.Restart();
             for (var i = 0; i < scene.Bodies.Count; i++) scene.Bodies[i].Mesh = scene.Builders[i].Build();
             for (var i = 0; i < scene.Targets.Count; i++) scene.Targets[i].Body = scene.TargetBuilders[i].Build();
             d["mallas_bvh_ms"] = sw.ElapsedMilliseconds;
 
-            // 2) Candidatos por rejilla 2D (lo que hace el índice del add-in)
+            // 2) Candidates via 2D grid (what the add-in index does)
             sw.Restart();
             Candidates(scene);
             d["candidatos_ms"] = sw.ElapsedMilliseconds;
@@ -99,7 +99,7 @@ namespace Bimbridge.Bench
 
             var spec = GeoSpec.Parse(new Dictionary<string, object> { ["name"] = "montaje" });
 
-            // 3) Montaje 9 puntos: SIMD y escalar, en paralelo y en un hilo
+            // 3) 9-point mounting: SIMD and scalar, parallel and single-threaded
             var runs = new Dictionary<string, object>();
             List<Dictionary<string, object>> rows = null;
             foreach (var (label, simd, parallel) in new[] { ("simd_paralelo", true, true), ("escalar_paralelo", false, true), ("simd_1hilo", true, false), ("escalar_1hilo", false, false) })
@@ -126,7 +126,7 @@ namespace Bimbridge.Bench
             TriMesh.SimdEnabled = true;
             d["montaje_ms"] = runs;
 
-            // Exactitud contra lo sembrado (sabemos la holgura real de cada luminaria)
+            // Accuracy against what was planted (we know the real clearance of each fixture)
             var byClass = rows.GroupBy(r => (string)r["clase"]).ToDictionary(g => g.Key, g => (object)(long)g.Count());
             d["clases"] = byClass;
             string Expected(string planted) => planted == "flotando" ? MountClass.Floating : planted == "empotrada" ? MountClass.Embedded : MountClass.Ok;
@@ -140,7 +140,7 @@ namespace Bimbridge.Bench
             d["aciertos"] = Math.Round(1 - (double)wrong.Count / rows.Count, 4);
             if (wrong.Count > 0) d["distintas"] = wrong.Take(6).ToList();
 
-            // 4) Lo que haría un script tipo pyRevit: cada luminaria × cada punto × TODOS los cuerpos × todos sus triángulos (sin índice)
+            // 4) What a pyRevit-style script would do: each fixture × each point × ALL bodies × all their triangles (no index)
             var sample = scene.Targets.Where((t, i) => i % 10 == 0).ToList();
             sw.Restart();
             long tests = 0;
@@ -158,7 +158,7 @@ namespace Bimbridge.Bench
             var simdPar = runs.TryGetValue("simd_paralelo", out var sp) ? Convert.ToDouble(sp) : Convert.ToDouble(runs["escalar_paralelo"]);
             d["aceleracion_vs_fuerza_bruta"] = Math.Round(bruteFull / Math.Max(0.01, simdPar), 0);
 
-            // 5) Resumen para la IA (conteos + problemas primero, 100 filas) y su tamaño
+            // 5) Summary for the AI (counts + problems first, 100 rows) and its size
             var cols = new List<string> { "id", "lvl", "clase", "gap", "gap_max", "pts", "contra", "pend", "cuerpo" };
             var setNames = new Dictionary<string, string> { [MountClass.Embedded] = "$empotradas", [MountClass.Floating] = "$flotando", [MountClass.NoSurface] = "$sin_superficie" };
             sw.Restart();
@@ -171,7 +171,7 @@ namespace Bimbridge.Bench
             d["respuesta_compacta_25_filas_chars"] = (long)CompactText.Write(GeoSummary.Build(spec, rows, cols, "clase", setNames, out _)).Length;
             spec.PageSize = ps;
             d["respuesta_tokens_est"] = (long)Math.Round(text.Length / CharsPerToken);
-            // La misma información como la imprimía un script (una línea por luminaria con id, nivel, clase y holgura)
+            // The same information as a script printed it (one line per fixture with id, level, class and clearance)
             var naive = new StringBuilder();
             foreach (var r in rows) naive.Append(r["id"]).Append(" ").Append(r["lvl"]).Append(" ").Append(r["clase"]).Append(" gap=").Append(Convert.ToString(r["gap"], CultureInfo.InvariantCulture)).Append('\n');
             d["salida_linea_por_luminaria_chars"] = (long)naive.Length;
@@ -192,20 +192,20 @@ namespace Bimbridge.Bench
                 s.Triangles += raw.Count / 9;
             }
             var levelZ = new double[levels + 1];
-            for (var l = 0; l <= levels; l++) levelZ[l] = l * F2F + (l > 0 ? 11.3 : 0); // L1 doble altura
+            for (var l = 0; l <= levels; l++) levelZ[l] = l * F2F + (l > 0 ? 11.3 : 0); // L1 double height
             var slabBottom = new Dictionary<int, Func<double, double, double>>();
             var beams = new List<(int lvl, double x0, double y0, double x1, double y1, double zb)>();
             for (var l = 1; l <= levels; l++)
             {
                 var z = levelZ[l];
-                var ramp = l >= 2 && l <= 4; // rampas de estacionamiento: la losa baja 1:20 en una franja
+                var ramp = l >= 2 && l <= 4; // parking ramps: the slab drops 1:20 along a strip
                 Func<double, double, double> bottom = (x, y) => ramp && x > 200 ? z - T - (x - 200) * 0.05 : z - T;
                 slabBottom[l] = bottom;
                 var b = new TriMeshBuilder(); var raw = new List<double>();
                 Grid(b, raw, 0, 0, W, D, nx, ny, (x, y) => bottom(x, y) + T, up: true);
                 Grid(b, raw, 0, 0, W, D, nx, ny, bottom, up: false);
-                AddBody(ramp ? "Ramps" : "Floors", "Losa L" + l, b, raw, new Box3(0, 0, z - T - 5.5, W, D, z));
-                // vigas bajo la losa (separadas de los ejes de luminarias para que haya de todo)
+                AddBody(ramp ? "Ramps" : "Floors", "Slab L" + l, b, raw, new Box3(0, 0, z - T - 5.5, W, D, z));
+                // beams under the slab (offset from the fixture rows so every case occurs)
                 for (var i = 0; i < 24; i++)
                 {
                     var alongX = i < 14;
@@ -215,24 +215,24 @@ namespace Bimbridge.Bench
                     var zb = bottom((x0 + x1) / 2, (y0 + y1) / 2) - 2.0;
                     var bb = new TriMeshBuilder(); var rb = new List<double>();
                     BoxFaces(bb, rb, x0, y0, zb, x1, y1, bottom((x0 + x1) / 2, (y0 + y1) / 2));
-                    AddBody("StructuralFraming", "Viga L" + l + "-" + i, bb, rb, new Box3(x0, y0, zb, x1, y1, z - T));
+                    AddBody("StructuralFraming", "Beam L" + l + "-" + i, bb, rb, new Box3(x0, y0, zb, x1, y1, z - T));
                     beams.Add((l, x0, y0, x1, y1, zb));
                 }
-                // dos escaleras (caja escalonada de 16 peldaños)
+                // two stairs (stepped box with 16 treads)
                 for (var k = 0; k < 2; k++)
                 {
                     var sb = new TriMeshBuilder(); var rs = new List<double>();
                     double sx = 20 + k * 240, sy = 150;
                     for (var st = 0; st < 16; st++)
                         BoxFaces(sb, rs, sx + st * 0.9, sy, levelZ[l - 1] + st * F2F / 16 - 0.6, sx + st * 0.9 + 0.9, sy + 4, levelZ[l - 1] + (st + 1) * F2F / 16);
-                    AddBody("Stairs", "Escalera L" + l + "-" + k, sb, rs, new Box3(sx, sy, levelZ[l - 1] - 0.6, sx + 14.4, sy + 4, levelZ[l]));
+                    AddBody("Stairs", "Stair L" + l + "-" + k, sb, rs, new Box3(sx, sy, levelZ[l - 1] - 0.6, sx + 14.4, sy + 4, levelZ[l]));
                 }
             }
 
-            // Luminarias: bajo la losa del nivel de arriba. Holgura sembrada: 70 % a ras, 15 % flotando, 10 % empotradas, 5 % bajo viga.
+            // Fixtures: under the slab of the level above. Planted clearance: 70 % flush, 15 % floating, 10 % embedded, 5 % under a beam.
             for (var i = 0; i < fixtures; i++)
             {
-                var l = 1 + i % (levels - 1);           // luminaria en el nivel l, la losa de arriba es l+1
+                var l = 1 + i % (levels - 1);           // fixture on level l, the slab above is l+1
                 double x, y;
                 var kind = rnd.NextDouble();
                 string planted;
@@ -241,14 +241,14 @@ namespace Bimbridge.Bench
                 var strip = rnd.NextDouble() < 0.6;
                 double hx = strip ? 2.0 : 0.25, hy = strip ? 0.33 : 0.25, h = strip ? 0.33 : 0.25;
                 var top = slabBottom[l + 1](x, y);
-                // en rampa manda la esquina más baja
+                // on a ramp the lowest corner governs
                 top = Math.Min(top, Math.Min(slabBottom[l + 1](x - hx, y), slabBottom[l + 1](x + hx, y)));
                 if (kind < 0.70) planted = "a_ras";
                 else if (kind < 0.85) { planted = "flotando"; top -= 0.1 + rnd.NextDouble() * 0.9; }
                 else if (kind < 0.95) { planted = "empotrada"; top += 0.05 + rnd.NextDouble() * 0.25; }
                 else
                 {
-                    // bajo una viga en X, lejos de las vigas en Y y fuera de la rampa (la viga es recta; la losa en rampa baja)
+                    // under an X beam, away from the Y beams and off the ramp (the beam is straight; the ramp slab drops)
                     planted = "bajo_viga";
                     var beam = beams.Where(b => b.lvl == l + 1 && b.x1 - b.x0 > 100).OrderBy(_ => rnd.Next()).First();
                     do { x = 5 + rnd.NextDouble() * 190; } while (beams.Any(b => b.lvl == l + 1 && b.x1 - b.x0 < 100 && x + hx > b.x0 - 0.5 && x - hx < b.x1 + 0.5));
@@ -344,7 +344,7 @@ namespace Bimbridge.Bench
             }
         }
 
-        /// <summary>Vertical por (x,y) contra todos los triángulos de un cuerpo, sin índice. Devuelve cuántos triángulos probó.</summary>
+        /// <summary>Vertical ray at (x,y) against every triangle of a body, without an index. Returns how many triangles it tested.</summary>
         private static int BruteRay(double[] raw, double x, double y)
         {
             var n = raw.Length / 9;
@@ -365,7 +365,7 @@ namespace Bimbridge.Bench
         }
 
         // =====================================================================================================
-        // Arranque en frío: primera llamada (con JIT) vs. segunda
+        // Cold start: first call (with JIT) vs. second
         // =====================================================================================================
 
         private static int Cold()
@@ -385,7 +385,7 @@ namespace Bimbridge.Bench
             return 0;
         }
 
-        /// <summary>Lo que hace el add-in en Revit 2022–2024 a los 20 s de arrancar: precompilar motor y protocolo. Luego la carga de trabajo.</summary>
+        /// <summary>What the add-in does in Revit 2022–2024 20 s after startup: precompile engine and protocol. Then the workload.</summary>
         private static int WarmupMode()
         {
             var sw = Stopwatch.StartNew();
@@ -419,7 +419,7 @@ namespace Bimbridge.Bench
             return n;
         }
 
-        /// <summary>Lo que corre una consulta + una revisión geo pequeña: mallas, montaje, tabla, JSON.</summary>
+        /// <summary>What a query + a small geo check runs: meshes, mounting, table, JSON.</summary>
         private static void Workload()
         {
             var scene = BuildScene(levels: 4, fixtures: 120, seed: 3);
@@ -437,7 +437,7 @@ namespace Bimbridge.Bench
         }
 
         // =====================================================================================================
-        // Tokens: lo que ve la IA
+        // Tokens: what the AI sees
         // =====================================================================================================
 
         private static List<Dictionary<string, object>> SyntheticRows(int n)
@@ -461,13 +461,13 @@ namespace Bimbridge.Bench
         {
             var d = new Dictionary<string, object>();
 
-            // 1) Costo fijo por sesión: lista de herramientas + instrucciones del servidor (medido del puente real)
+            // 1) Fixed cost per session: tool list + server instructions (measured from the real bridge)
             var bridgeDll = typeof(Bimbridge.Bridge.Program).Assembly.Location;
             var perfil = Environment.GetEnvironmentVariable("BIMBRIDGE_PROFILE") ?? "compacto";
             var transport = new StdioClientTransport(new StdioClientTransportOptions
             {
                 Name = "bench", Command = "dotnet", Arguments = new[] { bridgeDll },
-                EnvironmentVariables = new Dictionary<string, string> { ["BIMBRIDGE_PIPE"] = "Bimbridge.bench.nadie", ["BIMBRIDGE_PROFILE"] = perfil },
+                EnvironmentVariables = new Dictionary<string, string> { ["BIMBRIDGE_PIPE"] = "Bimbridge.bench.nobody", ["BIMBRIDGE_PROFILE"] = perfil },
             });
             await using (var c = await McpClient.CreateAsync(transport, new McpClientOptions { ClientInfo = new Implementation { Name = "bench", Version = "1" } }))
             {
@@ -492,7 +492,7 @@ namespace Bimbridge.Bench
                 d["guia_escritura_una_op_chars"] = (long)Guides.Get("escritura", "tag").Length;
             }
 
-            // 2) Consultas típicas: respuesta del MCP vs. lo que imprime un script equivalente (lista de diccionarios JSON)
+            // 2) Typical queries: MCP response vs. what an equivalent script prints (list of JSON dictionaries)
             var rows = SyntheticRows(1442);
             var cases = new Dictionary<string, object>();
             void Case(string name, Dictionary<string, object> args, Func<List<Dictionary<string, object>>, string> naive, string aiRequest)
@@ -530,15 +530,15 @@ namespace Bimbridge.Bench
                 "{\"ids\":\"$sin_tag\"}");
             d["consultas"] = cases;
 
-            // 3) get f=* de 10 luminarias del mismo tipo: con "comunes" vs. un diccionario completo por elemento
+            // 3) get f=* of 10 fixtures of the same type: with "comunes" vs. a full dictionary per element
             var paramsNaive = new List<object>();
             var common = new Dictionary<string, object>();
             var diffs = new List<object>();
             for (var i = 0; i < 10; i++)
             {
                 var p = new Dictionary<string, object>();
-                for (var k = 0; k < 58; k++) p["Param " + k.ToString("00", CultureInfo.InvariantCulture) + (k % 5 == 0 ? " Mounting Height" : "")] = k % 7 == 0 ? (object)(9.25 + k) : "valor común " + k;
-                p["Comments"] = i % 2 == 0 ? "REVISAR" : "OK"; p["Mark"] = "F-" + i; p["Elevation from Level"] = 9.0 + i * 0.01;
+                for (var k = 0; k < 58; k++) p["Param " + k.ToString("00", CultureInfo.InvariantCulture) + (k % 5 == 0 ? " Mounting Height" : "")] = k % 7 == 0 ? (object)(9.25 + k) : "common value " + k;
+                p["Comments"] = i % 2 == 0 ? "REVIEW" : "OK"; p["Mark"] = "F-" + i; p["Elevation from Level"] = 9.0 + i * 0.01;
                 paramsNaive.Add(new Dictionary<string, object> { ["id"] = 17855000L + i, ["params"] = p });
                 if (i == 0) foreach (var kv in p) if (!kv.Key.StartsWith("Comments") && kv.Key != "Mark" && kv.Key != "Elevation from Level") common[kv.Key] = kv.Value;
                 diffs.Add(new Dictionary<string, object> { ["id"] = 17855000L + i, ["params"] = new Dictionary<string, object> { ["Comments"] = p["Comments"], ["Mark"] = p["Mark"], ["Elevation from Level"] = p["Elevation from Level"] } });
@@ -551,7 +551,7 @@ namespace Bimbridge.Bench
                 ["ahorro"] = Math.Round(1 - (double)mcpText.Length / naiveText.Length, 3),
             };
 
-            // 4) Peticiones de escritura: un plan típico vs. el script medido de pyRevit (mediana F3 1583, p90 7157)
+            // 4) Write requests: a typical plan vs. the measured pyRevit script (median F3 1583, p90 7157)
             var plan = "[{\"op\":\"snap_to_surface\",\"ids\":\"$flotando\"},{\"op\":\"tag\",\"ids\":\"$sin_tag\",\"view\":17732282}]";
             d["plan_tipico_chars"] = (long)plan.Length;
             return d;

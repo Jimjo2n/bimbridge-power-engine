@@ -18,7 +18,7 @@
 
 1. Close Revit, download the reviewed package and verify its SHA-256. Select your Revit releases and client in Setup. See the [installation guide](docs/getting-started/INSTALLATION.md).
 2. Connect through **Codex** or **Claude Code**, or configure the MCP stdio bridge in your client. The bridge offers compact and complete profiles with separate tool schemas. See [MCP setup](docs/integrations/MCP.md) and the [compact](docs/ESQUEMA_HERRAMIENTAS_compacto.json) and [complete](docs/ESQUEMA_HERRAMIENTAS_completo.json) contracts.
-3. Open an authorized test model. In the compact read tool, use `ctx` to identify the document, then `q LF f=id,type digest=true` to request a fingerprint of the filtered lighting fixtures. See [command examples](examples/README.md) and [workflow recipes](docs/RECETAS.md).
+3. Open an authorized test model. In the compact read tool, use `ctx` to identify the document, then `q LF f=id,type digest=true` to request a fingerprint of the filtered lighting fixtures. See [command examples](examples/README.md) and [workflow recipes](docs/RECIPES.md).
 
 **Updating from 0.9.x:** do it once by hand. Finish or cancel paused tasks, close Revit and double-click `Bimbridge.Setup.exe`; the 0.9.x Update button cannot find the renamed installer. Setup moves your data, settings, grants and client registrations to the new names. Afterwards, re-create Claude Code permission rules written for the previous MCP tool prefix as `mcp__bimbridge__*`, and re-assign Revit shortcuts and Quick Access Toolbar buttons. Later updates work from the ribbon again. See the [changelog](CHANGELOG.md).
 
@@ -32,7 +32,7 @@
 | Automate multi-step work | `tarea iniciar`, `tarea reanudar`, `tarea reconciliar`, `exec` | Resumable execution, recovery decisions and dynamic C# extensions. |
 | Process external inputs | `power cap`, `pdf_grids`, `pdf_symbols`, `docx_extract` | Capability discovery and structured data for geometry, registration and placement workflows. |
 
-[Command and suboperation reference](docs/MATRIZ_CAPACIDADES.md) · [Workflow recipes](docs/RECETAS.md) · [Reproduce benchmarks](docs/performance/BENCHMARKS.md)
+[Command and suboperation reference](docs/MATRIZ_CAPACIDADES.md) · [Workflow recipes](docs/RECIPES.md) · [Reproduce benchmarks](docs/performance/BENCHMARKS.md)
 
 ## Release news
 

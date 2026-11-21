@@ -8,9 +8,9 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine.Workflow
 {
     /// <summary>
-    /// 0.8.0 (contrato de entrega; incidentes del informe: "se sincronizó una rama y se abrió otra", "la lámina se revisó pero el PDF
-    /// era de una revisión anterior"). Una entrega avanza por hitos DISTINTOS, cada uno con su recibo. No se salta un hito, no se
-    /// declara uno posterior por inferencia y un recibo de otro documento o de otra revisión no vale.
+    /// 0.8.0 (delivery contract; incidents from the report: "one branch was synced and another was opened", "the sheet was reviewed but the PDF
+    /// was from an earlier revision"). A delivery advances through DISTINCT milestones, each with its receipt. No milestone is skipped, a later one
+    /// is not declared by inference, and a receipt from another document or another revision does not count.
     /// </summary>
     public static class DeliveryStages
     {
@@ -19,7 +19,7 @@ namespace Bimbridge.Engine.Workflow
             Guardado = "cambios_guardados", Sincronizado = "modelo_sincronizado", SetPersistido = "set_laminas_persistido",
             Exportado = "archivo_exportado", ArtefactoVerificado = "artefacto_verificado", EntregaConfirmada = "entrega_confirmada";
 
-        /// <summary>Orden canónico. Guardado/Sincronizado/Set son opcionales según la entrega (ver <see cref="DeliveryTrack.Required"/>).</summary>
+        /// <summary>Canonical order. Guardado/Sincronizado/Set are optional depending on the delivery (see <see cref="DeliveryTrack.Required"/>).</summary>
         public static readonly string[] Order =
         {
             PlanGenerado, PlanValidado, PlanAutorizado, Ejecutada, CommitConfirmado, EstadoObservado,
@@ -27,16 +27,16 @@ namespace Bimbridge.Engine.Workflow
         };
 
         /// <summary>
-        /// 0.9.0 (P0): hitos críticos. Su recibo exige la revisión del modelo y procedencia: "origen" (qué operación o persona lo
-        /// produjo) y "evidencia" = COMPROBADO (observado por BIMBRIDGE). Un resultado REPORTADO nunca cierra un hito crítico,
-        /// salvo la confirmación de entrega, que es una declaración de una persona ("origen" = "usuario:…").
+        /// 0.9.0 (P0): critical milestones. Their receipt requires the model revision and provenance: "origen" (which operation or person
+        /// produced it) and "evidencia" = COMPROBADO (observed by BIMBRIDGE). A REPORTED result never closes a critical milestone,
+        /// except the delivery confirmation, which is a statement by a person ("origen" = "usuario:…").
         /// </summary>
         public static readonly HashSet<string> Critical = new HashSet<string>
         {
             CommitConfirmado, EstadoObservado, Guardado, Sincronizado, SetPersistido, Exportado, ArtefactoVerificado, EntregaConfirmada,
         };
 
-        /// <summary>Qué debe traer el recibo de cada hito (además de documento y revisión).</summary>
+        /// <summary>What each milestone's receipt must carry (besides document and revision).</summary>
         public static readonly Dictionary<string, string[]> ReceiptFields = new Dictionary<string, string[]>
         {
             [PlanGenerado] = new[] { "plan_id" },
@@ -57,8 +57,8 @@ namespace Bimbridge.Engine.Workflow
     public sealed class DeliveryReceipt
     {
         public string Stage;
-        public string DocKey;       // identidad del documento (clave + huella)
-        public string Revision;     // revisión/snapshot del modelo al que se refiere
+        public string DocKey;       // document identity (key + fingerprint)
+        public string Revision;     // revision/snapshot of the model it refers to
         public string At;
         public Dictionary<string, object> Data = new Dictionary<string, object>();
 
@@ -74,12 +74,12 @@ namespace Bimbridge.Engine.Workflow
         };
     }
 
-    /// <summary>Seguimiento de una entrega concreta sobre UN documento.</summary>
+    /// <summary>Tracking of one specific delivery on ONE document.</summary>
     public sealed class DeliveryTrack
     {
         public string Id;
         public string DocKey;
-        public List<string> Required;   // hitos que esta entrega exige, en orden canónico
+        public List<string> Required;   // milestones this delivery requires, in canonical order
         public readonly List<DeliveryReceipt> Receipts = new List<DeliveryReceipt>();
 
         public DeliveryTrack(string id, string docKey, IEnumerable<string> required = null)
@@ -93,51 +93,51 @@ namespace Bimbridge.Engine.Workflow
         public string Next => Required.FirstOrDefault(s => !Receipts.Any(r => r.Stage == s));
         public bool Complete => Next == null;
 
-        /// <summary>Registra un hito. Devuelve null si se acepta, o el motivo del rechazo.</summary>
+        /// <summary>Records a milestone. Returns null if accepted, or the reason for rejection.</summary>
         public string Record(DeliveryReceipt r)
         {
-            if (r == null || string.IsNullOrEmpty(r.Stage)) return "recibo vacío";
-            if (!Required.Contains(r.Stage)) return "el hito " + r.Stage + " no forma parte de esta entrega";
-            if (Receipts.Any(x => x.Stage == r.Stage)) return "el hito " + r.Stage + " ya tiene recibo";
-            if (r.Stage != Next) return "fuera de orden: el siguiente hito es " + Next + ", no " + r.Stage + " (no se declara un hito posterior por inferencia)";
+            if (r == null || string.IsNullOrEmpty(r.Stage)) return "empty receipt";
+            if (!Required.Contains(r.Stage)) return "milestone " + r.Stage + " is not part of this delivery";
+            if (Receipts.Any(x => x.Stage == r.Stage)) return "milestone " + r.Stage + " already has a receipt";
+            if (r.Stage != Next) return "out of order: the next milestone is " + Next + ", not " + r.Stage + " (a later milestone is not declared by inference)";
             if (!string.Equals(r.DocKey, DocKey, StringComparison.OrdinalIgnoreCase))
-                return "el recibo es de otro documento (" + r.DocKey + "); un resultado en un documento no prueba nada en " + DocKey;
+                return "the receipt is from another document (" + r.DocKey + "); a result in one document proves nothing in " + DocKey;
             foreach (var f in DeliveryStages.ReceiptFields[r.Stage])
-                if (!r.Data.TryGetValue(f, out var v) || v == null || (v is string s && s.Length == 0)) return r.Stage + ": falta " + f + " en el recibo";
+                if (!r.Data.TryGetValue(f, out var v) || v == null || (v is string s && s.Length == 0)) return r.Stage + ": the receipt is missing " + f;
             if (DeliveryStages.Critical.Contains(r.Stage))
             {
-                if (string.IsNullOrWhiteSpace(r.Revision)) return r.Stage + ": hito crítico sin revisión del modelo; no se sabe a qué estado se refiere";
+                if (string.IsNullOrWhiteSpace(r.Revision)) return r.Stage + ": critical milestone without a model revision; it is unknown which state it refers to";
                 var origin = Arg.GetString(r.Data, "origen");
-                if (string.IsNullOrWhiteSpace(origin)) return r.Stage + ": falta la procedencia (origen: operación o persona que lo produjo)";
+                if (string.IsNullOrWhiteSpace(origin)) return r.Stage + ": provenance is missing (origen: operation or person that produced it)";
                 var ev = Arg.GetString(r.Data, "evidencia");
                 if (r.Stage == DeliveryStages.EntregaConfirmada)
                 {
-                    if (!origin.StartsWith("usuario:", StringComparison.OrdinalIgnoreCase)) return r.Stage + ": la confirmación de entrega la da una persona (origen=usuario:…), no el agente";
+                    if (!origin.StartsWith("usuario:", StringComparison.OrdinalIgnoreCase)) return r.Stage + ": the delivery confirmation is given by a person (origen=usuario:…), not the agent";
                 }
                 else if (ev != Confidence.Comprobado)
-                    return r.Stage + ": la evidencia es " + (ev ?? "(sin indicar)") + "; un hito crítico exige COMPROBADO (observado por BIMBRIDGE), no un resultado reportado";
+                    return r.Stage + ": the evidence is " + (ev ?? "(not stated)") + "; a critical milestone requires COMPROBADO (observed by BIMBRIDGE), not a reported result";
             }
-            // 0.9.0: el artefacto exportado y su verificación deben ser de la MISMA revisión (no sólo no anterior)
+            // 0.9.0: the exported artifact and its verification must be from the SAME revision (not merely not earlier)
             if (r.Stage == DeliveryStages.ArtefactoVerificado)
             {
                 var exp0 = Receipts.FirstOrDefault(x => x.Stage == DeliveryStages.Exportado);
                 if (exp0 != null && exp0.Revision != null && !string.Equals(exp0.Revision, r.Revision, StringComparison.Ordinal))
-                    return "artefacto_verificado: se verificó la revisión " + r.Revision + " pero se exportó la " + exp0.Revision;
+                    return "artefacto_verificado: revision " + r.Revision + " was verified but revision " + exp0.Revision + " was exported";
             }
-            // la revisión no puede retroceder: un PDF de una revisión anterior al commit no vale
+            // the revision cannot go backwards: a PDF from a revision earlier than the commit does not count
             var lastRev = Receipts.LastOrDefault(x => x.Revision != null)?.Revision;
             if (lastRev != null && r.Revision != null && CompareRev(r.Revision, lastRev) < 0)
-                return r.Stage + ": el recibo es de la revisión " + r.Revision + ", anterior a " + lastRev + " (artefacto obsoleto)";
+                return r.Stage + ": the receipt is from revision " + r.Revision + ", earlier than " + lastRev + " (stale artifact)";
             if (r.Stage == DeliveryStages.ArtefactoVerificado)
             {
                 var exp = Receipts.FirstOrDefault(x => x.Stage == DeliveryStages.Exportado);
                 if (exp != null && !string.Equals(Arg.GetString(exp.Data, "sha256"), Arg.GetString(r.Data, "sha256"), StringComparison.OrdinalIgnoreCase))
-                    return "artefacto_verificado: el archivo verificado no es el exportado (sha256 distinto)";
+                    return "artefacto_verificado: the verified file is not the exported one (different sha256)";
                 var set = Receipts.FirstOrDefault(x => x.Stage == DeliveryStages.SetPersistido);
                 var expected = set == null ? null : Arg.GetLong(set.Data, "laminas");
                 var pages = Arg.GetLong(r.Data, "paginas");
                 if (expected.HasValue && pages.HasValue && expected.Value != pages.Value)
-                    return "artefacto_verificado: el PDF tiene " + pages + " páginas y el set " + expected + " láminas";
+                    return "artefacto_verificado: the PDF has " + pages + " pages and the set " + expected + " sheets";
             }
             r.At = r.At ?? DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
             Receipts.Add(r);

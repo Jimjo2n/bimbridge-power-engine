@@ -75,16 +75,16 @@ namespace Bimbridge.Tests
         [Fact]
         public void ResultStore_LongTextIsShortened_AndReadableByLines()
         {
-            var text = string.Join("\n", Enumerable.Range(0, 2000).Select(i => "fila " + i + " " + new string('x', 20)));
+            var text = string.Join("\n", Enumerable.Range(0, 2000).Select(i => "row " + i + " " + new string('x', 20)));
             var shown = ResultStore.Shorten(text, 1000, "t", out var id);
             Assert.NotNull(id);
             Assert.True(shown.Length < 1200);
             Assert.Contains("res " + id, shown);
             var part = ResultStore.Read(id, 1500, 3, out var total);
             Assert.Equal(2000, total);
-            Assert.StartsWith("fila 1500 ", part);
+            Assert.StartsWith("row 1500 ", part);
             Assert.Null(ResultStore.Read("../../etc/passwd", 0, 1, out _));
-            Assert.Equal("corto", ResultStore.Shorten("corto", 1000, "t", out var none));
+            Assert.Equal("short", ResultStore.Shorten("short", 1000, "t", out var none));
             Assert.Null(none);
         }
 

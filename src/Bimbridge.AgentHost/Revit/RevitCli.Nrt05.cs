@@ -9,25 +9,25 @@ using Bimbridge.Protocol;
 
 namespace Bimbridge.AgentHost
 {
-    /// <summary>Parámetros de NRT-05 (beta1). Todos los decide el operador al lanzar; el plan no puede cambiarlos.</summary>
+    /// <summary>NRT-05 parameters (beta1). The operator decides all of them at launch; the plan cannot change them.</summary>
     public sealed class Nrt05Options
     {
         public int Pid;
         public string OutDir, Category, Param = "Comments", Value, ExpectedPath;
         public List<long> Ids = new List<long>();
-        /// <summary>--autorizo-persistente: autorización explícita del operador para escribir, guardar y verificar en disco.</summary>
+        /// <summary>--autorizo-persistente: explicit operator authorization to write, save and verify on disk.</summary>
         public bool Authorized;
         public TimeSpan DocTimeout = TimeSpan.FromMinutes(10);
-        /// <summary>Ruta de Revit → ruta legible por este proceso (identidad en la PC; las pruebas la redirigen a un temporal).</summary>
+        /// <summary>Revit path → path readable by this process (identity on the PC; tests redirect it to a temp file).</summary>
         public Func<string, string> DiskPath = p => p;
     }
 
     /// <summary>
-    /// NRT-05 (beta1): escritura PERSISTENTE real nacida en AgentHost, y su persistencia en disco.
-    /// BIM Task IR → AgentHost (PlanRunner, diario, lease, fencing) → RevitBackend persistente → add-in → commit → observe → verify
-    /// → doc guardar → SHA-256 del .rvt (debe CAMBIAR) → doc verificar_disco (abre una COPIA del archivo guardado en segundo plano
-    /// y relee los valores) → reanudar el mismo diario (no debe haber un segundo commit) → evidencia.
-    /// Sólo sobre un .rvt local, no workshared, desechable, cuya ruta real coincide con --ruta-esperada. Nunca sincroniza ni cierra.
+    /// NRT-05 (beta1): real PERSISTENT write originating in AgentHost, and its persistence on disk.
+    /// BIM Task IR → AgentHost (PlanRunner, journal, lease, fencing) → persistent RevitBackend → add-in → commit → observe → verify
+    /// → doc guardar → SHA-256 of the .rvt (must CHANGE) → doc verificar_disco (opens a COPY of the saved file in the background
+    /// and re-reads the values) → resume the same journal (there must be no second commit) → evidence.
+    /// Only on a local, non-workshared, disposable .rvt whose actual path matches --ruta-esperada. Never syncs or closes.
     /// </summary>
     public static partial class RevitCli
     {
@@ -36,13 +36,13 @@ namespace Bimbridge.AgentHost
             var o = new Nrt05Options
             {
                 Pid = int.Parse(Program.Opt(a, "--revit-pid", "0"), CultureInfo.InvariantCulture),
-                OutDir = Program.Opt(a, "--salida") ?? throw new ArgumentException("falta --salida"),
-                Category = Program.Opt(a, "--categoria") ?? throw new ArgumentException("falta --categoria"),
+                OutDir = Program.Opt(a, "--salida") ?? throw new ArgumentException("missing --salida"),
+                Category = Program.Opt(a, "--categoria") ?? throw new ArgumentException("missing --categoria"),
                 Param = Program.Opt(a, "--parametro", "Comments"),
                 Value = Program.Opt(a, "--valor"),
                 ExpectedPath = Program.Opt(a, "--ruta-esperada"),
                 Authorized = a.Contains("--autorizo-persistente"),
-                Ids = (Program.Opt(a, "--ids") ?? throw new ArgumentException("falta --ids (3 a 5 elementos)")).Split(',').Select(x => long.Parse(x.Trim(), CultureInfo.InvariantCulture)).ToList(),
+                Ids = (Program.Opt(a, "--ids") ?? throw new ArgumentException("missing --ids (3 to 5 elements)")).Split(',').Select(x => long.Parse(x.Trim(), CultureInfo.InvariantCulture)).ToList(),
             };
             var link = RevitLink.ForPid(o.Pid, out var err);
             if (link == null)
@@ -62,7 +62,7 @@ namespace Bimbridge.AgentHost
                 return string.Concat(h.ComputeHash(s).Select(x => x.ToString("x2")));
         }
 
-        /// <summary>Núcleo de NRT-05 sobre una conexión ya abierta (también lo usan las pruebas con un add-in falso).</summary>
+        /// <summary>NRT-05 core over an already open connection (also used by the tests with a fake add-in).</summary>
         public static int Nrt05Run(RevitLink link, Nrt05Options o)
         {
             Directory.CreateDirectory(o.OutDir);
@@ -80,12 +80,12 @@ namespace Bimbridge.AgentHost
             int Blocked(string why) { Log("BLOQUEADA: " + why); report["resultado"] = "BLOQUEADA"; report["motivo"] = why; report["llamadas"] = link.Calls.Cast<object>().ToList(); Save(); return 3; }
             int Failed(object why) { Log("FALLIDA: " + Json.Write(why)); report["resultado"] = "FALLIDA"; report["motivo"] = why; report["llamadas"] = link.Calls.Cast<object>().ToList(); Save(); return 1; }
 
-            if (!o.Authorized) return Blocked("falta --autorizo-persistente: NRT-05 guarda el archivo; sólo con autorización explícita del operador");
-            if (o.Ids.Count < 3 || o.Ids.Count > 5) return Blocked("--ids: entre 3 y 5 elementos");
-            if (string.IsNullOrWhiteSpace(o.ExpectedPath)) return Blocked("falta --ruta-esperada (la ruta real del .rvt desechable)");
+            if (!o.Authorized) return Blocked("missing --autorizo-persistente: NRT-05 saves the file; only with explicit operator authorization");
+            if (o.Ids.Count < 3 || o.Ids.Count > 5) return Blocked("--ids: between 3 and 5 elements");
+            if (string.IsNullOrWhiteSpace(o.ExpectedPath)) return Blocked("missing --ruta-esperada (the actual path of the disposable .rvt)");
             link.OnCall = c => File.AppendAllText(callsPath, Json.Write(c) + "\n");
 
-            // 1. identidad + política: el backend persistente ya rechaza workshared, nube/no local, sólo lectura y cola retenida.
+            // 1. identity + policy: the persistent backend already rejects workshared, cloud/non-local, read-only and held queue.
             var backend = RevitBackend.Open(link, "persistente", out var err);
             if (backend == null) return Blocked(err);
             var ctx = backend.Context;
@@ -101,12 +101,12 @@ namespace Bimbridge.AgentHost
                 ["handle"] = ctx.GetValueOrDefault("doc"), ["titulo"] = ctx.GetValueOrDefault("documento"), ["ruta"] = ruta, ["clave"] = backend.DocKey,
                 ["huella"] = backend.DocPrint, ["worksharing"] = ctx.GetValueOrDefault("worksharing"), ["modificado_antes"] = ctx.GetValueOrDefault("modificado"),
             };
-            Log("conectado pid " + o.Pid + " · " + ruta + " · " + backend.DocKey);
+            Log("connected pid " + o.Pid + " · " + ruta + " · " + backend.DocKey);
             string Norm(string p) => (p ?? "").Trim().Replace('/', '\\').TrimEnd('\\');
             if (!string.Equals(Norm(ruta), Norm(o.ExpectedPath), StringComparison.OrdinalIgnoreCase))
-                return Blocked("la ruta real del documento (" + ruta + ") no es la autorizada (" + o.ExpectedPath + ")");
+                return Blocked("the actual document path (" + ruta + ") is not the authorized one (" + o.ExpectedPath + ")");
             var file = o.DiskPath(ruta);
-            if (!File.Exists(file)) return Blocked("no se encuentra el archivo en disco: " + ruta);
+            if (!File.Exists(file)) return Blocked("file not found on disk: " + ruta);
 
             Dictionary<string, object> Snapshot(string label)
             {
@@ -130,18 +130,18 @@ namespace Bimbridge.AgentHost
             bool AllEqual(Dictionary<string, object> vals, string v) =>
                 vals.Count == o.Ids.Count && o.Ids.All(i => vals.TryGetValue(i.ToString(CultureInfo.InvariantCulture), out var x) && Equals(Convert.ToString(x, CultureInfo.InvariantCulture), v));
 
-            // 2. línea base: documento sin cambios pendientes (el guardado del arnés no debe arrastrar cambios ajenos) y SHA del archivo.
+            // 2. baseline: document with no pending changes (the harness save must not carry other people's changes) and file SHA.
             var pre = Snapshot("antes");
             report["linea_base"] = pre;
-            if (pre["estado"] as string != Status.Ok || ((Dictionary<string, object>)pre["valores"]).Count != o.Ids.Count) return Blocked("línea base no válida (" + pre["estado"] + ")");
-            if (pre["modificado"] is bool m0 && m0) return Blocked("el documento tiene cambios sin guardar; NRT-05 guardaría cambios que no son suyos");
-            if (AllEqual((Dictionary<string, object>)pre["valores"], value)) return Blocked("los elementos ya tienen el valor «" + value + "»: el guardado no probaría nada");
+            if (pre["estado"] as string != Status.Ok || ((Dictionary<string, object>)pre["valores"]).Count != o.Ids.Count) return Blocked("invalid baseline (" + pre["estado"] + ")");
+            if (pre["modificado"] is bool m0 && m0) return Blocked("the document has unsaved changes; NRT-05 would save changes that are not its own");
+            if (AllEqual((Dictionary<string, object>)pre["valores"], value)) return Blocked("the elements already have the value '" + value + "': the save would prove nothing");
             var shaBefore = FileSha256(file);
             report["sha256_antes"] = shaBefore;
-            Log("línea base · rev " + pre["rev"] + " · sha " + shaBefore.Substring(0, 16));
+            Log("baseline · rev " + pre["rev"] + " · sha " + shaBefore.Substring(0, 16));
 
-            // 3. plan IR
-            var draft = new PlanDraft { Objective = "NRT-05: escritura persistente E2E AgentHost→Revit sobre copia desechable", DocKey = backend.DocKey, DocPrint = backend.DocPrint, LengthUnit = "mm", Coordinates = "interno_revit" };
+            // 3. IR plan
+            var draft = new PlanDraft { Objective = "NRT-05: E2E persistent AgentHost→Revit write on a disposable copy", DocKey = backend.DocKey, DocPrint = backend.DocPrint, LengthUnit = "mm", Coordinates = "interno_revit" };
             var q = new OpDraft { Operation = "consultar" }; q.Params["categoria"] = o.Category;
             draft.Ops.Add(q);
             var w = new OpDraft { Operation = "fijar_parametro" };
@@ -161,13 +161,13 @@ namespace Bimbridge.AgentHost
                 ["autorizacion_derivada"] = writeOp.Authorization.Cast<object>().ToList(),
                 ["valores_originales"] = pre["valores"], ["valor_esperado"] = value,
             };
-            Log("plan " + vp.Hash + " · escritura " + writeOp.Id + " · valor «" + value + "»");
+            Log("plan " + vp.Hash + " · write " + writeOp.Id + " · value '" + value + "'");
 
-            // 4. control: sin autorización del operador el mismo plan se rechaza antes de tocar nada
+            // 4. control: without operator authorization the same plan is rejected before touching anything
             using (var denied = PlanRunner.Open(Path.Combine(o.OutDir, "estado_sin_autorizacion"), draft, backend, new RunnerOptions(), out var ddiags))
                 checks["autorizacion_operador_requerida"] = denied == null && ddiags.Any(x => x.Code == "escrituras_no_permitidas");
 
-            // 5. ejecución persistente (commit real) por el PlanRunner
+            // 5. persistent run (real commit) by the PlanRunner
             var stateDir = Path.Combine(o.OutDir, "estado");
             using (var r = PlanRunner.Open(stateDir, draft, backend, new RunnerOptions { RealWrites = "persistente" }, out var diags))
             {
@@ -189,23 +189,23 @@ namespace Bimbridge.AgentHost
             checks["un_solo_commit"] = commits1 == 1;
             report["transaccion"] = link.Calls.Where(c => (string)c["op"] == Wire.OpCommit).Select(c => (object)new Dictionary<string, object> { ["estado"] = c["estado"], ["ms"] = c["ms"], ["modo"] = c.GetValueOrDefault("modo") }).ToList();
 
-            // 6. observación independiente tras el commit (en memoria)
+            // 6. independent observation after the commit (in memory)
             var post = Snapshot("tras_commit");
             report["tras_commit"] = post;
             checks["valores_tras_commit"] = AllEqual((Dictionary<string, object>)post["valores"], value);
             checks["mismo_documento"] = (post["clave_doc"] as string) == backend.DocKey;
             checks["modificado_tras_commit"] = post["modificado"] is bool m1 && m1;
-            // rc1 P0: guardado condicionado. CUALQUIER comprobación previa negativa (autorización, op, commit único, valores,
-            // documento, modificado) detiene el arnés antes de guardar; nada potencialmente persistente se hace después.
+            // rc1 P0: conditional save. ANY failed prior check (authorization, op, single commit, values,
+            // document, modified) stops the harness before saving; nothing potentially persistent is done afterwards.
             var failedBefore = checks.Where(kv => !(kv.Value is bool ok0 && ok0)).Select(kv => kv.Key).ToList();
             if (failedBefore.Count > 0)
             {
-                report["resultado"] = "FALLIDA"; report["motivo"] = "comprobaciones previas negativas (" + string.Join(", ", failedBefore) + "): no se guarda"; report["llamadas"] = link.Calls.Cast<object>().ToList(); Save();
-                Log("FALLIDA antes de guardar: " + string.Join(", ", failedBefore));
+                report["resultado"] = "FALLIDA"; report["motivo"] = "failed prior checks (" + string.Join(", ", failedBefore) + "): not saving"; report["llamadas"] = link.Calls.Cast<object>().ToList(); Save();
+                Log("FALLIDA before saving: " + string.Join(", ", failedBefore));
                 return 2;
             }
 
-            // 7. guardar (evento distinto del commit) y comprobar que el archivo CAMBIÓ en disco
+            // 7. save (an event separate from the commit) and check that the file CHANGED on disk
             var oldTimeout = link.WriteTimeout;
             link.WriteTimeout = o.DocTimeout;
             var save = link.Call(Wire.OpDoc, new Dictionary<string, object> { [Wire.DocArg] = ctx["doc"], ["accion"] = "guardar" }, true);
@@ -217,17 +217,17 @@ namespace Bimbridge.AgentHost
             var afterSave = Snapshot("tras_guardar");
             report["tras_guardar"] = afterSave;
             checks["sin_cambios_pendientes_tras_guardar"] = afterSave["modificado"] is bool m2 && !m2;
-            Log("guardar " + save.Estado + " · sha " + (shaAfter ?? "?").Substring(0, Math.Min(16, (shaAfter ?? "?").Length)));
+            Log("save " + save.Estado + " · sha " + (shaAfter ?? "?").Substring(0, Math.Min(16, (shaAfter ?? "?").Length)));
 
             if (!(bool)checks["guardado_ok"] || !(bool)checks["sha256_cambio"] || !(bool)checks["sin_cambios_pendientes_tras_guardar"])
             {
-                report["resultado"] = "FALLIDA"; report["motivo"] = "el guardado no quedó demostrado: no se verifica en disco ni se reanuda"; report["llamadas"] = link.Calls.Cast<object>().ToList(); Save();
+                report["resultado"] = "FALLIDA"; report["motivo"] = "the save was not proven: no disk verification and no resume"; report["llamadas"] = link.Calls.Cast<object>().ToList(); Save();
                 foreach (var kv in checks) Log((kv.Value is bool bx && bx ? "✓ " : "✗ ") + kv.Key);
-                Log("NRT-05 FALLIDA tras guardar");
+                Log("NRT-05 FALLIDA after saving");
                 return 2;
             }
 
-            // 8. persistencia: abrir una COPIA del archivo guardado (otro Document, sin tocar el abierto) y releer
+            // 8. persistence: open a COPY of the saved file (another Document, without touching the open one) and re-read
             var disk = link.Call(Wire.OpDoc, new Dictionary<string, object>
             {
                 [Wire.DocArg] = ctx["doc"], ["accion"] = "verificar_disco", ["parametro"] = o.Param,
@@ -243,7 +243,7 @@ namespace Bimbridge.AgentHost
             checks["disco_sha_es_el_guardado"] = dd != null && string.Equals(dd.GetValueOrDefault("sha256") as string, shaAfter, StringComparison.OrdinalIgnoreCase);
             Log("verificar_disco " + disk.Estado);
 
-            // 9. duplicado: reanudar EL MISMO diario no debe producir un segundo commit ni cambiar el modelo
+            // 9. duplicate: resuming THE SAME journal must not produce a second commit or change the model
             using (var again = PlanRunner.Open(stateDir, null, backend, new RunnerOptions { RealWrites = "persistente" }, out var diags2))
             {
                 if (again != null) report["reanudacion"] = again.Run();
@@ -254,7 +254,7 @@ namespace Bimbridge.AgentHost
             report["tras_reanudar"] = post2;
             checks["reanudar_no_modifica"] = post2["modificado"] is bool m3 && !m3 && AllEqual((Dictionary<string, object>)post2["valores"], value);
 
-            // 10. métricas (de llamadas.jsonl)
+            // 10. metrics (from llamadas.jsonl)
             report["metricas"] = link.Calls.GroupBy(c => (string)c["op"]).ToDictionary(g => g.Key, g => (object)new Dictionary<string, object>
             {
                 ["n"] = (long)g.Count(), ["ms_total"] = g.Sum(c => Convert.ToInt64(c["ms"], CultureInfo.InvariantCulture)),

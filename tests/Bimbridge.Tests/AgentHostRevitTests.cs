@@ -214,7 +214,7 @@ namespace Bimbridge.Tests
                     var s = r.Run();
                     var w = r.State.Ops[r.Plan.Ops[1].Id];
                     Assert.Equal(OpState.Ensayada, w.State);
-                    Assert.Contains("ensayadas", s);
+                    Assert.Contains("trialed", s);
                     Assert.Equal("RolledBack", w.Evidence["addin_grupo_estado"]);
                     Assert.Equal(3L, w.Evidence["restaurados_relectura"]);
                 }
@@ -252,7 +252,7 @@ namespace Bimbridge.Tests
                 Assert.Contains("pid", e1);
                 fake.Levels = "R";
                 Assert.Null(Backend(pipe, fake, "ensayo", out var e2));
-                Assert.Contains("no permite cambios", e2);
+                Assert.Contains("does not allow changes", e2);
                 fake.Levels = "RPW"; fake.Workshared = true;
                 Assert.Null(Backend(pipe, fake, "persistente", out var e3));
                 Assert.Contains("workshared", e3);
@@ -264,7 +264,7 @@ namespace Bimbridge.Tests
                     Assert.Contains(d, x => x.Code == ErrorClass.DocumentoDistinto);
                 }
                 Assert.Null(RevitLink.ForPid(0, out var e4));
-                Assert.Contains("nunca elige", e4);
+                Assert.Contains("never picks", e4);
             }
         }
 
@@ -296,7 +296,7 @@ namespace Bimbridge.Tests
                 r.Run();
                 var w = r.State.Ops[r.Plan.Ops[1].Id];
                 Assert.Equal(OpState.Fallida, w.State);
-                Assert.Contains("fuera del alcance", w.Note);
+                Assert.Contains("outside the scope", w.Note);
                 Assert.Equal(0, fake.TrialCommits + fake.Commits);
             }
         }
@@ -680,7 +680,7 @@ namespace Bimbridge.Tests
                     var h = Handoff.Build(r);
                     Assert.Equal(Handoff.Schema, h["esquema"]);
                     Assert.NotEmpty((List<object>)h["inciertas"]);
-                    Assert.Contains("NO repetir", (string)h["siguiente_paso_seguro"]);
+                    Assert.Contains("do NOT repeat", (string)h["siguiente_paso_seguro"]);
                 }
                 System.Threading.Thread.Sleep(500);
                 using (var b2 = Backend(pipe, fake, "persistente", out _))
@@ -689,7 +689,7 @@ namespace Bimbridge.Tests
                     r2.Run();
                     var h2 = Handoff.Build(r2);
                     Assert.Empty((List<object>)h2["inciertas"]);
-                    Assert.Equal("nada: plan terminado", h2["siguiente_paso_seguro"]);
+                    Assert.Equal("nothing: plan finished", h2["siguiente_paso_seguro"]);
                 }
             }
             Assert.Equal(1, fake.Commits);
@@ -721,12 +721,12 @@ namespace Bimbridge.Tests
             Assert.Empty(IrValidator.Validate(ok));
             var bad = LotePlan(new Dictionary<long, string> { [1] = "x", [2] = "y" });
             bad.Ops[0].Scope["ids"] = new List<object> { 1L, 3L }; bad.AssignIds();
-            Assert.Contains(IrValidator.Validate(bad), e => e.Contains("coincidir"));
+            Assert.Contains(IrValidator.Validate(bad), e => e.Contains("must match"));
             var nonNum = LotePlan(new Dictionary<long, string> { [1] = "x" });
             nonNum.Ops[0].Params["valores"] = new Dictionary<string, object> { ["abc"] = "x" }; nonNum.AssignIds();
-            Assert.Contains(IrValidator.Validate(nonNum), e => e.Contains("numéricos"));
+            Assert.Contains(IrValidator.Validate(nonNum), e => e.Contains("numeric"));
             var big = LotePlan(Enumerable.Range(1, IrValidator.MaxBatch + 1).ToDictionary(i => (long)i, i => "v"));
-            Assert.Contains(IrValidator.Validate(big), e => e.Contains("entre 1 y"));
+            Assert.Contains(IrValidator.Validate(big), e => e.Contains("between 1 and"));
             var empty = LotePlan(new Dictionary<long, string> { [1] = "x" });
             empty.Ops[0].Params["valores"] = new Dictionary<string, object> { ["1"] = "" }; empty.AssignIds();
             Assert.NotEmpty(IrValidator.Validate(empty));

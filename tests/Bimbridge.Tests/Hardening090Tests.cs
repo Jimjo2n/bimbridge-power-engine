@@ -180,15 +180,15 @@ namespace Bimbridge.Tests
         public void Delivery_CriticalReceipts_NeedRevisionOriginAndObservedEvidence()
         {
             var t = new DeliveryTrack("e1", "archivo:c:\\a.rvt", new[] { DeliveryStages.Exportado, DeliveryStages.ArtefactoVerificado, DeliveryStages.EntregaConfirmada });
-            Assert.Contains("sin revisión", t.Record(R(DeliveryStages.Exportado, null, ("archivo", "a.pdf"), ("sha256", Sha('a')), ("origen", "export"), ("evidencia", Confidence.Comprobado))));
-            Assert.Contains("procedencia", t.Record(R(DeliveryStages.Exportado, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("evidencia", Confidence.Comprobado))));
+            Assert.Contains("without a model revision", t.Record(R(DeliveryStages.Exportado, null, ("archivo", "a.pdf"), ("sha256", Sha('a')), ("origen", "export"), ("evidencia", Confidence.Comprobado))));
+            Assert.Contains("provenance", t.Record(R(DeliveryStages.Exportado, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("evidencia", Confidence.Comprobado))));
             Assert.Contains("COMPROBADO", t.Record(R(DeliveryStages.Exportado, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("origen", "export"), ("evidencia", "REPORTADO"))));
             Assert.Null(t.Record(R(DeliveryStages.Exportado, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("origen", "export"), ("evidencia", Confidence.Comprobado))));
             // verifying a revision other than the exported one
-            Assert.Contains("se exportó la r5", t.Record(R(DeliveryStages.ArtefactoVerificado, "r6", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("paginas", 3), ("origen", "pdf_info"), ("evidencia", Confidence.Comprobado))));
+            Assert.Contains("revision r5 was exported", t.Record(R(DeliveryStages.ArtefactoVerificado, "r6", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("paginas", 3), ("origen", "pdf_info"), ("evidencia", Confidence.Comprobado))));
             Assert.Null(t.Record(R(DeliveryStages.ArtefactoVerificado, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("paginas", 3), ("origen", "pdf_info"), ("evidencia", Confidence.Comprobado))));
             // delivery is confirmed by a person, not by the agent
-            Assert.Contains("persona", t.Record(R(DeliveryStages.EntregaConfirmada, "r5", ("confirma", "ok"), ("origen", "agente"))));
+            Assert.Contains("person", t.Record(R(DeliveryStages.EntregaConfirmada, "r5", ("confirma", "ok"), ("origen", "agente"))));
             Assert.Null(t.Record(R(DeliveryStages.EntregaConfirmada, "r5", ("confirma", "ok"), ("origen", "usuario:operator"))));
             Assert.True(t.Complete);
         }
@@ -198,7 +198,7 @@ namespace Bimbridge.Tests
         public void Draw2D_RejectsCollinearOverlap_NonFinite_Huge()
         {
             Draw2D.Segments(new List<double[]> { new[] { 0.0, 0 }, new[] { 10.0, 0 }, new[] { 5.0, 0 } }, false, out var e1);
-            Assert.Contains("colineales", e1 ?? "");
+            Assert.Contains("collinear", e1 ?? "");
             Draw2D.Segments(new List<double[]> { new[] { 0.0, 0 }, new[] { double.NaN, 1 } }, false, out var e2);
             Assert.NotNull(e2);
             Draw2D.Segments(new List<double[]> { new[] { 0.0, 0 }, new[] { 1e9, 1 } }, false, out var e3);
@@ -226,9 +226,9 @@ namespace Bimbridge.Tests
         public void Benchmarks_ItemsExistInProcedure_AndMatchTheirScenario()
         {
             var dir = AppContext.BaseDirectory;
-            while (dir != null && !Directory.Exists(Path.Combine(dir, "tools", "aceptacion", "0.8.0"))) dir = Path.GetDirectoryName(dir);
+            while (dir != null && !Directory.Exists(Path.Combine(dir, "tools", "acceptance", "0.8.0"))) dir = Path.GetDirectoryName(dir);
             Assert.NotNull(dir);
-            var proc = File.ReadAllText(Path.Combine(dir, "tools", "aceptacion", "0.8.0", "PROCEDIMIENTO_0.8.0.md"));
+            var proc = File.ReadAllText(Path.Combine(dir, "tools", "acceptance", "0.8.0", "PROCEDURE_0.8.0.md"));
             var known = new HashSet<string>(Regex.Matches(proc, @"^\| (N8-\d\d)", RegexOptions.Multiline).Cast<Match>().Select(m => m.Groups[1].Value));
             Assert.Equal(13, known.Count);
             foreach (var b in Benchmarks.Catalog)

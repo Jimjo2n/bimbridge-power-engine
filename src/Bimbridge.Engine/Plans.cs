@@ -11,23 +11,23 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Una operación pedida por la IA en "plan" (sección 7). Sólo operaciones tipadas; nunca código libre.
-    /// El catálogo completo (27 operaciones) está en <see cref="OpCatalog"/>.
-    /// ids: lista de ids, "1,2,3", "$conjunto" o "@n" (lo que creó la operación n del mismo plan).
+    /// An operation requested by the AI in "plan" (section 7). Typed operations only; never free code.
+    /// The full catalog (27 operations) is in <see cref="OpCatalog"/>.
+    /// ids: list of ids, "1,2,3", "$set" or "@n" (what operation n of the same plan created).
     /// </summary>
     public sealed class OpSpec
     {
         public string Kind;
-        /// <summary>Posición en el plan, desde 1 (para referencias @n).</summary>
+        /// <summary>Position in the plan, from 1 (for @n references).</summary>
         public int Index;
         public List<long> Ids = new List<long>();
         public string Set;
-        /// <summary>Operaciones anteriores del mismo plan cuyos elementos creados se usan como ids.</summary>
+        /// <summary>Earlier operations of the same plan whose created elements are used as ids.</summary>
         public List<int> RefOps = new List<int>();
-        /// <summary>Argumentos tal como llegaron (ya validadas las claves).</summary>
+        /// <summary>Arguments as received (keys already validated).</summary>
         public Dictionary<string, object> Args = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
-        // Atajos de las operaciones originales.
+        // Shortcuts for the original operations.
         public string Name;
         public object Value;
         public string Type;
@@ -40,18 +40,18 @@ namespace Bimbridge.Engine
         public static List<OpSpec> ParseAll(IDictionary<string, object> args)
         {
             if (!args.TryGetValue("ops", out var raw) || !(raw is List<object> list) || list.Count == 0)
-                throw new QueryException("plan necesita ops: [{op, ids, ...}]. Operaciones: " + OpCatalog.KindList + " (detalle: guide tema=escritura)");
-            if (list.Count > MaxOps) throw new QueryException("máximo " + MaxOps + " operaciones por plan");
+                throw new QueryException("plan needs ops: [{op, ids, ...}]. Operations: " + OpCatalog.KindList + " (detail: guide tema=escritura)");
+            if (list.Count > MaxOps) throw new QueryException("maximum " + MaxOps + " operations per plan");
             var result = new List<OpSpec>();
             foreach (var item in list)
             {
-                if (!(item is Dictionary<string, object> o)) throw new QueryException("cada op debe ser un objeto");
+                if (!(item is Dictionary<string, object> o)) throw new QueryException("each op must be an object");
                 var s = Parse(o, result.Count + 1);
                 foreach (var r in s.RefOps)
                 {
-                    if (r < 1 || r >= s.Index) throw new QueryException(s.Kind + ": @" + r + " debe ser una operación anterior del mismo plan");
+                    if (r < 1 || r >= s.Index) throw new QueryException(s.Kind + ": @" + r + " must be an earlier operation of the same plan");
                     if (!OpCatalog.ByKind[result[r - 1].Kind].Creates)
-                        throw new QueryException(s.Kind + ": @" + r + " (" + result[r - 1].Kind + ") no crea elementos");
+                        throw new QueryException(s.Kind + ": @" + r + " (" + result[r - 1].Kind + ") does not create elements");
                 }
                 result.Add(s);
             }
@@ -62,7 +62,7 @@ namespace Bimbridge.Engine
         {
             var s = new OpSpec { Kind = (Arg.GetString(o, "op") ?? "").Trim().ToLowerInvariant(), Index = index };
             if (!OpCatalog.ByKind.TryGetValue(s.Kind, out var info))
-                throw new QueryException("op desconocida '" + s.Kind + "'. Use: " + OpCatalog.KindList + " (detalle: guide tema=escritura)");
+                throw new QueryException("unknown op '" + s.Kind + "'. Use: " + OpCatalog.KindList + " (detail: guide tema=escritura)");
             foreach (var kv in o) s.Args[kv.Key] = kv.Value;
 
             foreach (var x in Arg.GetStringList(o, "ids"))
@@ -71,12 +71,12 @@ namespace Bimbridge.Engine
                 if (x.StartsWith("@"))
                 {
                     if (!int.TryParse(x.Substring(1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var n))
-                        throw new QueryException("ids: '" + x + "' debe ser @n (número de una operación anterior)");
+                        throw new QueryException("ids: '" + x + "' must be @n (number of an earlier operation)");
                     s.RefOps.Add(n);
                     continue;
                 }
                 if (!long.TryParse(x, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
-                    throw new QueryException("ids: '" + x + "' no es un id, un $conjunto ni @n");
+                    throw new QueryException("ids: '" + x + "' is not an id, a $set or @n");
                 s.Ids.Add(id);
             }
             foreach (var key in new[] { "view", "hoja", "vista", "tipo", "origen" })
@@ -97,12 +97,12 @@ namespace Bimbridge.Engine
                 case "set_values":
                     s.Name = Arg.GetString(o, "name");
                     if (!(o["values"] is Dictionary<string, object> vals) || vals.Count == 0)
-                        throw new QueryException("set_values: values debe ser {\"id\": valor, ...}");
-                    if (vals.Count > PlanOpsLimits.MaxEntries) throw new QueryException("set_values: máximo " + PlanOpsLimits.MaxEntries + " valores");
+                        throw new QueryException("set_values: values must be {\"id\": value, ...}");
+                    if (vals.Count > PlanOpsLimits.MaxEntries) throw new QueryException("set_values: maximum " + PlanOpsLimits.MaxEntries + " values");
                     foreach (var k in vals.Keys)
                     {
                         if (!long.TryParse(k, NumberStyles.Integer, CultureInfo.InvariantCulture, out var vid))
-                            throw new QueryException("set_values: la clave '" + k + "' no es un id");
+                            throw new QueryException("set_values: the key '" + k + "' is not an id");
                         s.Ids.Add(vid);
                     }
                     break;
@@ -112,7 +112,7 @@ namespace Bimbridge.Engine
                 case "set_elevation":
                     if (o.TryGetValue("ft", out var ft) && ft != null)
                     {
-                        if (!(ft is double || ft is long)) throw new QueryException("set_elevation: ft debe ser un número en pies (o use valor con unidades)");
+                        if (!(ft is double || ft is long)) throw new QueryException("set_elevation: ft must be a number in feet (or use valor with units)");
                         s.Ft = Convert.ToDouble(ft, CultureInfo.InvariantCulture);
                     }
                     else if (o.TryGetValue("valor", out var valor) && valor != null)
@@ -120,8 +120,8 @@ namespace Bimbridge.Engine
                         if (!Lengths.TryFeet(valor, out var f, out var err)) throw new QueryException("set_elevation valor: " + err);
                         s.Ft = f;
                     }
-                    else throw new QueryException("set_elevation: falta ft (pies) o valor (\"10' - 9\\\"\", \"3277 mm\")");
-                    if (s.Ft < -1000 || s.Ft > 1000) throw new QueryException("set_elevation: fuera de rango");
+                    else throw new QueryException("set_elevation: missing ft (feet) or valor (\"10' - 9\\\"\", \"3277 mm\")");
+                    if (s.Ft < -1000 || s.Ft > 1000) throw new QueryException("set_elevation: out of range");
                     break;
                 case "set_workset":
                     s.Workset = Arg.GetString(o, "ws");
@@ -130,28 +130,28 @@ namespace Bimbridge.Engine
                     s.Name = Arg.GetString(o, "name");
                     o.TryGetValue("value", out s.Value);
                     s.Type = Arg.GetString(o, "type");
-                    if (s.Type == null && !hasIds) throw new QueryException("set_type_param: indique type \"Familia: Tipo\" o ids de instancias");
+                    if (s.Type == null && !hasIds) throw new QueryException("set_type_param: give type \"Family: Type\" or instance ids");
                     break;
                 case "snap_to_surface":
-                    if (s.RefOps.Count > 0) throw new QueryException("snap_to_surface mide elementos que ya existen: no use @n (para colocar a ras use place con montaje=losa)");
+                    if (s.RefOps.Count > 0) throw new QueryException("snap_to_surface measures elements that already exist: do not use @n (to place flush use place with montaje=losa)");
                     var lado = (Arg.GetString(o, "lado") ?? "arriba").Trim().ToLowerInvariant();
-                    if (lado != "arriba" && lado != "abajo") throw new QueryException("snap_to_surface lado: arriba (por defecto) o abajo");
+                    if (lado != "arriba" && lado != "abajo") throw new QueryException("snap_to_surface lado: arriba (default) or abajo");
                     OpCatalog.Length(o, "holgura", "snap_to_surface");
                     OpCatalog.Length(o, "max", "snap_to_surface");
                     var pts = OpCatalog.Number(o, "puntos", "snap_to_surface");
-                    if (pts.HasValue && pts != 1 && pts != 5 && pts != 9) throw new QueryException("snap_to_surface puntos: 1, 5 o 9");
+                    if (pts.HasValue && pts != 1 && pts != 5 && pts != 9) throw new QueryException("snap_to_surface puntos: 1, 5 or 9");
                     break;
                 case "move":
                     if (o.ContainsKey("to"))
                     {
                         OpCatalog.Point(o["to"], "move to");
-                        if (s.Ids.Count + (s.Set != null ? 2 : 0) + s.RefOps.Count != 1) throw new QueryException("move to: sólo con un elemento; para varios use dx/dy/dz");
+                        if (s.Ids.Count + (s.Set != null ? 2 : 0) + s.RefOps.Count != 1) throw new QueryException("move to: only with one element; for several use dx/dy/dz");
                     }
                     else
                     {
                         var any = false;
                         foreach (var k in new[] { "dx", "dy", "dz" }) any |= OpCatalog.Length(o, k, "move").HasValue;
-                        if (!any) throw new QueryException("move: indique dx, dy, dz o to [x,y,z]");
+                        if (!any) throw new QueryException("move: give dx, dy, dz or to [x,y,z]");
                     }
                     break;
                 case "rotate":
@@ -160,14 +160,14 @@ namespace Bimbridge.Engine
                     break;
                 case "mirror":
                     var eje = OpCatalog.Points(o["eje"], "mirror eje", 2, 2, false);
-                    if (Math.Abs(eje[0][0] - eje[1][0]) + Math.Abs(eje[0][1] - eje[1][1]) < 1e-6) throw new QueryException("mirror eje: los dos puntos son iguales");
+                    if (Math.Abs(eje[0][0] - eje[1][0]) + Math.Abs(eje[0][1] - eje[1][1]) < 1e-6) throw new QueryException("mirror eje: the two points are equal");
                     break;
                 case "copy":
                     if (!o.ContainsKey("nivel"))
                     {
                         var anyc = false;
                         foreach (var k in new[] { "dx", "dy", "dz" }) anyc |= OpCatalog.Length(o, k, "copy").HasValue;
-                        if (!anyc) throw new QueryException("copy: indique dx/dy/dz o nivel");
+                        if (!anyc) throw new QueryException("copy: give dx/dy/dz or nivel");
                     }
                     break;
                 case "place":
@@ -177,22 +177,22 @@ namespace Bimbridge.Engine
                         if (!(rawItems is List<object> items) || items.Count != placePoints.Count ||
                             items.Any(item => !(item is string text) || string.IsNullOrWhiteSpace(text)) ||
                             items.Distinct().Count() != items.Count)
-                            throw new QueryException("place: items_fuente exige un identificador único por punto");
+                            throw new QueryException("place: items_fuente requires a unique identifier per point");
                     }
                     OpCatalog.Length(o, "elev", "place");
                     OpCatalog.Length(o, "holgura", "place");
                     OpCatalog.Number(o, "rot", "place");
                     var montaje = Arg.GetString(o, "montaje");
                     if (montaje != null && !string.Equals(montaje, "losa", StringComparison.OrdinalIgnoreCase) && !string.Equals(montaje, "piso", StringComparison.OrdinalIgnoreCase))
-                        throw new QueryException("place montaje: losa (cara superior bajo lo de arriba) o piso (base sobre lo de abajo)");
-                    if (montaje != null && o.ContainsKey("elev")) throw new QueryException("place: use elev o montaje, no los dos");
+                        throw new QueryException("place montaje: losa (top face under what is above) or piso (base on what is below)");
+                    if (montaje != null && o.ContainsKey("elev")) throw new QueryException("place: use elev or montaje, not both");
                     if (o.TryGetValue("params", out var pr) && pr != null && !(pr is Dictionary<string, object>))
-                        throw new QueryException("place params: {\"Parámetro\": valor}");
+                        throw new QueryException("place params: {\"Parameter\": value}");
                     break;
                 case "tag":
                     if (o.TryGetValue("offset", out var off) && off != null) OpCatalog.Point(off, "tag offset", false);
                     var ori = Arg.GetString(o, "orientacion");
-                    if (ori != null && ori != "horizontal" && ori != "vertical") throw new QueryException("tag orientacion: horizontal o vertical");
+                    if (ori != null && ori != "horizontal" && ori != "vertical") throw new QueryException("tag orientacion: horizontal or vertical");
                     break;
                 case "tag_move":
                     if (o.TryGetValue("head", out var h) && h != null) OpCatalog.Point(h, "tag_move head", false);
@@ -201,55 +201,55 @@ namespace Bimbridge.Engine
                     if (o.TryGetValue("extremo", out var ex) && ex != null) OpCatalog.Point(ex, "tag_move extremo", false);
                     if (o.TryGetValue("codo", out var co) && co != null) OpCatalog.Point(co, "tag_move codo", false);
                     if (!new[] { "head", "dx", "dy", "dxp", "dyp", "leader", "extremo", "codo", "orientacion" }.Any(o.ContainsKey))
-                        throw new QueryException("tag_move: indique head, dx/dy, dxp/dyp, leader, extremo, codo u orientacion");
+                        throw new QueryException("tag_move: give head, dx/dy, dxp/dyp, leader, extremo, codo or orientacion");
                     break;
                 case "group_place":
                     OpCatalog.Points(o["puntos"], "group_place puntos", 1, 1000);
                     OpCatalog.Number(o, "rot", "group_place");
                     if (o.ContainsKey("reutilizar") && !Arg.GetBool(o, "reutilizar").HasValue)
-                        throw new QueryException("group_place reutilizar: indique true o false");
+                        throw new QueryException("group_place reutilizar: give true or false");
                     if (o.ContainsKey("prototipo") && (!(Arg.GetLong(o, "prototipo") is long prototype) || prototype <= 0))
-                        throw new QueryException("group_place prototipo: indique el ID positivo del grupo de referencia");
+                        throw new QueryException("group_place prototipo: give the positive ID of the reference group");
                     break;
                 case "group_variant":
                     if (s.Ids.Count != 1 || s.Ids[0] <= 0 || s.Set != null || s.RefOps.Count != 0 ||
                         !(o["reglas"] is Dictionary<string, object> groupRules) || groupRules.Count == 0 ||
                         groupRules.Any(pair => string.IsNullOrWhiteSpace(pair.Key) ||
                             !(pair.Value is string targetType) || string.IsNullOrWhiteSpace(targetType)))
-                        throw new QueryException("group_variant: indique el ID de un grupo y reglas {tipo anterior: tipo nuevo}");
+                        throw new QueryException("group_variant: give the ID of a group and reglas {old type: new type}");
                     break;
                 case "view_create":
                     var vt = (Arg.GetString(o, "tipo") ?? "").Trim().ToLowerInvariant();
                     var allowed = new[] { "plano", "rcp", "seccion", "callout", "3d", "duplicar", "dibujo" };
                     if (Array.IndexOf(allowed, vt) < 0) throw new QueryException("view_create tipo: " + string.Join(", ", allowed));
-                    if ((vt == "plano" || vt == "rcp") && Arg.GetString(o, "nivel") == null) throw new QueryException("view_create " + vt + ": falta nivel");
-                    if ((vt == "duplicar" || vt == "callout") && Arg.GetString(o, "origen") == null) throw new QueryException("view_create " + vt + ": falta origen (vista)");
-                    if ((vt == "seccion" || vt == "callout") && !o.ContainsKey("caja")) throw new QueryException("view_create " + vt + ": falta caja [[x0,y0,z0],[x1,y1,z1]]");
+                    if ((vt == "plano" || vt == "rcp") && Arg.GetString(o, "nivel") == null) throw new QueryException("view_create " + vt + ": missing nivel");
+                    if ((vt == "duplicar" || vt == "callout") && Arg.GetString(o, "origen") == null) throw new QueryException("view_create " + vt + ": missing origen (view)");
+                    if ((vt == "seccion" || vt == "callout") && !o.ContainsKey("caja")) throw new QueryException("view_create " + vt + ": missing caja [[x0,y0,z0],[x1,y1,z1]]");
                     if (o.ContainsKey("caja")) OpCatalog.Points(o["caja"], "view_create caja", 2, 2);
                     var opc = Arg.GetString(o, "opcion");
-                    if (opc != null && opc != "duplicar" && opc != "detalles" && opc != "dependiente") throw new QueryException("view_create opcion: duplicar, detalles o dependiente");
+                    if (opc != null && opc != "duplicar" && opc != "detalles" && opc != "dependiente") throw new QueryException("view_create opcion: duplicar, detalles or dependiente");
                     break;
                 case "view_set":
                     if (!new[] { "plantilla", "rango", "escala", "detalle", "nombre", "recorte", "scope_box", "caja_seccion" }.Any(o.ContainsKey))
-                        throw new QueryException("view_set: indique plantilla, rango, escala, detalle, nombre, recorte, scope_box o caja_seccion");
+                        throw new QueryException("view_set: give plantilla, rango, escala, detalle, nombre, recorte, scope_box or caja_seccion");
                     if (o.TryGetValue("rango", out var rg) && rg != null)
                     {
                         if (!(rg is Dictionary<string, object> rd) || rd.Count == 0) throw new QueryException("view_set rango: {top:[\"NIVEL\",offset], corte:[…], fondo:[…], profundidad:[…]}");
                         foreach (var kv in rd)
                         {
-                            if (Array.IndexOf(new[] { "top", "corte", "fondo", "profundidad" }, kv.Key) < 0) throw new QueryException("view_set rango: claves top, corte, fondo, profundidad");
-                            if (!(kv.Value is List<object> pair) || pair.Count != 2) throw new QueryException("view_set rango " + kv.Key + ": [\"NIVEL\", offset] (nivel: nombre, actual, arriba, abajo o ilimitado)");
+                            if (Array.IndexOf(new[] { "top", "corte", "fondo", "profundidad" }, kv.Key) < 0) throw new QueryException("view_set rango: keys top, corte, fondo, profundidad");
+                            if (!(kv.Value is List<object> pair) || pair.Count != 2) throw new QueryException("view_set rango " + kv.Key + ": [\"LEVEL\", offset] (level: name, actual, arriba, abajo or ilimitado)");
                             if (!Lengths.TryFeet(pair[1], out _, out var err)) throw new QueryException("view_set rango " + kv.Key + ": " + err);
                         }
                     }
                     if (o.ContainsKey("caja_seccion")) OpCatalog.Points(o["caja_seccion"], "view_set caja_seccion", 2, 2);
                     var det = Arg.GetString(o, "detalle");
-                    if (det != null && det != "fino" && det != "medio" && det != "bajo") throw new QueryException("view_set detalle: fino, medio o bajo");
+                    if (det != null && det != "fino" && det != "medio" && det != "bajo") throw new QueryException("view_set detalle: fino, medio or bajo");
                     OpCatalog.Number(o, "escala", "view_set");
                     break;
                 case "view_hide":
                 case "view_override":
-                    if (!o.ContainsKey("ids") && !o.ContainsKey("cats")) throw new QueryException(s.Kind + ": indique ids o cats");
+                    if (!o.ContainsKey("ids") && !o.ContainsKey("cats")) throw new QueryException(s.Kind + ": give ids or cats");
                     OpCatalog.Number(o, "transparencia", s.Kind);
                     OpCatalog.Number(o, "grosor", s.Kind);
                     break;
@@ -257,28 +257,28 @@ namespace Bimbridge.Engine
                     OpCatalog.Point(o["punto"], "text_note punto", false);
                     var linked = o.ContainsKey("luminaria");
                     if (linked && (!(Arg.GetLong(o, "luminaria") is long lightId) || lightId <= 0 || o.ContainsKey("texto")))
-                        throw new QueryException("text_note: luminaria exige su ID positivo y genera el texto desde el modelo");
+                        throw new QueryException("text_note: luminaria requires its positive ID and generates the text from the model");
                     if (!linked && string.IsNullOrWhiteSpace(Arg.GetString(o, "texto")))
-                        throw new QueryException("text_note: indique texto o luminaria");
+                        throw new QueryException("text_note: give texto or luminaria");
                     foreach (var key in new[] { "codigo_param", "altura_param", "descontar_tipo_param" })
                         if (o.TryGetValue(key, out var name) && (!linked || !(name is string param) || string.IsNullOrWhiteSpace(param)))
-                            throw new QueryException("text_note: " + key + " exige una luminaria y el nombre de un parámetro");
+                            throw new QueryException("text_note: " + key + " requires a luminaria and the name of a parameter");
                     foreach (var key in new[] { "negrita", "subrayado" })
                         if (o.ContainsKey(key) && !Arg.GetBool(o, key).HasValue)
-                            throw new QueryException("text_note " + key + ": indique true o false");
+                            throw new QueryException("text_note " + key + ": give true or false");
                     break;
                 case "annotation_rebind":
                     if (s.Ids.Count != 1 || s.Ids[0] <= 0 || s.Set != null || s.RefOps.Count != 0)
-                        throw new QueryException("annotation_rebind: indique el ID de una sola anotación");
+                        throw new QueryException("annotation_rebind: give the ID of a single annotation");
                     if (o.ContainsKey("destino") == o.ContainsKey("refs_estables"))
-                        throw new QueryException("annotation_rebind: indique destino o refs_estables");
+                        throw new QueryException("annotation_rebind: give destino or refs_estables");
                     if (o.ContainsKey("destino") && (!(Arg.GetLong(o, "destino") is long destination) || destination <= 0))
-                        throw new QueryException("annotation_rebind: destino debe ser un ID positivo");
+                        throw new QueryException("annotation_rebind: destino must be a positive ID");
                     if (o.TryGetValue("refs_estables", out var stableRefs) &&
                         (!(stableRefs is List<object> stable) || stable.Count < 2 || stable.Count > 100 ||
                          stable.Any(x => !(x is string reference) || string.IsNullOrWhiteSpace(reference)) ||
                          stable.Distinct().Count() != stable.Count))
-                        throw new QueryException("annotation_rebind: refs_estables exige de 2 a 100 referencias no repetidas");
+                        throw new QueryException("annotation_rebind: refs_estables requires 2 to 100 non-repeated references");
                     break;
                 case "level_create":
                 case "grid_create":
@@ -319,8 +319,8 @@ namespace Bimbridge.Engine
                 {
                     OpCatalog.Point(o["centro"], "detail_arc centro", false);
                     if (!Lengths.TryFeet(o["radio"], out var rad, out var rerr)) throw new QueryException("detail_arc radio: " + rerr);
-                    var a0 = OpCatalog.Number(o, "inicio", "detail_arc") ?? throw new QueryException("detail_arc: falta inicio (grados)");
-                    var a1 = OpCatalog.Number(o, "fin", "detail_arc") ?? throw new QueryException("detail_arc: falta fin (grados)");
+                    var a0 = OpCatalog.Number(o, "inicio", "detail_arc") ?? throw new QueryException("detail_arc: missing inicio (degrees)");
+                    var a1 = OpCatalog.Number(o, "fin", "detail_arc") ?? throw new QueryException("detail_arc: missing fin (degrees)");
                     var ae = Draw2D.ValidateArc(rad, a0, a1);
                     if (ae != null) throw new QueryException("detail_arc: " + ae);
                     break;
@@ -344,8 +344,8 @@ namespace Bimbridge.Engine
                     Draw2D.Segments(dl, false, out var de);
                     if (de != null) throw new QueryException("dimension linea: " + de);
                     var refs = (Arg.GetString(o, "refs") ?? "").Split(',').Where(x => x.Trim().Length > 0).ToList();
-                    if (refs.Count < 2) throw new QueryException("dimension refs: al menos 2 ids de líneas de detalle");
-                    if (refs.Any(x => x.Trim().StartsWith("@", StringComparison.Ordinal))) throw new QueryException("dimension refs: en 0.8.0 sólo ids existentes (no @n del mismo plan): cree las líneas en un plan y acote en el siguiente");
+                    if (refs.Count < 2) throw new QueryException("dimension refs: at least 2 detail line ids");
+                    if (refs.Any(x => x.Trim().StartsWith("@", StringComparison.Ordinal))) throw new QueryException("dimension refs: in 0.8.0 only existing ids (no @n of the same plan): create the lines in one plan and dimension in the next");
                     break;
                 }
                 case "sheet_place":
@@ -353,10 +353,10 @@ namespace Bimbridge.Engine
                     break;
                 case "sheet_set":
                 {
-                    if (string.IsNullOrWhiteSpace(Arg.GetString(o, "nombre"))) throw new QueryException("sheet_set: falta nombre");
+                    if (string.IsNullOrWhiteSpace(Arg.GetString(o, "nombre"))) throw new QueryException("sheet_set: missing nombre");
                     var hs = o.TryGetValue("hojas", out var hv) && hv is List<object> hl ? hl.Select(x => Convert.ToString(x, System.Globalization.CultureInfo.InvariantCulture)?.Trim() ?? "").ToList() : null;
-                    if (hs == null || hs.Count == 0 || hs.Count > 1000 || hs.Any(x => x.Length == 0)) throw new QueryException("sheet_set hojas: lista de 1 a 1000 láminas (número, nombre o id)");
-                    if (hs.Any(x => x.StartsWith("@", StringComparison.Ordinal))) throw new QueryException("sheet_set hojas: sin @n; cree las láminas en un plan y guarde el conjunto en el siguiente");
+                    if (hs == null || hs.Count == 0 || hs.Count > 1000 || hs.Any(x => x.Length == 0)) throw new QueryException("sheet_set hojas: list of 1 to 1000 sheets (number, name or id)");
+                    if (hs.Any(x => x.StartsWith("@", StringComparison.Ordinal))) throw new QueryException("sheet_set hojas: no @n; create the sheets in one plan and save the set in the next");
                     break;
                 }
             }
@@ -369,26 +369,26 @@ namespace Bimbridge.Engine
         public const int MaxEntries = 20000;
     }
 
-    /// <summary>Un cambio concreto sobre un elemento, con el valor que tenía al planificar y el que tendrá.</summary>
+    /// <summary>A concrete change on an element, with the value it had when planned and the value it will have.</summary>
     public sealed class PlanEntry : IJsonWritable
     {
-        /// <summary>Elemento que cambia; 0 si la entrada crea uno nuevo.</summary>
+        /// <summary>Element that changes; 0 if the entry creates a new one.</summary>
         public long Id;
         public string Op;
-        /// <summary>Qué se cambia: nombre del parámetro, "type", "elev", "ws", "exists", "loc", "nuevo"…</summary>
+        /// <summary>What changes: parameter name, "type", "elev", "ws", "exists", "loc", "nuevo"…</summary>
         public string Key;
-        /// <summary>Valor canónico (texto) al planificar. Al aplicar se compara con el actual: si difiere, hay conflicto.</summary>
+        /// <summary>Canonical value (text) when planned. On apply it is compared with the current one: if it differs, there is a conflict.</summary>
         public string Before;
         public string After;
-        /// <summary>Valor tipado para aplicar (double/long/string/bool), id de destino o un objeto con los datos de creación.</summary>
+        /// <summary>Typed value to apply (double/long/string/bool), target id or an object with the creation data.</summary>
         public object Target;
-        /// <summary>Operación del plan que la generó (desde 1), para resolver @n.</summary>
+        /// <summary>Plan operation that generated it (from 1), to resolve @n.</summary>
         public int OpIndex;
-        /// <summary>Texto legible del "después" cuando After es técnico (p. ej. una creación).</summary>
+        /// <summary>Readable text of the "after" when After is technical (e.g. a creation).</summary>
         public string Show;
         /// <summary>
-        /// &gt; 0: la entrada se aplica a lo que cree la operación Ref del mismo plan (ids=@n). Al planificar esos elementos aún no
-        /// existen: no hay "antes" que comparar.
+        /// &gt; 0: the entry applies to what operation Ref of the same plan creates (ids=@n). When planning, those elements do not
+        /// exist yet: there is no "before" to compare.
         /// </summary>
         public int Ref;
 
@@ -421,9 +421,9 @@ namespace Bimbridge.Engine
         };
 
         /// <summary>
-        /// ¿Dos valores canónicos son el mismo? Igual texto, o los mismos números separados por , | ; = + y espacios con una diferencia
-        /// menor que <paramref name="tol"/> (pies: 1e-5 ft = 0.003 mm). Evita conflictos falsos por ruido de coma flotante al encadenar
-        /// planes retenidos y al verificar tras aplicar.
+        /// Are two canonical values the same? Equal text, or the same numbers separated by , | ; = + and spaces with a difference
+        /// smaller than <paramref name="tol"/> (feet: 1e-5 ft = 0.003 mm). Avoids false conflicts from floating-point noise when chaining
+        /// held plans and when verifying after apply.
         /// </summary>
         public static bool Same(string a, string b, double tol = 1e-5)
         {
@@ -438,7 +438,7 @@ namespace Bimbridge.Engine
                 if (!double.TryParse(tb[i], NumberStyles.Float, CultureInfo.InvariantCulture, out var y)) return false;
                 if (Math.Abs(x - y) > tol)
                 {
-                    // Ángulos: 359.99999 y 0 son el mismo giro.
+                    // Angles: 359.99999 and 0 are the same rotation.
                     if (!(Math.Abs(Math.Abs(x - y) - 360) <= tol)) return false;
                 }
             }
@@ -464,7 +464,7 @@ namespace Bimbridge.Engine
             return list;
         }
 
-        /// <summary>Forma canónica para comparar valores sin problemas de redondeo ni de formato.</summary>
+        /// <summary>Canonical form to compare values without rounding or formatting issues.</summary>
         public static string Canon(object v)
         {
             switch (v)
@@ -482,18 +482,18 @@ namespace Bimbridge.Engine
 
     public static class PlanStatus
     {
-        public const string Listo = "listo";            // planificado, esperando commit
+        public const string Listo = "listo";            // planned, waiting for commit
         public const string EnProceso = "en_proceso";
-        public const string Retenido = "retenido";      // en la cola de Revit, esperando que el usuario lo aplique
+        public const string Retenido = "retenido";      // in the Revit queue, waiting for the user to apply it
         public const string Aplicado = "aplicado";
         public const string Conflicto = "conflicto";
         public const string Revertido = "revertido";
         public const string Descartado = "descartado";
         public const string Vencido = "vencido";
-        /// <summary>alpha3: resultado de commit modo=ensayo (aplicado, verificado y REVERTIDO). No es un estado del plan:
-        /// el plan vuelve a "listo". Nunca equivale a aplicado.</summary>
+        /// <summary>alpha3: result of commit modo=ensayo (applied, verified and REVERTED). Not a plan state:
+        /// the plan goes back to "listo". Never equivalent to applied.</summary>
         public const string Ensayado = "ensayado";
-        /// <summary>Resultado incierto ya comprobado y registrado. Terminal: nunca vuelve a listo.</summary>
+        /// <summary>Uncertain result already checked and recorded. Terminal: never returns to listo.</summary>
         public const string Reconciliado = "reconciliado";
     }
 
@@ -504,17 +504,17 @@ namespace Bimbridge.Engine
         public string Client;
         public string DocKey;
         public string DocTitle;
-        /// <summary>Handle dN del documento en este Revit (commit aplica sobre él aunque el usuario cambie de pestaña).</summary>
+        /// <summary>Handle dN of the document in this Revit (commit applies to it even if the user switches tabs).</summary>
         public string DocId;
-        /// <summary>Tarea autorizada (tarea=…): otra conexión de la misma tarea puede hacer commit tras reconectar.</summary>
+        /// <summary>Authorized task (tarea=…): another connection of the same task can commit after reconnecting.</summary>
         public string Task;
-        /// <summary>Clave de idempotencia del commit (clave=…).</summary>
+        /// <summary>Idempotency key of the commit (clave=…).</summary>
         public string IdemKey;
-        /// <summary>AUD-19: vínculo con la fuente del lote (testigo, clave y huella derivadas del contenido). null si el plan no viene de una fuente.
-        /// El commit usa esta clave y esta huella en el diario de operaciones aunque el agente no pase clave=.</summary>
+        /// <summary>AUD-19: link to the batch source (token, key and fingerprint derived from the content). null if the plan does not come from a source.
+        /// The commit uses this key and this fingerprint in the operation journal even if the agent does not pass clave=.</summary>
         public string BoundToken, BoundKey, BoundHash;
         public string ReceiptAttempt, ReceiptSession, ReceiptAgent, ReceiptDocPrint;
-        public string Summary;          // texto corto que la IA da (o se genera) para mostrar en la cola
+        public string Summary;          // short text the AI gives (or is generated) to show in the queue
         public DateTime CreatedUtc;
         public string Status = PlanStatus.Listo;
         public string StatusDetail;
@@ -524,16 +524,16 @@ namespace Bimbridge.Engine
         public List<string> Warnings = new List<string>();
         public int AppliedBatches;
         public int TotalBatches;
-        /// <summary>Ids creados al aplicar (en orden). Se guardan como $creados en la sesión.</summary>
+        /// <summary>Ids created on apply (in order). Saved as $creados in the session.</summary>
         public List<long> Created = new List<long>();
-        /// <summary>Creados por cada operación (n desde 1): $creados_n en la sesión.</summary>
+        /// <summary>Created by each operation (n from 1): $creados_n in the session.</summary>
         public Dictionary<int, List<long>> CreatedByOp = new Dictionary<int, List<long>>();
-        /// <summary>Relectura tras aplicar: cuántos quedaron como se planificó y cuáles no.</summary>
+        /// <summary>Re-read after apply: how many ended up as planned and which did not.</summary>
         public Dictionary<string, object> Verification;
         public Dictionary<string, object> Reconciliation;
-        /// <summary>Último fallo de almacenamiento de este plan. Null si su estado está en disco.</summary>
+        /// <summary>Last storage failure of this plan. Null if its state is on disk.</summary>
         public string StorageWarning;
-        /// <summary>Copia leída de disco: la verdad del bloqueo sigue estando en el archivo (puede ser la intención viva de otro proceso).</summary>
+        /// <summary>Copy read from disk: the truth of the lock is still in the file (it may be another process's live intent).</summary>
         internal bool FromDisk;
 
         public bool IsFinal => Status == PlanStatus.Aplicado || Status == PlanStatus.Conflicto || Status == PlanStatus.Revertido
@@ -598,7 +598,7 @@ namespace Bimbridge.Engine
             return p;
         }
 
-        /// <summary>Diff compacto para la IA y para la cola: encabezado una vez y hasta N filas.</summary>
+        /// <summary>Compact diff for the AI and for the queue: header once and up to N rows.</summary>
         public Dictionary<string, object> Describe(int maxRows = 30)
         {
             var d = new Dictionary<string, object>
@@ -615,7 +615,7 @@ namespace Bimbridge.Engine
                     ResultTable.Trim(ShowValue(x, x.Before, true)), ResultTable.Trim(x.Show ?? ShowValue(x, x.After, false)),
                 }).ToList(),
             };
-            if (BoundKey != null) d["clave_vinculada"] = BoundKey;   // AUD-19: el commit la usa aunque no se pase clave=
+            if (BoundKey != null) d["clave_vinculada"] = BoundKey;   // AUD-19: the commit uses it even if clave= is not passed
             var nuevos = CreationCount;
             if (nuevos > 0) d["nuevos"] = (long)nuevos;
             if (Entries.Count > maxRows) d["filas_omitidas"] = (long)(Entries.Count - maxRows);
@@ -632,7 +632,7 @@ namespace Bimbridge.Engine
             return d;
         }
 
-        /// <summary>Los "antes" de las creaciones son guardas técnicas (qué debe seguir existiendo): se muestran como "—".</summary>
+        /// <summary>The "before" values of creations are technical guards (what must still exist): shown as "—".</summary>
         public static string ShowValue(PlanEntry e, string v, bool before)
         {
             if (v == null) return "";
@@ -644,7 +644,7 @@ namespace Bimbridge.Engine
             return v;
         }
 
-        /// <summary>Entradas cuyo valor actual ya no es el que se vio al planificar (alguien lo cambió).</summary>
+        /// <summary>Entries whose current value is no longer the one seen when planning (someone changed it).</summary>
         public List<PlanEntry> FindConflicts(Func<PlanEntry, string> currentValue)
         {
             var list = new List<PlanEntry>();
@@ -660,8 +660,8 @@ namespace Bimbridge.Engine
     }
 
     /// <summary>
-    /// Planes en memoria + cola de retenidos en disco (%LOCALAPPDATA%\Bimbridge\cola\&lt;doc&gt;\P-xxxx.json).
-    /// La cola en disco sobrevive a un cierre o crash de Revit; al aplicar se vuelve a validar cada valor.
+    /// Plans in memory + queue of held plans on disk (%LOCALAPPDATA%\Bimbridge\cola\&lt;doc&gt;\P-xxxx.json).
+    /// The on-disk queue survives a Revit close or crash; on apply every value is validated again.
     /// </summary>
     public sealed class PlanStore
     {
@@ -670,7 +670,7 @@ namespace Bimbridge.Engine
         private readonly string _queueRoot;
         private readonly Func<DateTime> _now;
         private int _counter;
-        /// <summary>Operaciones de disco; reemplazables para probar fallos de almacenamiento.</summary>
+        /// <summary>Disk operations; replaceable to test storage failures.</summary>
         public Action<string, string> WriteFile = Home.WriteAtomic;
         public Action<string> RemoveFile = path => { if (File.Exists(path)) File.Delete(path); };
         public TimeSpan LockWait = TimeSpan.FromSeconds(5);
@@ -709,7 +709,7 @@ namespace Bimbridge.Engine
             lock (_lock) return _plans.TryGetValue(id.Trim(), out var p) ? p : null;
         }
 
-        /// <summary>Pasa a "vencido" los planes listos más viejos que el límite. Los retenidos no vencen.</summary>
+        /// <summary>Moves to "vencido" the ready plans older than the limit. Held plans do not expire.</summary>
         public int ExpireOld(TimeSpan maxAge)
         {
             var n = 0;
@@ -718,7 +718,7 @@ namespace Bimbridge.Engine
                     if (p.Status == PlanStatus.Listo && _now() - p.CreatedUtc > maxAge)
                     {
                         p.Status = PlanStatus.Vencido;
-                        p.StatusDetail = "pasaron más de " + (int)maxAge.TotalMinutes + " min; vuelva a planificar";
+                        p.StatusDetail = "more than " + (int)maxAge.TotalMinutes + " min passed; plan again";
                         n++;
                     }
             return n;
@@ -730,13 +730,13 @@ namespace Bimbridge.Engine
             {
                 p.Status = PlanStatus.Retenido;
                 p.HeldUtc = _now();
-                p.StatusDetail = "en la cola de Revit; el usuario lo aplicará con 'Aplicar cola'";
+                p.StatusDetail = "in the Revit queue; the user will apply it with 'Apply queue'";
                 _plans[p.Id] = p;
             }
             Persist(p);
         }
 
-        /// <summary>Retenidos de un documento, en orden de llegada.</summary>
+        /// <summary>Held plans of a document, in arrival order.</summary>
         public List<Plan> Held(string docKey)
         {
             lock (_lock)
@@ -747,8 +747,8 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// Cierra un plan. Devuelve false si su estado no quedó en disco: el fallo se anota en el plan y el documento sigue bloqueado.
-        /// Un resultado desconocido siempre conserva evidencia, aunque quien llama no la haya preparado.
+        /// Closes a plan. Returns false if its state did not reach disk: the failure is noted in the plan and the document stays locked.
+        /// An unknown result always keeps evidence, even if the caller did not prepare it.
         /// </summary>
         public bool Finish(Plan p, string status, string detail)
         {
@@ -761,7 +761,7 @@ namespace Bimbridge.Engine
                 p.FromDisk = false;
                 if (status == Status.Desconocido) GroupAbort.PreserveInterrupted(p, detail);
             }
-            // La evidencia de un resultado incierto debe sobrevivir a un cierre de Revit: nunca se borra al terminar.
+            // The evidence of an uncertain result must survive a Revit close: it is never deleted on finish.
             try
             {
                 if (p.Reconciliation == null) DeleteFile(p);
@@ -772,13 +772,13 @@ namespace Bimbridge.Engine
             {
                 lock (_lock)
                     p.StorageWarning = (p.Reconciliation == null
-                        ? "no se pudo retirar la intención de escritura del disco (" + ex.Message + "); el documento sigue bloqueado hasta reconciliar."
-                        : "no se pudo guardar la evidencia en disco (" + ex.Message + "); no es durable y el documento sigue bloqueado.");
+                        ? "could not remove the write intent from disk (" + ex.Message + "); the document stays locked until reconciled."
+                        : "could not save the evidence to disk (" + ex.Message + "); it is not durable and the document stays locked.");
                 return false;
             }
         }
 
-        /// <summary>Planes con evidencia pendiente de reconciliar en un documento.</summary>
+        /// <summary>Plans with evidence pending reconciliation in a document.</summary>
         public List<Plan> Unreconciled(string docKey)
         {
             lock (_lock)
@@ -789,8 +789,8 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// ¿Se puede escribir? Lee siempre el disco, así que ve lo que dejó otro proceso o un cierre de Revit.
-        /// También cuenta la evidencia que sólo está en la memoria de este proceso. Una duda de lectura bloquea.
+        /// Can it write? Always reads the disk, so it sees what another process or a Revit close left behind.
+        /// It also counts evidence that is only in this process's memory. A read doubt blocks.
         /// </summary>
         public DocWriteBlock CheckWritable(string docKey)
         {
@@ -818,8 +818,8 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// Última barrera antes de tocar el modelo: comprueba el documento y deja en disco la intención de escritura, bajo un bloqueo entre
-        /// procesos. Si Revit muere después, el archivo mantiene el documento bloqueado. Lanza sin haber cambiado nada si no puede garantizarlo.
+        /// Last barrier before touching the model: checks the document and leaves the write intent on disk, under a cross-process
+        /// lock. If Revit dies afterwards, the file keeps the document locked. Throws without having changed anything if it cannot guarantee this.
         /// </summary>
         public void BeginWrite(Plan p)
         {
@@ -827,12 +827,12 @@ namespace Bimbridge.Engine
             {
                 var block = CheckWritable(p.DocKey);
                 if (block.Blocked) throw new DocWriteBlockedException(block);
-                WriteSnapshot(p, "intención de escritura sin resultado registrado: el proceso pudo terminar durante la operación");
+                WriteSnapshot(p, "write intent with no recorded result: the process may have ended during the operation");
             });
         }
 
-        /// <summary>Punto de control tras cada lote: conserva los ids creados. Lanza PlanStoreException si no quedó en disco.</summary>
-        public void Checkpoint(Plan p) => WriteSnapshot(p, "interrumpido tras el lote " + p.AppliedBatches + " de " + p.TotalBatches);
+        /// <summary>Checkpoint after each batch: keeps the created ids. Throws PlanStoreException if it did not reach disk.</summary>
+        public void Checkpoint(Plan p) => WriteSnapshot(p, "interrupted after batch " + p.AppliedBatches + " of " + p.TotalBatches);
 
         private void WriteSnapshot(Plan p, string reason)
         {
@@ -853,13 +853,13 @@ namespace Bimbridge.Engine
             try { WriteFile(Path.Combine(DocDir(p.DocKey), p.Id + ".json"), text); }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
-                throw new PlanStoreException("no se pudo guardar la intención de escritura del plan " + p.Id + ": " + ex.Message, ex);
+                throw new PlanStoreException("could not save the write intent of plan " + p.Id + ": " + ex.Message, ex);
             }
         }
 
         /// <summary>
-        /// Libera un plan sólo con un veredicto verificado. Primero archiva evidencia y veredicto en reconciliados\ y después retira el archivo
-        /// activo: si algo falla, el documento sigue bloqueado. Un veredicto no verificable queda anotado y no libera nada.
+        /// Releases a plan only with a verified verdict. First archives evidence and verdict in reconciliados\ and then removes the active
+        /// file: if anything fails, the document stays locked. An unverifiable verdict is noted and releases nothing.
         /// </summary>
         public bool Reconcile(Plan p, ReconcileCheck check, string author)
         {
@@ -874,12 +874,12 @@ namespace Bimbridge.Engine
                 {
                     lock (_lock)
                     {
-                        if (p.Reconciliation == null) GroupAbort.PreserveInterrupted(p, "sin evidencia previa");
+                        if (p.Reconciliation == null) GroupAbort.PreserveInterrupted(p, "no prior evidence");
                         if (!(p.Reconciliation.TryGetValue("intentos", out var a) && a is List<object> attempts)) p.Reconciliation["intentos"] = attempts = new List<object>();
                         attempts.Add(record);
                     }
                     try { Persist(p); }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { lock (_lock) p.StorageWarning = "no se pudo anotar el intento: " + ex.Message; }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { lock (_lock) p.StorageWarning = "could not note the attempt: " + ex.Message; }
                     return;
                 }
                 var archive = new Dictionary<string, object> { ["registro"] = record, ["plan"] = Json.Parse(Json.Write(p)) };
@@ -891,12 +891,12 @@ namespace Bimbridge.Engine
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
-                    throw new PlanStoreException("no se pudo registrar la reconciliación de " + p.Id + "; el documento sigue bloqueado: " + ex.Message, ex);
+                    throw new PlanStoreException("could not record the reconciliation of " + p.Id + "; the document stays locked: " + ex.Message, ex);
                 }
                 lock (_lock)
                 {
                     p.Status = PlanStatus.Reconciliado;
-                    p.StatusDetail = check.Verdict + " por " + author;
+                    p.StatusDetail = check.Verdict + " by " + author;
                     p.FinishedUtc = _now();
                     p.StorageWarning = null;
                     p.FromDisk = false;
@@ -907,11 +907,11 @@ namespace Bimbridge.Engine
             return released;
         }
 
-        /// <summary>Aparta un archivo de evidencia dañado a cuarentena\ con un registro humano. No lo borra. Sólo para la vía manual con Revit cerrado.</summary>
+        /// <summary>Moves a damaged evidence file to cuarentena\ with a human record. Does not delete it. Only for the manual path with Revit closed.</summary>
         public void QuarantineCorrupt(string docDir, string fileName, string author, string justification)
         {
-            if (string.IsNullOrWhiteSpace(justification)) throw new ArgumentException("falta la justificación");
-            if (fileName != Path.GetFileName(fileName) || !fileName.StartsWith("P-", StringComparison.Ordinal)) throw new ArgumentException("archivo no válido: " + fileName);
+            if (string.IsNullOrWhiteSpace(justification)) throw new ArgumentException("missing justification");
+            if (fileName != Path.GetFileName(fileName) || !fileName.StartsWith("P-", StringComparison.Ordinal)) throw new ArgumentException("invalid file: " + fileName);
             var src = Path.Combine(docDir, fileName);
             var dest = Path.Combine(docDir, "cuarentena");
             Directory.CreateDirectory(dest);
@@ -924,7 +924,7 @@ namespace Bimbridge.Engine
             File.Move(src, Path.Combine(dest, fileName + "." + stamp));
         }
 
-        /// <summary>Bloqueo entre procesos por documento. Si no se obtiene, no se escribe.</summary>
+        /// <summary>Cross-process lock per document. If it is not obtained, nothing is written.</summary>
         private void WithDocLock(string docKey, Action body)
         {
             FileStream handle = null;
@@ -941,7 +941,7 @@ namespace Bimbridge.Engine
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
-                throw new PlanStoreException("no se pudo obtener el bloqueo del documento: " + ex.Message, ex);
+                throw new PlanStoreException("could not obtain the document lock: " + ex.Message, ex);
             }
             using (handle) body();
         }
@@ -960,8 +960,8 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// Último valor que dejará la cola para (elemento, campo), si algún plan retenido lo toca.
-        /// Así un plan nuevo se encadena sobre los retenidos en vez de chocar con ellos al aplicar.
+        /// Last value the queue will leave for (element, field), if any held plan touches it.
+        /// That way a new plan chains onto the held ones instead of clashing with them on apply.
         /// </summary>
         public bool TryHeldAfter(string docKey, long id, string key, out string after, out string planId)
         {
@@ -976,7 +976,7 @@ namespace Bimbridge.Engine
             return planId != null;
         }
 
-        /// <summary>Planes de una sesión, los más recientes primero.</summary>
+        /// <summary>Plans of a session, most recent first.</summary>
         public List<Plan> ForSession(string sessionId, int max = 20)
         {
             lock (_lock)
@@ -985,7 +985,7 @@ namespace Bimbridge.Engine
                     .Take(max).ToList();
         }
 
-        /// <summary>Descarta todos los retenidos de un documento. Devuelve cuántos.</summary>
+        /// <summary>Discards all held plans of a document. Returns how many.</summary>
         public int DiscardHeld(string docKey, string detail)
         {
             var list = Held(docKey);
@@ -993,7 +993,7 @@ namespace Bimbridge.Engine
             return list.Count;
         }
 
-        /// <summary>Carga los retenidos guardados en disco de un documento (por ejemplo, tras reiniciar Revit).</summary>
+        /// <summary>Loads the held plans saved on disk for a document (for example, after restarting Revit).</summary>
         public int LoadPersisted(string docKey)
         {
             var dir = DocDir(docKey);
@@ -1006,11 +1006,11 @@ namespace Bimbridge.Engine
                     var p = Plan.FromJson(ReadShared(f));
                     if (p.Status != PlanStatus.Retenido && p.Status != PlanStatus.EnProceso && p.Reconciliation == null) continue;
                     p.FromDisk = true;
-                    // Una intención sin resultado nunca se convierte en éxito ni vuelve a listo.
+                    // An intent without a result never turns into success nor goes back to listo.
                     if (p.Status == PlanStatus.EnProceso)
                     {
                         p.Status = Status.Desconocido;
-                        p.StatusDetail = "la operación empezó y no registró resultado; reconcilie antes de escribir";
+                        p.StatusDetail = "the operation started and recorded no result; reconcile before writing";
                         GroupAbort.PreserveInterrupted(p, p.StatusDetail);
                     }
                     lock (_lock)
@@ -1020,7 +1020,7 @@ namespace Bimbridge.Engine
                     }
                     n++;
                 }
-                catch (Exception) { /* archivo dañado: se conserva y CheckWritable bloquea el documento */ }
+                catch (Exception) { /* damaged file: kept, and CheckWritable locks the document */ }
             }
             return n;
         }
@@ -1039,7 +1039,7 @@ namespace Bimbridge.Engine
             RemoveFile(file);
         }
 
-        /// <summary>Carpeta por documento: hash corto de la ruta (las rutas de nube tienen caracteres no válidos).</summary>
+        /// <summary>Folder per document: short hash of the path (cloud paths have invalid characters).</summary>
         public string DocDir(string docKey)
         {
             using (var sha = SHA1.Create())

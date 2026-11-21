@@ -1,0 +1,153 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N8-04",
+ "titulo": "2D drafting",
+ "estado_inicial": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW.",
+ "variables": {},
+ "pasos": [
+  {
+   "nombre": "drafting view and geometry",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "view_create",
+      "tipo": "dibujo",
+      "nombre": "BB-N8-04 DRAFTING",
+      "escala": 48
+     },
+     {
+      "op": "detail_line",
+      "view": "@1",
+      "puntos": [
+       [
+        0,
+        0
+       ],
+       [
+        10,
+        0
+       ],
+       [
+        10,
+        5
+       ]
+      ]
+     },
+     {
+      "op": "detail_rect",
+      "view": "@1",
+      "esquinas": [
+       [
+        12,
+        0
+       ],
+       [
+        16,
+        2
+       ]
+      ]
+     },
+     {
+      "op": "detail_polygon",
+      "view": "@1",
+      "centro": [
+       20,
+       2
+      ],
+      "radio": 1,
+      "lados": 6
+     },
+     {
+      "op": "detail_arc",
+      "view": "@1",
+      "centro": [
+       25,
+       2
+      ],
+      "radio": "6 in",
+      "inicio": 0,
+      "fin": 180
+     },
+     {
+      "op": "text_note",
+      "view": "@1",
+      "punto": [
+       0,
+       8
+      ],
+      "texto": "BB-N8-04"
+     },
+     {
+      "op": "filled_region",
+      "view": "@1",
+      "puntos": [
+       [
+        0,
+        10
+       ],
+       [
+        4,
+        10
+       ],
+       [
+        4,
+        12
+       ],
+       [
+        0,
+        12
+       ]
+      ]
+     }
+    ],
+    "summary": "campaign 0.8.0"
+   },
+   "guardar": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "nombre": "apply",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "escritura": true
+  },
+  {
+   "nombre": "the view exists",
+   "op": "catalog",
+   "args": {
+    "que": "vistas",
+    "buscar": "BB-N8-04"
+   },
+   "contiene": [
+    "BB-N8-04 DRAFTING"
+   ]
+  },
+  {
+   "nombre": "invalid segment is rejected before Revit",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "detail_line",
+      "view": 1,
+      "puntos": [
+       [
+        0,
+        0
+       ],
+       [
+        0.001,
+        0
+       ]
+      ]
+     }
+    ]
+   },
+   "esperar": "invalido"
+  }
+ ]
+}

@@ -1,53 +1,53 @@
-# 0.7.0 — Bimbridge.AgentHost: fronteras iniciales
+# 0.7.0 — Bimbridge.AgentHost: initial boundaries
 
-Diseño mínimo para empezar la 0.7.0 sin usar capacidades que 0.6.1 deja restringidas. No se implementa en 0.6.1.
+Minimal design to start 0.7.0 without using capabilities that 0.6.1 leaves restricted. Not implemented in 0.6.1.
 
-## 1. Lugar en la arquitectura
+## 1. Place in the architecture
 
-`Claude/Codex → AgentHost (C#, proceso propio) → contratos de ejecución → Engine C# en Revit (+ workers de cálculo)`
+`Claude/Codex → AgentHost (C#, its own process) → execution contracts → C# Engine in Revit (+ compute workers)`
 
-AgentHost **no** tiene acceso a la API de Revit ni a las concesiones: habla con el add-in por el mismo puente (pipe por usuario), con un cliente como cualquier otro. Todo lo que modifique el modelo pasa por `tarea` y, por tanto, por concesiones de una persona, auditoría en dos fases, leases y reconciliación.
+AgentHost has **no** access to the Revit API or to grants: it talks to the add-in over the same bridge (per-user pipe), as a client like any other. Everything that modifies the model goes through `tarea` and therefore through a person's grants, two-phase audit, leases and reconciliation.
 
-## 2. Representación intermedia (BIM Task IR), esquema 1
+## 2. Intermediate representation (BIM Task IR), schema 1
 
 ```json
 {
   "ir": 1,
-  "id": "op-7f3a…",                       // estable: sha256 de (fuente + alcance + operación + parámetros canónicos)
+  "id": "op-7f3a…",                       // stable: sha256 of (source + scope + operation + canonical parameters)
   "documento": {"clave": "archivo:c:\\…\\practica.rvt", "huella": "…"},
   "alcance": {"categoria": "OST_LightingFixtures", "nivel": "LEVEL 03", "ids": [], "consulta": "…"},
-  "operacion": "fijar_parametro",          // del catálogo cerrado (= recetas instaladas); nada de código libre
+  "operacion": "fijar_parametro",          // from the closed catalog (= installed recipes); no free code
   "parametros": {"parametro": "Mounting Height", "valor": 2700, "unidades": "mm"},
-  "precondiciones": ["vista RCP existe", "elementos sin etiqueta"],
+  "precondiciones": ["RCP view exists", "untagged elements"],
   "depende_de": ["op-12ab…"],
-  "autorizacion": ["revit_modificar"],     // calculada, no declarada por el agente
+  "autorizacion": ["revit_modificar"],     // computed, not declared by the agent
   "resultado_esperado": {"cambiados": 43},
   "verificacion": {"receta": "qc_manifiesto", "tolerancias": {"z": 25}},
-  "reintento": "nunca_si_dudoso",          // idempotencia: sólo se repite lo que el motor prueba que no quedó
+  "reintento": "nunca_si_dudoso",          // idempotency: only what the engine proves did not stick is repeated
   "estado": "propuesta",                   // propuesta → validada → simulada → aprobada → en_tarea → verificada | rechazada
-  "trazabilidad": [{"fuente": "E-1.3.03 p.1 región B2", "sha256": "…", "cita": "MH 22'-4\""}]
+  "trazabilidad": [{"fuente": "E-1.3.03 p.1 region B2", "sha256": "…", "cita": "MH 22'-4\""}]
 }
 ```
 
-- `estado` sólo avanza a `aprobada` con una concesión real (botón «Autorizar» en Revit); AgentHost no la puede crear.
-- `operacion` se compila a `tarea iniciar receta=<instalada>`; una IR que requiera código fuera del catálogo queda en `propuesta` con el motivo.
+- `estado` only advances to `aprobada` with a real grant (the «Autorizar» button in Revit); AgentHost cannot create it.
+- `operacion` compiles to `tarea iniciar receta=<installed>`; an IR that requires code outside the catalog stays in `propuesta` with the reason.
 
-## 3. Lo que se puede construir ya (sin capacidades restringidas)
+## 3. What can be built now (without restricted capabilities)
 
-| Orden | Trabajo | Usa | Depende de |
+| Order | Work | Uses | Depends on |
 |---|---|---|---|
-| 1 | Esquema IR + validador (JSON Schema + pruebas) | nada de Revit | — |
-| 2 | Extracción de requisitos de documentos con trazabilidad (`fuente`, `sha256`, cita) | archivos | 1 |
-| 3 | Grafo de dependencias y orden topológico; detección de ciclos | memoria | 1 |
-| 4 | Consultas de sólo lectura al modelo vía `revit`/`exec modo=consulta` (perfil restringido) | puente | — |
-| 5 | Simulación: `qc_manifiesto` y `montaje_soportes` (recetas de lectura instaladas) | puente | 4 |
-| 6 | Memoria de contexto resumida por tarea (ya existe `tarea resumen`) y por documento | disco | — |
-| 7 | Adaptador simulado del motor (el `FakeBackend` de las pruebas) para desarrollar el orquestador sin Revit | pruebas | — |
-| 8 | Coordinación Claude/Codex: cola de propuestas con dueño por IR, usando los mismos leases con fencing | Engine | 3 |
+| 1 | IR schema + validator (JSON Schema + tests) | nothing from Revit | — |
+| 2 | Requirement extraction from documents with traceability (`fuente`, `sha256`, quote) | files | 1 |
+| 3 | Dependency graph and topological order; cycle detection | memory | 1 |
+| 4 | Read-only queries to the model via `revit`/`exec modo=consulta` (restricted profile) | bridge | — |
+| 5 | Simulation: `qc_manifiesto` and `montaje_soportes` (installed read recipes) | bridge | 4 |
+| 6 | Summarized context memory per task (`tarea resumen` already exists) and per document | disk | — |
+| 7 | Simulated engine adapter (the tests' `FakeBackend`) to develop the orchestrator without Revit | tests | — |
+| 8 | Claude/Codex coordination: proposal queue with an owner per IR, using the same leases with fencing | Engine | 3 |
 
-## 4. Lo que queda bloqueado hasta cumplir sus condiciones
+## 4. What stays blocked until its conditions are met
 
-- Escrituras autónomas sobre modelos reales: requieren la aceptación nativa D-01..D-12 en copias de práctica (ver NATIVE_ACCEPTANCE_0.6.1.md).
-- Reanudación automática de escrituras dudosas: nunca automática; sólo `reconciliar` con evidencia y concesión.
-- Código libre autónomo: sólo con aprobación de esa receta (`receta_externa`).
-- Workers Rust: sólo tras el benchmark de RUST_INTEROP_DESIGN.md §6.
+- Autonomous writes on real models: require native acceptance D-01..D-12 on practice copies (see NATIVE_ACCEPTANCE_0.6.1.md).
+- Automatic resumption of uncertain writes: never automatic; only `reconciliar` with evidence and a grant.
+- Autonomous free code: only with approval of that recipe (`receta_externa`).
+- Rust workers: only after the benchmark in RUST_INTEROP_DESIGN.md §6.

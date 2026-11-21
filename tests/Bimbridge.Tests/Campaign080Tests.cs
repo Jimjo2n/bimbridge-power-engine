@@ -17,7 +17,7 @@ namespace Bimbridge.Tests
         {
             var d = new DirectoryInfo(AppContext.BaseDirectory);
             while (d != null && !File.Exists(Path.Combine(d.FullName, "Directory.Build.props"))) d = d.Parent;
-            return Path.Combine(d.FullName, "tools", "aceptacion", "0.8.0");
+            return Path.Combine(d.FullName, "tools", "acceptance", "0.8.0");
         }
 
         [Fact]
@@ -45,7 +45,7 @@ namespace Bimbridge.Tests
             Assert.True(seen[1].Write);
             var pasos = (List<object>)r["pasos"];
             Assert.True((bool)((Dictionary<string, object>)pasos[1])["ok"]);
-            Assert.Contains("no ejecutado", (string)((Dictionary<string, object>)pasos[4])["motivo"]);
+            Assert.Contains("not run", (string)((Dictionary<string, object>)pasos[4])["motivo"]);
         }
 
         [Fact]
@@ -103,7 +103,7 @@ namespace Bimbridge.Tests
             v.Params["excepciones"] = new System.Collections.Generic.Dictionary<string, object> { ["D-103"] = "justificada en la fuente, hoja 2" };
             d.Ops.Add(v); d.AssignIds();
             var text = Json.Write(d.ToJson());
-            var path = Path.Combine(Path.GetDirectoryName(typeof(Campaign080Tests).Assembly.Location)!, "..", "..", "..", "..", "..", "tools", "aceptacion", "0.8.0", "N8-10_plan.json");
+            var path = Path.Combine(Path.GetDirectoryName(typeof(Campaign080Tests).Assembly.Location)!, "..", "..", "..", "..", "..", "tools", "acceptance", "0.8.0", "N8-10_plan.json");
             if (Environment.GetEnvironmentVariable("BIMBRIDGE_GEN_MATRIZ") == "1") File.WriteAllText(path, text);
             var errs = IrValidator.Validate(PlanDraft.Parse(File.ReadAllText(path)), out _);
             Assert.Empty(errs);

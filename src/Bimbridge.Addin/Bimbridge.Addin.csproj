@@ -57,9 +57,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- recetas\*.cs (recipes) are compiled inside Revit with Roslyn (tarea iniciar receta=…); they are not part of the assembly -->
-    <Compile Remove="recetas\**" />
-    <None Include="recetas\*.cs" />
+    <!-- recipes\*.cs are compiled inside Revit with Roslyn (tarea iniciar receta=…); they are not part of the assembly -->
+    <Compile Remove="recipes\**" />
+    <None Include="recipes\*.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Bimbridge.Protocol\Bimbridge.Protocol.csproj" />

@@ -1,13 +1,13 @@
-# Matriz fallo → protección → aceptación (FPA) 0.6.1
+# Failure → protection → acceptance matrix (FPA) 0.6.1
 
-| Fallo | Protección | Prueba |
+| Failure | Protection | Test |
 |---|---|---|
-| Dos Revit toman la misma tarea | bloqueo de archivo + fencing | 20 procesos reales |
-| Revit A se cuelga, B toma la tarea, A despierta | A valida fencing antes del lote → interrumpida | LeaseStolen_MidRun |
-| `lease.json` corrupto | error explícito, no ejecuta | Lease_CorruptFile |
-| Disco lleno / carpeta de auditoría sin permiso | `exec` de escritura rechazado; tarea `parcial` si el diario de unidades falla (0.6.0) | AuditLogTests, DurabilityTests |
-| Alguien borra o edita una línea de auditoría | `Verify` lo detecta | AuditLogTests |
-| Caída entre commit y diario | verificar, nunca re-ejecutar a ciegas (0.6.0) | TaskEngineTests |
-| Receta con `Process.Start`, red, reflexión, `doc.Close` | rechazada en perfil autónomo | HostileCode |
-| Receta alterada en la carpeta de la tarea | SHA-256 no coincide → no se reanuda (0.6.0) | TaskEngineTests |
-| Otro proceso ocupa el nombre del pipe | PID y ejecutable comprobados | PipeServerCheckTests |
+| Two Revits take the same task | file lock + fencing | 20 real processes |
+| Revit A hangs, B takes the task, A wakes up | A validates fencing before the batch → interrumpida | LeaseStolen_MidRun |
+| Corrupt `lease.json` | explicit error, does not run | Lease_CorruptFile |
+| Full disk / audit folder without permission | write `exec` rejected; task `parcial` if the unit journal fails (0.6.0) | AuditLogTests, DurabilityTests |
+| Someone deletes or edits an audit line | `Verify` detects it | AuditLogTests |
+| Crash between commit and journal | verify, never blindly re-run (0.6.0) | TaskEngineTests |
+| Recipe with `Process.Start`, network, reflection, `doc.Close` | rejected in the autonomous profile | HostileCode |
+| Recipe altered in the task folder | SHA-256 mismatch → not resumed (0.6.0) | TaskEngineTests |
+| Another process takes the pipe name | PID and executable checked | PipeServerCheckTests |

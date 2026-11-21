@@ -1,0 +1,118 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Washbasin case with the general runner (exec), without using the typed act actions.
+// Creates or reconciles two water connectors in the open RFA: "fria" (cold) and "caliente" (hot), with RADIUS 6.5 mm (not diameter).
+// Side: facing the fixture from the front, cold on the right and hot on the left. The front is taken as the -Y side
+// of the family (Revit Front view convention); if the family uses another front, pass frente="+Y", "-X" or "+X".
+// Flow: "In" or "Bidirectional" is NOT decided; if flujo= is not passed, it is not changed and is reported as pending.
+//
+// Usage (doc = handle of the RFA, from "revit docs" or from "act abrir familia=..."):
+//   exec modo=ejecutar tx=auto doc=dN args={"cara_fria":"812:3","cara_caliente":"812:5","radio_mm":6.5}
+// Repeating it does not duplicate: it first searches by the connector description ("fria"/"caliente").
+using Autodesk.Revit.DB.Plumbing;
+
+public static class Lavamanos
+{
+    public static object Run(Bimbridge.Addin.Scripting.ScriptContext ctx)
+    {
+        var doc = ctx.Doc;
+        if (!doc.IsFamilyDocument) throw new InvalidOperationException("open the washbasin RFA (act abrir familia=...) and pass doc=dN");
+        var a = ctx.Args;
+        string S(string k) => a != null && a.ContainsKey(k) && a[k] != null ? Convert.ToString(a[k], System.Globalization.CultureInfo.InvariantCulture) : null;
+        var radioMm = S("radio_mm") != null ? double.Parse(S("radio_mm"), System.Globalization.CultureInfo.InvariantCulture) : 6.5;
+        var radioFt = radioMm / 304.8;
+        var frente = (S("frente") ?? "-Y").ToUpperInvariant();
+        var flujo = S("flujo");
+
+        // Planar faces with a reference, numbered the same as "revit fam caras" (element:n).
+        var faces = new List<(string label, PlanarFace face)>();
+        var opt = new Options { ComputeReferences = true, IncludeNonVisibleObjects = false, DetailLevel = ViewDetailLevel.Fine };
+        foreach (var e in new FilteredElementCollector(doc).WhereElementIsNotElementType()
+                     .Where(x => x is GenericForm || x is FreeFormElement || x is ImportInstance).OrderBy(x => ctx.Long(x.Id)))
+        {
+            var geo = e.get_Geometry(opt);
+            if (geo == null) continue;
+            var idx = 0;
+            foreach (var obj in geo)
+            {
+                if (!(obj is Solid s) || s.Volume <= 0) continue;
+                foreach (Face f in s.Faces)
+                {
+                    if (!(f is PlanarFace pf)) continue;
+                    idx++;
+                    if (pf.Reference != null) faces.Add((ctx.Long(e.Id) + ":" + idx, pf));
+                }
+            }
+        }
+        if (S("cara_fria") == null || S("cara_caliente") == null)
+            return new { estado = "missing faces", aviso = "pass cara_fria and cara_caliente (element:n); candidates below", caras = faces.Select(f => new { f.label, normal = f.face.FaceNormal, origen_mm = new[] { f.face.Origin.X * 304.8, f.face.Origin.Y * 304.8, f.face.Origin.Z * 304.8 } }).Take(60) };
+
+        PlanarFace Face(string label) => faces.FirstOrDefault(f => f.label == label).face ?? throw new ArgumentException("face does not exist: " + label);
+        var fFria = Face(S("cara_fria"));
+        var fCal = Face(S("cara_caliente"));
+
+        var all = new FilteredElementCollector(doc).OfClass(typeof(ConnectorElement)).Cast<ConnectorElement>().ToList();
+        string Desc(ConnectorElement c) => c.get_Parameter(BuiltInParameter.RBS_CONNECTOR_DESCRIPTION)?.AsString() ?? "";
+        var cambios = new List<string>();
+        var pendientes = new List<string>();
+
+        ConnectorElement Upsert(string clave, PipeSystemType sys, PlanarFace face)
+        {
+            var mine = all.Where(c => string.Equals(Desc(c), clave, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (mine.Count > 1) throw new InvalidOperationException("there are already " + mine.Count + " connectors '" + clave + "': resolve the duplicate first");
+            var c = mine.FirstOrDefault();
+            if (c == null)
+            {
+                c = ConnectorElement.CreatePipeConnector(doc, sys, face.Reference);
+                c.get_Parameter(BuiltInParameter.RBS_CONNECTOR_DESCRIPTION)?.Set(clave);
+                cambios.Add(clave + ": created");
+            }
+            var pr = c.get_Parameter(BuiltInParameter.CONNECTOR_RADIUS);
+            var assoc = doc.FamilyManager.GetAssociatedFamilyParameter(pr);
+            if (assoc != null)
+            {
+                if (Math.Abs(pr.AsDouble() - radioFt) > 1e-6)
+                    pendientes.Add(clave + ": the radius is driven by '" + assoc.Definition.Name + "'; change it in that parameter (the association is not broken)");
+            }
+            else if (Math.Abs(pr.AsDouble() - radioFt) > 1e-6) { pr.Set(radioFt); cambios.Add(clave + ": radius → " + radioMm + " mm"); }
+            if (flujo != null)
+            {
+                var fv = flujo.Equals("In", StringComparison.OrdinalIgnoreCase) ? FlowDirectionType.In
+                       : flujo.StartsWith("Bi", StringComparison.OrdinalIgnoreCase) ? FlowDirectionType.Bidirectional
+                       : flujo.Equals("Out", StringComparison.OrdinalIgnoreCase) ? FlowDirectionType.Out
+                       : throw new ArgumentException("flujo must be In, Out or Bidirectional");
+                var pf = c.get_Parameter(BuiltInParameter.RBS_PIPE_FLOW_DIRECTION_PARAM);
+                if (pf != null && pf.AsInteger() != (int)fv) { pf.Set((int)fv); cambios.Add(clave + ": flow → " + fv); }
+            }
+            return c;
+        }
+
+        var fria = Upsert("fria", PipeSystemType.DomesticColdWater, fFria);
+        var cal = Upsert("caliente", PipeSystemType.DomesticHotWater, fCal);
+        if (flujo == null) pendientes.Add("flow In or Bidirectional undecided: not changed");
+
+        // Side: the "right" of an observer facing the front. With front -Y the observer looks toward +Y and their right is +X.
+        XYZ derecha = frente == "-Y" ? XYZ.BasisX : frente == "+Y" ? -XYZ.BasisX : frente == "-X" ? -XYZ.BasisY : frente == "+X" ? XYZ.BasisY
+                    : throw new ArgumentException("frente must be -Y, +Y, -X or +X");
+        var lado = (fria.Origin - cal.Origin).DotProduct(derecha);
+        var ladoOk = lado > 1e-6;
+        if (!ladoOk) pendientes.Add("the cold connector is NOT to the right of the hot one facing front " + frente + ": change the faces");
+
+        // Verification: one "fria" connector and one "caliente" connector, exact radius, no duplicates.
+        doc.Regenerate();
+        var after = new FilteredElementCollector(doc).OfClass(typeof(ConnectorElement)).Cast<ConnectorElement>().ToList();
+        object V(ConnectorElement c) => new
+        {
+            id = ctx.Long(c.Id), clave = Desc(c), sistema = c.SystemClassification.ToString(),
+            radio_mm = Math.Round(c.get_Parameter(BuiltInParameter.CONNECTOR_RADIUS).AsDouble() * 304.8, 4),
+            flujo = c.get_Parameter(BuiltInParameter.RBS_PIPE_FLOW_DIRECTION_PARAM)?.AsValueString(),
+            origen_mm = new[] { Math.Round(c.Origin.X * 304.8, 1), Math.Round(c.Origin.Y * 304.8, 1), Math.Round(c.Origin.Z * 304.8, 1) },
+        };
+        return new
+        {
+            cambios, pendientes,
+            conectores = after.Select(V).ToList(),
+            n_fria = after.Count(c => Desc(c) == "fria"), n_caliente = after.Count(c => Desc(c) == "caliente"),
+            lado_correcto = ladoOk, frente,
+        };
+    }
+}

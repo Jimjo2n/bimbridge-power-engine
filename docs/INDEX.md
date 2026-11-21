@@ -16,8 +16,7 @@
 - [Architecture decision records](adr/0001-csharp-core.md)
 
 ## Users
-- [Spanish introduction](README.es.md)
-- [Recipes](RECETAS.md)
+- [Recipes](RECIPES.md)
 - [Capabilities](MATRIZ_CAPACIDADES.md)
 - [Compact tool schema](ESQUEMA_HERRAMIENTAS_compacto.json) and [complete tool schema](ESQUEMA_HERRAMIENTAS_completo.json); consult source for current behavior
 

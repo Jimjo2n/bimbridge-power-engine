@@ -12,10 +12,10 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine.Families
 {
     /// <summary>
-    /// 0.8.0 (Paquete D): descubrimiento de familias en carpetas AUTORIZADAS. Indexa archivos .rfa sin Revit (nombre, carpeta,
-    /// tamaño, fecha, versión de Revit leída del archivo cuando es posible, tipos del catálogo .txt hermano), con caché invalidada por
-    /// tamaño y fecha. Nunca explora fuera de las raíces configuradas (ni por "..", ni por enlaces), y la carga posterior exige que el
-    /// archivo siga siendo el mismo que se indexó (SHA-256).
+    /// 0.8.0 (Package D): family discovery in AUTHORIZED folders. Indexes .rfa files without Revit (name, folder,
+    /// size, date, Revit version read from the file when possible, types from the sibling .txt catalog), with a cache invalidated by
+    /// size and date. Never explores outside the configured roots (neither via ".." nor via links), and a later load requires the
+    /// file to still be the same one that was indexed (SHA-256).
     /// </summary>
     public sealed class FamilyLibrary
     {
@@ -27,9 +27,9 @@ namespace Bimbridge.Engine.Families
             public string Path, Root, Relative, Name;
             public long Size;
             public long MtimeTicks;
-            public int? RevitVersion;        // null = no se pudo leer del archivo
+            public int? RevitVersion;        // null = could not be read from the file
             public List<string> CatalogTypes = new List<string>();
-            public string Sha256;            // se calcula al cargar, no al indexar
+            public string Sha256;            // computed on load, not on indexing
 
             public Dictionary<string, object> ToJson(bool full = false)
             {
@@ -57,7 +57,7 @@ namespace Bimbridge.Engine.Families
 
         public static string Normalize(string p) => System.IO.Path.GetFullPath(p.Trim().Trim('"')).TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
 
-        /// <summary>¿Está dentro de una raíz autorizada? (ruta canónica; ".." y rutas relativas no escapan).</summary>
+        /// <summary>Is it inside an authorized root? (canonical path; ".." and relative paths do not escape).</summary>
         public string RootOf(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) return null;
@@ -68,7 +68,7 @@ namespace Bimbridge.Engine.Families
             return null;
         }
 
-        /// <summary>Indexa (o refresca) las raíces. Devuelve (nuevos, actualizados, quitados, reutilizados de caché).</summary>
+        /// <summary>Indexes (or refreshes) the roots. Returns (added, updated, removed, reused from cache).</summary>
         public (int added, int updated, int removed, int cached) Refresh()
         {
             var old = _byPath.Count > 0 ? _byPath : LoadCache();
@@ -110,15 +110,15 @@ namespace Bimbridge.Engine.Families
                 foreach (var f in files) yield return f;
                 foreach (var d in dirs)
                 {
-                    try { if ((new DirectoryInfo(d).Attributes & FileAttributes.ReparsePoint) != 0) continue; } catch (Exception) { continue; }  // no se siguen enlaces
+                    try { if ((new DirectoryInfo(d).Attributes & FileAttributes.ReparsePoint) != 0) continue; } catch (Exception) { continue; }  // links are not followed
                     stack.Push(d);
                 }
             }
         }
 
         /// <summary>
-        /// Versión de Revit con la que se guardó el RFA. El flujo BasicFileInfo del archivo OLE guarda, en UTF-16, "Format: 2024"
-        /// (o en versiones antiguas "Autodesk Revit 2019"). Se busca en los primeros 16 MB; si no aparece, se devuelve null (no se adivina).
+        /// Revit version the RFA was saved with. The BasicFileInfo stream of the OLE file stores, in UTF-16, "Format: 2024"
+        /// (or "Autodesk Revit 2019" in older versions). The first 16 MB are searched; if it does not appear, null is returned (no guessing).
         /// </summary>
         public static int? ReadRevitVersion(string path)
         {
@@ -152,7 +152,7 @@ namespace Bimbridge.Engine.Families
             return null;
         }
 
-        /// <summary>Catálogo de tipos de Revit: un .txt con el mismo nombre junto al .rfa; la primera columna de cada fila es el tipo.</summary>
+        /// <summary>Revit type catalog: a .txt with the same name next to the .rfa; the first column of each row is the type.</summary>
         public static List<string> ReadTypeCatalog(string rfa)
         {
             var txt = System.IO.Path.ChangeExtension(rfa, ".txt");
@@ -182,8 +182,8 @@ namespace Bimbridge.Engine.Families
         }
 
         /// <summary>
-        /// Búsqueda por palabras (nombre pesa más que carpeta; los tipos del catálogo también cuentan). <paramref name="revitVersion"/>:
-        /// la del Revit destino (un RFA de una versión posterior no se puede cargar). <paramref name="loadedFamilies"/>: ya cargadas.
+        /// Word search (name weighs more than folder; catalog types also count). <paramref name="revitVersion"/>:
+        /// the target Revit's (an RFA from a later version cannot be loaded). <paramref name="loadedFamilies"/>: already loaded.
         /// </summary>
         public List<Hit> Search(string query, int revitVersion, IEnumerable<string> loadedFamilies = null, string folderFilter = null, int top = 10)
         {
@@ -204,12 +204,12 @@ namespace Bimbridge.Engine.Families
                     score += s;
                 }
                 if (matched == 0) continue;
-                score = score * matched / tokens.Count;   // las que cubren todas las palabras primero
+                score = score * matched / tokens.Count;   // those covering all words first
                 var compatible = !e.RevitVersion.HasValue || e.RevitVersion.Value <= revitVersion;
                 hits.Add(new Hit
                 {
                     Entry = e, Score = score, Compatible = compatible, Loaded = loaded.Contains(e.Name),
-                    Why = !compatible ? "guardada en Revit " + e.RevitVersion + ", posterior al destino " + revitVersion : null,
+                    Why = !compatible ? "saved in Revit " + e.RevitVersion + ", later than the target " + revitVersion : null,
                 });
             }
             return hits.OrderByDescending(h => h.Compatible).ThenByDescending(h => h.Score).ThenBy(h => h.Entry.Relative.Length).Take(Math.Max(1, Math.Min(top, 50))).ToList();
@@ -218,22 +218,22 @@ namespace Bimbridge.Engine.Families
         private static List<string> Tokens(string s) =>
             Regex.Split((s ?? "").ToLowerInvariant(), @"[^\p{L}\p{N}]+").Where(t => t.Length > 0).Distinct().ToList();
 
-        /// <summary>Antes de cargar: dentro de raíz, indexado, sin cambios desde el índice y con hash calculado.</summary>
+        /// <summary>Before loading: inside a root, indexed, unchanged since indexing, and with the hash computed.</summary>
         public Entry ResolveForLoad(string path, out string error)
         {
             error = null;
-            if (RootOf(path) == null) { error = "la ruta no está dentro de una carpeta de familias autorizada"; return null; }
+            if (RootOf(path) == null) { error = "the path is not inside an authorized family folder"; return null; }
             var full = Normalize(path);
-            if (!_byPath.TryGetValue(full, out var e)) { error = "la familia no está en el índice; refresque la biblioteca (fam buscar refrescar=true)"; return null; }
+            if (!_byPath.TryGetValue(full, out var e)) { error = "the family is not in the index; refresh the library (fam buscar refrescar=true)"; return null; }
             var fi = new FileInfo(full);
-            if (!fi.Exists) { error = "el archivo ya no existe"; return null; }
-            if (fi.Length != e.Size || fi.LastWriteTimeUtc.Ticks != e.MtimeTicks) { error = "el archivo cambió desde que se indexó; refresque y vuelva a elegir"; return null; }
+            if (!fi.Exists) { error = "the file no longer exists"; return null; }
+            if (fi.Length != e.Size || fi.LastWriteTimeUtc.Ticks != e.MtimeTicks) { error = "the file changed since it was indexed; refresh and choose again"; return null; }
             using (var fs = new FileStream(full, FileMode.Open, FileAccess.Read, FileShare.Read))
             using (var h = SHA256.Create()) e.Sha256 = string.Concat(h.ComputeHash(fs).Select(b => b.ToString("x2")));
             return e;
         }
 
-        // ---------------- caché ----------------
+        // ---------------- cache ----------------
 
         private Dictionary<string, Entry> LoadCache()
         {
@@ -251,7 +251,7 @@ namespace Bimbridge.Engine.Families
                         RevitVersion = Arg.GetLong(o, "v") is long v ? (int?)v : null,
                         CatalogTypes = Arg.GetStringList(o, "t").ToList(),
                     };
-                    if (e.Path != null && RootOf(e.Path) != null) d[e.Path] = e;   // una caché vieja no amplía las raíces
+                    if (e.Path != null && RootOf(e.Path) != null) d[e.Path] = e;   // an old cache does not widen the roots
                 }
             }
             catch (Exception) { }

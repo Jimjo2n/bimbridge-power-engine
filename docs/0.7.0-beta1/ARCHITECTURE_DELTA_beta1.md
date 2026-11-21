@@ -1,47 +1,47 @@
-# Delta de arquitectura beta1 (sobre alpha3)
+# beta1 architecture delta (over alpha3)
 
-No hay frameworks nuevos. Todo es C#/.NET; no hay Python ni Rust.
+No new frameworks. Everything is C#/.NET; no Python or Rust.
 
-| Pieza | Cambio |
+| Piece | Change |
 |---|---|
-| Add-in `DocOps.VerifyOnDisk` | Verbo `verificar_disco` de `doc`. Exige un .rvt local guardado, no workshared y sin cambios. Calcula el SHA-256 del archivo, abre una copia temporal con `Application.OpenDocumentFile` y lee `LookupParameter(p)` de 1 a 200 ids. Cierra con `Close(false)` y borra la copia. Requiere el nivel D o W, como el resto de `doc`. |
-| AgentHost `RevitCli.Nrt05Run` | El núcleo del arnés es testeable con un add-in falso: recibe la conexión ya abierta. |
-| AgentHost `OpState.DirectiveName` | Correspondencia de estados (ver abajo). |
-| Setup.Core `SetupCore.CopyOver` | Quita el atributo de sólo lectura antes de sobrescribir. `Platform.LastWarning` recoge los fallos no fatales. |
-| build.sh / build.ps1 | Árbol limpio obligatorio y `SourceRevisionId=HEAD`. `BIMBRIDGE_ALLOW_DIRTY=1` sólo para desarrollo. |
+| Add-in `DocOps.VerifyOnDisk` | `verificar_disco` verb of `doc`. Requires a saved local .rvt, not workshared and without changes. Computes the file's SHA-256, opens a temporary copy with `Application.OpenDocumentFile` and reads `LookupParameter(p)` for 1 to 200 ids. Closes with `Close(false)` and deletes the copy. Requires level D or W, like the rest of `doc`. |
+| AgentHost `RevitCli.Nrt05Run` | The harness core is testable with a fake add-in: it receives the connection already open. |
+| AgentHost `OpState.DirectiveName` | State mapping (see below). |
+| Setup.Core `SetupCore.CopyOver` | Clears the read-only attribute before overwriting. `Platform.LastWarning` collects non-fatal failures. |
+| build.sh / build.ps1 | Clean tree required and `SourceRevisionId=HEAD`. `BIMBRIDGE_ALLOW_DIRTY=1` for development only. |
 
-## Estados (contrato de estados de ejecución → OpState existente)
-| Decisión de diseño | OpState |
+## States (execution state contract → existing OpState)
+| Design decision | OpState |
 |---|---|
 | PREPARED | `validada` |
-| AUTHORIZED | `validada` con una autorización vigente del plan (GrantStore + `RealWrites` del operador) |
+| AUTHORIZED | `validada` with a current authorization for the plan (GrantStore + the operator's `RealWrites`) |
 | EXECUTING | `en_ejecucion` |
 | COMMITTED | `ejecutada` |
 | VERIFIED | `verificada` |
-| ROLLED_BACK | `ensayada` (ensayo revertido) |
-| REJECTED | `bloqueada`, `cancelada` o `fallida` sin intento de escritura |
-| OUTCOME_UNKNOWN | `requiere_verificacion` o `requiere_reconciliar` |
+| ROLLED_BACK | `ensayada` (rolled-back trial) |
+| REJECTED | `bloqueada`, `cancelada` or `fallida` without a write attempt |
+| OUTCOME_UNKNOWN | `requiere_verificacion` or `requiere_reconciliar` |
 
-Un éxito de IPC nunca es VERIFIED: `ejecutada` sólo pasa a `verificada` tras observar el modelo. La semántica de ensayo (TrialGuard) no se aplica a `persistente`.
+An IPC success is never VERIFIED: `ejecutada` only moves to `verificada` after observing the model. Trial semantics (TrialGuard) do not apply to `persistente`.
 
-## Auditoría de exec y tareas (§6)
-- `exec modo=ejecutar` ya distingue estos casos:
-  - `revertido`: nada aplicado, se puede repetir.
-  - `parcial`: hay cambios confirmados; reconciliar.
-  - `desconocido`: Revit no confirmó ni revirtió.
+## exec and task audit (§6)
+- `exec modo=ejecutar` already distinguishes these cases:
+  - `revertido`: nothing applied, can be repeated.
+  - `parcial`: there are committed changes; reconcile.
+  - `desconocido`: Revit neither committed nor rolled back.
 
-  Comprueba el estado de Commit, Assimilate y RollBack. El resultado se serializa antes del commit. No hubo hallazgos nuevos.
-- Tras una interrupción, la clave de idempotencia (`opId#fencing`) y el diario del add-in impiden un segundo commit: se observa y no se repite. Lo cubren las pruebas NRT-03 (5 puntos de caída) y la de timeout persistente.
+  It checks the status of Commit, Assimilate and RollBack. The result is serialized before the commit. No new findings.
+- After an interruption, the idempotency key (`opId#fencing`) and the add-in journal prevent a second commit: it is observed and not repeated. Covered by the NRT-03 tests (5 crash points) and the persistent timeout test.
 
-## Política de TI (§12)
-- **Proveedores identificables:**
-  - Cada cliente MCP (Claude Code o Codex) se registra por separado, y cada sesión queda en el diario del add-in con su id.
-  - AgentHost registra pid, tubería e instancia en cada llamada (`llamadas.jsonl`).
-- **Restricción:** la configuración de niveles del add-in (`R`, `P`, `W`, `D`) es el interruptor por instancia:
-  - sin `W` no hay escritura;
-  - sin `D` (o `W`) no hay guardar ni verificar_disco;
-  - "Pausar IA" rechaza todo.
-- **Separación por modo:** `lectura`, `ensayo` (rollback literal) y `persistente`.
-  - El modo lo fija el operador al lanzar el AgentHost; el plan no puede ampliarlo.
-  - `persistente` exige un archivo local, no workshared, no de sólo lectura y sin cola.
-- **Auditoría:** diario del plan (`diario.jsonl`), diario de operaciones del add-in (clave de idempotencia), `llamadas.jsonl` con ms y bytes, e informe JSON de cada NRT.
+## IT policy (§12)
+- **Identifiable providers:**
+  - Each MCP client (Claude Code or Codex) is registered separately, and each session is recorded in the add-in journal with its id.
+  - AgentHost records pid, pipe and instance on every call (`llamadas.jsonl`).
+- **Restriction:** the add-in level configuration (`R`, `P`, `W`, `D`) is the per-instance switch:
+  - without `W` there are no writes;
+  - without `D` (or `W`) there is no save and no verificar_disco;
+  - "Pause AI" rejects everything.
+- **Separation by mode:** `lectura`, `ensayo` (literal rollback) and `persistente`.
+  - The mode is set by the operator when launching the AgentHost; the plan cannot widen it.
+  - `persistente` requires a local file, not workshared, not read-only and without a queue.
+- **Audit:** plan journal (`diario.jsonl`), add-in operation journal (idempotency key), `llamadas.jsonl` with ms and bytes, and a JSON report for each NRT.

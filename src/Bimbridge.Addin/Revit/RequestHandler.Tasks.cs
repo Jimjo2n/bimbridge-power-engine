@@ -38,7 +38,7 @@ namespace Bimbridge.Addin.Revit
                 try
                 {
                     var store = new TaskStore();
-                    _recipes = new RecipeRegistry(RecipeRegistry.UserFolder, Path.Combine(ScriptHost.AddinDir, "recetas"));
+                    _recipes = new RecipeRegistry(RecipeRegistry.UserFolder, Path.Combine(ScriptHost.AddinDir, "recipes"));
                     _taskMgr = new TaskManager(store, DocRegistry.Instance.InstanceId, t => new RevitTaskBackend(this, t))
                     {
                         // R03: without a grant store, the engine denies every write (DenyWritesAuthority).

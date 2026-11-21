@@ -1,0 +1,91 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N8-08",
+ "titulo": "Authorization and rejection",
+ "estado_inicial": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW. config.json: \"permisos\": [\"leer\",\"modificar_proyecto\",\"interfaz\"]; restart Revit after changing it.",
+ "variables": {
+  "ids": "3–30 ids",
+  "rfa": "path of the RFA from N8-06"
+ },
+ "pasos": [
+  {
+   "nombre": "dynamic code denied",
+   "op": "exec",
+   "args": {
+    "modo": "ejecutar",
+    "codigo": "return 1;"
+   },
+   "escritura": true,
+   "esperar": "rechazado",
+   "contiene": [
+    "codigo_dinamico"
+   ]
+  },
+  {
+   "nombre": "sync denied",
+   "op": "doc",
+   "args": {
+    "accion": "sync"
+   },
+   "escritura": true,
+   "esperar": "rechazado",
+   "contiene": [
+    "sincronizar"
+   ]
+  },
+  {
+   "nombre": "export denied",
+   "op": "doc",
+   "args": {
+    "accion": "pdf",
+    "hojas": [
+     "BB-N8-05"
+    ]
+   },
+   "escritura": true,
+   "esperar": "rechazado",
+   "contiene": [
+    "exportar"
+   ]
+  },
+  {
+   "nombre": "load file denied",
+   "op": "fam",
+   "args": {
+    "accion": "cargar_archivo",
+    "ruta": "${rfa}"
+   },
+   "escritura": true,
+   "esperar": "rechazado",
+   "contiene": [
+    "cargar_archivo"
+   ]
+  },
+  {
+   "nombre": "modify project allowed",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "set_param",
+      "ids": "${ids}",
+      "name": "Comments",
+      "value": "BB-N8-08"
+     }
+    ],
+    "summary": "campaign 0.8.0"
+   },
+   "guardar": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "nombre": "apply allowed",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "escritura": true
+  }
+ ]
+}

@@ -1,0 +1,96 @@
+{
+ "esquema": "bimbridge.campana080/1",
+ "item": "N8-05",
+ "titulo": "Sheet creation and composition",
+ "estado_inicial": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW.",
+ "variables": {
+  "vista_lamina": "id of a view that is not on any sheet (e.g. BB-N8-04 DRAFTING)"
+ },
+ "pasos": [
+  {
+   "nombre": "sheet and view",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "sheet_create",
+      "numero": "BB-N8-05",
+      "nombre": "BIMBRIDGE CAMPAIGN"
+     },
+     {
+      "op": "sheet_place",
+      "hoja": "@1",
+      "vista": "${vista_lamina}"
+     }
+    ],
+    "summary": "campaign 0.8.0"
+   },
+   "guardar": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "nombre": "apply",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "escritura": true
+  },
+  {
+   "nombre": "sheet set (print set)",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "sheet_set",
+      "nombre": "BB-N8-05 SET",
+      "hojas": [
+       "BB-N8-05"
+      ]
+     }
+    ],
+    "summary": "campaign 0.8.0"
+   },
+   "guardar": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "nombre": "save set",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "escritura": true
+  },
+  {
+   "nombre": "repeated set without replace is rejected",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "sheet_set",
+      "nombre": "BB-N8-05 SET",
+      "hojas": [
+       "BB-N8-05"
+      ]
+     }
+    ]
+   },
+   "esperar": "invalido",
+   "depende_del_modelo": true
+  },
+  {
+   "nombre": "the sheet exists",
+   "op": "catalog",
+   "args": {
+    "que": "laminas",
+    "buscar": "BB-N8-05"
+   },
+   "contiene": [
+    "BB-N8-05"
+   ]
+  }
+ ]
+}

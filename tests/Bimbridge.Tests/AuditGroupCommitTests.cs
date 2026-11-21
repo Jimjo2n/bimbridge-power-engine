@@ -101,7 +101,7 @@ namespace Bimbridge.Tests
             using (HoldLock(p))
             {
                 var ex = Assert.Throws<JournalUnavailableException>(() => b.Append("b", "op", "ok"));
-                Assert.Contains("no se escribió nada", ex.Message);
+                Assert.Contains("nothing was written", ex.Message);
             }
             Assert.Equal(1, b.Failures);
             Assert.Empty(Pending(p));                          // the withdrawn entry cannot be written by another leader later
@@ -125,7 +125,7 @@ namespace Bimbridge.Tests
                 using (new FileStream(Pending(p)[0], FileMode.Open, FileAccess.Read, FileShare.None, 4096, FileOptions.DeleteOnClose)) { }
                 var ex = Assert.Throws<AggregateException>(() => t.Wait(10000));
                 Assert.IsType<JournalUnavailableException>(ex.InnerException);
-                Assert.Contains("reclamada", ex.InnerException.Message);
+                Assert.Contains("claimed", ex.InnerException.Message);
             }
             Assert.Single(Lines(p));                           // the follower does not rewrite it: no duplicates
             b.Append("b", "despues", "ok");

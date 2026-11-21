@@ -19,12 +19,12 @@ namespace BimBridge.PowerEngine.Workflows
         private static bool Same(Edge a, Edge b) => Key(a.Start) == Key(b.Start) && Key(a.End) == Key(b.End);
         private static string Text(Dictionary<string, object> item, string key) =>
             Arg.GetString(item, key)?.Trim() is string value && value.Length > 0 ? value :
-                throw new QueryException("riser: falta " + key);
+                throw new QueryException("riser: missing " + key);
         private static Dictionary<string, object> Object(object value) => value as Dictionary<string, object> ??
-            throw new QueryException("riser: se esperaba un objeto JSON");
+            throw new QueryException("riser: a JSON object was expected");
         private static List<object> List(Dictionary<string, object> args, string name) =>
             args.TryGetValue(name, out var value) && value is List<object> rows ? rows :
-                throw new QueryException("riser: faltan los objetos de " + name);
+                throw new QueryException("riser: missing the objects of " + name);
 
         private static Dictionary<string, Edge> Read(IEnumerable<object> rows, string source)
         {
@@ -36,9 +36,9 @@ namespace BimBridge.PowerEngine.Workflows
                 var end = Arg.GetString(row, "destino")?.Trim();
                 var open = Arg.GetBool(row, "abierto") == true;
                 if (open != string.IsNullOrEmpty(end) || (!open && Key(start) == Key(end)))
-                    throw new QueryException(source + ": extremo inválido en " + id);
+                    throw new QueryException(source + ": invalid end in " + id);
                 var key = Key(id);
-                if (result.ContainsKey(key)) throw new QueryException(source + ": ID de alimentador repetido " + id);
+                if (result.ContainsKey(key)) throw new QueryException(source + ": repeated feeder ID " + id);
                 result.Add(key, new Edge { Id = id, Start = start, End = open ? null : end, Evidence = row });
             }
             return result;
@@ -50,7 +50,7 @@ namespace BimBridge.PowerEngine.Workflows
             var b = Read(pdf, "PDF");
             var precedence = (Arg.GetString(args, "precedencia") ?? "acuerdo").ToLowerInvariant();
             if (precedence != "acuerdo" && precedence != "excel" && precedence != "pdf")
-                throw new QueryException("precedencia: use acuerdo, excel o pdf");
+                throw new QueryException("precedencia: use acuerdo, excel or pdf");
             var resolved = new List<Edge>();
             var unresolved = false;
             var output = new List<object>();
@@ -98,8 +98,8 @@ namespace BimBridge.PowerEngine.Workflows
 
         private static List<object> Draw(Dictionary<string, object> args, List<Edge> edges, out List<object> drawing)
         {
-            var view = Arg.GetLong(args, "vista") ?? throw new QueryException("indique el ID positivo de la vista de dibujo");
-            if (view <= 0) throw new QueryException("indique el ID positivo de la vista de dibujo");
+            var view = Arg.GetLong(args, "vista") ?? throw new QueryException("give the positive ID of the drafting view");
+            if (view <= 0) throw new QueryException("give the positive ID of the drafting view");
             var style = Text(args, "estilo");
             drawing = new List<object>();
             var operations = new List<Dictionary<string, object>>();
@@ -128,16 +128,16 @@ namespace BimBridge.PowerEngine.Workflows
             foreach (var edge in edges)
             {
                 if (!nodes.TryGetValue(Key(edge.Start), out var start))
-                    throw new QueryException("falta el símbolo del origen " + edge.Start);
+                    throw new QueryException("missing the symbol for source " + edge.Start);
                 if (!layoutEdges.TryGetValue(Key(edge.Id), out var layout))
-                    throw new QueryException("falta el trazado y posición del rótulo de " + edge.Id);
+                    throw new QueryException("missing the route and label position for " + edge.Id);
                 List<object> end;
                 string endType = null;
                 if (edge.End == null) end = List(layout, "fin_abierto");
                 else
                 {
                     if (!nodes.TryGetValue(Key(edge.End), out var destination))
-                        throw new QueryException("falta el símbolo del destino " + edge.End);
+                        throw new QueryException("missing the symbol for target " + edge.End);
                     end = destination.Point;
                     endType = destination.Type;
                 }

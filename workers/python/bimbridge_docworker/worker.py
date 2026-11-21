@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Bucle del Python Worker: contrato, guardas (rutas, red, memoria) y despacho de trabajos."""
+"""Python Worker loop: contract, guards (paths, network, memory) and job dispatch."""
 import hashlib
 import json
 import os
@@ -11,7 +11,7 @@ import traceback
 from . import __version__, PROTOCOL
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-# dependencias puras empaquetadas (pdfminer.six, charset_normalizer) AL FINAL: las del sistema ganan si existen
+# bundled pure dependencies (pdfminer.six, charset_normalizer) at the END: system ones win if present
 _VENDOR = os.path.join(os.path.dirname(_HERE), "vendor")
 if os.path.isdir(_VENDOR) and _VENDOR not in sys.path:
     sys.path.append(_VENDOR)
@@ -24,14 +24,14 @@ class JobError(Exception):
         self.message = message
 
 
-# ---------------- guardas ----------------
+# ---------------- guards ----------------
 
 def _no_network(*_a, **_k):
-    raise JobError("RUTA_DENEGADA", "el Python Worker no tiene acceso a la red")
+    raise JobError("RUTA_DENEGADA", "the Python Worker has no network access")
 
 
 def block_network():
-    """Sin red por defecto: ningún documento sale del equipo por accidente (ni por una biblioteca)."""
+    """No network by default: no document leaves the machine by accident (not even through a library)."""
     socket.socket = _no_network  # type: ignore
     socket.create_connection = _no_network  # type: ignore
     socket.getaddrinfo = _no_network  # type: ignore
@@ -41,7 +41,7 @@ _mem_limit_set = [0]
 
 
 def limit_memory(mb):
-    """Límite de memoria del proceso (POSIX). En Windows lo vigila el núcleo C# (mata el proceso si lo supera)."""
+    """Process memory limit (POSIX). On Windows the C# core enforces it (kills the process if it is exceeded)."""
     if not mb or mb <= 0 or mb == _mem_limit_set[0]:
         return
     try:
@@ -57,21 +57,21 @@ def limit_memory(mb):
 
 
 class Paths:
-    """Rutas autorizadas para UN trabajo. Se compara la ruta real (sin enlaces) con prefijos reales."""
+    """Authorized paths for ONE job. The real path (links resolved) is compared against real prefixes."""
 
     def __init__(self, allowed):
         self.allowed = [os.path.realpath(p) for p in (allowed or []) if p]
 
     def check(self, path):
         if not path or not isinstance(path, str):
-            raise JobError("INVALIDO", "falta la ruta del documento")
+            raise JobError("INVALIDO", "missing document path")
         real = os.path.realpath(path)
         for a in self.allowed:
             if os.path.normcase(real) == os.path.normcase(a) or os.path.normcase(real).startswith(os.path.normcase(a.rstrip(os.sep) + os.sep)):
                 if not os.path.isfile(real):
-                    raise JobError("INVALIDO", "no existe el archivo: " + path)
+                    raise JobError("INVALIDO", "file does not exist: " + path)
                 return real
-        raise JobError("RUTA_DENEGADA", "ruta no autorizada para este trabajo: " + path)
+        raise JobError("RUTA_DENEGADA", "path not authorized for this job: " + path)
 
 
 def sha256_file(path):
@@ -82,10 +82,10 @@ def sha256_file(path):
     return h.hexdigest()
 
 
-# ---------------- trabajos ----------------
+# ---------------- jobs ----------------
 
 def _jobs():
-    from . import pdf, docx, xlsx  # import diferido: el saludo no depende de pdfminer
+    from . import pdf, docx, xlsx  # deferred import: the handshake does not depend on pdfminer
     return {
         "pdf_info": pdf.info,
         "pdf_verify": pdf.verify,
@@ -115,11 +115,11 @@ def handle(req):
     job = req.get("trabajo") or ""
     args = req.get("args") or {}
     if req.get("pe") != PROTOCOL:
-        return {"pe": PROTOCOL, "id": rid, "codigo": "VERSION_INCOMPATIBLE", "error": "contrato distinto de %d" % PROTOCOL}
+        return {"pe": PROTOCOL, "id": rid, "codigo": "VERSION_INCOMPATIBLE", "error": "contract other than %d" % PROTOCOL}
     if job == "hola":
         lo, hi = int(args.get("pe_min", 1)), int(args.get("pe_max", 1))
         if not (lo <= PROTOCOL <= hi):
-            return {"pe": PROTOCOL, "id": rid, "codigo": "VERSION_INCOMPATIBLE", "error": "sólo contrato %d" % PROTOCOL}
+            return {"pe": PROTOCOL, "id": rid, "codigo": "VERSION_INCOMPATIBLE", "error": "only contract %d" % PROTOCOL}
         return {"pe": PROTOCOL, "id": rid, "codigo": "OK", "resultado": {
             "motor": "python_document_worker", "version": __version__, "pe": PROTOCOL, "capacidades": capabilities(),
             "python": "%d.%d.%d" % sys.version_info[:3]}}
@@ -129,17 +129,17 @@ def handle(req):
     try:
         fn = _jobs().get(job)
         if fn is None:
-            raise JobError("NO_SOPORTADO", "trabajo desconocido: " + job)
+            raise JobError("NO_SOPORTADO", "unknown job: " + job)
         res = fn(args, Paths(req.get("rutas")))
         code = "OK"
         err = None
     except JobError as e:
         res, code, err = {}, e.code, e.message
     except MemoryError:
-        res, code, err = {}, "LIMITE_MEMORIA", "el documento excede el límite de memoria del worker"
+        res, code, err = {}, "LIMITE_MEMORIA", "the document exceeds the worker memory limit"
     except ImportError as e:
-        res, code, err = {}, "NO_DISPONIBLE", "falta una dependencia del worker: %s" % e
-    except Exception as e:  # un documento malicioso o dañado no tumba el worker
+        res, code, err = {}, "NO_DISPONIBLE", "missing worker dependency: %s" % e
+    except Exception as e:  # a malicious or damaged document does not bring the worker down
         res, code, err = {}, "ERROR_MOTOR", "%s: %s" % (type(e).__name__, str(e)[:300])
         traceback.print_exc(file=sys.stderr)
     out = {"pe": PROTOCOL, "id": rid, "codigo": code, "resultado": res, "telemetria": {"motor_ms": (time.perf_counter() - t0) * 1000.0}}
@@ -164,7 +164,7 @@ def main():
         try:
             req = json.loads(line)
         except ValueError as e:
-            resp = {"pe": PROTOCOL, "id": None, "codigo": "INVALIDO", "error": "JSON ilegible: %s" % e}
+            resp = {"pe": PROTOCOL, "id": None, "codigo": "INVALIDO", "error": "unreadable JSON: %s" % e}
         else:
             if req.get("trabajo") == "salir":
                 break

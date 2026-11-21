@@ -387,6 +387,15 @@ namespace Bimbridge.Addin.Ui
                 // headers and labels in the normal font; monospace only for ids and values
                 grid.AutoGeneratingColumn += (s, e) =>
                 {
+                    // column headers come from DiffRow property names; show them in English
+                    switch (e.PropertyName)
+                    {
+                        case nameof(DiffRow.Elemento): e.Column.Header = "Element"; break;
+                        case nameof(DiffRow.Cambio): e.Column.Header = "Change"; break;
+                        case nameof(DiffRow.Campo): e.Column.Header = "Field"; break;
+                        case nameof(DiffRow.Antes): e.Column.Header = "Before"; break;
+                        case nameof(DiffRow.Después): e.Column.Header = "After"; break;
+                    }
                     if (e.Column is DataGridTextColumn tc && (e.PropertyName == nameof(DiffRow.Elemento) || e.PropertyName == nameof(DiffRow.Antes) || e.PropertyName == nameof(DiffRow.Después)))
                         tc.FontFamily = Theme.Mono;
                 };

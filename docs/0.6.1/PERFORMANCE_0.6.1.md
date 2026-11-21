@@ -1,11 +1,11 @@
-# Rendimiento 0.6.1 (sin Revit)
+# Performance 0.6.1 (without Revit)
 
-| Medida | Valor | Cómo |
+| Measure | Value | How |
 |---|---|---|
-| ValidateOwnership (bloqueo + lectura) | 0.0689 ms por llamada | 1 000 llamadas, Linux, disco local del contenedor |
-| RenewLease (bloqueo + escritura atómica) | 2.3653 ms por llamada | 1 000 llamadas |
-| Coste por lote | 1 validación por lote; renovación cada 20 s | TaskRunner |
-| Análisis de capacidades | se hace sobre el árbol ya compilado; sin compilación extra | Compiler.CompileWithCapabilities |
-| Tokens | sin cambios en las herramientas: el perfil compacto sigue en 5 685 caracteres | bench tokens de 0.6.0 |
+| ValidateOwnership (lock + read) | 0.0689 ms per call | 1,000 calls, Linux, container local disk |
+| RenewLease (lock + atomic write) | 2.3653 ms per call | 1,000 calls |
+| Cost per batch | 1 validation per batch; renewal every 20 s | TaskRunner |
+| Capability analysis | done on the already compiled tree; no extra compilation | Compiler.CompileWithCapabilities |
+| Tokens | no changes to the tools: the compact profile stays at 5,685 characters | 0.6.0 tokens bench |
 
-No es una medida de Windows ni de Revit. En Windows con antivirus la apertura de archivo puede costar más; se medirá en la aceptación nativa.
+This is not a Windows or Revit measurement. On Windows with antivirus, opening a file may cost more; it will be measured during native acceptance.

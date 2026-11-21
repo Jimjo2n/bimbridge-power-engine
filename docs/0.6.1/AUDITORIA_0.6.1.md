@@ -1,16 +1,16 @@
-# Auditoría 0.6.1: hallazgos y estado
+# Audit 0.6.1: findings and status
 
-| # | Hallazgo en v0.6.0 | Severidad | Estado 0.6.1 | Evidencia |
+| # | Finding in v0.6.0 | Severity | 0.6.1 status | Evidence |
 |---|---|---|---|---|
-| A1 | Lease sin atomicidad entre procesos | P0 | corregido | LeaseFencingTests (procesos reales) |
-| A2 | Sin fencing; liberar borraba `lease.json` | P0 | corregido | LeaseFencingTests |
-| A3 | Renovación fallida ignorada por el ejecutor | P0 | corregido | LeaseStolen_MidRun |
-| A4 | `lease.json` ilegible tratado como libre | P0 | corregido | Lease_CorruptFile |
-| A5 | Auditoría de `exec` podía perderse en silencio | P0 | corregido (fail closed para escritura) | AuditLogTests + compila |
-| A6 | Código autónomo sin límites de capacidades | P0 | mitigado (política estática; no es sandbox) | ScriptingTests |
-| A7 | Cliente no verificaba el servidor del pipe | P1 | corregido | PipeServerCheck (regla probada; Win32 compila) |
-| A8 | Recetas sin firma (autenticidad) | P1 | abierto → 0.7.0 | SECURITY_MODEL |
-| A9 | Cadena de auditoría sin ancla externa | P2 | abierto → 0.7.0 | SECURITY_MODEL |
-| A10 | Lote ya validado termina aunque el lease venza en medio | P2 | aceptado y documentado | RELIABILITY_MODEL |
-| A11 | MainThread/presupuestos: revisados, sin cambios | — | sin cambios (presupuesto por visita ya acotado desde 0.6.0) | — |
-| A12 | Todo lo anterior sin ejecución nativa | P0 para aprobar | pendiente | NATIVE_ACCEPTANCE |
+| A1 | Lease without cross-process atomicity | P0 | fixed | LeaseFencingTests (real processes) |
+| A2 | No fencing; release deleted `lease.json` | P0 | fixed | LeaseFencingTests |
+| A3 | Failed renewal ignored by the runner | P0 | fixed | LeaseStolen_MidRun |
+| A4 | Unreadable `lease.json` treated as free | P0 | fixed | Lease_CorruptFile |
+| A5 | `exec` audit could be lost silently | P0 | fixed (fail closed for writes) | AuditLogTests + compiles |
+| A6 | Autonomous code without capability limits | P0 | mitigated (static policy; not a sandbox) | ScriptingTests |
+| A7 | Client did not verify the pipe server | P1 | fixed | PipeServerCheck (rule tested; Win32 compiles) |
+| A8 | Unsigned recipes (authenticity) | P1 | open → 0.7.0 | SECURITY_MODEL |
+| A9 | Audit chain without an external anchor | P2 | open → 0.7.0 | SECURITY_MODEL |
+| A10 | An already validated batch finishes even if the lease expires midway | P2 | accepted and documented | RELIABILITY_MODEL |
+| A11 | MainThread/budgets: reviewed, no changes | — | no changes (per-visit budget already bounded since 0.6.0) | — |
+| A12 | All of the above without native execution | P0 to approve | pending | NATIVE_ACCEPTANCE |

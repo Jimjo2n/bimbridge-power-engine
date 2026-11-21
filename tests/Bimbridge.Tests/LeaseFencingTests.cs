@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.6.1 P0: lease entre procesos reales + fencing token monotónico.</summary>
+    /// <summary>0.6.1 P0: lease across real processes + monotonic fencing token.</summary>
     public class LeaseFencingTests
     {
         private static string NewRoot() { var d = Path.Combine(Path.GetTempPath(), "bimbridgelease_" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(d); return d; }
@@ -19,7 +19,7 @@ namespace Bimbridge.Tests
             var cfg = new DirectoryInfo(AppContext.BaseDirectory).Parent.Name; // net8.0 -> Debug|Release
             var baseDir = AppContext.BaseDirectory;
             var p = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "Bimbridge.LeaseProbe", "bin", cfg, "net8.0", "Bimbridge.LeaseProbe.dll"));
-            Assert.True(File.Exists(p), "falta la sonda " + p);
+            Assert.True(File.Exists(p), "probe is missing: " + p);
             return p;
         }
 
@@ -49,7 +49,7 @@ namespace Bimbridge.Tests
         {
             var root = NewRoot();
             var startAt = DateTime.UtcNow.AddSeconds(4).Ticks.ToString();
-            // Espera de bloqueo amplia: un STOREERR por CPU saturada no es lo que se mide aquí (ver el caso siguiente).
+            // Generous lock wait: a STOREERR from a saturated CPU is not what is measured here (see the next case).
             var procs = Enumerable.Range(0, 20).Select(i => Start("180000", new[] { root, "t1", "dueno" + i, "acquire", "60000", startAt })).ToList();
             var outs = procs.Select(p => { var o = p.StandardOutput.ReadToEnd().Trim(); p.WaitForExit(240000); p.Dispose(); return o; }).ToList();
             var seen = string.Join(" | ", outs.GroupBy(o => o).Select(g => g.Count() + "x " + g.Key));

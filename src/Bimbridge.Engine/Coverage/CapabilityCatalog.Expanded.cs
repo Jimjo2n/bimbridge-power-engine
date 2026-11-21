@@ -5,25 +5,25 @@ using System.Linq;
 namespace Bimbridge.Engine.Coverage
 {
     /// <summary>
-    /// 0.9.1 (directiva de inventario universal): descomposición de F01–F37 en subcapacidades operativas y enlace de comandos de la
-    /// cinta con su capacidad. Reglas de esta ampliación:
-    /// - DYNAMIC_CSHARP_ONLY sólo cita superficies que EXISTEN en el listado completo de símbolos (lo comprueba CapabilityCatalogTests);
-    ///   existir no implica que el flujo esté probado: falta operación tipada, verificador y prueba nativa.
-    /// - UNKNOWN = sin evidencia suficiente: se registra la investigación pendiente en vez de inventar soporte.
-    /// - NOT_APPLICABLE = función de la interfaz o de la sesión de Revit que no es una operación sobre el modelo.
-    /// - Enlazar un comando a una capacidad tipada exige que la operación haga lo mismo; las diferencias van en limitaciones.
+    /// 0.9.1 (universal inventory directive): breakdown of F01–F37 into operational sub-capabilities and linking of ribbon
+    /// commands to their capability. Rules of this extension:
+    /// - DYNAMIC_CSHARP_ONLY only cites surfaces that EXIST in the full symbol listing (checked by CapabilityCatalogTests);
+    ///   existing does not mean the workflow is proven: typed operation, verifier and native test are missing.
+    /// - UNKNOWN = not enough evidence: the pending research is recorded instead of inventing support.
+    /// - NOT_APPLICABLE = a Revit UI or session function that is not a model operation.
+    /// - Linking a command to a typed capability requires the operation to do the same thing; differences go in the limitations.
     /// </summary>
     public static partial class CapabilityCatalog
     {
         private static CapabilityEntry Unknown(string id, string dom, string sub, string es, string en, string op, string expected, string[] cmds, string pending, string prio = "P2") => new CapabilityEntry
         {
             Id = id, Domain = dom, Subdomain = sub, Name = es, NameEn = en, Operation = op, Expected = expected, Strategy = "none",
-            Status = CoverageStatus.UNKNOWN, PostableCommands = cmds ?? new string[0], Limitations = "investigación pendiente: " + pending, Priority = prio,
+            Status = CoverageStatus.UNKNOWN, PostableCommands = cmds ?? new string[0], Limitations = "research pending: " + pending, Priority = prio,
         };
 
         private static CapabilityEntry NotApplicable(string id, string dom, string sub, string es, string en, string[] cmds, string why) => new CapabilityEntry
         {
-            Id = id, Domain = dom, Subdomain = sub, Name = es, NameEn = en, Operation = "UI", Expected = "no aplica: " + why, Strategy = "none", DocumentKind = "any",
+            Id = id, Domain = dom, Subdomain = sub, Name = es, NameEn = en, Operation = "UI", Expected = "not applicable: " + why, Strategy = "none", DocumentKind = "any",
             Status = CoverageStatus.NOT_APPLICABLE, PostableCommands = cmds ?? new string[0], Limitations = why, Priority = "P3",
         };
 
@@ -36,266 +36,266 @@ namespace Bimbridge.Engine.Coverage
             var plan = new[] { "PlanTests", "WriteEngineTests" };
             l.AddRange(new[]
             {
-                // ---------------- F01 Documentos ----------------
-                Dyn("F01-DOC-CLOUD-001", "F01", "documentos en la nube", "Guardar, abrir y gestionar modelos en la nube", "Cloud models", "SAVE", "modelo guardado o abierto en ACC/BIM 360 con su ruta en la nube",
-                    new[] { DB + "Document::SaveAsCloudModel" }, new[] { "SaveAsCloudModel", "OpenCloudModel", "ManageCloudModels" }, "requiere sesión de Autodesk y permisos del proyecto en la nube", "P2"),
-                Dyn("F01-DOC-TEMPLATE-001", "F01", "plantillas", "Guardar como plantilla y crear proyecto desde plantilla", "Templates", "SAVE", "archivo .rte o proyecto nuevo desde la plantilla pedida",
+                // ---------------- F01 Documents ----------------
+                Dyn("F01-DOC-CLOUD-001", "F01", "cloud documents", "Save, open and manage cloud models", "Cloud models", "SAVE", "model saved or opened in ACC/BIM 360 with its cloud path",
+                    new[] { DB + "Document::SaveAsCloudModel" }, new[] { "SaveAsCloudModel", "OpenCloudModel", "ManageCloudModels" }, "requires an Autodesk session and permissions on the cloud project", "P2"),
+                Dyn("F01-DOC-TEMPLATE-001", "F01", "templates", "Save as template and create project from template", "Templates", "SAVE", ".rte file or new project from the requested template",
                     new[] { DB + "Document::SaveAs" }, new[] { "SaveAsTemplate", "NewProject", "ManageTemplates", "EditATemplate" }),
-                Unknown("F01-DOC-STANDARDS-001", "F01", "estándares", "Transferir normas de proyecto", "Transfer project standards", "UPDATE", "tipos y estilos copiados del proyecto origen",
-                    new[] { "TransferProjectStandards" }, "no se ha localizado una API pública equivalente al diálogo; candidato: ElementTransformUtils.CopyElements entre documentos para tipos (no equivale a todas las categorías del diálogo)"),
-                Unknown("F01-DOC-REPAIR-001", "F01", "recuperación", "Reparar modelo central y restaurar copia de seguridad", "Repair central / restore backup", "RECOVER", "modelo recuperado con evidencia",
-                    new[] { "RepairCentralModel", "RestoreBackup" }, "sin API pública identificada para ambos diálogos; requiere flujo manual"),
-                NotApplicable("F01-UI-SESSION-001", "F01", "sesión", "Salir de Revit, opciones de la aplicación y archivos de ejemplo", "Session and application UI",
-                    new[] { "ExitRevit", "Options", "OpenSampleFiles", "Close", "OpenBuildingComponent" }, "acciones de la aplicación o de la sesión del usuario; no son operaciones sobre el modelo (cerrar un documento ya está en F01-DOC-CLOSE-001)"),
+                Unknown("F01-DOC-STANDARDS-001", "F01", "standards", "Transfer project standards", "Transfer project standards", "UPDATE", "types and styles copied from the source project",
+                    new[] { "TransferProjectStandards" }, "no public API equivalent to the dialog has been found; candidate: ElementTransformUtils.CopyElements between documents for types (does not cover every category of the dialog)"),
+                Unknown("F01-DOC-REPAIR-001", "F01", "recovery", "Repair central model and restore backup", "Repair central / restore backup", "RECOVER", "model recovered with evidence",
+                    new[] { "RepairCentralModel", "RestoreBackup" }, "no public API identified for either dialog; requires a manual workflow"),
+                NotApplicable("F01-UI-SESSION-001", "F01", "session", "Exit Revit, application options and sample files", "Session and application UI",
+                    new[] { "ExitRevit", "Options", "OpenSampleFiles", "Close", "OpenBuildingComponent" }, "application or user-session actions; they are not model operations (closing a document is already F01-DOC-CLOSE-001)"),
 
-                // ---------------- F02 Edición ----------------
-                Dyn("F02-EDIT-PIN-001", "F02", "edición", "Fijar y liberar elementos", "Pin / unpin", "UPDATE", "elementos con Pinned según lo pedido",
+                // ---------------- F02 Editing ----------------
+                Dyn("F02-EDIT-PIN-001", "F02", "editing", "Pin and unpin elements", "Pin / unpin", "UPDATE", "elements with Pinned as requested",
                     new[] { DB + "Element::Pinned" }, new[] { "Pin", "Unpin" }, prio: "P2"),
-                Dyn("F02-EDIT-PASTE-001", "F02", "edición", "Copiar al portapapeles y pegar alineado (vistas, niveles, mismo lugar)", "Paste aligned", "COPY", "copias en los niveles o vistas pedidos con el desplazamiento correcto",
+                Dyn("F02-EDIT-PASTE-001", "F02", "editing", "Copy to clipboard and paste aligned (views, levels, same place)", "Paste aligned", "COPY", "copies on the requested levels or views with the correct offset",
                     new[] { DB + "ElementTransformUtils::CopyElements" }, new[] { "CopyToClipboard", "CutToClipboard", "PasteFromClipboard", "AlignedToCurrentView", "AlignedToPickedLevel", "AlignedToSamePlace", "AlignedToSelectedLevels", "AlignedToSelectedViews" },
-                    "el portapapeles de Revit no tiene API: el equivalente es CopyElements con transformación (copy tipado cubre traslado y nivel)", "P1"),
-                Dyn("F02-EDIT-CUT-001", "F02", "edición", "Cortar y unir geometría, cambiar orden de unión", "Cut / join geometry", "JOIN", "relaciones de corte/unión según lo pedido",
+                    "the Revit clipboard has no API: the equivalent is CopyElements with a transform (typed copy covers translation and level)", "P1"),
+                Dyn("F02-EDIT-CUT-001", "F02", "editing", "Cut and join geometry, switch join order", "Cut / join geometry", "JOIN", "cut/join relationships as requested",
                     new[] { DB + "SolidSolidCutUtils::AddCutBetweenSolids", DB + "InstanceVoidCutUtils::AddInstanceVoidCut", DB + "JoinGeometryUtils::SwitchJoinOrder" }, new[] { "CutGeometry", "UncutGeometry", "SwitchJoinOrder", "CutBy" }),
-                Unknown("F02-EDIT-TRIM-001", "F02", "edición", "Recortar/extender y dividir con hueco", "Trim / extend / split with gap", "UPDATE", "curvas de ubicación recortadas o extendidas",
-                    new[] { "TrimOrExtendToCorner", "TrimOrExtendSingleElement", "TrimOrExtendMultipleElements", "SplitWithGap", "DisplaceElements" }, "no hay método público de recorte; posible vía LocationCurve.Curve por categoría, a validar por tipo de elemento"),
-                WithLimits(Typed("F02-EDIT-MATCH-001", "F02", "edición", "Igualar propiedades de tipo", "Match type properties", "UPDATE", "change_type", "elementos con el tipo del elemento de referencia", plan, new[] { "MatchTypeProperties" }),
-                    "change_type necesita el tipo explícito; el «pincel» de la cinta lo toma de un elemento elegido. Efecto en Revit pendiente de la campaña nativa"),
-                WithLimits(Typed("F02-EDIT-SIMILAR-001", "F02", "edición", "Crear similar (colocar otro del mismo tipo)", "Create similar", "CREATE", "place", "instancia del mismo tipo en la posición pedida", plan, new[] { "CreateSimilar" }),
-                    "place con el tipo del elemento de referencia; familias alojadas requieren anfitrión. Efecto en Revit pendiente de la campaña nativa"),
-                Dyn("F02-SEL-FILTER-001", "F02", "selección", "Guardar, cargar y editar selecciones guardadas", "Saved selections", "QUERY", "SelectionFilterElement con los elementos pedidos",
-                    new[] { DB + "SelectionFilterElement::Create" }, new[] { "SaveSelection", "LoadSelection", "EditSelection", "AddToSet" }, "los conjuntos con nombre de BIMBRIDGE ($conjunto) viven en la sesión; esto persiste en el modelo", "P2"),
-                NotApplicable("F02-UI-SELECT-001", "F02", "selección", "Seleccionar por id, ids de la selección y deshacer/rehacer", "Selection UI and undo",
-                    new[] { "SelectById", "IdsOfSelection", "Undo", "Redo", "ActivateControlsAndDimensions" }, "herramientas de la interfaz; BIMBRIDGE lee ids con query y deshace con un TransactionGroup por plan"),
+                Unknown("F02-EDIT-TRIM-001", "F02", "editing", "Trim/extend and split with gap", "Trim / extend / split with gap", "UPDATE", "location curves trimmed or extended",
+                    new[] { "TrimOrExtendToCorner", "TrimOrExtendSingleElement", "TrimOrExtendMultipleElements", "SplitWithGap", "DisplaceElements" }, "there is no public trim method; possible via LocationCurve.Curve per category, to be validated per element type"),
+                WithLimits(Typed("F02-EDIT-MATCH-001", "F02", "editing", "Match type properties", "Match type properties", "UPDATE", "change_type", "elements with the type of the reference element", plan, new[] { "MatchTypeProperties" }),
+                    "change_type needs the explicit type; the ribbon \"brush\" takes it from a picked element. Effect in Revit pending the native campaign"),
+                WithLimits(Typed("F02-EDIT-SIMILAR-001", "F02", "editing", "Create similar (place another of the same type)", "Create similar", "CREATE", "place", "instance of the same type at the requested position", plan, new[] { "CreateSimilar" }),
+                    "place with the type of the reference element; hosted families require a host. Effect in Revit pending the native campaign"),
+                Dyn("F02-SEL-FILTER-001", "F02", "selection", "Save, load and edit saved selections", "Saved selections", "QUERY", "SelectionFilterElement with the requested elements",
+                    new[] { DB + "SelectionFilterElement::Create" }, new[] { "SaveSelection", "LoadSelection", "EditSelection", "AddToSet" }, "BIMBRIDGE named sets ($conjunto) live in the session; this persists in the model", "P2"),
+                NotApplicable("F02-UI-SELECT-001", "F02", "selection", "Select by id, selection ids and undo/redo", "Selection UI and undo",
+                    new[] { "SelectById", "IdsOfSelection", "Undo", "Redo", "ActivateControlsAndDimensions" }, "UI tools; BIMBRIDGE reads ids with query and undoes with one TransactionGroup per plan"),
 
-                // ---------------- F03 Coordenadas y datums ----------------
-                Dyn("F03-COORD-SHARED-001", "F03", "coordenadas", "Coordenadas compartidas: informar, especificar, reubicar y girar norte", "Shared coordinates", "UPDATE", "ProjectLocation/SiteLocation con la posición y el norte pedidos",
+                // ---------------- F03 Coordinates and datums ----------------
+                Dyn("F03-COORD-SHARED-001", "F03", "coordinates", "Shared coordinates: report, specify, relocate and rotate north", "Shared coordinates", "UPDATE", "ProjectLocation/SiteLocation with the requested position and north",
                     new[] { DB + "ProjectLocation", DB + "SiteLocation" }, new[] { "ReportSharedCoordinates", "SpecifyCoordinatesAtPoint", "ResetSharedCoordinates", "RelocateProject", "RotateProjectNorth", "RotateTrueNorth", "Location", "MirrorProject" }, prio: "P1"),
-                Dyn("F03-WORKPLANE-001", "F03", "planos de trabajo", "Definir y mostrar plano de trabajo", "Work plane", "UPDATE", "SketchPlane activo según lo pedido",
+                Dyn("F03-WORKPLANE-001", "F03", "work planes", "Set and show work plane", "Work plane", "UPDATE", "active SketchPlane as requested",
                     new[] { DB + "SketchPlane::Create" }, new[] { "SetWorkPlane", "ShowWorkPlane", "PickAPlane", "FormWorkPlaneView" }),
 
-                // ---------------- F04 Estándares ----------------
-                Dyn("F04-STD-STYLES-001", "F04", "estilos", "Patrones de línea y relleno, estilos y grosores de línea, estilos de objeto", "Line/fill patterns and object styles", "UPDATE", "patrones y estilos creados o ajustados",
+                // ---------------- F04 Standards ----------------
+                Dyn("F04-STD-STYLES-001", "F04", "styles", "Line and fill patterns, line styles and line weights, object styles", "Line/fill patterns and object styles", "UPDATE", "patterns and styles created or adjusted",
                     new[] { DB + "LinePatternElement::Create", DB + "FillPatternElement::Create", DB + "Category::SetLineWeight" }, new[] { "LinePatterns", "FillPatterns", "LineStyles", "LineWeights", "ObjectStyles", "Arrowheads" }),
-                Dyn("F04-PROJ-INFO-001", "F04", "proyecto", "Información y unidades del proyecto", "Project information and units", "UPDATE", "ProjectInfo y Units según lo pedido",
+                Dyn("F04-PROJ-INFO-001", "F04", "project", "Project information and units", "Project information and units", "UPDATE", "ProjectInfo and Units as requested",
                     new[] { DB + "ProjectInfo", DB + "Document::SetUnits" }, new[] { "ProjectInformation", "ProjectUnits" }, prio: "P1"),
-                Dyn("F04-PARAM-PROJ-001", "F04", "parámetros", "Parámetros de proyecto y de categoría de familia", "Project parameters", "CREATE", "parámetros enlazados a las categorías pedidas",
+                Dyn("F04-PARAM-PROJ-001", "F04", "parameters", "Project parameters and family category parameters", "Project parameters", "CREATE", "parameters bound to the requested categories",
                     new[] { DB + "ParameterElement" }, new[] { "ProjectParameters", "FamilyCategoryAndParameters", "ParametersService" }, prio: "P1"),
-                Dyn("F04-KEYNOTE-001", "F04", "notas clave", "Configuración de notas clave", "Keynoting settings", "UPDATE", "tabla de notas clave cargada", new[] { DB + "KeynoteTable" }, new[] { "KeynotingSettings" }),
-                Unknown("F04-MAT-ASSET-001", "F04", "materiales", "Recursos de apariencia y física de materiales", "Material assets", "UPDATE", "material con los recursos pedidos",
-                    new[] { "MaterialAssets" }, "AppearanceAssetElement existe pero la edición de recursos tiene restricciones por versión; no verificado"),
+                Dyn("F04-KEYNOTE-001", "F04", "keynotes", "Keynoting settings", "Keynoting settings", "UPDATE", "keynote table loaded", new[] { DB + "KeynoteTable" }, new[] { "KeynotingSettings" }),
+                Unknown("F04-MAT-ASSET-001", "F04", "materials", "Material appearance and physical assets", "Material assets", "UPDATE", "material with the requested assets",
+                    new[] { "MaterialAssets" }, "AppearanceAssetElement exists but asset editing has per-version restrictions; not verified"),
 
-                // ---------------- F05 Muros ----------------
-                Dyn("F05-WALL-OPEN-001", "F05", "muros", "Hueco en muro", "Wall opening", "CREATE", "hueco rectangular en el muro", new[] { "Autodesk.Revit.Creation.Document::NewOpening" }, new[] { "WallOpening" }),
-                Dyn("F05-WALL-JOINS-001", "F05", "muros", "Uniones de muros (permitir/impedir en extremos)", "Wall joins", "JOIN", "unión del extremo según lo pedido", new[] { DB + "WallUtils::DisallowWallJoinAtEnd" }, new[] { "WallJoins" }),
-                Unknown("F05-WALL-SWEEP-001", "F05", "muros", "Barridos y telares de muro, muro por cara", "Wall sweeps / reveals / by face", "CREATE", "barrido o telar en el muro",
-                    new[] { "SweepWall", "RevealWall", "WallByFaceWall" }, "WallSweep.Create existe en algunas versiones; muro por cara depende de masas; sin verificar"),
+                // ---------------- F05 Walls ----------------
+                Dyn("F05-WALL-OPEN-001", "F05", "walls", "Wall opening", "Wall opening", "CREATE", "rectangular opening in the wall", new[] { "Autodesk.Revit.Creation.Document::NewOpening" }, new[] { "WallOpening" }),
+                Dyn("F05-WALL-JOINS-001", "F05", "walls", "Wall joins (allow/disallow at ends)", "Wall joins", "JOIN", "end join as requested", new[] { DB + "WallUtils::DisallowWallJoinAtEnd" }, new[] { "WallJoins" }),
+                Unknown("F05-WALL-SWEEP-001", "F05", "walls", "Wall sweeps and reveals, wall by face", "Wall sweeps / reveals / by face", "CREATE", "sweep or reveal on the wall",
+                    new[] { "SweepWall", "RevealWall", "WallByFaceWall" }, "WallSweep.Create exists in some versions; wall by face depends on masses; not verified"),
 
-                // ---------------- F06 Suelos, cubiertas, huecos ----------------
-                Dyn("F06-OPENING-001", "F06", "huecos", "Huecos verticales, de patinillo, buhardilla y por cara", "Shaft / vertical / dormer openings", "CREATE", "hueco con el contorno y los niveles pedidos",
+                // ---------------- F06 Floors, roofs, openings ----------------
+                Dyn("F06-OPENING-001", "F06", "openings", "Vertical, shaft, dormer and by-face openings", "Shaft / vertical / dormer openings", "CREATE", "opening with the requested boundary and levels",
                     new[] { "Autodesk.Revit.Creation.Document::NewOpening" }, new[] { "ShaftOpening", "VerticalOpening", "DormerOpening", "OpeningByFace", "Opening" }, prio: "P1"),
-                Unknown("F06-EDGES-001", "F06", "bordes", "Impostas, canalones, sofitos y bordes de losa; suelo y cubierta por cara", "Fascia, gutter, soffit, slab edge, by face", "CREATE", "perfil barrido sobre los bordes pedidos",
-                    new[] { "Fascia", "Gutter", "Soffit", "SlabEdgeFloor", "FloorByFaceFloor", "RoofByFace", "JoinOrUnjoinRoof" }, "API de creación de estos barridos no confirmada en el listado; requiere investigación por versión"),
+                Unknown("F06-EDGES-001", "F06", "edges", "Fascias, gutters, soffits and slab edges; floor and roof by face", "Fascia, gutter, soffit, slab edge, by face", "CREATE", "profile swept along the requested edges",
+                    new[] { "Fascia", "Gutter", "Soffit", "SlabEdgeFloor", "FloorByFaceFloor", "RoofByFace", "JoinOrUnjoinRoof" }, "creation API for these sweeps not confirmed in the listing; needs per-version research"),
 
-                // ---------------- F07 Componentes ----------------
-                Dyn("F07-MODELLINE-001", "F07", "líneas de modelo", "Líneas de modelo y simbólicas", "Model / symbolic lines", "CREATE", "curvas de modelo en el plano de trabajo pedido",
+                // ---------------- F07 Components ----------------
+                Dyn("F07-MODELLINE-001", "F07", "model lines", "Model and symbolic lines", "Model / symbolic lines", "CREATE", "model curves on the requested work plane",
                     new[] { "Autodesk.Revit.Creation.ItemFactoryBase::NewModelCurve" }, new[] { "ModelLine", "SymbolicLine" }),
-                Dyn("F07-MODELTEXT-001", "F07", "texto de modelo", "Texto de modelo 3D", "Model text", "CREATE", "texto de modelo con el tipo y el texto pedidos", new[] { DB + "ModelText" }, new[] { "ModelText" }, prio: "P3"),
-                Unknown("F07-INPLACE-001", "F07", "familias in situ", "Modelar in situ y dibujar en cara/plano de trabajo", "Model in place", "CREATE", "familia in situ", new[] { "ModelInPlace", "DrawOnFace", "DrawOnWorkPlane", "ArchitecturalColumn", "RepeatComponent" },
-                    "modelado in situ no tiene API pública de edición de familia in situ; colocación en cara/plano son opciones de place"),
-                WithLimits(Typed("F16-MEP-PLACE-001", "F16", "MEP", "Colocar equipos, terminales, aparatos y dispositivos MEP (familia cargada)", "Place MEP equipment and devices", "CREATE", "place",
-                    "instancia del tipo pedido en la posición y nivel pedidos", plan,
+                Dyn("F07-MODELTEXT-001", "F07", "model text", "3D model text", "Model text", "CREATE", "model text with the requested type and text", new[] { DB + "ModelText" }, new[] { "ModelText" }, prio: "P3"),
+                Unknown("F07-INPLACE-001", "F07", "in-place families", "Model in place and draw on face/work plane", "Model in place", "CREATE", "in-place family", new[] { "ModelInPlace", "DrawOnFace", "DrawOnWorkPlane", "ArchitecturalColumn", "RepeatComponent" },
+                    "in-place modeling has no public API for editing in-place families; placement on face/plane are place options"),
+                WithLimits(Typed("F16-MEP-PLACE-001", "F16", "MEP", "Place MEP equipment, terminals, fixtures and devices (loaded family)", "Place MEP equipment and devices", "CREATE", "place",
+                    "instance of the requested type at the requested position and level", plan,
                     new[] { "AirTerminal", "MechanicalEquipment", "MechanicalControlDevice", "PlumbingFixture", "PlumbingEquipment", "ElectricalEquipment", "ElectricalFixture", "LightingFixture", "Communication", "Telephone", "NurseCall", "Security", "Control" }),
-                    "colocación genérica: no conecta a sistemas ni a conectores, ni aloja en caras. Efecto en Revit pendiente de la campaña nativa"),
+                    "generic placement: does not connect to systems or connectors, nor host on faces. Effect in Revit pending the native campaign"),
 
-                // ---------------- F08 Circulación y cortinas ----------------
-                Dyn("F08-STAIR-EDIT-001", "F08", "escaleras", "Recorrido, numeración y elementos sobre escaleras/rampas", "Stair path, numbering, place on stair", "CREATE", "anotación o elemento sobre la escalera",
+                // ---------------- F08 Circulation and curtain systems ----------------
+                Dyn("F08-STAIR-EDIT-001", "F08", "stairs", "Path, numbering and elements on stairs/ramps", "Stair path, numbering, place on stair", "CREATE", "annotation or element on the stair",
                     new[] { DB + "StairsEditScope" }, new[] { "StairPath", "StairTreadOrRiserNumber", "PlaceOnStairOrRamp", "Ramp" }),
-                Unknown("F08-CURTAIN-SYS-001", "F08", "muros cortina", "Sistema cortina por cara y montantes", "Curtain system by face, mullions", "CREATE", "sistema cortina con rejilla y montantes",
-                    new[] { "CurtainSystemByFace", "CurtainWallMullion" }, "montantes vía CurtainGrid/Mullion; sistema por cara depende de masas; sin verificar"),
+                Unknown("F08-CURTAIN-SYS-001", "F08", "curtain walls", "Curtain system by face and mullions", "Curtain system by face, mullions", "CREATE", "curtain system with grid and mullions",
+                    new[] { "CurtainSystemByFace", "CurtainWallMullion" }, "mullions via CurtainGrid/Mullion; system by face depends on masses; not verified"),
 
-                // ---------------- F09 Habitaciones y áreas ----------------
-                Dyn("F09-BOUNDARY-001", "F09", "límites", "Separadores de habitación y de espacio", "Room / space separators", "CREATE", "líneas de separación que delimitan el recinto",
+                // ---------------- F09 Rooms and areas ----------------
+                Dyn("F09-BOUNDARY-001", "F09", "boundaries", "Room and space separators", "Room / space separators", "CREATE", "separation lines that bound the room",
                     new[] { "Autodesk.Revit.Creation.Document::NewRoomBoundaryLines", "Autodesk.Revit.Creation.Document::NewSpaceBoundaryLines" }, new[] { "RoomSeparator", "SpaceSeparator" }, prio: "P1"),
-                Dyn("F09-AREA-001", "F09", "áreas", "Áreas, contornos de área y cálculo de áreas/volúmenes", "Areas and area boundaries", "CREATE", "área delimitada en el esquema pedido",
+                Dyn("F09-AREA-001", "F09", "areas", "Areas, area boundaries and area/volume computation", "Areas and area boundaries", "CREATE", "bounded area in the requested scheme",
                     new[] { DB + "AreaScheme", "Autodesk.Revit.Creation.Document::NewAreaBoundaryLine", DB + "ViewPlan::CreateAreaPlan" }, new[] { "Area", "AreaBoundary", "AreaAndVolumeComputations" }, prio: "P1"),
-                Dyn("F09-TAG-001", "F09", "etiquetas", "Etiquetas de habitación, área y espacio", "Room / area / space tags", "TAG", "etiqueta en la vista pedida sobre el recinto",
-                    new[] { "Autodesk.Revit.Creation.Document::NewRoomTag", "Autodesk.Revit.Creation.Document::NewAreaTag" }, new[] { "RoomTag", "AreaTag", "SpaceTag" }, "tag tipado usa IndependentTag y no etiqueta recintos", "P1"),
-                Dyn("F09-COLORFILL-001", "F09", "esquemas de color", "Esquemas de color y leyendas de relleno", "Color fill schemes", "UPDATE", "esquema de color aplicado y leyenda colocada",
+                Dyn("F09-TAG-001", "F09", "tags", "Room, area and space tags", "Room / area / space tags", "TAG", "tag in the requested view on the room",
+                    new[] { "Autodesk.Revit.Creation.Document::NewRoomTag", "Autodesk.Revit.Creation.Document::NewAreaTag" }, new[] { "RoomTag", "AreaTag", "SpaceTag" }, "typed tag uses IndependentTag and does not tag rooms", "P1"),
+                Dyn("F09-COLORFILL-001", "F09", "color schemes", "Color schemes and fill legends", "Color fill schemes", "UPDATE", "color scheme applied and legend placed",
                     new[] { DB + "ColorFillScheme" }, new[] { "ColorFillLegend", "ColorSchemes", "DuctLegend", "PipeLegend" }),
-                Dyn("F09-SPACE-001", "F09", "espacios", "Espacios MEP y su nomenclatura", "MEP spaces", "CREATE", "espacio delimitado con nombre y número",
+                Dyn("F09-SPACE-001", "F09", "spaces", "MEP spaces and their naming", "MEP spaces", "CREATE", "bounded space with name and number",
                     new[] { "Autodesk.Revit.Creation.Document::NewSpace" }, new[] { "Space", "SpaceNaming" }, prio: "P1"),
 
-                // ---------------- F10–F11 Masas y emplazamiento ----------------
-                Unknown("F10-MASS-002", "F10", "masas", "Masas conceptuales: crear, colocar, mostrar y suelos de masa", "Conceptual mass", "CREATE", "masa con su forma y suelos",
+                // ---------------- F10–F11 Massing and site ----------------
+                Unknown("F10-MASS-002", "F10", "masses", "Conceptual masses: create, place, show and mass floors", "Conceptual mass", "CREATE", "mass with its form and floors",
                     new[] { "NewConceptualMass", "PlaceMass", "ShowMassByViewSettings", "ShowMassFormAndFloors", "ShowMassSurfaceTypes", "ShowMassZonesAndShades", "SplitFace", "Paint", "RemovePaint", "PanelByBoundary", "PanelByExtrusion" },
-                    "edición de formas conceptuales en familias de masa; algunas tienen API (FamilyItemFactory), otras sólo UI"),
-                Dyn("F11-PAD-001", "F11", "emplazamiento", "Plataformas de construcción", "Building pad", "CREATE", "plataforma con contorno y nivel", new[] { DB + "Architecture.BuildingPad::Create" }, new[] { "BuildingPad" }),
-                Unknown("F11-SITE-002", "F11", "emplazamiento", "Subregiones, líneas de propiedad, contornos, región explanada y componentes de emplazamiento", "Site tools", "CREATE", "elementos de emplazamiento",
+                    "editing conceptual forms in mass families; some have API (FamilyItemFactory), others UI only"),
+                Dyn("F11-PAD-001", "F11", "site", "Building pads", "Building pad", "CREATE", "pad with boundary and level", new[] { DB + "Architecture.BuildingPad::Create" }, new[] { "BuildingPad" }),
+                Unknown("F11-SITE-002", "F11", "site", "Subregions, property lines, contours, graded region and site components", "Site tools", "CREATE", "site elements",
                     new[] { "Subregion", "PropertyLine", "PropertyLineData", "LabelContours", "GradedRegion", "SplitSurface", "MergeSurfaces", "SiteComponent", "ParkingComponent", "ToposolidByFace", "ToposolidSmoothShading", "TopographyCutVoidStability", "LinkTopography" },
-                    "superficies topográficas (2022–2023) y Toposolid (2024+) tienen APIs distintas; cada herramienta requiere su verificación"),
+                    "topography surfaces (2022–2023) and Toposolid (2024+) have different APIs; each tool needs its own verification"),
 
-                // ---------------- F12–F15 Estructura ----------------
-                Dyn("F12-BEAMSYS-001", "F12", "estructura", "Sistemas de vigas y cerchas", "Beam systems and trusses", "CREATE", "sistema de vigas o cercha con su tipo",
+                // ---------------- F12–F15 Structure ----------------
+                Dyn("F12-BEAMSYS-001", "F12", "structure", "Beam systems and trusses", "Beam systems and trusses", "CREATE", "beam system or truss with its type",
                     new[] { DB + "BeamSystem::Create", DB + "Structure.Truss::Create" }, new[] { "AutomaticBeamSystem", "StructuralTrusses", "BeamSystemSymbol", "TopChord", "BottomChord", "Web" }),
-                Unknown("F12-JOINS-001", "F12", "estructura", "Uniones viga/pilar y anotaciones de viga", "Beam/column joins, beam annotations", "UPDATE", "uniones ajustadas",
-                    new[] { "BeamOrColumnJoins", "BeamAnnotations", "Brace", "StructuralPlan", "Slab", "MajorSegment", "Miter" }, "parte en API de StructuralFramingUtils; sin verificar por herramienta"),
-                Dyn("F13-STEEL-CONN-001", "F13", "acero", "Conexiones estructurales", "Structural connections", "CREATE", "conexión entre los elementos pedidos con su tipo",
+                Unknown("F12-JOINS-001", "F12", "structure", "Beam/column joins and beam annotations", "Beam/column joins, beam annotations", "UPDATE", "joins adjusted",
+                    new[] { "BeamOrColumnJoins", "BeamAnnotations", "Brace", "StructuralPlan", "Slab", "MajorSegment", "Miter" }, "partly in the StructuralFramingUtils API; not verified per tool"),
+                Dyn("F13-STEEL-CONN-001", "F13", "steel", "Structural connections", "Structural connections", "CREATE", "connection between the requested elements with its type",
                     new[] { DB + "Structure.StructuralConnectionHandler::Create" }, new[] { "StructuralConnection", "ConnectionSettings" }, prio: "P2"),
-                Unknown("F13-STEEL-FAB-002", "F13", "acero", "Placas, pernos, soldaduras, anclajes, conectores, despuntes y cortes", "Steel fabrication elements", "CREATE", "elementos de fabricación de acero",
+                Unknown("F13-STEEL-FAB-002", "F13", "steel", "Plates, bolts, welds, anchors, shear studs, copes and cuts", "Steel fabrication elements", "CREATE", "steel fabrication elements",
                     new[] { "Plate", "Bolts", "Welds", "Anchors", "ShearStuds", "Cope", "CopeSkewed", "ApplyCoping", "RemoveCoping", "CornerCut", "SawCutFlange", "SawCutWeb", "Holes", "Shorten", "ContourCut", "CutThrough", "CutProfile" },
-                    "API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aquí"),
-                Dyn("F14-REBAR-SETS-001", "F14", "armadura", "Armadura por área, camino, malla y acopladores; recubrimientos", "Area/path/fabric reinforcement, couplers, cover", "CREATE", "armadura con su tipo y recubrimiento",
+                    "Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"),
+                Dyn("F14-REBAR-SETS-001", "F14", "rebar", "Area, path and fabric reinforcement and couplers; covers", "Area/path/fabric reinforcement, couplers, cover", "CREATE", "reinforcement with its type and cover",
                     new[] { DB + "Structure.AreaReinforcement::Create", DB + "Structure.PathReinforcement::Create", DB + "Structure.FabricArea::Create", DB + "Structure.FabricSheet::Create", DB + "Structure.RebarCoupler::Create", DB + "Structure.RebarCoverType::Create" },
                     new[] { "StructuralAreaReinforcement", "StructuralPathReinforcement", "StructuralFabricArea", "SingleFabricSheetPlacement", "StructuralRebarCoupler", "InsertCoupler", "RebarCoverSettings", "EditRebarCover", "ReinforcementSettings", "ReinforcementNumbers", "AreaReinforcementSymbol", "PathReinforcementSymbol", "FabricReinforcementSymbol", "AllowableBarTypes", "RebarBendingDetail", "AlignedMultiRebarAnnotation", "LinearMultiRebarAnnotation", "LoadRebarShapeIntoProjectAndClose" }),
-                Dyn("F15-LOADS-001", "F15", "cargas", "Casos, combinaciones y cargas estructurales; vínculos analíticos", "Load cases, combinations, loads, analytical links", "CREATE", "cargas y combinaciones con su naturaleza",
+                Dyn("F15-LOADS-001", "F15", "loads", "Structural load cases, combinations and loads; analytical links", "Load cases, combinations, loads, analytical links", "CREATE", "loads and combinations with their nature",
                     new[] { DB + "Structure.LoadCase::Create", DB + "Structure.LoadCombination::Create", DB + "Structure.PointLoad::Create", DB + "Structure.AnalyticalLink::Create" },
                     new[] { "LoadCases", "LoadCombinations", "LoadCasesAndCombinations", "Loads", "LoadCasesDisplay", "LoadsScalingDisplay", "AnalyticalLink", "CreateAnalyticalLink", "BoundaryConditions", "BoundaryConditionsSettings", "AnalyticalMember", "AdjustAnalyticalModel", "ResetAnalyticalModel", "AnalyticalAutomation", "RunAnalyticalToPhysicalForBuildings", "RunPhysicalToAnalyticalForBuildings" }),
 
                 // ---------------- F17–F22 MEP ----------------
-                Dyn("F17-FLEX-001", "F17", "conductos", "Conducto flexible y conversión a flexible", "Flex duct", "CREATE", "conducto flexible conectado", new[] { DB + "Mechanical.FlexDuct::Create" }, new[] { "FlexDuct", "ConvertToFlexDuct" }, prio: "P1"),
-                Dyn("F17-PLACEHOLDER-001", "F17", "conductos", "Marcadores de conducto y tubería y su conversión", "Duct / pipe placeholders", "CREATE", "marcador creado o convertido en conducto/tubería",
+                Dyn("F17-FLEX-001", "F17", "ducts", "Flex duct and convert to flex", "Flex duct", "CREATE", "connected flex duct", new[] { DB + "Mechanical.FlexDuct::Create" }, new[] { "FlexDuct", "ConvertToFlexDuct" }, prio: "P1"),
+                Dyn("F17-PLACEHOLDER-001", "F17", "ducts", "Duct and pipe placeholders and their conversion", "Duct / pipe placeholders", "CREATE", "placeholder created or converted to duct/pipe",
                     new[] { DB + "Mechanical.Duct::CreatePlaceholder", DB + "Mechanical.MechanicalUtils::ConvertDuctPlaceholders", DB + "Plumbing.Pipe::CreatePlaceholder", DB + "Plumbing.PlumbingUtils::ConvertPipePlaceholders" }, new[] { "DuctPlaceholder", "PipePlaceholder" }, prio: "P1"),
-                Dyn("F17-INSUL-001", "F17", "aislamiento", "Aislamiento de conductos y tuberías", "Duct / pipe insulation", "CREATE", "aislamiento con tipo y espesor",
+                Dyn("F17-INSUL-001", "F17", "insulation", "Duct and pipe insulation", "Duct / pipe insulation", "CREATE", "insulation with type and thickness",
                     new[] { DB + "Mechanical.DuctInsulation::Create", DB + "Plumbing.PipeInsulation::Create" }, new[] { "Insulation" }),
-                Unknown("F17-FITTINGS-001", "F17", "accesorios", "Accesorios, uniones y conectores de conducto/tubería/bandeja/tubo", "Fittings, accessories, connectors", "CREATE", "accesorio conectado en el punto pedido",
+                Unknown("F17-FITTINGS-001", "F17", "fittings", "Duct/pipe/cable tray/conduit fittings, accessories and connectors", "Fittings, accessories, connectors", "CREATE", "fitting connected at the requested point",
                     new[] { "DuctFitting", "DuctAccessory", "DuctConnector", "PipeFitting", "PipeAccessory", "PipeConnector", "CableTrayFitting", "CableTrayConnector", "ConduitFitting", "ConduitConnector", "ElectricalConnector", "ParallelPipes", "ParallelConduits", "MultiPointRouting", "OneWayIndicator" },
-                    "Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"),
-                Unknown("F17-REPORTS-001", "F17", "análisis", "Informes de pérdida de presión y ajustes mecánicos", "Pressure loss reports and mechanical settings", "VERIFY", "informe con las secciones del sistema",
+                    "Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"),
+                Unknown("F17-REPORTS-001", "F17", "analysis", "Pressure loss reports and mechanical settings", "Pressure loss reports and mechanical settings", "VERIFY", "report with the system sections",
                     new[] { "DuctPressureLossReport", "PipePressureLossReport", "MechanicalSettings", "SystemsAnalysis", "SystemZone", "Zone", "ZoneBySketch", "ZoneBySpace", "BuildingOperatingSchedules", "OperatingSchedules", "BuildingOrSpaceTypeSettings" },
-                    "API de informes de presión no identificada; zonas y análisis de sistemas cambian entre 2022 y 2026"),
-                Dyn("F18-FLEX-001", "F18", "tuberías", "Tubería flexible", "Flex pipe", "CREATE", "tubería flexible conectada", new[] { DB + "Plumbing.FlexPipe::Create" }, new[] { "FlexPipe" }),
-                Dyn("F20-SETTINGS-001", "F20", "electricidad", "Ajustes eléctricos, factores de demanda, clasificaciones de carga y cables", "Electrical settings", "UPDATE", "ajustes eléctricos según lo pedido",
+                    "pressure report API not identified; zones and system analysis change between 2022 and 2026"),
+                Dyn("F18-FLEX-001", "F18", "piping", "Flex pipe", "Flex pipe", "CREATE", "connected flex pipe", new[] { DB + "Plumbing.FlexPipe::Create" }, new[] { "FlexPipe" }),
+                Dyn("F20-SETTINGS-001", "F20", "electrical", "Electrical settings, demand factors, load classifications and wires", "Electrical settings", "UPDATE", "electrical settings as requested",
                     new[] { DB + "Electrical.ElectricalSetting" }, new[] { "ElectricalSettings", "DemandFactors", "LoadClassifications", "ElectricalConductorAndCableSettings", "ElectricalAnalyticalLoadTypeSettings" }, prio: "P1"),
-                Unknown("F20-ANALYTICAL-001", "F20", "electricidad", "Cargas de equipo y cargas por área (análisis eléctrico)", "Equipment and area-based loads", "CREATE", "carga analítica con su clasificación",
-                    new[] { "EquipmentLoad", "CreateAnAreaBasedLoad", "AreaBasedLoadBoundary" }, "API de cargas analíticas eléctricas introducida en versiones recientes; verificar por versión"),
-                Dyn("F22-FAB-PART-001", "F22", "fabricación", "Piezas de fabricación MEP y ajustes", "Fabrication parts", "CREATE", "pieza de fabricación con servicio y botón",
+                Unknown("F20-ANALYTICAL-001", "F20", "electrical", "Equipment loads and area-based loads (electrical analysis)", "Equipment and area-based loads", "CREATE", "analytical load with its classification",
+                    new[] { "EquipmentLoad", "CreateAnAreaBasedLoad", "AreaBasedLoadBoundary" }, "electrical analytical load API introduced in recent versions; verify per version"),
+                Dyn("F22-FAB-PART-001", "F22", "fabrication", "MEP fabrication parts and settings", "Fabrication parts", "CREATE", "fabrication part with service and button",
                     new[] { DB + "FabricationPart::Create" }, new[] { "FabricationPart", "FabricationSettings", "MEPFabricationDuctworkStiffener" }),
-                Unknown("F22-PID-001", "F22", "P&ID", "P&ID Modeler", "P&ID Modeler", "CREATE", "modelo desde P&ID", new[] { "PAndIDModeler", "PAndIDSettings" }, "complemento de Autodesk con su propia API; no inventariado"),
+                Unknown("F22-PID-001", "F22", "P&ID", "P&ID Modeler", "P&ID Modeler", "CREATE", "model from P&ID", new[] { "PAndIDModeler", "PAndIDSettings" }, "Autodesk add-in with its own API; not inventoried"),
 
-                // ---------------- F23 Editor de familias ----------------
-                Dyn("F23-FAM-GEOM-001", "F23", "geometría de familia", "Sólidos y vacíos: extrusión, fundido, revolución, barrido y barrido fundido", "Family solids and voids", "CREATE", "forma con su boceto y plano",
+                // ---------------- F23 Family Editor ----------------
+                Dyn("F23-FAM-GEOM-001", "F23", "family geometry", "Solids and voids: extrusion, blend, revolve, sweep and swept blend", "Family solids and voids", "CREATE", "form with its sketch and plane",
                     new[] { "Autodesk.Revit.Creation.FamilyItemFactory::NewExtrusion", "Autodesk.Revit.Creation.FamilyItemFactory::NewBlend", "Autodesk.Revit.Creation.FamilyItemFactory::NewRevolution", "Autodesk.Revit.Creation.FamilyItemFactory::NewSweep", "Autodesk.Revit.Creation.FamilyItemFactory::NewSweptBlend" },
                     new[] { "SolidExtrusion", "SolidBlend", "SolidRevolve", "SolidSweep", "SolidSweptBlend", "VoidExtrusion", "VoidBlend", "VoidRevolve", "VoidSweep", "VoidSweptBlend", "ReferenceLine", "Label" }, prio: "P1"),
-                Dyn("F23-FAM-TYPES-001", "F23", "tipos de familia", "Tipos de familia", "Family types", "CREATE", "tipo nuevo con sus valores", new[] { DB + "FamilyManager::NewType" }, new[] { "FamilyTypes" }, prio: "P1"),
-                Dyn("F23-FAM-NEW-001", "F23", "familias", "Nueva familia, cajetín o símbolo; guardar como familia de biblioteca", "New family / save as library", "CREATE", "archivo de familia nuevo",
+                Dyn("F23-FAM-TYPES-001", "F23", "family types", "Family types", "Family types", "CREATE", "new type with its values", new[] { DB + "FamilyManager::NewType" }, new[] { "FamilyTypes" }, prio: "P1"),
+                Dyn("F23-FAM-NEW-001", "F23", "families", "New family, titleblock or symbol; save as library family", "New family / save as library", "CREATE", "new family file",
                     new[] { DB + "Document::SaveAs" }, new[] { "NewFamily", "NewTitleBlock", "NewAnnotationSymbol", "SaveAsFamily", "SaveAsLibraryFamily", "SaveAsLibraryView", "SaveAsLibraryGroup", "LoadIntoProject", "LoadFamilyIntoProjectAndClose" }),
-                Unknown("F23-FAM-CLOUD-001", "F23", "familias", "Cargar familia de Autodesk (contenido en la nube)", "Load Autodesk family", "CREATE", "familia descargada y cargada", new[] { "LoadAutodeskFamily" }, "servicio en la nube sin API pública conocida"),
+                Unknown("F23-FAM-CLOUD-001", "F23", "families", "Load Autodesk family (cloud content)", "Load Autodesk family", "CREATE", "family downloaded and loaded", new[] { "LoadAutodeskFamily" }, "cloud service with no known public API"),
 
-                // ---------------- F24 Vistas ----------------
-                Dyn("F24-VIEW-FILTER-001", "F24", "filtros", "Filtros de vista y sustitución por filtro", "View filters", "UPDATE", "filtro creado y aplicado con sus gráficos",
+                // ---------------- F24 Views ----------------
+                Dyn("F24-VIEW-FILTER-001", "F24", "filters", "View filters and filter overrides", "View filters", "UPDATE", "filter created and applied with its graphics",
                     new[] { DB + "ParameterFilterElement::Create", DB + "View::SetFilterOverrides" }, new[] { "OverrideByFilter" }, prio: "P1"),
-                Dyn("F24-VIEW-TEMPLATE-001", "F24", "plantillas de vista", "Crear plantilla desde la vista y aplicar sus parámetros", "View templates", "CREATE", "plantilla creada o aplicada",
+                Dyn("F24-VIEW-TEMPLATE-001", "F24", "view templates", "Create template from view and apply its parameters", "View templates", "CREATE", "template created or applied",
                     new[] { DB + "View::CreateViewTemplate", DB + "View::ApplyViewTemplateParameters" }, new[] { "CreateTemplateFromCurrentView" }),
-                Dyn("F24-VIEW-CAMERA-001", "F24", "vistas", "Cámara (vista 3D en perspectiva) y planta estructural", "Camera / structural plan", "CREATE", "vista con orientación y tipo pedidos",
+                Dyn("F24-VIEW-CAMERA-001", "F24", "views", "Camera (perspective 3D view) and structural plan", "Camera / structural plan", "CREATE", "view with the requested orientation and type",
                     new[] { DB + "View3D::CreatePerspective", DB + "ViewPlan::Create" }, new[] { "Camera" }),
-                Unknown("F24-VIEW-MISC-001", "F24", "vistas", "Región de plano, líneas ocultas por elemento, recorrido y etiquetas de vista", "Plan region, hidden lines, walkthrough, view tags", "UPDATE", "vista con la configuración pedida",
+                Unknown("F24-VIEW-MISC-001", "F24", "views", "Plan region, per-element hidden lines, walkthrough and view tags", "Plan region, hidden lines, walkthrough, view tags", "UPDATE", "view with the requested configuration",
                     new[] { "PlanRegion", "ShowHiddenLinesByElement", "RemoveHiddenLinesByElement", "Walkthrough", "SectionTags", "ElevationTags", "CalloutTags", "Linework", "HalftoneOrUnderlay", "ShowBoundaryOpenEnds", "HideBoundaryOpenEnds", "Isolated", "Multiplanar", "SharedViews" },
-                    "cada herramienta tiene una API distinta o ninguna; sin verificar"),
-                NotApplicable("F24-UI-001", "F24", "interfaz de vistas", "Navegación, ventanas, ViewCube y modos de visualización de la interfaz", "View UI",
+                    "each tool has a different API or none; not verified"),
+                NotApplicable("F24-UI-001", "F24", "view UI", "Navigation, windows, ViewCube and UI display modes", "View UI",
                     new[] { "ViewCube", "NavigationBar", "TabViews", "TileViews", "CloseInactiveViews", "ThinLines", "ToggleRevealHiddenElementsMode", "ActivateView", "DeactivateView", "StartingView" },
-                    "estado de la interfaz o de la ventana; no cambia datos del modelo que BIMBRIDGE deba planificar"),
+                    "UI or window state; does not change model data that BIMBRIDGE must plan"),
 
-                // ---------------- F25 Anotación ----------------
-                Unknown("F25-DIM-002", "F25", "cotas", "Cotas angulares, radiales, de diámetro y de longitud de arco; cotas temporales", "Angular / radial / diameter / arc length dimensions", "CREATE", "cota con las referencias pedidas",
+                // ---------------- F25 Annotation ----------------
+                Unknown("F25-DIM-002", "F25", "dimensions", "Angular, radial, diameter and arc length dimensions; temporary dimensions", "Angular / radial / diameter / arc length dimensions", "CREATE", "dimension with the requested references",
                     new[] { "AngularDimension", "RadialDimension", "DiameterDimension", "ArcLengthDimension", "AngularDimensionTypes", "RadialDimensionTypes", "DiameterDimensionTypes", "LinearDimensionTypes", "AlignmentStation", "AlignmentStationLabelTypes", "AlignmentStationSet" },
-                    "NewDimension sólo crea cotas lineales; las demás necesitan API específica por versión"),
-                Dyn("F25-SPOT-001", "F25", "cotas de punto", "Cotas y coordenadas de punto y pendiente", "Spot elevation / coordinate / slope", "CREATE", "cota de punto sobre la referencia pedida",
+                    "NewDimension only creates linear dimensions; the others need version-specific API"),
+                Dyn("F25-SPOT-001", "F25", "spot dimensions", "Spot elevations, spot coordinates and spot slopes", "Spot elevation / coordinate / slope", "CREATE", "spot dimension on the requested reference",
                     new[] { "Autodesk.Revit.Creation.Document::NewSpotElevation", "Autodesk.Revit.Creation.Document::NewSpotCoordinate" }, new[] { "SpotElevation", "SpotCoordinate", "SpotSlope", "SpotElevationTypes", "SpotCoordinateTypes", "SpotSlopeTypes" }),
-                Unknown("F25-KEYNOTE-001", "F25", "notas clave", "Notas clave de elemento, material y usuario; leyenda de notas clave", "Keynotes", "TAG", "nota clave colocada con su valor",
+                Unknown("F25-KEYNOTE-001", "F25", "keynotes", "Element, material and user keynotes; keynote legend", "Keynotes", "TAG", "keynote placed with its value",
                     new[] { "ElementKeynote", "MaterialKeynote", "UserKeynote", "KeynoteLegend", "MaterialTag", "MultiCategoryTag", "LoadedTagsAndSymbols", "SpanDirectionSymbol", "MultipleValuesIndication", "MeasureAlongAnElement", "MeasureBetweenTwoReferences" },
-                    "IndependentTag cubre algunas; verificar tipos de etiqueta por categoría"),
-                WithLimits(Typed("F25-TAG-ALL-001", "F25", "etiquetas", "Etiquetar todo lo no etiquetado (por vista)", "Tag all not tagged", "TAG", "tag", "un tag por elemento sin etiquetar en la vista", plan, new[] { "TagAllNotTagged" }),
-                    "composición: query de lo no etiquetado + tag; no etiqueta recintos. Efecto en Revit pendiente de la campaña nativa"),
-                WithLimits(Typed("F25-SYMBOL-001", "F25", "símbolos", "Colocar símbolo de anotación", "Place annotation symbol", "CREATE", "detail_component", "símbolo (familia basada en vista) en la vista", new[] { "Draw2DTests", "PlanTests" }, new[] { "Symbol" }),
-                    "familias basadas en vista; sin directrices. Efecto en Revit pendiente de la campaña nativa"),
-                Unknown("F25-DETAIL-002", "F25", "detalle", "Región de máscara, componente de detalle repetido, aislamiento de detalle, leyendas y componentes de leyenda", "Masking region, repeating detail, legends", "CREATE", "elemento de detalle en la vista",
-                    new[] { "MaskingRegion", "RepeatingDetailComponent", "Legend", "LegendComponent", "Matchline" }, "región de máscara = FilledRegion con tipo de máscara (no verificado); leyendas sin API de creación directa"),
+                    "IndependentTag covers some; verify tag types per category"),
+                WithLimits(Typed("F25-TAG-ALL-001", "F25", "tags", "Tag all not tagged (per view)", "Tag all not tagged", "TAG", "tag", "one tag per untagged element in the view", plan, new[] { "TagAllNotTagged" }),
+                    "composition: query of untagged elements + tag; does not tag rooms. Effect in Revit pending the native campaign"),
+                WithLimits(Typed("F25-SYMBOL-001", "F25", "symbols", "Place annotation symbol", "Place annotation symbol", "CREATE", "detail_component", "symbol (view-based family) in the view", new[] { "Draw2DTests", "PlanTests" }, new[] { "Symbol" }),
+                    "view-based families; no leaders. Effect in Revit pending the native campaign"),
+                Unknown("F25-DETAIL-002", "F25", "detail", "Masking region, repeating detail component, detail insulation, legends and legend components", "Masking region, repeating detail, legends", "CREATE", "detail element in the view",
+                    new[] { "MaskingRegion", "RepeatingDetailComponent", "Legend", "LegendComponent", "Matchline" }, "masking region = FilledRegion with a masking type (not verified); legends have no direct creation API"),
 
-                // ---------------- F26–F27 Tablas, láminas, impresión ----------------
-                Dyn("F26-SCHED-SPECIAL-001", "F26", "tablas", "Listas de láminas, de vistas, bloques de notas, tablas de revisiones, cómputo de materiales y tablas clave", "Special schedules", "SCHEDULE", "tabla especial con sus campos",
+                // ---------------- F26–F27 Schedules, sheets, printing ----------------
+                Dyn("F26-SCHED-SPECIAL-001", "F26", "schedules", "Sheet lists, view lists, note blocks, revision schedules, material takeoffs and key schedules", "Special schedules", "SCHEDULE", "special schedule with its fields",
                     new[] { DB + "ViewSchedule::CreateSheetList", DB + "ViewSchedule::CreateViewList", DB + "ViewSchedule::CreateNoteBlock", DB + "ViewSchedule::CreateRevisionSchedule", DB + "ViewSchedule::CreateMaterialTakeoff", DB + "ViewSchedule::CreateKeySchedule" },
-                    new[] { "SheetList", "ViewList", "NoteBlock", "RevisionSchedule", "MaterialTakeoff" }, "schedule_create tipado sólo crea tablas de categoría", "P1"),
-                Unknown("F26-SCHED-GRAPH-001", "F26", "tablas", "Tabla gráfica de pilares", "Graphical column schedule", "SCHEDULE", "tabla gráfica", new[] { "GraphicalColumnSchedule" }, "sin API de creación identificada"),
-                WithLimits(Typed("F27-SHEET-VIEW-001", "F27", "láminas", "Colocar vista en lámina", "Place view", "CREATE", "sheet_place", "viewport en la lámina", plan, new[] { "PlaceView" }), "efecto en Revit pendiente de la campaña nativa"),
-                Dyn("F27-SHEET-PH-001", "F27", "láminas", "Láminas de marcador de posición y cajetín", "Placeholder sheets, title block", "CREATE", "lámina de marcador o cajetín colocado",
+                    new[] { "SheetList", "ViewList", "NoteBlock", "RevisionSchedule", "MaterialTakeoff" }, "typed schedule_create only creates category schedules", "P1"),
+                Unknown("F26-SCHED-GRAPH-001", "F26", "schedules", "Graphical column schedule", "Graphical column schedule", "SCHEDULE", "graphical schedule", new[] { "GraphicalColumnSchedule" }, "no creation API identified"),
+                WithLimits(Typed("F27-SHEET-VIEW-001", "F27", "sheets", "Place view on sheet", "Place view", "CREATE", "sheet_place", "viewport on the sheet", plan, new[] { "PlaceView" }), "effect in Revit pending the native campaign"),
+                Dyn("F27-SHEET-PH-001", "F27", "sheets", "Placeholder sheets and titleblock", "Placeholder sheets, title block", "CREATE", "placeholder sheet or titleblock placed",
                     new[] { DB + "ViewSheet::CreatePlaceholder" }, new[] { "TitleBlock", "GuideGrid", "ViewReference" }),
-                Dyn("F27-PRINT-001", "F27", "impresión", "Imprimir, configurar impresión y conjuntos", "Print / print setup", "EXPORT", "trabajo de impresión con la configuración pedida",
-                    new[] { DB + "Document::Print", DB + "PrintManager", DB + "ViewSheetSet" }, new[] { "Print", "PrintSetup", "PrintPreview", "BatchPrint" }, "impresora del sistema: efecto externo sin rollback; doc pdf cubre PDF", "P2"),
+                Dyn("F27-PRINT-001", "F27", "printing", "Print, print setup and print sets", "Print / print setup", "EXPORT", "print job with the requested setup",
+                    new[] { DB + "Document::Print", DB + "PrintManager", DB + "ViewSheetSet" }, new[] { "Print", "PrintSetup", "PrintPreview", "BatchPrint" }, "system printer: external effect without rollback; doc pdf covers PDF", "P2"),
 
-                // ---------------- F28 Vínculos ----------------
-                Dyn("F28-LINK-IFC-001", "F28", "vínculos", "Vincular y abrir IFC", "Link / open IFC", "CREATE", "vínculo IFC con su transformación",
+                // ---------------- F28 Links ----------------
+                Dyn("F28-LINK-IFC-001", "F28", "links", "Link and open IFC", "Link / open IFC", "CREATE", "IFC link with its transform",
                     new[] { DB + "RevitLinkType::CreateFromIFC" }, new[] { "LinkIFC", "OpenIFC", "OpenIFCOptions" }, prio: "P1"),
-                Dyn("F28-IMAGE-PDF-001", "F28", "vínculos", "Vincular o importar imagen y PDF; gestionar imágenes", "Link / import image and PDF", "CREATE", "imagen o página PDF colocada en la vista",
-                    new[] { DB + "ImageType::Create" }, new[] { "LinkImage", "ImportImage", "ManageImages", "LinkPDF", "ImportPDF" }, "PDF como ImageType según opciones por versión; sin verificar", "P1"),
-                Dyn("F28-POINTCLOUD-001", "F28", "vínculos", "Nubes de puntos", "Point clouds", "CREATE", "instancia de nube de puntos", new[] { DB + "PointCloudInstance" }, new[] { "PointCloud" }),
-                Unknown("F28-MANAGE-001", "F28", "vínculos", "Gestionar vínculos, modelos de coordinación, FormIt e insertar desde archivo", "Manage links, coordination models, insert from file", "UPDATE", "vínculos recargados o descargados",
+                Dyn("F28-IMAGE-PDF-001", "F28", "links", "Link or import image and PDF; manage images", "Link / import image and PDF", "CREATE", "image or PDF page placed in the view",
+                    new[] { DB + "ImageType::Create" }, new[] { "LinkImage", "ImportImage", "ManageImages", "LinkPDF", "ImportPDF" }, "PDF as ImageType per version-specific options; not verified", "P1"),
+                Dyn("F28-POINTCLOUD-001", "F28", "links", "Point clouds", "Point clouds", "CREATE", "point cloud instance", new[] { DB + "PointCloudInstance" }, new[] { "PointCloud" }),
+                Unknown("F28-MANAGE-001", "F28", "links", "Manage links, coordination models, FormIt and insert from file", "Manage links, coordination models, insert from file", "UPDATE", "links reloaded or unloaded",
                     new[] { "ManageLinks", "CoordinationModel", "CoordinationModelAutodeskDocs", "CoordinationModelChanges", "CoordinationModelLocal", "LinkFormit", "Insert2DElementsFromFile", "InsertViewsFromFile", "CreateFromImport", "ImportTypes", "ImportGBXML", "ManageConnectionToARevitServerAccelerator", "DecalTypes", "PlaceDecal" },
-                    "RevitLinkType.Reload/Unload existen; modelos de coordinación y FormIt sin verificar"),
+                    "RevitLinkType.Reload/Unload exist; coordination models and FormIt not verified"),
 
-                // ---------------- F30–F31 Colaboración y organización ----------------
-                Dyn("F30-OWN-001", "F30", "worksharing", "Liberar lo mío, recargar lo último y habilitar colaboración", "Relinquish / reload latest / enable worksharing", "SYNC", "propiedad liberada o modelo recargado",
+                // ---------------- F30–F31 Collaboration and organization ----------------
+                Dyn("F30-OWN-001", "F30", "worksharing", "Relinquish all mine, reload latest and enable collaboration", "Relinquish / reload latest / enable worksharing", "SYNC", "ownership relinquished or model reloaded",
                     new[] { DB + "WorksharingUtils::RelinquishOwnership", DB + "Document::ReloadLatest", DB + "Document::EnableWorksharing" }, new[] { "RelinquishAllMine", "ReloadLatest", "Collaborate" }, prio: "P1"),
-                Unknown("F30-CLOUD-001", "F30", "worksharing", "Colaborar en la nube, solicitudes de edición, historial y publicación", "Cloud collaboration, editing requests, history", "SYNC", "estado de colaboración",
-                    new[] { "CollaborateInCloud", "EditingRequests", "ShowHistory", "PublishSettings" }, "sin API pública identificada para estos diálogos"),
-                Dyn("F31-PARTS-001", "F31", "piezas", "Crear piezas", "Create parts", "CREATE", "piezas de los elementos pedidos", new[] { DB + "PartUtils::CreateParts" }, new[] { "CreateParts" }),
-                WithLimits(Typed("F31-DEMOLISH-001", "F31", "fases", "Derribar (fase de derribo)", "Demolish", "UPDATE", "set_param", "elementos con la fase de derribo pedida", plan, new[] { "Demolish" }),
-                    "set_param sobre el parámetro de fase de derribo; la herramienta de la cinta usa la fase de la vista. Efecto en Revit pendiente de la campaña nativa"),
-                WithLimits(Typed("F31-GROUP-DETAIL-001", "F31", "grupos", "Colocar grupo de detalle", "Place detail group", "CREATE", "group_place", "grupo colocado", plan, new[] { "PlaceDetailGroup" }), "efecto en Revit pendiente de la campaña nativa"),
-                Unknown("F31-GROUP-LOAD-001", "F31", "grupos", "Cargar grupo en proyectos abiertos y asignar código de ensamblaje", "Load group into projects, assembly code", "CREATE", "grupo cargado en los proyectos pedidos",
-                    new[] { "LoadAsGroupIntoOpenProjects", "AssemblyCode" }, "sin API equivalente verificada"),
+                Unknown("F30-CLOUD-001", "F30", "worksharing", "Cloud collaboration, editing requests, history and publishing", "Cloud collaboration, editing requests, history", "SYNC", "collaboration state",
+                    new[] { "CollaborateInCloud", "EditingRequests", "ShowHistory", "PublishSettings" }, "no public API identified for these dialogs"),
+                Dyn("F31-PARTS-001", "F31", "parts", "Create parts", "Create parts", "CREATE", "parts of the requested elements", new[] { DB + "PartUtils::CreateParts" }, new[] { "CreateParts" }),
+                WithLimits(Typed("F31-DEMOLISH-001", "F31", "phases", "Demolish (phase demolished)", "Demolish", "UPDATE", "set_param", "elements with the requested phase demolished", plan, new[] { "Demolish" }),
+                    "set_param on the phase demolished parameter; the ribbon tool uses the view's phase. Effect in Revit pending the native campaign"),
+                WithLimits(Typed("F31-GROUP-DETAIL-001", "F31", "groups", "Place detail group", "Place detail group", "CREATE", "group_place", "group placed", plan, new[] { "PlaceDetailGroup" }), "effect in Revit pending the native campaign"),
+                Unknown("F31-GROUP-LOAD-001", "F31", "groups", "Load group into open projects and assign assembly code", "Load group into projects, assembly code", "CREATE", "group loaded into the requested projects",
+                    new[] { "LoadAsGroupIntoOpenProjects", "AssemblyCode" }, "no verified equivalent API"),
 
-                // ---------------- F32–F34 Análisis, visualización y exportación ----------------
-                Dyn("F32-ENERGY-002", "F32", "análisis energético", "Crear y borrar modelo energético; generar análisis", "Energy model", "CREATE", "modelo de análisis energético",
+                // ---------------- F32–F34 Analysis, visualization and export ----------------
+                Dyn("F32-ENERGY-002", "F32", "energy analysis", "Create and delete energy model; generate analysis", "Energy model", "CREATE", "energy analysis model",
                     new[] { DB + "Analysis.EnergyAnalysisDetailModel::Create" }, new[] { "CreateEnergyModel", "DeleteEnergyModel", "Generate", "GenerateAnalysis", "Optimize", "ViewAnalysis", "Lighting" }),
-                Dyn("F32-PATH-001", "F32", "análisis espacial", "Recorrido de evacuación", "Path of travel", "CREATE", "recorrido entre dos puntos con su longitud", new[] { DB + "Analysis.PathOfTravel::Create" }, new[] { "PathOfTravel", "RevealObstacles", "SpatialGrid", "PeopleContent" }),
-                Unknown("F33-RENDER-002", "F33", "visualización", "Renderizar, galería, nube y ajustes de sol", "Render and sun settings", "EXPORT", "imagen renderizada", new[] { "Render", "RenderInCloud", "RenderGallery", "SunSettings", "AnalysisDisplayStyles" },
-                    "motor de render sin API pública de lanzamiento; SunAndShadowSettings sí existe para el sol"),
-                Dyn("F34-EXPORT-OTHER-001", "F34", "exportación", "Exportar FBX, DWF/DWFx, DGN, STL, OBJ, SAT y gbXML", "Export FBX/DWF/DGN/STL/OBJ/SAT/gbXML", "EXPORT", "archivo del formato pedido",
+                Dyn("F32-PATH-001", "F32", "spatial analysis", "Path of travel", "Path of travel", "CREATE", "path between two points with its length", new[] { DB + "Analysis.PathOfTravel::Create" }, new[] { "PathOfTravel", "RevealObstacles", "SpatialGrid", "PeopleContent" }),
+                Unknown("F33-RENDER-002", "F33", "visualization", "Render, gallery, cloud and sun settings", "Render and sun settings", "EXPORT", "rendered image", new[] { "Render", "RenderInCloud", "RenderGallery", "SunSettings", "AnalysisDisplayStyles" },
+                    "render engine has no public launch API; SunAndShadowSettings does exist for the sun"),
+                Dyn("F34-EXPORT-OTHER-001", "F34", "export", "Export FBX, DWF/DWFx, DGN, STL, OBJ, SAT and gbXML", "Export FBX/DWF/DGN/STL/OBJ/SAT/gbXML", "EXPORT", "file in the requested format",
                     new[] { DB + "FBXExportOptions", DB + "DWFExportOptions", DB + "DGNExportOptions", DB + "STLExportOptions", DB + "OBJExportOptions", DB + "SATExportOptions", DB + "GBXMLExportOptions" },
                     new[] { "ExportFBX", "ExportDWFOrDWFx", "ExportCADFormatsDGN", "ExportCADFormatsSTL", "ExportCADFormatsOBJ", "ExportCADFormatsACIS_SAT", "ExportGBXML", "ExportOptionsExportSetupsDGN" }, prio: "P2"),
-                Dyn("F34-EXPORT-STEP-001", "F34", "exportación", "Exportar STEP (2025+)", "Export STEP", "EXPORT", "archivo STEP", new[] { DB + "STEPExportOptions" }, new[] { "ExportCADFormatsSTEP" }, "sólo Revit 2025–2026 (inventario)"),
-                Unknown("F34-EXPORT-REPORTS-001", "F34", "exportación", "Informes de habitación/área, ODBC, animaciones y tipos", "Room/area report, ODBC, animations, export types", "EXPORT", "archivo del informe",
-                    new[] { "ExportReportsRoomOrAreaReport", "ExportODBCDatabase", "ExportImagesandAnimationsSolarStudy", "ExportImagesandAnimationsWalkthrough", "ExportExportTypes", "DWFMarkup" }, "sin API pública identificada para estos asistentes"),
+                Dyn("F34-EXPORT-STEP-001", "F34", "export", "Export STEP (2025+)", "Export STEP", "EXPORT", "STEP file", new[] { DB + "STEPExportOptions" }, new[] { "ExportCADFormatsSTEP" }, "Revit 2025–2026 only (inventory)"),
+                Unknown("F34-EXPORT-REPORTS-001", "F34", "export", "Room/area reports, ODBC, animations and types", "Room/area report, ODBC, animations, export types", "EXPORT", "report file",
+                    new[] { "ExportReportsRoomOrAreaReport", "ExportODBCDatabase", "ExportImagesandAnimationsSolarStudy", "ExportImagesandAnimationsWalkthrough", "ExportExportTypes", "DWFMarkup" }, "no public API identified for these wizards"),
 
-                // ---------------- F35 Automatización (otras herramientas) ----------------
-                NotApplicable("F35-OTHER-TOOLS-001", "F35", "automatización", "Dynamo, macros, gestor de complementos y personalización", "Dynamo, macros, add-ins",
+                // ---------------- F35 Automation (other tools) ----------------
+                NotApplicable("F35-OTHER-TOOLS-001", "F35", "automation", "Dynamo, macros, add-in manager and customization", "Dynamo, macros, add-ins",
                     new[] { "Dynamo", "DynamoPlayer", "DynamoPlayerForSteel", "MacroManager", "MacroSecurity", "AddInsManager", "AutomationCustomization", "KeyboardShortcuts", "CanvasTheme" },
-                    "otras herramientas de automatización o personalización de la interfaz; BIMBRIDGE tiene su propio motor (exec, tareas, planes)"),
+                    "other automation or UI customization tools; BIMBRIDGE has its own engine (exec, tasks, plans)"),
 
                 // ---------------- F36 QA/QC ----------------
                 new CapabilityEntry
                 {
-                    Id = "F36-HEALTH-001", Domain = "F36", Subdomain = "model health", Name = "Salud del modelo: avisos, duplicados, parámetros vacíos y conectores MEP desconectados", NameEn = "Model health",
-                    Operation = "VERIFY", Expected = "informe con avisos por tipo, duplicados en la misma posición, parámetros requeridos vacíos y conectores sin conectar, con ids",
+                    Id = "F36-HEALTH-001", Domain = "F36", Subdomain = "model health", Name = "Model health: warnings, duplicates, empty parameters and disconnected MEP connectors", NameEn = "Model health",
+                    Operation = "VERIFY", Expected = "report with warnings by type, duplicates at the same position, empty required parameters and unconnected connectors, with ids",
                     Strategy = "query:check model_health", Status = CoverageStatus.IMPLEMENTED_UNVERIFIED,
                     Implementation = new[] { "src/Bimbridge.Engine/Qa/ModelHealth.cs", "src/Bimbridge.Addin/Revit/ModelHealthProbe.cs" }, Tests = new[] { "ModelHealthTests" },
                     PostableCommands = new[] { "ReviewWarnings", "ShowWarningsInViews", "ShowDisconnects", "CheckDuctSystems", "CheckPipeSystems", "AnalyticalConsistencyChecks", "CheckMemberSupports" },
-                    Verifier = "reglas offline sobre el inventario leído (ModelHealthTests); lectura en Revit pendiente de campaña",
-                    Limitations = "sólo lectura; las comprobaciones estructurales de Revit (apoyos, consistencia analítica) no se reproducen. Lectura en Revit pendiente de la campaña nativa", Priority = "P1",
+                    Verifier = "offline rules on the read inventory (ModelHealthTests); reading in Revit pending the campaign",
+                    Limitations = "read-only; Revit's structural checks (supports, analytical consistency) are not reproduced. Reading in Revit pending the native campaign", Priority = "P1",
                 },
-                Unknown("F37-CONTEXT-001", "F37", "modos contextuales", "Modos de edición y boceto contextuales (editar boceto, centrar referencia, estado de forma, rutas, sustituciones, reconciliar alojamiento)", "Contextual edit/sketch modes", "UPDATE",
-                    "elemento editado en su modo contextual con verificación", new[] { "PickToEdit", "ReCenterReference", "ShapeStatus", "MultiplePaths", "SubstitutionSettings", "ReconcileHosting" },
-                    "dependen del modo de edición activo de la interfaz; sin API pública equivalente identificada para cada uno"),
-                Unknown("F02-EDIT-SCALE-001", "F02", "edición", "Escalar elementos", "Scale", "UPDATE", "elementos escalados respecto a un punto", new[] { "Scale" },
-                    "Revit sólo escala ciertos elementos 2D, imágenes y vínculos; sin método genérico en la API"),
-                Unknown("F25-TEXT-REPLACE-001", "F25", "texto", "Buscar y reemplazar texto", "Find / replace text", "UPDATE", "notas de texto con el texto reemplazado", new[] { "FindOrReplace" },
-                    "factible con TextNote.Text + set_param, pero sin contrato ni verificador todavía"),
-                Unknown("F15-SETTINGS-001", "F15", "estructura", "Ajustes estructurales", "Structural settings", "UPDATE", "ajustes estructurales según lo pedido", new[] { "StructuralSettings" },
-                    "clase de ajustes estructurales a localizar en el listado por versión"),
-                Engine("F35-HISTORY-001", "F35", "operaciones largas", "Historial de operaciones con filtros, cancelación y consejo de reintento seguro", "Operation history and safe retry", "QUERY",
-                    "cada trabajo terminado queda persistido con estado, duración y si es reintentable o exige reconciliar; en curso con progreso",
+                Unknown("F37-CONTEXT-001", "F37", "contextual modes", "Contextual edit and sketch modes (edit sketch, center reference, form state, paths, overrides, reconcile hosting)", "Contextual edit/sketch modes", "UPDATE",
+                    "element edited in its contextual mode with verification", new[] { "PickToEdit", "ReCenterReference", "ShapeStatus", "MultiplePaths", "SubstitutionSettings", "ReconcileHosting" },
+                    "depend on the active UI edit mode; no equivalent public API identified for each"),
+                Unknown("F02-EDIT-SCALE-001", "F02", "editing", "Scale elements", "Scale", "UPDATE", "elements scaled about a point", new[] { "Scale" },
+                    "Revit only scales certain 2D elements, images and links; no generic API method"),
+                Unknown("F25-TEXT-REPLACE-001", "F25", "text", "Find and replace text", "Find / replace text", "UPDATE", "text notes with the text replaced", new[] { "FindOrReplace" },
+                    "feasible with TextNote.Text + set_param, but no contract or verifier yet"),
+                Unknown("F15-SETTINGS-001", "F15", "structure", "Structural settings", "Structural settings", "UPDATE", "structural settings as requested", new[] { "StructuralSettings" },
+                    "structural settings class still to be located in the per-version listing"),
+                Engine("F35-HISTORY-001", "F35", "long operations", "Operation history with filters, cancellation and safe-retry advice", "Operation history and safe retry", "QUERY",
+                    "each finished job is persisted with status, duration and whether it is retryable or requires reconciliation; in-progress ones with progress",
                     new[] { "src/Bimbridge.Engine/OperationHistory.cs", "src/Bimbridge.Engine/Jobs.cs" }, new[] { "OperationHistoryTests" },
-                    "historial y JobStore con trabajos sintéticos", "consulta por check name=historial (ámbito propio; lo ajeno sólo con historial_compartido) y sección «Operaciones largas» del panel de estado con filtro y Cancelar; la ventana WPF no tiene prueba automática"),
-                Engine("F35-SCHED-001", "F35", "operaciones largas", "Planificador de operaciones largas entre agentes", "Long-operation scheduler", "UPDATE",
-                    "límite global y por agente, una operación a la vez por documento, reparto justo, cola acotada con rechazo y cancelación en cola sin efectos",
+                    "history and JobStore with synthetic jobs", "query via check name=historial (own scope; others' only with historial_compartido) and the \"Long operations\" section of the status panel with filter and Cancel; the WPF window has no automated test"),
+                Engine("F35-SCHED-001", "F35", "long operations", "Long-operation scheduler across agents", "Long-operation scheduler", "UPDATE",
+                    "global and per-agent limit, one operation at a time per document, fair sharing, bounded queue with refusal, and cancellation while queued without effects",
                     new[] { "src/Bimbridge.Engine/OperationScheduler.cs" }, new[] { "OperationSchedulerTests" },
-                    "pruebas deterministas de orden, límites, exclusión, cancelación y fallo", "gobierna las operaciones de documento (guardar, sync, exportar); commit y exec siguen con la cola propia del hilo de Revit"),
-                NotApplicable("F37-UI-002", "F37", "interfaz", "Paletas, barras de estado, temas y controles de la interfaz", "UI palettes and bars",
+                    "deterministic tests of ordering, limits, exclusion, cancellation and failure", "governs document operations (save, sync, export); commit and exec keep the Revit thread's own queue"),
+                NotApplicable("F37-UI-002", "F37", "ui", "UI palettes, status bars, themes and controls", "UI palettes and bars",
                     new[] { "ProjectBrowser", "SystemBrowser", "StatusBar", "StatusBarDesignOptions", "StatusBarWorksets", "TogglePropertiesPalette", "ToggleHome", "TogglePAndIDModelerBrowser", "LaunchAsApp", "LaunchInBrowser", "LaunchInDockedWindow", "Snaps", "TemporaryDimensions", "ShowWorksharingMakeEditableControls", "GrayInactiveWorksets", "WorksharingMonitor", "ShowLastReport", "CheckSpelling", "BrowserOrganization" },
-                    "estado de la interfaz de Revit; no son operaciones del modelo"),
+                    "Revit UI state; not model operations"),
             });
 
-            // Comandos de la cinta que corresponden a capacidades ya existentes (misma función; diferencias en sus limitaciones).
+            // Ribbon commands that map to existing capabilities (same function; differences in their limitations).
             var extra = new Dictionary<string, string[]>
             {
                 ["F24-VIEW-DUP-001"] = new[] { "DuplicateView", "DuplicateAsDependent", "DuplicateWithDetailing" },
@@ -315,7 +315,7 @@ namespace Bimbridge.Engine.Coverage
             foreach (var kv in extra)
             {
                 var e = l.FirstOrDefault(c => c.Id == kv.Key);
-                if (e == null) throw new System.InvalidOperationException("Expand: no existe " + kv.Key);
+                if (e == null) throw new System.InvalidOperationException("Expand: does not exist " + kv.Key);
                 e.PostableCommands = e.PostableCommands.Concat(kv.Value).Distinct().ToArray();
             }
         }

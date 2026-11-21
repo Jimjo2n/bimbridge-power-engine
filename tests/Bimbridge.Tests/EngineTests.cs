@@ -127,8 +127,8 @@ namespace Bimbridge.Tests
 
             var c = v.FindConflicts(snap).OrderBy(x => x.Id).ToList();
             Assert.Equal(2, c.Count);
-            Assert.Equal("2 fue cambiado por otro agente", c[0].Describe("S-claude"));
-            Assert.Equal("3 fue borrado por el usuario en Revit", c[1].Describe("S-claude"));
+            Assert.Equal("2 was changed by another agent", c[0].Describe("S-claude"));
+            Assert.Equal("3 was deleted by the user in Revit", c[1].Describe("S-claude"));
         }
 
         [Fact]

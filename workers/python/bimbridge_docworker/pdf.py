@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Trabajos PDF: información, extracción textual/geométrica, tablas con reglas y símbolos candidatos.
+"""PDF jobs: information, text/geometric extraction, ruled tables and candidate symbols.
 
-Coordenadas: pdfminer entrega el espacio VISIBLE de la página (rotación /Rotate aplicada, origen abajo-izquierda, puntos PDF).
-Cada resultado lleva ese espacio ("pagina_pt"), el normalizado [0,1]×[0,1] del área visible y las pulgadas de papel
-(teniendo en cuenta /UserUnit). Nunca son coordenadas de Revit: eso es el registro plano–modelo, en C#.
+Coordinates: pdfminer delivers the VISIBLE space of the page (/Rotate applied, origin bottom-left, PDF points).
+Each result carries that space ("pagina_pt"), the normalized [0,1]×[0,1] of the visible area and the paper inches
+(taking /UserUnit into account). They are never Revit coordinates: that is the drawing–model registration, in C#.
 """
 import math
 import re
@@ -11,7 +11,7 @@ from hashlib import sha256
 
 from .worker import JobError, sha256_file
 
-# ---------------- utilidades ----------------
+# ---------------- utilities ----------------
 
 
 CODE_RX = re.compile(r"^[A-Z]{1,3}[0-9]{0,2}[A-Z]?(-[0-9]{1,2}[A-Z]{0,2})?$")
@@ -22,15 +22,15 @@ def _lazy():
         from pdfminer.high_level import extract_pages  # noqa: F401
         from pdfminer import layout  # noqa: F401
     except ImportError as e:
-        raise JobError("NO_DISPONIBLE", "pdfminer.six no está instalado ni empaquetado: %s" % e)
+        raise JobError("NO_DISPONIBLE", "pdfminer.six is neither installed nor bundled: %s" % e)
     from pdfminer.high_level import extract_pages
     from pdfminer import layout
     return extract_pages, layout
 
 
 def _open_pages(path, pages=None, laparams=None):
-    """Analiza cada página en el ESPACIO DEL CONTENIDO (sin /Rotate): el texto rotado por la página sigue siendo
-    horizontal para agrupar palabras y leer leyendas. Frame.to_visible convierte después al espacio visible."""
+    """Analyzes each page in CONTENT SPACE (without /Rotate): text rotated by the page stays
+    horizontal for grouping words and reading legends. Frame.to_visible then converts to visible space."""
     _, layout = _lazy()
     from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
     from pdfminer.converter import PDFPageAggregator
@@ -51,19 +51,19 @@ def _open_pages(path, pages=None, laparams=None):
         except JobError:
             raise
         except Exception as e:  # noqa: BLE001
-            raise JobError("INVALIDO", "PDF ilegible: %s" % e)
+            raise JobError("INVALIDO", "unreadable PDF: %s" % e)
     return gen(), layout
 
 
 def _raw_pages(path):
-    """Datos de página que pdfminer.layout no expone: /Rotate, /UserUnit, MediaBox/CropBox originales y cifrado."""
+    """Page data that pdfminer.layout does not expose: /Rotate, /UserUnit, original MediaBox/CropBox and encryption."""
     try:
         from pdfminer.pdfparser import PDFParser
         from pdfminer.pdfdocument import PDFDocument, PDFEncryptionError, PDFPasswordIncorrect
         from pdfminer.pdfpage import PDFPage
         from pdfminer.pdftypes import resolve1
     except ImportError as e:
-        raise JobError("NO_DISPONIBLE", "pdfminer.six no disponible: %s" % e)
+        raise JobError("NO_DISPONIBLE", "pdfminer.six not available: %s" % e)
     out = []
     try:
         with open(path, "rb") as f:
@@ -82,11 +82,11 @@ def _raw_pages(path):
                             "rotate": int(p.rotate or 0) % 360, "userunit": float(uu)})
             return out, info, bool(doc.encryption)
     except (PDFEncryptionError, PDFPasswordIncorrect) as e:
-        raise JobError("NO_SOPORTADO", "PDF cifrado o con contraseña: %s" % e)
+        raise JobError("NO_SOPORTADO", "encrypted or password-protected PDF: %s" % e)
     except JobError:
         raise
     except Exception as e:  # noqa: BLE001
-        raise JobError("INVALIDO", "PDF ilegible: %s" % e)
+        raise JobError("INVALIDO", "unreadable PDF: %s" % e)
 
 
 def _page_sel(args, n):
@@ -97,13 +97,13 @@ def _page_sel(args, n):
     pages = [int(p) for p in pages]
     bad = [p for p in pages if p < 1 or p > n]
     if bad:
-        raise JobError("INVALIDO", "páginas fuera de rango 1..%d: %s" % (n, bad[:5]))
+        raise JobError("INVALIDO", "pages out of range 1..%d: %s" % (n, bad[:5]))
     return pages
 
 
 class Frame:
-    """Página: el análisis trabaja en el espacio del contenido (sin /Rotate); todo lo que se DEVUELVE está en el espacio
-    VISIBLE (con /Rotate aplicado, como lo ve una persona). norm/inches/to_visible reciben coordenadas del contenido."""
+    """Page: analysis works in content space (without /Rotate); everything RETURNED is in VISIBLE
+    space (with /Rotate applied, as a person sees it). norm/inches/to_visible take content coordinates."""
 
     def __init__(self, w, h, userunit, rotate=0, mediabox=None):
         self.cw, self.ch = float(w), float(h)
@@ -114,7 +114,7 @@ class Frame:
         self.uu = float(userunit or 1)
 
     def vis(self, x, y):
-        """Mismo cálculo que el CTM de pdfminer para /Rotate (interpreter.process_page)."""
+        """Same computation as pdfminer's CTM for /Rotate (interpreter.process_page)."""
         if self.rot == 90:
             return y - self.y0, self.x1 - x
         if self.rot == 180:
@@ -136,7 +136,7 @@ class Frame:
         return [_r(min(a[0], c[0])), _r(min(a[1], c[1])), _r(max(a[0], c[0])), _r(max(a[1], c[1]))]
 
     def to_visible(self, o):
-        """Convierte (en sitio) las claves de coordenadas pt del contenido al espacio visible."""
+        """Converts (in place) the content pt coordinate keys to visible space."""
         if not self.rot:
             return o
         if isinstance(o, list):
@@ -162,7 +162,7 @@ class Frame:
     def json(self):
         return {"ancho_pt": self.w, "alto_pt": self.h, "unidad_usuario": self.uu, "rotacion": self.rot,
                 "ancho_in": round(self.w * self.uu / 72.0, 4), "alto_in": round(self.h * self.uu / 72.0, 4),
-                "espacio": "visible (rotación aplicada), origen abajo-izquierda, pt"}
+                "espacio": "visible (rotation applied), origin bottom-left, pt"}
 
 
 def _r(v, k=3):
@@ -170,7 +170,7 @@ def _r(v, k=3):
 
 
 def _words(layout, page, frame):
-    """Palabras con caja (de los caracteres): texto, bbox pt, centro normalizado, tamaño de letra."""
+    """Words with a box (from their characters): text, pt bbox, normalized center, font size."""
     words = []
 
     def flush(chars):
@@ -205,7 +205,7 @@ def _words(layout, page, frame):
 
 
 def _vectors(layout, page, curve_paths=False):
-    """Primitivas geométricas: líneas, rectángulos y curvas (polilíneas de puntos), con trazo/relleno."""
+    """Geometric primitives: lines, rectangles and curves (point polylines), with stroke/fill."""
     lines, rects, curves = [], [], []
 
     def walk(o):
@@ -241,7 +241,7 @@ def _has_image(layout, page):
     return any(walk(o) for o in page)
 
 
-# ---------------- metadatos de lámina (extracción textual, no interpretación) ----------------
+# ---------------- sheet metadata (text extraction, not interpretation) ----------------
 
 SHEET_RX = re.compile(r"^[A-Z]{1,2}-?\d+(?:\.\d+){0,3}[A-Z]?$")
 REV_RX = re.compile(r"REV(?:ISION|\.)?\s*[:#]?\s*([A-Z]{0,4}\d+[A-Z0-9]*)", re.I)
@@ -249,13 +249,13 @@ SCALE_RX = re.compile(r"(\d+(?:/\d+)?)\"\s*=\s*1'-0\"")
 
 
 def _sheet_meta(words, frame):
-    """Candidatos de número de lámina, revisión y escala con el texto fuente y su posición. Confianza = regla, no comprensión."""
+    """Candidates for sheet number, revision and scale with the source text and its position. Confidence = rule, not understanding."""
     meta = {"metodo": "extraccion_textual", "numero": None, "revision": None, "escala": None}
     big = sorted([w for w in words if SHEET_RX.match(w["texto"])], key=lambda w: -w["tam"])
     if big:
         meta["numero"] = {"valor": big[0]["texto"], "fuente": big[0]["bbox"], "confianza": 0.8 if big[0]["tam"] >= 12 else 0.5}
     joined = []
-    # reconstruir líneas por altura para encontrar "REVISION: CCD7" y "SCALE: 1/8" = 1'-0""
+    # rebuild lines by height to find "REVISION: CCD7" and "SCALE: 1/8" = 1'-0""
     rows = {}
     for w in words:
         rows.setdefault(round(w["bbox"][1]), []).append(w)
@@ -275,7 +275,7 @@ def _sheet_meta(words, frame):
     return meta
 
 
-# ---------------- trabajos ----------------
+# ---------------- jobs ----------------
 
 
 def info(args, paths):
@@ -296,35 +296,35 @@ def info(args, paths):
                           imagen=_has_image(layout, pg)))
     return {"sha256": sha256_file(path), "paginas": len(pages), "detalle_paginas": pages, "cifrado": enc,
             "metadatos": docinfo, "extraible": {"texto": text_chars > 0, "geometria": vec > 0},
-            "aviso": None if text_chars or vec else "sin texto ni vectores extraíbles: probablemente escaneado; requiere interpretación visual autorizada"}
+            "aviso": None if text_chars or vec else "no extractable text or vectors: probably scanned; requires authorized visual interpretation"}
 
 
 def verify(args, paths):
-    """Compara un PDF emitido con un manifiesto de entrega posicional y un recibo opcional."""
+    """Compares an issued PDF with a positional delivery manifest and an optional receipt."""
     path = paths.check(args.get("ruta"))
     previous = paths.check(args["anterior"]) if "anterior" in args else None
     expected = args.get("esperado")
     if not isinstance(expected, list) or not expected:
-        raise JobError("INVALIDO", "esperado exige una lista de páginas en orden de emisión")
+        raise JobError("INVALIDO", "esperado requires a list of pages in issue order")
     expected_hash = args.get("sha256_esperado")
     if "sha256_esperado" in args and (not isinstance(expected_hash, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", expected_hash)):
-        raise JobError("INVALIDO", "sha256_esperado debe ser el SHA-256 hexadecimal del recibo")
+        raise JobError("INVALIDO", "sha256_esperado must be the hexadecimal SHA-256 of the receipt")
     for spec in expected:
         if not isinstance(spec, dict) or not spec or spec.keys() - {"textos", "papel_pt", "rgb_vectorial"}:
-            raise JobError("INVALIDO", "cada página exige textos, papel_pt o rgb_vectorial")
+            raise JobError("INVALIDO", "each page requires textos, papel_pt or rgb_vectorial")
         if "textos" in spec and (not isinstance(spec["textos"], list) or not spec["textos"] or
                                 any(not isinstance(s, str) or not s.strip() for s in spec["textos"])):
-            raise JobError("INVALIDO", "textos exige una lista de textos visibles")
+            raise JobError("INVALIDO", "textos requires a list of visible texts")
         if "papel_pt" in spec:
             paper = spec["papel_pt"]
             if not isinstance(paper, list) or len(paper) != 2 or any(type(n) not in (int, float) or not 0 < n <= 1e6 for n in paper):
-                raise JobError("INVALIDO", "papel_pt exige ancho y alto positivos en puntos")
+                raise JobError("INVALIDO", "papel_pt requires positive width and height in points")
         if "rgb_vectorial" in spec:
             colors = spec["rgb_vectorial"]
             if not isinstance(colors, list) or not colors or any(
                     not isinstance(rgb, list) or len(rgb) != 3 or any(type(c) is not int or not 0 <= c <= 255 for c in rgb)
                     for rgb in colors):
-                raise JobError("INVALIDO", "rgb_vectorial exige una lista de tripletas RGB de 0 a 255")
+                raise JobError("INVALIDO", "rgb_vectorial requires a list of RGB triplets from 0 to 255")
 
     digest = sha256_file(path)
     prior_digest = sha256_file(previous) if previous else None
@@ -383,10 +383,10 @@ def verify(args, paths):
         pages.append({"pagina": page_number, "papel_pt": paper, "tiene_imagen": has_image, "textos_extraibles": len(lines)})
 
     if sha256_file(path) != digest:
-        raise JobError("INVALIDO", "el PDF cambió durante la verificación; repita con la emisión terminada")
+        raise JobError("INVALIDO", "the PDF changed during verification; repeat once the issue is finished")
     return {"estado": "con_diferencias" if differences else "verificado", "sha256": digest, "sha256_anterior": prior_digest,
             "paginas": pages, "diferencias": differences,
-            "alcance": "Texto extraíble dentro del recorte y color RGB observado en vectores. La apariencia impresa requiere cotejo visual."}
+            "alcance": "Extractable text within the crop and RGB color observed in vectors. The printed appearance requires visual checking."}
 
 
 def extract(args, paths):
@@ -420,14 +420,14 @@ def extract(args, paths):
         item["contenido"] = {"palabras": len(words), "vectores": len(lines) + len(rects) + len(curves), "imagen": _has_image(layout, pg)}
         out_pages.append(fr.to_visible(item))
     if total == 0 and not truncated:
-        raise JobError("SIN_CONTENIDO", "no hay texto ni geometría extraíble en las páginas pedidas (¿escaneado?); "
-                                        "requiere interpretación visual autorizada, no se inventa contenido")
+        raise JobError("SIN_CONTENIDO", "no extractable text or geometry on the requested pages (scanned?); "
+                                        "requires authorized visual interpretation, no content is invented")
     return {"sha256": sha256_file(path), "paginas": out_pages, "truncado": truncated, "clase": "extraccion_textual+geometrica",
-            "nota": "Coordenadas en puntos del espacio visible de la página; no son coordenadas de Revit."}
+            "nota": "Coordinates in points of the visible page space; they are not Revit coordinates."}
 
 
 def tables(args, paths):
-    """Tablas con REGLAS (líneas o bordes de rectángulos que forman una rejilla). Celda = texto cuyo centro cae dentro."""
+    """Tables from RULES (lines or rectangle edges forming a grid). Cell = text whose center falls inside."""
     path = paths.check(args.get("ruta"))
     raw, _, _ = _raw_pages(path)
     sel = _page_sel(args, len(raw))
@@ -450,7 +450,7 @@ def tables(args, paths):
             row_h = sorted(ys[i] - ys[i + 1] for i in range(len(ys) - 1))
             if row_h and row_h[len(row_h) // 2] > float(args.get("max_alto_fila_pt", 54.0)) and not args.get("incluir_rejillas"):
                 descartadas.append(fr.to_visible({"pagina": sel[k], "bbox": [_r(xs[0]), _r(ys[-1]), _r(xs[-1]), _r(ys[0])],
-                                    "motivo": "filas de %.0f pt: rejilla de plano probable, no tabla" % row_h[len(row_h) // 2]}))
+                                    "motivo": "rows of %.0f pt: probably a drawing grid, not a table" % row_h[len(row_h) // 2]}))
                 continue
             cells = []
             for i in range(len(t["ys"]) - 1):
@@ -471,7 +471,7 @@ def tables(args, paths):
 
 
 def _grid_tables(hs, vs, tol=1.5):
-    """Agrupa líneas H/V que se cruzan en rejillas (≥2 filas y ≥2 columnas)."""
+    """Groups crossing H/V lines into grids (≥2 rows and ≥2 columns)."""
     out = []
     used_h = set()
     for i, h in enumerate(hs):
@@ -505,9 +505,9 @@ LEGEND_RX = re.compile(r"^([A-Z]{1,3}\d{0,3}[A-Z]?(?:-\d{1,3}[A-Z]{0,2})?)\s*[-�
 
 def symbols(args, paths):
     """
-    Símbolos CANDIDATOS: formas cerradas pequeñas agrupadas por firma (tipo, tamaño, relleno). La leyenda (forma + "CÓDIGO - texto")
-    da el significado de cada firma; un rótulo cercano lo confirma o lo contradice. Nada se clasifica sin leyenda o rótulo:
-    lo dudoso queda en "ambiguos" para un agente autorizado. Es extracción geométrica + reglas, no visión.
+    CANDIDATE symbols: small closed shapes grouped by signature (type, size, fill). The legend (shape + "CODE - text")
+    gives the meaning of each signature; a nearby label confirms or contradicts it. Nothing is classified without a legend or label:
+    anything doubtful stays in "ambiguos" for an authorized agent. This is geometric extraction + rules, not vision.
     """
     path = paths.check(args.get("ruta"))
     traced = args.get("trazabilidad") is True or "decisiones" in args
@@ -515,15 +515,15 @@ def symbols(args, paths):
     if "decisiones" in args:
         supplied = args["decisiones"]
         if not isinstance(supplied, list):
-            raise JobError("INVALIDO", "decisiones exige una lista por id_simbolo")
+            raise JobError("INVALIDO", "decisiones requires a list keyed by id_simbolo")
         for item in supplied:
             if (not isinstance(item, dict) or not isinstance(item.get("id_simbolo"), str) or
                     item.get("decision") not in ("incluir", "excluir") or
                     not isinstance(item.get("evidencia"), str) or not item["evidencia"].strip() or
                     ("codigo" in item and (not isinstance(item["codigo"], str) or not CODE_RX.fullmatch(item["codigo"])))):
-                raise JobError("INVALIDO", "cada decisión exige id_simbolo, incluir|excluir, evidencia y código opcional")
+                raise JobError("INVALIDO", "each decision requires id_simbolo, incluir|excluir, evidencia and an optional codigo")
             if item["id_simbolo"] in decisions:
-                raise JobError("INVALIDO", "decisión duplicada para " + item["id_simbolo"])
+                raise JobError("INVALIDO", "duplicate decision for " + item["id_simbolo"])
             decisions[item["id_simbolo"]] = item
     digest = sha256_file(path) if traced else None
     raw, _, _ = _raw_pages(path)
@@ -571,7 +571,7 @@ def symbols(args, paths):
                 continue
             seen[key] = s
             unique.append((i, s))
-        # leyenda: forma con texto a la derecha en la misma línea "COD - descripción"
+        # legend: shape with text to its right on the same line "CODE - description"
         legend = {}
         legend_idx = set()
         for i, s in unique:
@@ -613,20 +613,20 @@ def symbols(args, paths):
             if lg and not lg.get("conflicto"):
                 entry["codigo"] = lg["codigo"]
                 if label is None:
-                    entry["confianza"] = 0.75; entry["motivo"] = "firma de leyenda sin rótulo cercano"
+                    entry["confianza"] = 0.75; entry["motivo"] = "legend signature without a nearby label"
                 elif label == lg["codigo"]:
-                    entry["confianza"] = 0.95; entry["motivo"] = "firma de leyenda y rótulo coinciden"
+                    entry["confianza"] = 0.95; entry["motivo"] = "legend signature and label match"
                 else:
-                    entry["confianza"] = 0.4; entry["motivo"] = "rótulo «%s» contradice la leyenda «%s»" % (label, lg["codigo"])
+                    entry["confianza"] = 0.4; entry["motivo"] = "label \"%s\" contradicts the legend \"%s\"" % (label, lg["codigo"])
                     amb.append(entry); continue
                 cands.append(entry)
             elif label and any(l["codigo"] == label for l in legend.values()):
-                entry["codigo"] = label; entry["confianza"] = 0.5; entry["motivo"] = "rótulo de leyenda con una firma distinta a la de la leyenda"
+                entry["codigo"] = label; entry["confianza"] = 0.5; entry["motivo"] = "legend label on a signature different from the legend's"
                 amb.append(entry)
             else:
                 unclassified.setdefault(s["firma"], []).append(entry)
-        # 2.ª pasada: firma SIN leyenda cuyos rótulos coinciden de forma consistente (≥80 %, ≥3 formas) en un código
-        # que la leyenda no asigna a otra firma -> candidato de confianza media; el resto del grupo, ambiguo.
+        # 2nd pass: signature WITHOUT a legend whose labels consistently agree (≥80 %, ≥3 shapes) on a code
+        # that the legend does not assign to another signature -> medium-confidence candidate; the rest of the group, ambiguous.
         legend_codes = {v["codigo"] for v in legend.values()}
         rest = {}
         for firma, group in unclassified.items():
@@ -636,10 +636,10 @@ def symbols(args, paths):
                 for e in group:
                     if e["rotulo"] == top:
                         e["codigo"] = top; e["confianza"] = 0.7
-                        e["motivo"] = "firma sin leyenda; rótulo «%s» consistente en %d/%d formas" % (top, labels.count(top), len(group))
+                        e["motivo"] = "signature without a legend; label \"%s\" consistent on %d/%d shapes" % (top, labels.count(top), len(group))
                         cands.append(e)
                     else:
-                        e["codigo"] = top; e["confianza"] = 0.3; e["motivo"] = "grupo rotulado «%s» pero esta forma no tiene ese rótulo" % top
+                        e["codigo"] = top; e["confianza"] = 0.3; e["motivo"] = "group labeled \"%s\" but this shape does not have that label" % top
                         amb.append(e)
             else:
                 rest[firma] = len(group)
@@ -658,7 +658,7 @@ def symbols(args, paths):
                         continue
                     if decision and (decision["decision"] != previous["decision"] or
                                      decision.get("codigo", entry.get("codigo")) != previous.get("codigo", entry.get("codigo"))):
-                        raise JobError("INVALIDO", "decisiones incompatibles para trazos superpuestos de " + entry["id_simbolo"])
+                        raise JobError("INVALIDO", "incompatible decisions for overlapping strokes of " + entry["id_simbolo"])
                     decision = decision or previous
                 item = dict(entry, estado="sin_revisar")
                 if decision:
@@ -667,7 +667,7 @@ def symbols(args, paths):
                     if item["estado"] == "incluido":
                         code = decision.get("codigo", entry.get("codigo"))
                         if not code:
-                            raise JobError("INVALIDO", "indique el código confirmado de " + entry["id_simbolo"])
+                            raise JobError("INVALIDO", "specify the confirmed code of " + entry["id_simbolo"])
                         item["codigo_confirmado"] = code
                         confirmed.append(dict(item, codigo=code, confianza=1.0))
                 inventory.append(item)
@@ -675,12 +675,12 @@ def symbols(args, paths):
             page["confirmados"] = confirmed
         pages.append(fr.to_visible(page))
     if decisions:
-        raise JobError("INVALIDO", "hay decisiones de otra página, revisión o configuración de extracción: " + ", ".join(list(decisions)[:5]))
+        raise JobError("INVALIDO", "there are decisions from another page, revision or extraction configuration: " + ", ".join(list(decisions)[:5]))
     final_digest = sha256_file(path)
     if traced and digest != final_digest:
-        raise JobError("INVALIDO", "el PDF cambió durante la extracción")
+        raise JobError("INVALIDO", "the PDF changed during extraction")
     return {"sha256": final_digest, "paginas": pages, "clase": "extraccion_geometrica+reglas_de_leyenda",
-            "nota": "Candidatos, no luminarias confirmadas. Las ambigüedades requieren un agente o una persona autorizados."}
+            "nota": "Candidates, not confirmed fixtures. Ambiguities require an authorized agent or person."}
 
 
 def _q(v):
@@ -692,9 +692,9 @@ GRID_LABEL_RX = re.compile(r"^([A-Z]{1,2}(\.\d{1,2})?|\d{1,3}(\.\d{1,2})?)$")
 
 def grids(args, paths):
     """
-    Ejes del plano: líneas largas con un globo (círculo con rótulo corto) en un extremo, e intersecciones entre ejes con
-    nombre. Las intersecciones son ANCLAS candidatas para el registro plano–modelo (el modelo aporta las suyas por nombre
-    de eje). Coordenadas en el espacio visible de la página; nunca son coordenadas de Revit.
+    Drawing grids: long lines with a bubble (circle with a short label) at one end, and intersections between named
+    grids. The intersections are candidate ANCHORS for drawing–model registration (the model supplies its own by grid
+    name). Coordinates in the visible page space; never Revit coordinates.
     """
     path = paths.check(args.get("ruta"))
     raw, _, _ = _raw_pages(path)
@@ -720,9 +720,9 @@ def grids(args, paths):
                 inside = [wd for wd in words if math.hypot((wd["bbox"][0] + wd["bbox"][2]) / 2 - cx, (wd["bbox"][1] + wd["bbox"][3]) / 2 - cy) < rad]
                 if len(inside) == 1 and GRID_LABEL_RX.match(inside[0]["texto"]):
                     bubbles.append({"c": (cx, cy), "r": rad, "label": inside[0]["texto"]})
-        # Algunos exportadores dibujan el rótulo sin círculo. Esta heurística es optativa y
-        # sólo se aplica en páginas sin globos reconocibles. Busca rótulos aislados, alineados
-        # con el extremo de un trazo largo y situados inmediatamente fuera de él.
+        # Some exporters draw the label without a circle. This heuristic is optional and
+        # only applies to pages without recognizable bubbles. It looks for isolated labels aligned
+        # with the end of a long stroke and placed just beyond it.
         bare_labels = args.get("sin_globo") is True and not bubbles
         if bare_labels:
             for wd in words:
@@ -742,8 +742,8 @@ def grids(args, paths):
                     if d_end > b["r"] * 1.8 + 3:
                         continue
                     L = math.hypot(ex - ox, ey - oy)
-                    perp = abs((ex - ox) * (oy - cy) - (ox - cx) * (ey - oy)) / L   # distancia del centro a la recta
-                    ahead = ((cx - ex) * (ex - ox) + (cy - ey) * (ey - oy)) / L     # el globo está más allá del extremo
+                    perp = abs((ex - ox) * (oy - cy) - (ox - cx) * (ey - oy)) / L   # distance from the center to the line
+                    ahead = ((cx - ex) * (ex - ox) + (cy - ey) * (ey - oy)) / L     # the bubble lies beyond the end
                     min_ahead = 0 if bare_labels else -b["r"] * 0.2
                     if perp <= b["r"] * 0.6 and ahead > min_ahead and (bd is None or d_end < bd):
                         best, bd = l, d_end
@@ -763,7 +763,7 @@ def grids(args, paths):
                 den = d1[0] * d2[1] - d1[1] * d2[0]
                 n1, n2 = math.hypot(*d1), math.hypot(*d2)
                 if abs(den) < math.sin(math.radians(20)) * n1 * n2:
-                    continue   # casi paralelos: no dan un ancla fiable
+                    continue   # nearly parallel: they do not give a reliable anchor
                 t = ((b[0] - a[0]) * d2[1] - (b[1] - a[1]) * d2[0]) / den
                 u = ((b[0] - a[0]) * d1[1] - (b[1] - a[1]) * d1[0]) / den
                 if -0.02 <= t <= 1.02 and -0.02 <= u <= 1.02:
@@ -786,4 +786,4 @@ def grids(args, paths):
             g["globo_pt"] = [_r(t) for t in fr.vis(*g["globo_pt"])] if fr.rot else g["globo_pt"]
         out.append(page)
     return {"sha256": sha256_file(path), "paginas": out, "clase": "extraccion_geometrica+reglas_de_ejes",
-            "nota": "Anclas candidatas por nombre de eje. El registro exige las mismas intersecciones en el modelo."}
+            "nota": "Candidate anchors by grid name. Registration requires the same intersections in the model."}

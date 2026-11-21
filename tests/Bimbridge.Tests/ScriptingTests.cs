@@ -122,7 +122,7 @@ namespace Bimbridge.Tests
         [Theory, MemberData(nameof(Years))]
         public void Lavamanos_CompilesAgainstEachYearsApi(int year)
         {
-            var code = File.ReadAllText(Path.Combine(Root, "tools", "aceptacion", "lavamanos_exec.cs"));
+            var code = File.ReadAllText(Path.Combine(Root, "tools", "acceptance", "washbasin_exec.cs"));
             var (dll, diags) = Compile(code, year);
             Assert.True(dll != null, year + ": " + string.Join("\n", diags));
         }
@@ -141,7 +141,7 @@ namespace Bimbridge.Tests
                 var (dll, diags) = Compile(code, year);
                 Assert.True(dll != null, year + " " + Path.GetFileName(f) + ": " + string.Join("\n", diags));
             }
-            foreach (var f in Directory.GetFiles(Path.Combine(Root, "tools", "bench_060"), "mcp_*.cs").Concat(Directory.GetFiles(Path.Combine(Root, "tools", "aceptacion"), "*_060.cs")).Concat(Directory.GetFiles(Path.Combine(Root, "tools", "aceptacion", "0.9.0"), "*_090.cs")))
+            foreach (var f in Directory.GetFiles(Path.Combine(Root, "tools", "bench_060"), "mcp_*.cs").Concat(Directory.GetFiles(Path.Combine(Root, "tools", "acceptance"), "*_060.cs")).Concat(Directory.GetFiles(Path.Combine(Root, "tools", "acceptance", "0.9.0"), "*_090.cs")))
             {
                 var (db, gb) = Compile(File.ReadAllText(f), year);
                 Assert.True(db != null, year + " " + Path.GetFileName(f) + ": " + string.Join("\n", gb));
@@ -168,7 +168,7 @@ namespace Bimbridge.Tests
         {
             var outPath = Environment.GetEnvironmentVariable("BIMBRIDGE_BENCH_OUT");
             if (string.IsNullOrEmpty(outPath)) return;
-            var code = File.ReadAllText(Path.Combine(Root, "tools", "aceptacion", "lavamanos_exec.cs"));
+            var code = File.ReadAllText(Path.Combine(Root, "tools", "acceptance", "washbasin_exec.cs"));
             var lines = new List<string> { "año;primera_ms;siguientes_mediana_ms;referencias" };
             foreach (var y in RefVersion.Keys.OrderBy(year => year))
             {

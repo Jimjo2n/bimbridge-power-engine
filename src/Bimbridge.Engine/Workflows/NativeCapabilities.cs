@@ -5,19 +5,19 @@ using System.Linq;
 
 namespace Bimbridge.Engine.Workflows
 {
-    /// <summary>Modos de ejecución de una capacidad nativa (#23 §1).</summary>
+    /// <summary>Execution modes of a native capability (#23 §1).</summary>
     public enum ExecMode { read, preflight, plan, direct_api, interactive_invocation, ui_assisted, manual_handoff }
 
-    /// <summary>Nivel de soporte de un modo: probado (campaña nativa), experimental (implementado sin prueba nativa) o no disponible.</summary>
+    /// <summary>Support level of a mode: proven (native campaign), experimental (implemented without native proof) or unavailable.</summary>
     public enum SupportLevel { proven, experimental, unavailable }
 
-    /// <summary>Lo que el cliente puede hacer de verdad, medido en tiempo de ejecución (no supuesto por el catálogo de herramientas).</summary>
+    /// <summary>What the client can actually do, measured at run time (not assumed from the tool catalog).</summary>
     public sealed class ClientEnvironment
     {
-        /// <summary>Hay un ejecutor de UI autorizado que puede responder diálogos de Revit (no lo hay por defecto).</summary>
+        /// <summary>An authorized UI executor that can answer Revit dialogs is present (none by default).</summary>
         public bool UiExecutorAvailable;
         public string UiExecutorName;
-        /// <summary>El usuario autorizó guardar el documento destino en esta sesión.</summary>
+        /// <summary>The user authorized saving the target document in this session.</summary>
         public bool SaveAuthorized;
     }
 
@@ -28,7 +28,7 @@ namespace Bimbridge.Engine.Workflows
         public string Why;
     }
 
-    /// <summary>Descriptor versionado y descubrible de una operación nativa por versión de Revit y entorno del cliente (#23 §1).</summary>
+    /// <summary>Versioned, discoverable descriptor of a native operation per Revit version and client environment (#23 §1).</summary>
     public sealed class NativeCapability
     {
         public const string Schema = "bimbridge.native_capability/1";
@@ -41,7 +41,7 @@ namespace Bimbridge.Engine.Workflows
 
         public SupportLevel LevelOf(ExecMode m) => Modes.FirstOrDefault(x => x.Mode == m)?.Level ?? SupportLevel.unavailable;
 
-        /// <summary>El mejor modo para llegar al final: API directa, si no UI asistida, si no traspaso manual.</summary>
+        /// <summary>The best mode to reach the end: direct API, else assisted UI, else manual handoff.</summary>
         public ExecMode Recommended =>
             LevelOf(ExecMode.direct_api) != SupportLevel.unavailable ? ExecMode.direct_api
             : LevelOf(ExecMode.ui_assisted) != SupportLevel.unavailable ? ExecMode.ui_assisted
@@ -57,10 +57,10 @@ namespace Bimbridge.Engine.Workflows
     }
 
     /// <summary>
-    /// Matriz de capacidades nativas. Se apoya en el inventario offline de la API (0.9.1 Bloque B): Copy/Monitor NO tiene API pública de
-    /// copia por lotes en 2022–2026 (no existe CopyMonitorOptions ni equivalente); sí la hay para leer vínculos e inspeccionar relaciones
-    /// de supervisión (Element.IsMonitoringLinkElement / GetMonitoredLinkElementIds) y para invocar el comando (PostCommand).
-    /// Nada aquí es "proven" hasta la campaña nativa única.
+    /// Native capability matrix. It relies on the offline API inventory (0.9.1 Block B): Copy/Monitor has NO public batch-copy
+    /// API in 2022–2026 (there is no CopyMonitorOptions or equivalent); there is one to read links and inspect monitoring
+    /// relationships (Element.IsMonitoringLinkElement / GetMonitoredLinkElementIds) and to invoke the command (PostCommand).
+    /// Nothing here is "proven" until the single native campaign.
     /// </summary>
     public static class NativeCapabilities
     {
@@ -76,51 +76,51 @@ namespace Bimbridge.Engine.Workflows
                 case CopyMonitorFixtures:
                 {
                     var c = new NativeCapability { Operation = operation, RevitVersion = revitVersion, RequiresUiExecutor = true };
-                    c.Modes.Add(new ModeSupport { Mode = ExecMode.read, Level = SupportLevel.experimental, Why = "inventario de vínculos, aparatos de origen y del anfitrión con la API pública" });
-                    c.Modes.Add(new ModeSupport { Mode = ExecMode.preflight, Level = SupportLevel.experimental, Why = "vínculo cargado, transformación, niveles, categorías y conteos por tipo" });
-                    c.Modes.Add(new ModeSupport { Mode = ExecMode.plan, Level = SupportLevel.experimental, Why = "mapeo de tipos propuesto y excepciones esperadas, sin tocar el modelo" });
-                    c.Modes.Add(new ModeSupport { Mode = ExecMode.direct_api, Level = SupportLevel.unavailable, Why = "BIMBRIDGE usa el traspaso interactivo para configurar y ejecutar la copia por lotes" });
-                    c.Modes.Add(new ModeSupport { Mode = ExecMode.interactive_invocation, Level = SupportLevel.experimental, Why = "PostCommand(CopyMonitorSelectLink) sólo abre el modo nativo: aceptar la orden no es copiar" });
+                    c.Modes.Add(new ModeSupport { Mode = ExecMode.read, Level = SupportLevel.experimental, Why = "inventory of links, source and host fixtures with the public API" });
+                    c.Modes.Add(new ModeSupport { Mode = ExecMode.preflight, Level = SupportLevel.experimental, Why = "loaded link, transform, levels, categories and counts per type" });
+                    c.Modes.Add(new ModeSupport { Mode = ExecMode.plan, Level = SupportLevel.experimental, Why = "proposed type mapping and expected exceptions, without touching the model" });
+                    c.Modes.Add(new ModeSupport { Mode = ExecMode.direct_api, Level = SupportLevel.unavailable, Why = "BIMBRIDGE uses the interactive handoff to configure and run the batch copy" });
+                    c.Modes.Add(new ModeSupport { Mode = ExecMode.interactive_invocation, Level = SupportLevel.experimental, Why = "PostCommand(CopyMonitorSelectLink) only opens the native mode: accepting the command is not copying" });
                     c.Modes.Add(env.UiExecutorAvailable
-                        ? new ModeSupport { Mode = ExecMode.ui_assisted, Level = SupportLevel.experimental, Why = "ejecutor de UI declarado: " + (env.UiExecutorName ?? "sin nombre") + "; cada paso se demuestra con evidencia observada" }
-                        : new ModeSupport { Mode = ExecMode.ui_assisted, Level = SupportLevel.unavailable, Why = "no hay ejecutor de UI autorizado en este cliente" });
-                    c.Modes.Add(new ModeSupport { Mode = ExecMode.manual_handoff, Level = SupportLevel.experimental, Why = "pasos exactos para el usuario + verificación posterior con la API" });
+                        ? new ModeSupport { Mode = ExecMode.ui_assisted, Level = SupportLevel.experimental, Why = "declared UI executor: " + (env.UiExecutorName ?? "unnamed") + "; each step is proven with observed evidence" }
+                        : new ModeSupport { Mode = ExecMode.ui_assisted, Level = SupportLevel.unavailable, Why = "there is no authorized UI executor in this client" });
+                    c.Modes.Add(new ModeSupport { Mode = ExecMode.manual_handoff, Level = SupportLevel.experimental, Why = "exact steps for the user + later verification with the API" });
                     c.Validations.AddRange(new[]
                     {
-                        "conteo y tipo de aparatos de origen por familia/tipo", "transformación del vínculo (identidad o la declarada)",
-                        "relación de supervisión de cada copia (IsMonitoringLinkElement)", "familia/tipo esperado tras el mapeo", "posición y orientación tras la transformación",
-                        "duplicados, ausentes, tipo incorrecto y sin supervisión", "guardado sólo con autorización expresa y relectura posterior",
+                        "count and type of source fixtures per family/type", "link transform (identity or the declared one)",
+                        "monitoring relationship of each copy (IsMonitoringLinkElement)", "expected family/type after the mapping", "position and orientation after the transform",
+                        "duplicates, missing, wrong type and unmonitored", "save only with explicit authorization and a later reread",
                     });
                     c.Limitations.AddRange(new[]
                     {
-                        "GetMonitoredLinkElementIds devuelve ids de INSTANCIAS de vínculo, no del aparato de origen: la correspondencia origen→copia se infiere por tipo y posición",
-                        "ElementTransformUtils.CopyElements no crea relaciones de supervisión: nunca sustituye a Copy/Monitor",
-                        "sin campaña nativa: ningún modo es 'proven'",
+                        "GetMonitoredLinkElementIds returns ids of link INSTANCES, not of the source fixture: the source→copy correspondence is inferred by type and position",
+                        "ElementTransformUtils.CopyElements does not create monitoring relationships: it never replaces Copy/Monitor",
+                        "no native campaign: no mode is 'proven'",
                     });
                     return c;
                 }
                 default:
-                    throw new ArgumentException("operación nativa desconocida: " + operation + ". Conocidas: " + string.Join(", ", Operations));
+                    throw new ArgumentException("unknown native operation: " + operation + ". Known: " + string.Join(", ", Operations));
             }
         }
 
-        /// <summary>Pasos exactos del flujo nativo para el usuario cuando no hay ejecutor de UI (traspaso manual veraz).</summary>
+        /// <summary>Exact steps of the native workflow for the user when there is no UI executor (truthful manual handoff).</summary>
         public static List<string> CopyMonitorManualSteps(string linkName, IEnumerable<string> typeMappings, bool saveAuthorized)
         {
             var steps = new List<string>
             {
-                "Pestaña Colaborar > Copiar/Supervisar > Seleccionar vínculo, y elija el vínculo '" + linkName + "'.",
-                "En la barra Copiar/Supervisar, abra Parámetros de coordinación.",
-                "Categoría Aparatos sanitarios (Plumbing Fixtures): marque 'Permitir copia por lotes'.",
+                "Collaborate tab > Copy/Monitor > Select Link, and pick the link '" + linkName + "'.",
+                "In the Copy/Monitor bar, open Coordination Settings.",
+                "Plumbing Fixtures category: check 'Allow batch copy'.",
             };
             var maps = (typeMappings ?? Enumerable.Empty<string>()).ToList();
             steps.Add(maps.Count == 0
-                ? "Mapeo de tipos: deje 'Copiar tipo original' para todos los tipos."
-                : "Mapeo de tipos: " + string.Join("; ", maps) + ".");
-            steps.Add("Pulse Aceptar y luego Copia por lotes; en 'Aparatos encontrados' elija copiar los aparatos.");
-            steps.Add("Pulse Finalizar en la barra Copiar/Supervisar.");
-            steps.Add(saveAuthorized ? "Guarde el documento destino." : "No guarde todavía: primero se verifica el resultado.");
-            steps.Add("Avise al asistente para que lea el modelo y verifique conteos, tipos, posición y supervisión.");
+                ? "Type mapping: leave 'Copy original type' for all types."
+                : "Type mapping: " + string.Join("; ", maps) + ".");
+            steps.Add("Click OK and then Batch Copy; in 'Fixtures Found' choose to copy the fixtures.");
+            steps.Add("Click Finish in the Copy/Monitor bar.");
+            steps.Add(saveAuthorized ? "Save the target document." : "Do not save yet: the result is verified first.");
+            steps.Add("Tell the assistant to read the model and verify counts, types, position and monitoring.");
             return steps;
         }
     }

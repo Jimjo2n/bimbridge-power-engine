@@ -33,7 +33,7 @@ namespace Bimbridge.Engine.Qa
                 {
                     if (!(row is Dictionary<string, object> data) || !(Arg.GetLong(data, "id") is long id) || id <= 0 ||
                         !ids.Add(id) || !(Arg.GetString(data, "uid") is string uid) || uid.Length == 0 || !uids.Add(uid))
-                        throw new QueryException("miembros: se requieren IDs y UID únicos en cada instantánea");
+                        throw new QueryException("miembros: unique IDs and UIDs are required in each snapshot");
                     result.Add((id, uid, Arg.GetString(data, "firma")));
                 }
                 return result;

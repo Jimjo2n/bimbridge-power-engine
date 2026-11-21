@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Pruebas del Python Worker (contrato pe=1) con fixtures SINTÉTICOS. Ejecutar: python3 -m unittest -v tests/test_worker.py"""
+"""Python Worker tests (contract pe=1) with SYNTHETIC fixtures. Run: python3 -m unittest -v tests/test_worker.py"""
 import json
 import math
 import os
@@ -27,7 +27,7 @@ def setUpModule():
 
 
 class Worker:
-    """Proceso real, aislado (-I -B), hablando JSON por líneas como lo hace el núcleo C#."""
+    """Real, isolated process (-I -B), speaking JSON lines the way the C# core does."""
 
     def __init__(self, rutas=None):
         self.p = subprocess.Popen([sys.executable, "-I", "-B", os.path.join(ROOT, "run_worker.py")], stdin=subprocess.PIPE,
@@ -45,7 +45,7 @@ class Worker:
         if limites:
             req["limites"] = limites
         r = self.raw(json.dumps(req))
-        assert r["id"] == req["id"], "correlación rota"
+        assert r["id"] == req["id"], "broken correlation"
         return r
 
     def close(self):
@@ -91,8 +91,8 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(self.w.call("pdf_info", {"ruta": fx("plan_vectorial.pdf")}, pe=2)["codigo"], "VERSION_INCOMPATIBLE")
 
     def test_unknown_job_and_bad_json_do_not_kill_worker(self):
-        self.assertEqual(self.w.call("formatear_disco")["codigo"], "NO_SOPORTADO")
-        self.assertEqual(self.w.raw("{esto no es json")["codigo"], "INVALIDO")
+        self.assertEqual(self.w.call("format_disk")["codigo"], "NO_SOPORTADO")
+        self.assertEqual(self.w.raw("{not json")["codigo"], "INVALIDO")
         self.assertEqual(self.w.call("hola")["codigo"], "OK")
 
     def test_telemetry(self):
@@ -103,8 +103,8 @@ class ContractTests(unittest.TestCase):
 class PdfDeliveryTests(unittest.TestCase):
     def test_current_issue_passes_and_previous_issue_reports_order_stamp_color_and_receipt(self):
         with tempfile.TemporaryDirectory(dir=FX) as folder:
-            current = os.path.join(folder, "actual.pdf")
-            previous = os.path.join(folder, "anterior.pdf")
+            current = os.path.join(folder, "current.pdf")
+            previous = os.path.join(folder, "previous.pdf")
             for path, revision, color in ((current, "QC REV 02", "1 0 1"), (previous, "QC REV 01", "0 0 0")):
                 pdf = fixtures.Pdf()
                 contents = [
@@ -149,7 +149,7 @@ class FeederWorkbookTests(unittest.TestCase):
                     <c r="C1" t="inlineStr"><is><t>Destino</t></is></c><c r="D1" t="inlineStr"><is><t>Abierto</t></is></c></row>
                     <row r="2"><c r="A2" t="s"><v>0</v></c><c r="B2" t="inlineStr"><is><t>METER</t></is></c>
                     <c r="D2" t="b"><v>1</v></c></row>
-                    <row r="3"><c r="A3" t="inlineStr"><is><t>NOTA</t></is></c></row>
+                    <row r="3"><c r="A3" t="inlineStr"><is><t>NOTE</t></is></c></row>
                     </sheetData></worksheet>""")
             worker = Worker()
             try:
@@ -172,7 +172,7 @@ class PathAndNetworkGuards(unittest.TestCase):
     def setUpClass(cls):
         cls.w = Worker()
         cls.outside = tempfile.mkdtemp()
-        shutil.copy(fx("plan_vectorial.pdf"), os.path.join(cls.outside, "fuera.pdf"))
+        shutil.copy(fx("plan_vectorial.pdf"), os.path.join(cls.outside, "outside.pdf"))
 
     @classmethod
     def tearDownClass(cls):
@@ -180,25 +180,25 @@ class PathAndNetworkGuards(unittest.TestCase):
         shutil.rmtree(cls.outside)
 
     def test_outside_path_denied(self):
-        self.assertEqual(self.w.call("pdf_info", {"ruta": os.path.join(self.outside, "fuera.pdf")})["codigo"], "RUTA_DENEGADA")
+        self.assertEqual(self.w.call("pdf_info", {"ruta": os.path.join(self.outside, "outside.pdf")})["codigo"], "RUTA_DENEGADA")
 
     def test_verify_checks_authorization_for_previous_issue(self):
-        reply = self.w.call("pdf_verify", {"ruta": fx("plan_vectorial.pdf"), "anterior": os.path.join(self.outside, "fuera.pdf"),
+        reply = self.w.call("pdf_verify", {"ruta": fx("plan_vectorial.pdf"), "anterior": os.path.join(self.outside, "outside.pdf"),
                                            "esperado": [{"textos": ["E-101"]}]})
         self.assertEqual(reply["codigo"], "RUTA_DENEGADA")
 
     def test_dotdot_denied(self):
-        p = os.path.join(FX, "..", os.path.basename(self.outside), "fuera.pdf")
+        p = os.path.join(FX, "..", os.path.basename(self.outside), "outside.pdf")
         self.assertEqual(self.w.call("pdf_info", {"ruta": p})["codigo"], "RUTA_DENEGADA")
 
     def test_symlink_escape_denied(self):
         with tempfile.TemporaryDirectory(dir=FX) as folder:
-            link = os.path.join(folder, "enlace_fuera.pdf")
+            link = os.path.join(folder, "outside_link.pdf")
             try:
-                os.symlink(os.path.join(self.outside, "fuera.pdf"), link)
+                os.symlink(os.path.join(self.outside, "outside.pdf"), link)
             except OSError as exc:
                 if getattr(exc, "winerror", None) == 1314:
-                    self.skipTest("Windows requiere privilegio de enlace simbólico")
+                    self.skipTest("Windows requires the symbolic link privilege")
                 raise
             self.assertEqual(self.w.call("pdf_info", {"ruta": link})["codigo"], "RUTA_DENEGADA")
 
@@ -206,8 +206,8 @@ class PathAndNetworkGuards(unittest.TestCase):
         self.assertEqual(self.w.call("pdf_info", {"ruta": fx("plan_vectorial.pdf")}, rutas=[])["codigo"], "RUTA_DENEGADA")
 
     def test_prefix_sibling_denied(self):
-        # /x/fx no autoriza /x/fx_otro
-        sib = FX.rstrip(os.sep) + "_otro"
+        # /x/fx does not authorize /x/fx_other
+        sib = FX.rstrip(os.sep) + "_other"
         os.makedirs(sib, exist_ok=True)
         shutil.copy(fx("plan_vectorial.pdf"), os.path.join(sib, "a.pdf"))
         try:
@@ -217,7 +217,7 @@ class PathAndNetworkGuards(unittest.TestCase):
 
     def test_network_blocked_in_process(self):
         code = ("import sys,socket; sys.path.insert(0,%r); from bimbridge_docworker import worker as w; w.block_network()\n"
-                "try:\n socket.create_connection(('127.0.0.1',9)); print('RED')\nexcept w.JobError as e: print(e.code)") % ROOT
+                "try:\n socket.create_connection(('127.0.0.1',9)); print('NETWORK')\nexcept w.JobError as e: print(e.code)") % ROOT
         out = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True).stdout.strip()
         self.assertEqual(out, "RUTA_DENEGADA")
 
@@ -240,9 +240,9 @@ class PdfTests(unittest.TestCase):
         for lum in t["luminarias"]:
             x, y = lum["lamina_pt"]
             best = min(cands, key=lambda c: math.hypot(c["centro_pt"][0] - x, c["centro_pt"][1] - y))
-            self.assertLess(math.hypot(best["centro_pt"][0] - x, best["centro_pt"][1] - y), 0.6, "%s %s omitido" % (name, lum))
+            self.assertLess(math.hypot(best["centro_pt"][0] - x, best["centro_pt"][1] - y), 0.6, "%s %s missed" % (name, lum))
             self.assertEqual(best["codigo"], lum["codigo"])
-        # los casi duplicados del plano también se extraen (se resuelven en registro/planificación, no aquí)
+        # the near-duplicates of the plan are also extracted (they are resolved in registration/planning, not here)
         self.assertEqual(len(cands), len(t["luminarias"]) + len(t["casi_duplicados"]))
         self.assertEqual(page["lamina"]["numero"]["valor"], "E-1.3.09")
         self.assertEqual(page["lamina"]["revision"]["valor"], "CCD7")
@@ -271,19 +271,19 @@ class PdfTests(unittest.TestCase):
             self.assertEqual([s["centro_pt"] for s in inventory], [[25, 33], [26, 33]])
             raw_alias = "%s:1:1:rectangulo|10.0|6.0|hueco:[25.0, 33.0]" % result["sha256"]
             alias = sha256(raw_alias.encode()).hexdigest()[:24]
-            alias_decision = {"id_simbolo": alias, "codigo": "LT", "decision": "incluir", "evidencia": "revisión"}
+            alias_decision = {"id_simbolo": alias, "codigo": "LT", "decision": "incluir", "evidencia": "review"}
             applied = self.w.call("pdf_symbols", dict(args, decisiones=[alias_decision]), rutas=[folder])
             self.assertEqual(applied["codigo"], "OK", applied.get("error"))
             confirmed = applied["resultado"]["paginas"][0]["confirmados"]
             self.assertEqual([entry["id_simbolo"] for entry in confirmed], [inventory[0]["id_simbolo"]])
-            conflict = {"id_simbolo": inventory[0]["id_simbolo"], "decision": "excluir", "evidencia": "revisión"}
+            conflict = {"id_simbolo": inventory[0]["id_simbolo"], "decision": "excluir", "evidencia": "review"}
             rejected = self.w.call("pdf_symbols", dict(args, decisiones=[alias_decision, conflict]), rutas=[folder])
             self.assertEqual(rejected["codigo"], "INVALIDO")
 
     def test_symbols_page_rotate90_visible_space(self):
         p = self._symbols_match_truth("plan_rotado.pdf")
         self.assertEqual((p["marco"]["ancho_pt"], p["marco"]["alto_pt"], p["marco"]["rotacion"]), (1728.0, 2592.0, 90))
-        self.assertEqual(len(p["leyenda"]), 3, "la leyenda se lee aunque la página esté girada")
+        self.assertEqual(len(p["leyenda"]), 3, "the legend is read even when the page is rotated")
 
     def test_symbols_model_rotated30(self):
         self._symbols_match_truth("plan_girado30.pdf")
@@ -435,17 +435,17 @@ class LargeAndLimits(unittest.TestCase):
             self.assertEqual(r["codigo"], "OK")
             pages = r["resultado"]["paginas"]
             self.assertEqual(len(pages), 40)
-            bubble = "circulo|14.0|14.0|hueco"  # globos de ejes: no son luminarias
+            bubble = "circulo|14.0|14.0|hueco"  # grid bubbles: they are not fixtures
             n = sum(1 for p in pages for c in p["candidatos"] + p["ambiguos"] if c["firma"] != bubble)
             n += sum(s["cantidad"] for p in pages for s in p["sin_leyenda"] if s["firma"] != bubble)
-            self.assertEqual(n, 20000, "toda luminaria acaba en candidatos, ambiguos o sin_leyenda; ninguna se pierde")
+            self.assertEqual(n, 20000, "every fixture ends up in candidatos, ambiguos or sin_leyenda; none is lost")
             self.assertGreater(sum(len(p["candidatos"]) for p in pages), 19800)
             self.assertLess(dt, 60.0)
-            sys.stderr.write("\n[grande_40p] pdf_symbols %.1f s, pico %s kB\n" % (dt, r["telemetria"].get("memoria_pico_kb")))
+            sys.stderr.write("\n[grande_40p] pdf_symbols %.1f s, peak %s kB\n" % (dt, r["telemetria"].get("memoria_pico_kb")))
         finally:
             w.close()
 
-    @unittest.skipUnless(sys.platform.startswith("linux"), "RLIMIT_AS sólo POSIX; en Windows lo aplica el núcleo C#")
+    @unittest.skipUnless(sys.platform.startswith("linux"), "RLIMIT_AS is POSIX only; on Windows the C# core enforces it")
     def test_memory_limit_reported(self):
         w = Worker()
         try:
@@ -459,7 +459,7 @@ class LargeAndLimits(unittest.TestCase):
         req = {"pe": 1, "id": "x", "trabajo": "pdf_symbols", "args": {"ruta": fx("grande_40p.pdf")}, "rutas": [FX]}
         w.p.stdin.write((json.dumps(req) + "\n").encode()); w.p.stdin.flush()
         time.sleep(0.5)
-        w.p.kill(); w.close()  # la cancelación desde C# es matar el proceso; no queda estado compartido
+        w.p.kill(); w.close()  # cancellation from C# means killing the process; no shared state remains
         w2 = Worker()
         try:
             self.assertEqual(w2.call("hola")["codigo"], "OK")

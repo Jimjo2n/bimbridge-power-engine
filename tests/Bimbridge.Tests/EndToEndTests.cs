@@ -268,7 +268,7 @@ namespace Bimbridge.Tests
             // 0.9.0: Power Engine through the same real bridge; on-demand discovery, and without authorized folders it opens no documents
             var pw = (await c.CallToolAsync("power", new Dictionary<string, object> { ["c"] = "cap ejes\npdf info ruta=/etc/passwd" })).Content.OfType<TextContentBlock>().First().Text;
             Assert.Contains("pdf.grids", pw);
-            Assert.Contains("sin carpetas de documentos autorizadas", pw);
+            Assert.Contains("no authorized document folders", pw);
 
             // Several commands in one call (in parallel), text without JSON
             var r = await c.CallToolAsync("revit", new Dictionary<string, object> { ["c"] = "q LF n=true\nq LF g=lvl\nguide escritura op=tag" });
@@ -323,9 +323,9 @@ namespace Bimbridge.Tests
                 ["c"] = "conector nombre=cold sistema=cold cara=812:3 radio=6.5mm doc=d3\nconector nombre=hot sistema=hot cara=812:5 doc=d3\ncargar en=d1 doc=d3",
             });
             var text = act.Content.OfType<TextContentBlock>().First().Text;
-            Assert.Contains("parcial: fallaron 1 de 3", text);
+            Assert.Contains("parcial: 1 of 3 failed", text);
             Assert.Contains("## ERROR conector nombre=hot", text);
-            Assert.Contains("no se ejecutaron", text);
+            Assert.Contains("skipped the remaining", text);
             lock (_fake.Seen)
             {
                 Assert.Equal(2, _fake.Seen.Count);
@@ -402,7 +402,7 @@ namespace Bimbridge.Tests
             await using var c = await Connect("claude-code");
             var r = await Call(c, "query", new Dictionary<string, object> { ["f"] = "id" });
             Assert.Equal("invalido", r["estado"]);
-            Assert.Contains("cat, ids, set o view", (string)r["aviso"]);
+            Assert.Contains("cat, ids, set or view", (string)r["aviso"]);
         }
 
         [Fact]

@@ -1,28 +1,28 @@
-# Centro de control «BIMBRIDGE - Power Engine»
+# «BIMBRIDGE - Power Engine» control center
 
-Botón **Power Engine | Estado** de la cinta BIMBRIDGE. Ventana no modal. No llama a la API de Revit ni guarda `Document` o `Element`. Se redibuja como mucho cada 1,5 s y sólo si algo cambió; la cola en disco se relee como mucho cada 5 s.
+**Power Engine | Status** button on the BIMBRIDGE ribbon. Modeless window. It does not call the Revit API or hold `Document` or `Element`. It redraws at most every 1.5 s and only if something changed; the on-disk queue is re-read at most every 5 s.
 
-## Secciones
+## Sections
 
-| Sección | Muestra |
+| Section | Shows |
 |---|---|
-| Resumen | Permisos R/P/W, estado del C# dinámico, versión exacta del add-in, Revit y pid, documento activo, agentes conectados y activos, solicitudes en ejecución, planes en cola, errores recientes, modo, salud del diario, tiempo activo |
-| Agentes | Por sesión: alias o «sin nombre», presencia, cliente y versión, fuente de identidad, usuario verificado, sesión, conexión, última actividad, solicitudes, en ejecución, errores, tiempo acumulado, última operación y documento, conversación y modelo declarados. Debajo, las últimas desconectadas con su motivo |
-| Seguridad y recuperación | Bloqueo de C#, bloqueo de escritura del documento activo (`CheckWritable`) y cómo resolverlo, últimas ejecuciones dinámicas |
-| Rendimiento | Por operación sobre las últimas 200 solicitudes: n, mediana, p95 (sólo con 20 o más muestras) y errores |
-| Actividad | Últimas 30 entradas con hora, agente, operación, resultado, duración y documento. Distingue consultas, planes, commits, ensayos, desconocidos y C# dinámico |
+| Summary | R/P/W permissions, dynamic C# status, exact add-in version, Revit and pid, active document, connected and active agents, requests in progress, queued plans, recent errors, mode, journal health, uptime |
+| Agents | Per session: alias or «unnamed», presence, client and version, identity source, verified user, session, connection, last activity, requests, in progress, errors, accumulated time, last operation and document, declared conversation and model. Below, the most recently disconnected ones with their reason |
+| Security and recovery | C# block, write lock of the active document (`CheckWritable`) and how to resolve it, latest dynamic runs |
+| Performance | Per operation over the last 200 requests: n, median, p95 (only with 20 or more samples) and errors |
+| Activity | Last 30 entries with time, agent, operation, result, duration and document. Distinguishes queries, plans, commits, trials, unknowns and dynamic C# |
 
-**Exportar:** guarda `actividad_*.jsonl`, `actividad_*.csv` y `sesiones_*.json` en `%LOCALAPPDATA%\Bimbridge\exportes`.
+**Export:** saves `actividad_*.jsonl`, `actividad_*.csv` and `sesiones_*.json` in `%LOCALAPPDATA%\Bimbridge\exportes`.
 
-## Límites de esta revisión
+## Limits of this revision
 
-| Requisito | Estado |
+| Requirement | Status |
 |---|---|
-| Vista Agentes con filtros, orden y búsqueda | NO: lista fija ordenada por conexión |
-| Desconectar, revocar o cancelar desde el panel | NO |
-| Vista Power Engine por motor (Rust, Python) | NO: el estado sigue disponible con `power estado` y `AgentHost power-engine estado` |
-| Leases y fencing en el panel | NO |
-| Tiempos IPC y de serialización por motor | NO: el commit añade `espera_cola_ms` y `revit_ms` |
-| MVVM y virtualización de tablas | NO: WPF por código como el resto del add-in, con firma de cambios y límites acotados |
-| Tokens reales | NO: el cliente MCP no los informa; los estimados siguen en la herramienta `metricas` |
-| Validación en Revit | PENDIENTE |
+| Agents view with filters, sorting and search | NO: fixed list ordered by connection |
+| Disconnect, revoke or cancel from the panel | NO |
+| Power Engine view per engine (Rust, Python) | NO: the status is still available with `power estado` and `AgentHost power-engine estado` |
+| Leases and fencing in the panel | NO |
+| IPC and serialization timings per engine | NO: the commit adds `espera_cola_ms` and `revit_ms` |
+| MVVM and table virtualization | NO: code-built WPF like the rest of the add-in, with change signatures and bounded limits |
+| Real tokens | NO: the MCP client does not report them; the estimates remain in the `metricas` tool |
+| Validation in Revit | PENDING |

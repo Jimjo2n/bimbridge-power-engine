@@ -167,7 +167,7 @@ namespace Bimbridge.AgentHost
             }
             if (sub == "flujo-pdf")
             {
-                // power-engine flujo-pdf --pdf f.pdf --pagina 1 --nivel "LEVEL 09" --reglas reglas.json --ejes ejes_modelo_090.json --salida DIR
+                // power-engine flujo-pdf --pdf f.pdf --pagina 1 --nivel "LEVEL 09" --reglas reglas.json --ejes model_grids_090.json --salida DIR
                 // Writes DIR/plan.json (summary) and DIR/ops.json (list of place ops for plan→commit; campaign: --var ops=@DIR/ops.json).
                 var pdf = Opt(a, "--pdf");
                 var folder = Path.GetDirectoryName(Path.GetFullPath(pdf));

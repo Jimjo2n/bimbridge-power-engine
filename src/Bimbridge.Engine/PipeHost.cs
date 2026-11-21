@@ -10,23 +10,23 @@ using Bimbridge.Protocol;
 
 namespace Bimbridge.Engine
 {
-    /// <summary>Lo que el add-in de Revit (o una prueba) implementa para atender peticiones.</summary>
+    /// <summary>What the Revit add-in (or a test) implements to serve requests.</summary>
     public interface IRequestHandler
     {
-        /// <summary>Datos que se devuelven en el saludo (versión de Revit, documento, rev…).</summary>
+        /// <summary>Data returned in the hello (Revit version, document, rev…).</summary>
         Dictionary<string, object> HelloInfo();
 
-        /// <summary>Atiende una petición. Nunca debe lanzar: los errores van como Response.</summary>
+        /// <summary>Serves a request. Must never throw: errors go back as a Response.</summary>
         Task<Response> HandleAsync(Session session, Request request, CancellationToken ct);
 
-        /// <summary>La conexión se cerró: soltar turnos, cancelar trabajos en cola de esa sesión.</summary>
+        /// <summary>The connection closed: release turns, cancel that session's queued jobs.</summary>
         void OnSessionClosed(Session session);
     }
 
     /// <summary>
-    /// Servidor de named pipe con varias instancias (sección 6). Cada puente que se conecta
-    /// abre una sesión propia; varias peticiones pueden estar en vuelo en la misma conexión.
-    /// Corre en hilos de fondo: aquí nunca se toca la API de Revit.
+    /// Named pipe server with several instances (section 6). Each bridge that connects
+    /// opens its own session; several requests can be in flight on the same connection.
+    /// Runs on background threads: the Revit API is never touched here.
     /// </summary>
     public sealed class PipeHost : IDisposable
     {
@@ -56,7 +56,7 @@ namespace Bimbridge.Engine
 
         public string PipeName => _pipeName;
 
-        /// <summary>Fábrica sin ACL, sólo para pruebas. El add-in pasa la suya con ACL de usuario actual.</summary>
+        /// <summary>Factory without ACL, for tests only. The add-in passes its own with a current-user ACL.</summary>
         public static NamedPipeServerStream DefaultFactory(string name) =>
             new NamedPipeServerStream(name, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
                 PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
@@ -85,7 +85,7 @@ namespace Bimbridge.Engine
                 catch (ObjectDisposedException) { if (_stop.IsCancellationRequested) break; }
                 catch (Exception ex)
                 {
-                    _log("pipe: error al aceptar conexión: " + ex.Message);
+                    _log("pipe: error accepting connection: " + ex.Message);
                     try { await Task.Delay(500, _stop.Token).ConfigureAwait(false); } catch (OperationCanceledException) { break; }
                 }
                 finally
@@ -106,24 +106,24 @@ namespace Bimbridge.Engine
             {
                 try
                 {
-                    // 1) Saludo obligatorio en 10 s.
+                    // 1) Mandatory hello within 10 s.
                     var helloText = await ReadWithTimeout(stream, 10000, connCts).ConfigureAwait(false);
                     if (helloText == null) return;
                     var hello = Request.FromJson(helloText);
                     if (hello.Op != Wire.OpHello)
                     {
-                        await Send(stream, writeLock, Response.Fail(hello.Id, Status.Invalido, "primero hay que saludar (hello)"), connCts.Token).ConfigureAwait(false);
+                        await Send(stream, writeLock, Response.Fail(hello.Id, Status.Invalido, "hello must come first"), connCts.Token).ConfigureAwait(false);
                         return;
                     }
                     var proto = Arg.GetLong(hello.Args, "protocol") ?? 0;
                     if (proto != Wire.ProtocolVersion)
                     {
                         await Send(stream, writeLock, Response.Fail(hello.Id, Status.Incompatible,
-                            "versión de protocolo del puente " + proto + ", del add-in " + Wire.ProtocolVersion + ": actualice ambos a la misma versión"), connCts.Token).ConfigureAwait(false);
+                            "bridge protocol version " + proto + ", add-in " + Wire.ProtocolVersion + ": update both to the same version"), connCts.Token).ConfigureAwait(false);
                         return;
                     }
                     session = _sessions.Open(Arg.GetString(hello.Args, "client"), (int)(Arg.GetLong(hello.Args, "pid") ?? 0));
-                    // La ACL de la tubería sólo admite al usuario de Windows de este Revit: ése es el principal verificado.
+                    // The pipe ACL only admits the Windows user of this Revit: that is the verified principal.
                     _sessions.Describe(session, Arg.GetString(hello.Args, "client_version"), Arg.GetString(hello.Args, "agente"),
                         Arg.GetString(hello.Args, "conversacion"), Arg.GetString(hello.Args, "modelo"),
                         Arg.GetString(hello.Args, "agente_fuente") == AgentIdentity.SourceConfig ? AgentIdentity.SourceConfig
@@ -141,14 +141,14 @@ namespace Bimbridge.Engine
                     {
                         ["cliente"] = session.ClientName, ["pid"] = (long)session.ClientPid, ["agente"] = session.AgentName, ["identidad_fuente"] = session.IdentitySource,
                     });
-                    _log("sesión abierta: " + session.Id);
+                    _log("session opened: " + session.Id);
 
-                    // 2) Peticiones. Sin latido ni petición en HeartbeatTimeoutMs, la sesión se da por muerta.
+                    // 2) Requests. With no heartbeat or request within HeartbeatTimeoutMs, the session is considered dead.
                     while (!connCts.IsCancellationRequested)
                     {
-                        // Issue #1: el umbral de inactividad sólo cierra sesiones OCIOSAS. Con solicitudes en curso se sigue esperando la
-                        // misma lectura: la duración de una escritura no es abandono. Una conexión realmente rota termina la lectura con
-                        // EOF o IOException, y eso sí cierra la sesión (las escrituras en curso quedan con su propia evidencia y su estado).
+                        // Issue #1: the inactivity threshold only closes IDLE sessions. With requests in progress it keeps waiting on the
+                        // same read: the duration of a write is not abandonment. A truly broken connection ends the read with
+                        // EOF or IOException, and that does close the session (writes in progress keep their own evidence and status).
                         pendingRead = pendingRead ?? Frame.ReadAsync(stream, connCts.Token);
                         var waited = await Task.WhenAny(pendingRead, Task.Delay(_config.HeartbeatTimeoutMs, connCts.Token)).ConfigureAwait(false);
                         if (waited != pendingRead)
@@ -175,14 +175,14 @@ namespace Bimbridge.Engine
                             await Send(stream, writeLock, new Response { Id = req.Id, Estado = Status.Ok }, connCts.Token).ConfigureAwait(false);
                             continue;
                         }
-                        // El latido mantiene viva la conexión (timeout de lectura) pero NO cuenta como actividad del agente:
-                        // si contara, un agente ocioso aparecería "activo" para siempre en el panel.
+                        // The heartbeat keeps the connection alive (read timeout) but does NOT count as agent activity:
+                        // if it did, an idle agent would show as "active" forever in the panel.
                         _sessions.Touch(session);
                         var s = session;
                         var corr = Correlation.For(s, req);
                         var reqDoc = Arg.GetString(req.Args, Wire.DocArg);
-                        // Issue #3 (revisión PR #22): sin nombre de agente sólo saludo, latido y registro. Ni lecturas ni cambios.
-                        // El rechazo queda en el diario con su correlación.
+                        // Issue #3 (PR #22 review): without an agent name only hello, heartbeat and registration. No reads or changes.
+                        // The refusal is recorded in the journal with its correlation.
                         var anonymous = s.AgentName == null;
                         if (_config.IdentityRequired && anonymous && IdentityPolicy.RequiresIdentity(req))
                         {
@@ -200,15 +200,15 @@ namespace Bimbridge.Engine
                             Correlation.Current = corr;
                             var sw = Stopwatch.StartNew();
                             Response resp;
-                            // Plazo real: si el puente deja de esperar, el trabajo pendiente en Revit también se cancela
-                            // (antes seguía corriendo y bloqueaba Revit; ver prueba de check views=rcp, 2026-10-15).
+                            // Real deadline: if the bridge stops waiting, the pending work in Revit is cancelled too
+                            // (it used to keep running and block Revit; see the check views=rcp test, 2026-10-15).
                             using (var reqCts = CancellationTokenSource.CreateLinkedTokenSource(connCts.Token))
                             {
                                 if (req.DeadlineMs > 0) reqCts.CancelAfter(req.DeadlineMs + DeadlineGraceMs);
                                 try
                                 {
                                     resp = await _handler.HandleAsync(s, req, reqCts.Token).ConfigureAwait(false)
-                                           ?? Response.Fail(req.Id, Status.Error, "respuesta vacía");
+                                           ?? Response.Fail(req.Id, Status.Error, "empty response");
                                 }
                                 catch (Exception ex)
                                 {
@@ -220,25 +220,25 @@ namespace Bimbridge.Engine
                             var failed = resp.Estado == Status.Error || resp.Estado == Status.Desconocido || resp.Estado == Status.Invalido;
                             _sessions.RequestFinished(s, ms, failed);
                             var extra = JournalExtra(resp) ?? new Dictionary<string, object>();
-                            // Atribución: cada línea del diario lleva el agente, el cliente, la traza y el documento pedido.
+                            // Attribution: every journal line carries the agent, the client, the trace and the requested document.
                             extra["agente"] = s.AgentName;
                             extra["cliente"] = s.ClientName;
                             extra["traza"] = corr.TraceId;
                             corr.Complete(req, resp);
                             corr.WriteTo(extra);
-                            // Modo heredado explícito (identidad_obligatoria=false): la operación anónima queda marcada como tal en el diario.
+                            // Explicit legacy mode (identidad_obligatoria=false): the anonymous operation is marked as such in the journal.
                             if (anonymous && !IdentityPolicy.IsRegistration(req)) extra["identidad"] = _config.IdentityRequired ? "sin_nombre" : "sin_nombre_modo_heredado";
                             if (reqDoc != null) extra["doc"] = reqDoc;
                             _journal?.Log(s.Id, ToolName(req), resp.Estado, ms, extra);
                             try { await Send(stream, writeLock, resp, connCts.Token, largeResults).ConfigureAwait(false); }
-                            catch (Exception) { /* conexión cerrada mientras se trabajaba */ }
+                            catch (Exception) { /* connection closed while working */ }
                         });
                     }
                 }
                 catch (OperationCanceledException) { }
                 catch (IOException) { }
                 catch (ObjectDisposedException) { }
-                catch (Exception ex) { _log("pipe: conexión terminada por error: " + ex.Message); }
+                catch (Exception ex) { _log("pipe: connection ended by error: " + ex.Message); }
                 finally
                 {
                     var lost = !_stop.IsCancellationRequested;
@@ -248,16 +248,16 @@ namespace Bimbridge.Engine
                         _sessions.Close(session, closeReason ?? (lost ? "conexion_cerrada" : "revit_cerrando"));
                         try { _handler.OnSessionClosed(session); } catch (Exception ex) { _log("OnSessionClosed: " + ex.Message); }
                         _journal?.Log(session.Id, "desconectar", Status.Ok, 0);
-                        _log("sesión cerrada: " + session.Id);
+                        _log("session closed: " + session.Id);
                     }
                 }
             }
         }
 
-        /// <summary>Margen sobre el plazo del puente antes de cancelar dentro de Revit.</summary>
+        /// <summary>Margin over the bridge deadline before cancelling inside Revit.</summary>
         public const int DeadlineGraceMs = 1000;
 
-        /// <summary>Nombre de la herramienta que vio la IA ("get" viaja como query con _tool=get).</summary>
+        /// <summary>Name of the tool the AI saw ("get" travels as query with _tool=get).</summary>
         internal static string ToolName(Request req)
         {
             var t = Arg.GetString(req.Args, Wire.ToolArg);
@@ -278,8 +278,8 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// Lectura con límite de tiempo que funciona igual en .NET Framework 4.8 (donde los pipes
-        /// pueden ignorar el CancellationToken): si se vence, se cierra el stream.
+        /// Time-limited read that works the same on .NET Framework 4.8 (where pipes
+        /// may ignore the CancellationToken): if it expires, the stream is closed.
         /// </summary>
         private static async Task<string> ReadWithTimeout(Stream stream, int timeoutMs, CancellationTokenSource cts)
         {
@@ -323,10 +323,10 @@ namespace Bimbridge.Engine
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
-                    summary["aviso_resultado"] = "No se pudo guardar el detalle: " + ex.Message;
+                    summary["aviso_resultado"] = "Could not save the detail: " + ex.Message;
                 }
             }
-            else summary["aviso_resultado"] = "La respuesta excede el límite del puente. Acote la lectura o reinicie la conversación con el puente actualizado.";
+            else summary["aviso_resultado"] = "The response exceeds the bridge limit. Narrow the read or restart the conversation with the updated bridge.";
             var result = new Response { Id = response.Id, Estado = response.Estado, Rev = response.Rev, Aviso = response.Aviso, Datos = summary };
             var fitted = Json.Write(result);
             if (System.Text.Encoding.UTF8.GetByteCount(fitted) <= budget) return fitted;

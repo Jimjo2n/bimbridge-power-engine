@@ -1,9 +1,9 @@
-# Limitaciones conocidas de beta1
+# Known limitations of beta1
 
-1. **NRT-05 nativo aún no se ejecutó.** Todo lo de beta1 está probado sólo contra un add-in falso. No se declara éxito hasta correrlo en la instancia de prueba autorizada.
-2. **La "reapertura" es una verificación en disco, no un cierre y reapertura del documento activo.** La API de Revit no puede cerrar el documento activo, y el procedimiento utiliza una instancia de prueba aislada. Lo que se hace es abrir una copia del archivo recién guardado como otro Document. Esto prueba lo que está en disco, pero no un ciclo de cerrar y abrir por la interfaz. Ese ciclo requiere una operación manual seguida de `verificar_disco`.
-3. **verificar_disco sobre modelos grandes.** Abrir la copia cuesta lo mismo que abrir el modelo. Con el modelo de muestra de Dynamo es aceptable; con modelos corporativos no debe usarse (además está fuera de alcance).
-4. **Comprobación de duplicados en NRT-05.** Se reanuda el mismo diario y se cuentan los commits. La reenviada de la misma clave al add-in con argumentos distintos (conflicto) está cubierta por las pruebas del diario del add-in, no por el arnés nativo.
-5. **El instalador sólo lectura** se probó en Linux. Ahí el atributo ReadOnly casi no se aplica, así que la validación real de `CopyOver` es la próxima actualización en Windows.
-6. **Rendimiento en Revit** (latencias de commit, guardado y verificar_disco) sólo existe cuando corre NRT-05 nativo; ver PERFORMANCE_beta1.md.
-7. Siguen vigentes las limitaciones de alpha3: rev cuenta las transacciones revertidas, el ensayo exige IsModified=false y NRT-03 nativo está pendiente (beta2).
+1. **Native NRT-05 has not run yet.** Everything in beta1 is tested only against a fake add-in. No success is declared until it runs on the authorized test instance.
+2. **The "reopen" is an on-disk verification, not a close and reopen of the active document.** The Revit API cannot close the active document, and the procedure uses an isolated test instance. What it does is open a copy of the just-saved file as another Document. This proves what is on disk, but not a close-and-open cycle through the UI. That cycle requires a manual operation followed by `verificar_disco`.
+3. **verificar_disco on large models.** Opening the copy costs the same as opening the model. With the Dynamo sample model it is acceptable; it must not be used with corporate models (which are also out of scope).
+4. **Duplicate check in NRT-05.** The same journal is resumed and commits are counted. Resending the same key to the add-in with different arguments (conflict) is covered by the add-in journal tests, not by the native harness.
+5. **The read-only installer fix** was tested on Linux. There the ReadOnly attribute barely applies, so the real validation of `CopyOver` is the next update on Windows.
+6. **Performance in Revit** (commit, save and verificar_disco latencies) only exists once native NRT-05 runs; see PERFORMANCE_beta1.md.
+7. The alpha3 limitations still apply: rev counts rolled-back transactions, the trial requires IsModified=false and native NRT-03 is pending (beta2).

@@ -7,9 +7,9 @@ using System.Text.RegularExpressions;
 namespace Bimbridge.Engine.Coverage
 {
     /// <summary>
-    /// Clasifica cada miembro del enum PostableCommand (inventario por versión) en un dominio F01–F37 por su nombre (0.9.1, §6).
-    /// Es una clasificación por dominio, no una afirmación de soporte: el estado de un comando sin capacidad enlazada en
-    /// <see cref="CapabilityCatalog"/> es UNKNOWN (sin analizar). Las reglas van de lo específico a lo general; la primera que coincide gana.
+    /// Classifies each member of the PostableCommand enum (per-version inventory) into a domain F01–F37 by its name (0.9.1, §6).
+    /// It is a domain classification, not a support claim: the status of a command with no linked capability in
+    /// <see cref="CapabilityCatalog"/> is UNKNOWN (not analyzed). Rules go from specific to general; the first match wins.
     /// </summary>
     public static class CommandClassifier
     {
@@ -54,7 +54,7 @@ namespace Bimbridge.Engine.Coverage
 
         private static Regex R(string pattern) => new Regex(pattern, RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
-        /// <summary>Dominio del comando; F37 (contextual/interactivo) si ninguna regla coincide, con <paramref name="byRule"/> = false.</summary>
+        /// <summary>Domain of the command; F37 (contextual/interactive) if no rule matches, with <paramref name="byRule"/> = false.</summary>
         public static string Classify(string command, out bool byRule)
         {
             foreach (var (domain, rule) in Rules)
@@ -63,7 +63,7 @@ namespace Bimbridge.Engine.Coverage
             return "F37";
         }
 
-        /// <summary>Capacidades del catálogo que citan este comando.</summary>
+        /// <summary>Catalog capabilities that cite this command.</summary>
         public static List<CapabilityEntry> LinkedCapabilities(string command) =>
             CapabilityCatalog.All.Where(c => c.PostableCommands.Contains(command, StringComparer.Ordinal)).ToList();
     }

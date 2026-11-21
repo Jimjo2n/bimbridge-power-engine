@@ -104,8 +104,8 @@ namespace Bimbridge.Tests
             var cache = new CompileCache<Unit>(maxEntries: 3, sizeOf: u => 1000);
             for (var i = 0; i < 3; i++) Assert.NotNull(cache.GetOrCompile("k" + i, "agente-A", () => Tuple.Create(new Unit { N = i }, 1L), out _, out var r0));
             Assert.Null(cache.GetOrCompile("k3", "agente-B", () => throw new InvalidOperationException("must not compile"), out _, out var refusal));
-            Assert.Contains("límite", refusal);
-            Assert.Contains("reinicie Revit", refusal);
+            Assert.Contains("limit", refusal);
+            Assert.Contains("restart Revit", refusal);
             Assert.NotNull(cache.GetOrCompile("k1", "agente-B", () => throw new InvalidOperationException("must not compile"), out var fc, out _));
             Assert.True(fc);
             Assert.Equal(1, cache.Refused);
