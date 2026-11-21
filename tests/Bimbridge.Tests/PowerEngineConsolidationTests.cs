@@ -57,7 +57,7 @@ namespace Bimbridge.Tests
         public void DynamicCode_BlockPersists_AndKeepsOtherKeys()
         {
             var cfg = Path.Combine(_root, "config.json");
-            File.WriteAllText(cfg, "{\"levels\":\"RPW\",\"carpetas_documentos\":[\"C:\\\\x\"]}");
+            File.WriteAllText(cfg, "{\"levels\":\"RPW\",\"document_folders\":[\"C:\\\\x\"]}");
             DynamicCodePolicy.SaveBlocked(cfg, true);
             Assert.True(DynamicCodePolicy.LoadBlocked(cfg));
             var c = EngineConfig.Load(cfg);
@@ -136,22 +136,22 @@ namespace Bimbridge.Tests
             var reg = new SessionRegistry(() => t);
             var s = reg.Open("codex", 3);
             reg.RequestStarted(s, "query", "d1");
-            Assert.Equal("ejecutando", AgentIdentity.Presence(s, t));
+            Assert.Equal("running_now", AgentIdentity.Presence(s, t));
             await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Task.Run(() => reg.RequestStarted(s, "q", null))));
             await Task.WhenAll(Enumerable.Range(0, 21).Select(i => Task.Run(() => reg.RequestFinished(s, 10, i == 0))));
             Assert.Equal(0, s.Active);
             Assert.Equal(21, s.Requests);
             Assert.Equal(1, s.Errors);
             Assert.Equal(210, s.TotalMs);
-            Assert.Equal("activo", AgentIdentity.Presence(s, t.AddSeconds(30)));
-            Assert.Equal("inactivo", AgentIdentity.Presence(s, t.AddMinutes(5)));
+            Assert.Equal("active", AgentIdentity.Presence(s, t.AddSeconds(30)));
+            Assert.Equal("inactive", AgentIdentity.Presence(s, t.AddMinutes(5)));
         }
 
         [Fact]
         public void Agent_ClosedHistoryIsBounded_AndNotCountedAsConnected()
         {
             var reg = new SessionRegistry();
-            for (var i = 0; i < SessionRegistry.ClosedMax + 10; i++) reg.Close(reg.Open("c", i), "conexion_cerrada");
+            for (var i = 0; i < SessionRegistry.ClosedMax + 10; i++) reg.Close(reg.Open("c", i), "connection_closed");
             Assert.Equal(0, reg.Count);
             Assert.Equal(SessionRegistry.ClosedMax, reg.Closed().Count);
         }
@@ -160,9 +160,9 @@ namespace Bimbridge.Tests
         public void Agent_Wiring_JournalCarriesAttribution()
         {
             var host = Source("src/Bimbridge.Engine/PipeHost.cs");
-            foreach (var k in new[] { "extra[\"agente\"]", "extra[\"cliente\"]", "extra[\"traza\"]", "RequestStarted(", "RequestFinished(" })
+            foreach (var k in new[] { "extra[\"agent\"]", "extra[\"client\"]", "extra[\"trace\"]", "RequestStarted(", "RequestFinished(" })
                 Assert.Contains(k, host);
-            Assert.Contains("[\"agente\"] = AgentName", Source("src/Bimbridge.Bridge/RevitConnection.cs"));
+            Assert.Contains("[\"agent\"] = AgentName", Source("src/Bimbridge.Bridge/RevitConnection.cs"));
             Assert.Contains("Sessions.TryRegister(session", Source("src/Bimbridge.Addin/Revit/RequestHandler.cs"));
             Assert.Contains("corr.WriteTo(extra)", host);   // issue #4: correlation ids on every journal line
         }
@@ -186,21 +186,21 @@ namespace Bimbridge.Tests
             var h = Source("src/Bimbridge.Addin/Revit/RequestHandler.cs");
             Assert.Contains("request.Args.ContainsKey(\"ops\")", h);
             Assert.True(h.IndexOf("await PlanOp(session, new Request", StringComparison.Ordinal) < h.IndexOf("await CommitPlan(session, request, ct)", StringComparison.Ordinal));
-            Assert.Contains("plan_en_el_mismo_viaje", h);
+            Assert.Contains("plan_in_same_round_trip", h);
         }
 
         [Fact]
         public void ReviewFixes_Wiring()
         {
             var h = Source("src/Bimbridge.Addin/Revit/RequestHandler.cs");
-            Assert.Contains("commit ops= does not accept clave=", h);
+            Assert.Contains("commit ops= does not accept key=", h);
             Assert.Contains("commit NOT run in this round trip", h);
             var host = Source("src/Bimbridge.Engine/PipeHost.cs");
             Assert.True(host.IndexOf("_sessions.Touch(session)", StringComparison.Ordinal) > host.IndexOf("req.Op == Wire.OpPing", StringComparison.Ordinal),
                 "the heartbeat must not count as activity");
             var compact = Source("src/Bimbridge.Bridge/CompactTools.cs");
             Assert.Contains("Name = \"commit\", ReadOnly = false, Destructive = true, Idempotent = false", compact);
-            Assert.Contains("_revit.AgentSource = \"registro\"", compact);
+            Assert.Contains("_revit.AgentSource = AgentIdentity.SourceRegister", compact);
             Assert.Contains("DynamicCodePolicy.Decide(Ui.Runtime.BlockDynamicCode)", Source("src/Bimbridge.Addin/Revit/RequestHandler.Tasks.cs"));
         }
 
@@ -211,7 +211,7 @@ namespace Bimbridge.Tests
         {
             Assert.True(Brand.IsOwnTransaction("BIMBRIDGE · ensayo · P-1"));
             Assert.False(Brand.IsOwnTransaction("Mover"));
-            Assert.True(Brand.IsTemporaryTransaction("BIMBRIDGE temporal exec"));
+            Assert.True(Brand.IsTemporaryTransaction("BIMBRIDGE temporary exec"));
             Assert.False(Brand.IsTemporaryTransaction("BIMBRIDGE · ensayo"));
         }
 

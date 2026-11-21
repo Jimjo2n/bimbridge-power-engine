@@ -52,9 +52,9 @@ namespace Bimbridge.Engine
     /// <summary>Agent identity rules: alias validation and verifiable presence state.</summary>
     public static class AgentIdentity
     {
-        public const string SourceNone = "ninguno";
-        public const string SourceConfig = "configuracion";
-        public const string SourceRegister = "registro";
+        public const string SourceNone = "none";
+        public const string SourceConfig = "configuration";
+        public const string SourceRegister = "registration";
         public const string SourceHello = "hello";
         public const int MaxName = 80;
 
@@ -71,7 +71,7 @@ namespace Bimbridge.Engine
 
         /// <summary>State of an open session: ejecutando (running), activo (request in the last 60 s) or inactivo (idle). Never "connected" by inference.</summary>
         public static string Presence(Session s, DateTime now) =>
-            s.Active > 0 ? "ejecutando" : (now - s.LastSeenUtc).TotalSeconds <= 60 ? "activo" : "inactivo";
+            s.Active > 0 ? "running_now" : (now - s.LastSeenUtc).TotalSeconds <= 60 ? "active" : "inactive";
     }
 
     /// <summary>
@@ -118,7 +118,7 @@ namespace Bimbridge.Engine
                 var s = new Session
                 {
                     Id = id,
-                    ClientName = string.IsNullOrWhiteSpace(clientName) ? "cliente" : clientName.Trim(),
+                    ClientName = string.IsNullOrWhiteSpace(clientName) ? "client" : clientName.Trim(),
                     ClientPid = clientPid,
                     ConnectedUtc = t,
                     LastSeenUtc = t,
@@ -186,7 +186,7 @@ namespace Bimbridge.Engine
             {
                 s.AgentName = null;
                 s.IdentitySource = AgentIdentity.SourceNone;
-                s.IdentityNote = "desregistrada";
+                s.IdentityNote = "unregistered";
             }
         }
 
@@ -220,7 +220,7 @@ namespace Bimbridge.Engine
         private readonly LinkedList<ClosedSession> _closed = new LinkedList<ClosedSession>();
         public const int ClosedMax = 50;
 
-        public bool Close(Session s, string reason = "desconectado")
+        public bool Close(Session s, string reason = "disconnected")
         {
             lock (_lock)
             {
@@ -260,7 +260,7 @@ namespace Bimbridge.Engine
 
         internal static string Slug(string name)
         {
-            if (string.IsNullOrWhiteSpace(name)) return "cliente";
+            if (string.IsNullOrWhiteSpace(name)) return "client";
             var sb = new StringBuilder();
             foreach (var c in name.Trim().ToLowerInvariant())
             {
@@ -269,7 +269,7 @@ namespace Bimbridge.Engine
                 if (sb.Length >= 24) break;
             }
             var s = sb.ToString().Trim('-');
-            return s.Length == 0 ? "cliente" : s;
+            return s.Length == 0 ? "client" : s;
         }
     }
 

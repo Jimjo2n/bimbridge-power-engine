@@ -18,7 +18,7 @@ namespace Bimbridge.Tests
             Assert.True(PlanEntry.Same("10.5", "10.500000001"));
             Assert.True(PlanEntry.Same("1,2,3", "1.000001,2,3"));
             Assert.True(PlanEntry.Same("1,2,3|359.999999", "1,2,3|0"));
-            Assert.True(PlanEntry.Same("top=LEVEL 10+5|corte=LEVEL 09+0", "top=LEVEL 10+5.000000001|corte=LEVEL 09+0"));
+            Assert.True(PlanEntry.Same("top=LEVEL 10+5|cut=LEVEL 09+0", "top=LEVEL 10+5.000000001|cut=LEVEL 09+0"));
             Assert.False(PlanEntry.Same("10.5", "10.51"));
             Assert.False(PlanEntry.Same("1,2,3", "1,2"));
             Assert.False(PlanEntry.Same("LIGHTING - DIST", "LIGHTING - EMERGENCY - DIST"));
@@ -43,7 +43,7 @@ namespace Bimbridge.Tests
         public void RefOps_MustPointBackToCreatingOps()
         {
             var ok = OpSpec.ParseAll(Json.ParseObject(
-                "{\"ops\":[{\"op\":\"place\",\"type\":\"F: G\",\"level\":\"LEVEL 09\",\"puntos\":[[1,2],[3,4]],\"montaje\":\"losa\"}," +
+                "{\"ops\":[{\"op\":\"place\",\"type\":\"F: G\",\"level\":\"LEVEL 09\",\"points\":[[1,2],[3,4]],\"mounting\":\"slab\"}," +
                 "{\"op\":\"tag\",\"ids\":\"@1\",\"view\":17732282}," +
                 "{\"op\":\"set_workset\",\"ids\":\"@1\",\"ws\":\"LIGHTING - DIST\"}]}"));
             Assert.Equal(new List<int> { 1 }, ok[1].RefOps);
@@ -59,7 +59,7 @@ namespace Bimbridge.Tests
                 "{\"ops\":[{\"op\":\"copy\",\"ids\":\"5\",\"dx\":1},{\"op\":\"snap_to_surface\",\"ids\":\"@1\"}]}")));
             // view=@n counts as a reference.
             var v = OpSpec.ParseAll(Json.ParseObject(
-                "{\"ops\":[{\"op\":\"view_create\",\"tipo\":\"rcp\",\"nivel\":\"LEVEL 09\"},{\"op\":\"view_hide\",\"view\":\"@1\",\"cats\":\"LightingDevices\"}]}"));
+                "{\"ops\":[{\"op\":\"view_create\",\"type\":\"rcp\",\"level\":\"LEVEL 09\"},{\"op\":\"view_hide\",\"view\":\"@1\",\"cats\":\"LightingDevices\"}]}"));
             Assert.Equal(new List<int> { 1 }, v[1].RefOps);
         }
 
@@ -67,17 +67,17 @@ namespace Bimbridge.Tests
         public void Parse_ValidatesShapes_BeforeTouchingRevit()
         {
             void Bad(string op) => Assert.Throws<QueryException>(() => OpSpec.ParseAll(Json.ParseObject("{\"ops\":[" + op + "]}")));
-            Bad("{\"op\":\"place\",\"type\":\"F: G\",\"level\":\"L9\",\"puntos\":[[1,2]],\"montaje\":\"techo\"}");
-            Bad("{\"op\":\"place\",\"type\":\"F: G\",\"level\":\"L9\",\"puntos\":[[1,2]],\"montaje\":\"losa\",\"elev\":9}");
-            Bad("{\"op\":\"mirror\",\"ids\":\"1\",\"eje\":[[0,0],[0,0]]}");
+            Bad("{\"op\":\"place\",\"type\":\"F: G\",\"level\":\"L9\",\"points\":[[1,2]],\"mounting\":\"ceiling\"}");
+            Bad("{\"op\":\"place\",\"type\":\"F: G\",\"level\":\"L9\",\"points\":[[1,2]],\"mounting\":\"slab\",\"elev\":9}");
+            Bad("{\"op\":\"mirror\",\"ids\":\"1\",\"axis\":[[0,0],[0,0]]}");
             Bad("{\"op\":\"move\",\"ids\":\"1,2\",\"to\":[0,0,0]}");
-            Bad("{\"op\":\"view_set\",\"ids\":\"1\",\"rango\":{\"arriba\":[\"L9\",0]}}");
-            Bad("{\"op\":\"view_set\",\"ids\":\"1\",\"detalle\":\"altisimo\"}");
-            Bad("{\"op\":\"view_create\",\"tipo\":\"seccion\"}");
-            Bad("{\"op\":\"snap_to_surface\",\"ids\":\"1\",\"puntos\":4}");
+            Bad("{\"op\":\"view_set\",\"ids\":\"1\",\"range\":{\"up\":[\"L9\",0]}}");
+            Bad("{\"op\":\"view_set\",\"ids\":\"1\",\"detail\":\"altisimo\"}");
+            Bad("{\"op\":\"view_create\",\"type\":\"section\"}");
+            Bad("{\"op\":\"snap_to_surface\",\"ids\":\"1\",\"points\":4}");
             Bad("{\"op\":\"tag_move\",\"ids\":\"1\"}");
             Bad("{\"op\":\"view_hide\",\"view\":1}");
-            var ok = OpSpec.ParseAll(Json.ParseObject("{\"ops\":[{\"op\":\"set_elevation\",\"ids\":\"1\",\"valor\":\"10' - 9\\\"\"}]}"));
+            var ok = OpSpec.ParseAll(Json.ParseObject("{\"ops\":[{\"op\":\"set_elevation\",\"ids\":\"1\",\"value\":\"10' - 9\\\"\"}]}"));
             Assert.Equal(10.75, ok[0].Ft.Value, 9);
         }
 

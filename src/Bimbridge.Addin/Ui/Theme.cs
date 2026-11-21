@@ -425,7 +425,7 @@ namespace Bimbridge.Addin.Ui
             var panel = new StackPanel { Orientation = Orientation.Horizontal };
             KeyboardNavigation.SetTabNavigation(panel, KeyboardNavigationMode.Once);
             KeyboardNavigation.SetDirectionalNavigation(panel, KeyboardNavigationMode.Cycle);
-            var group = "seg" + Guid.NewGuid().ToString("N");
+            var group = "sec" + Guid.NewGuid().ToString("N");
 
             var t = new ControlTemplate(typeof(RadioButton));
             var bd = new FrameworkElementFactory(typeof(Border), "bd");

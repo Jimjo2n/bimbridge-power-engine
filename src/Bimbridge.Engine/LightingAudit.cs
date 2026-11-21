@@ -12,9 +12,9 @@ namespace Bimbridge.Engine
     /// worksets, visibility per RCP) is answered in one call.
     /// This only summarizes; the Revit adapter collects the raw data.
     /// The tag rule is a task profile (F12, R044, A15), not something hard-coded:
-    ///   tags=uno      exactly one tag per fixture and view, no tag without a fixture (SAMPLE PROJECT Non-Unit Lighting);
-    ///   tags=ninguno  fixtures carry no tags (e.g. Unit Grouping): any fixture tag is a difference;
-    ///   tags=ignorar  only counts, does not judge.
+    ///   tags=one      exactly one tag per fixture and view, no tag without a fixture (SAMPLE PROJECT Non-Unit Lighting);
+    ///   tags=none     fixtures carry no tags (e.g. Unit Grouping): any fixture tag is a difference;
+    ///   tags=ignore   only counts, does not judge.
     /// </summary>
     public static class LightingAudit
     {
@@ -68,8 +68,8 @@ namespace Bimbridge.Engine
             var result = ManifestQc.Run(expected, physical, options).ToJson();
             var positionedIds = new HashSet<long>(physical.Select(e => e.Id));
             var withoutLocation = fixtures.Where(e => !positionedIds.Contains(e.Id)).Select(e => e.Id).ToArray();
-            result["sin_posicion_evaluable"] = Block(withoutLocation);
-            if (withoutLocation.Length > 0) result["aprobado"] = false;
+            result["no_evaluable_position"] = Block(withoutLocation);
+            if (withoutLocation.Length > 0) result["approved"] = false;
             return result;
         }
 
@@ -80,11 +80,11 @@ namespace Bimbridge.Engine
         public static Dictionary<string, object> Summarize(
             IList<Fixture> fixtures, IList<Tag> tags, IList<ViewCount> views,
             out Dictionary<string, long[]> setsToSave,
-            ICollection<long> allFixtureIds = null, IList<string> levels = null, string tagRule = "uno")
+            ICollection<long> allFixtureIds = null, IList<string> levels = null, string tagRule = "one")
         {
-            tagRule = (tagRule ?? "uno").Trim().ToLowerInvariant();
-            if (tagRule != "uno" && tagRule != "ninguno" && tagRule != "ignorar")
-                throw new ArgumentException("tags must be uno, ninguno or ignorar");
+            tagRule = (tagRule ?? "one").Trim().ToLowerInvariant();
+            if (tagRule != "one" && tagRule != "none" && tagRule != "ignore")
+                throw new ArgumentException("tags must be one, none or ignore");
             setsToSave = new Dictionary<string, long[]>(StringComparer.Ordinal);
             var fixtureIds = new HashSet<long>(fixtures.Select(f => f.Id));
             var all = allFixtureIds != null ? new HashSet<long>(allFixtureIds) : fixtureIds;
@@ -122,21 +122,21 @@ namespace Bimbridge.Engine
 
             var result = new Dictionary<string, object>
             {
-                ["luminarias"] = (long)fixtures.Count,
+                ["fixtures"] = (long)fixtures.Count,
                 ["tags"] = (long)tags.Count,
-                ["por_nivel"] = CountBy(fixtures, f => f.Level),
-                ["por_workset"] = CountBy(fixtures, f => f.Workset),
-                ["por_tipo"] = CountBy(fixtures, f => f.Type),
-                ["sin_tag"] = Block(untagged),
-                ["tags_huerfanos"] = Block(orphan),
-                ["tags_duplicados"] = new Dictionary<string, object>
+                ["by_level"] = CountBy(fixtures, f => f.Level),
+                ["by_workset"] = CountBy(fixtures, f => f.Workset),
+                ["by_type"] = CountBy(fixtures, f => f.Type),
+                ["untagged"] = Block(untagged),
+                ["orphan_tags"] = Block(orphan),
+                ["duplicate_tags"] = new Dictionary<string, object>
                 {
                     ["n"] = (long)dupGroups.Count,
-                    ["sobrantes"] = (long)extraTags.Length,
-                    ["muestra"] = dupGroups.Take(SampleSize)
+                    ["leftovers"] = (long)extraTags.Length,
+                    ["sample"] = dupGroups.Take(SampleSize)
                         .Select(kv => (object)new object[] { kv.Key.fixture, kv.Key.view, kv.Value.Cast<object>().ToList() })
                         .ToList(),
-                    ["cols_muestra"] = new List<object> { "luminaria", "vista", "tags" },
+                    ["sample_cols"] = new List<object> { "fixture", "view", "tags" },
                 },
             };
 
@@ -161,39 +161,39 @@ namespace Bimbridge.Engine
                     var missing = inView.Count(id => taggedHere == null || !taggedHere.Contains(id));
                     rows.Add(new object[] { v.ViewId, v.Name, v.Level ?? "", (long)inView.Length, tagCountByView.TryGetValue(v.ViewId, out var n) ? n : 0L, (long)missing });
                 }
-                result["vistas_cols"] = new List<object> { "id", "nombre", "nivel", "luminarias", "tags", "sin_tag_en_vista" };
-                result["vistas"] = rows.Take(MaxViewRows).ToList();
-                if (rows.Count > MaxViewRows) result["vistas_omitidas"] = (long)(rows.Count - MaxViewRows);
-                result["vistas_metodo"] = exact
+                result["views_cols"] = new List<object> { "id", "name", "level", "fixtures", "tags", "untagged_in_view" };
+                result["views"] = rows.Take(MaxViewRows).ToList();
+                if (rows.Count > MaxViewRows) result["skipped_views"] = (long)(rows.Count - MaxViewRows);
+                result["views_method"] = exact
                     ? "visible: fixtures that Revit shows in each view"
-                    : "nivel: fixtures on the level associated with the view (ignores crop, range and filters; use exacto=true with few views to confirm)";
+                    : "level: fixtures on the level associated with the view (ignores crop, range and filters; use exact=true with few views to confirm)";
             }
 
-            result["regla_tags"] = tagRule;
-            if (tagRule == "uno")
+            result["tags_rule"] = tagRule;
+            if (tagRule == "one")
             {
                 var ok = untagged.Length == 0 && orphan.Length == 0 && extraTags.Length == 0;
-                result["cumple_regla"] = ok;
-                if (untagged.Length > 0) setsToSave["$sin_tag"] = untagged;
+                result["meets_rule"] = ok;
+                if (untagged.Length > 0) setsToSave["$untagged"] = untagged;
                 if (extraTags.Length > 0) setsToSave["$tags_sobrantes"] = extraTags;
             }
-            else if (tagRule == "ninguno")
+            else if (tagRule == "none")
             {
                 // Fixtures must not carry tags: fixture tags are the difference; "untagged" is expected.
                 var fixtureTags = tags.Where(t => t.Tagged != null && t.Tagged.Any(fixtureIds.Contains)).Select(t => t.Id).ToArray();
-                result.Remove("sin_tag");
-                result["tags_de_luminarias"] = Block(fixtureTags);
-                result["cumple_regla"] = fixtureTags.Length == 0 && orphan.Length == 0;
-                if (fixtureTags.Length > 0) setsToSave["$tags_de_luminarias"] = fixtureTags;
+                result.Remove("untagged");
+                result["fixture_tags"] = Block(fixtureTags);
+                result["meets_rule"] = fixtureTags.Length == 0 && orphan.Length == 0;
+                if (fixtureTags.Length > 0) setsToSave["$fixture_tags"] = fixtureTags;
             }
-            if (orphan.Length > 0) setsToSave["$tags_huerfanos"] = orphan;
+            if (orphan.Length > 0) setsToSave["$orphan_tags"] = orphan;
             return result;
         }
 
         private static Dictionary<string, object> Block(long[] ids) => new Dictionary<string, object>
         {
             ["n"] = (long)ids.Length,
-            ["muestra"] = ids.Take(SampleSize).Cast<object>().ToList(),
+            ["sample"] = ids.Take(SampleSize).Cast<object>().ToList(),
         };
 
         private static Dictionary<string, object> CountBy(IEnumerable<Fixture> items, Func<Fixture, string> key)

@@ -27,7 +27,7 @@ class JobError(Exception):
 # ---------------- guards ----------------
 
 def _no_network(*_a, **_k):
-    raise JobError("RUTA_DENEGADA", "the Python Worker has no network access")
+    raise JobError("PATH_DENIED", "the Python Worker has no network access")
 
 
 def block_network():
@@ -64,14 +64,14 @@ class Paths:
 
     def check(self, path):
         if not path or not isinstance(path, str):
-            raise JobError("INVALIDO", "missing document path")
+            raise JobError("INVALID", "missing document path")
         real = os.path.realpath(path)
         for a in self.allowed:
             if os.path.normcase(real) == os.path.normcase(a) or os.path.normcase(real).startswith(os.path.normcase(a.rstrip(os.sep) + os.sep)):
                 if not os.path.isfile(real):
-                    raise JobError("INVALIDO", "file does not exist: " + path)
+                    raise JobError("INVALID", "file does not exist: " + path)
                 return real
-        raise JobError("RUTA_DENEGADA", "path not authorized for this job: " + path)
+        raise JobError("PATH_DENIED", "path not authorized for this job: " + path)
 
 
 def sha256_file(path):
@@ -116,12 +116,12 @@ def handle(req):
     args = req.get("args") or {}
     if req.get("pe") != PROTOCOL:
         return {"pe": PROTOCOL, "id": rid, "code": "VERSION_INCOMPATIBLE", "error": "contract other than %d" % PROTOCOL}
-    if job == "hola":
+    if job == "hello":
         lo, hi = int(args.get("pe_min", 1)), int(args.get("pe_max", 1))
         if not (lo <= PROTOCOL <= hi):
             return {"pe": PROTOCOL, "id": rid, "code": "VERSION_INCOMPATIBLE", "error": "only contract %d" % PROTOCOL}
         return {"pe": PROTOCOL, "id": rid, "code": "OK", "result": {
-            "motor": "python_document_worker", "version": __version__, "pe": PROTOCOL, "capacidades": capabilities(),
+            "engine": "python_document_worker", "version": __version__, "pe": PROTOCOL, "capabilities": capabilities(),
             "python": "%d.%d.%d" % sys.version_info[:3]}}
     lim = req.get("limits") or {}
     limit_memory(lim.get("max_mem_mb"))
@@ -129,25 +129,25 @@ def handle(req):
     try:
         fn = _jobs().get(job)
         if fn is None:
-            raise JobError("NO_SOPORTADO", "unknown job: " + job)
+            raise JobError("NOT_SUPPORTED", "unknown job: " + job)
         res = fn(args, Paths(req.get("paths")))
         code = "OK"
         err = None
     except JobError as e:
         res, code, err = {}, e.code, e.message
     except MemoryError:
-        res, code, err = {}, "LIMITE_MEMORIA", "the document exceeds the worker memory limit"
+        res, code, err = {}, "MEMORY_LIMIT", "the document exceeds the worker memory limit"
     except ImportError as e:
-        res, code, err = {}, "NO_DISPONIBLE", "missing worker dependency: %s" % e
+        res, code, err = {}, "UNAVAILABLE", "missing worker dependency: %s" % e
     except Exception as e:  # a malicious or damaged document does not bring the worker down
-        res, code, err = {}, "ERROR_MOTOR", "%s: %s" % (type(e).__name__, str(e)[:300])
+        res, code, err = {}, "ENGINE_ERROR", "%s: %s" % (type(e).__name__, str(e)[:300])
         traceback.print_exc(file=sys.stderr)
-    out = {"pe": PROTOCOL, "id": rid, "code": code, "result": res, "telemetry": {"motor_ms": (time.perf_counter() - t0) * 1000.0}}
+    out = {"pe": PROTOCOL, "id": rid, "code": code, "result": res, "telemetry": {"engine_ms": (time.perf_counter() - t0) * 1000.0}}
     if err:
         out["error"] = err
     try:
         import resource
-        out["telemetry"]["memoria_pico_kb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        out["telemetry"]["peak_memory_kb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     except ImportError:
         pass
     return out
@@ -164,9 +164,9 @@ def main():
         try:
             req = json.loads(line)
         except ValueError as e:
-            resp = {"pe": PROTOCOL, "id": None, "code": "INVALIDO", "error": "unreadable JSON: %s" % e}
+            resp = {"pe": PROTOCOL, "id": None, "code": "INVALID", "error": "unreadable JSON: %s" % e}
         else:
-            if req.get("job") == "salir":
+            if req.get("job") == "exit":
                 break
             resp = handle(req)
         out.write((json.dumps(resp, ensure_ascii=False, separators=(",", ":"), allow_nan=False, default=str) + "\n").encode("utf-8"))

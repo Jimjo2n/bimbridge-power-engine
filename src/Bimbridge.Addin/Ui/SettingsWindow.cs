@@ -13,7 +13,7 @@ namespace Bimbridge.Addin.Ui
     /// <summary>
     /// Settings: only the switches that already exist and are already saved (Pause and Hold as state files, C# block in
     /// config.json). Each change takes the same path as its ribbon button and shows immediately on the ribbon and in Status.
-    /// Plus a UI preference of the add-in itself (Motion), saved separately in interfaz.json.
+    /// Plus a UI preference of the add-in itself (Motion), saved separately in ui.json.
     /// Levels are shown, but only the installer changes them (they are read when Revit starts).
     /// </summary>
     internal sealed class SettingsWindow
@@ -92,7 +92,7 @@ namespace Bimbridge.Addin.Ui
             perms.Children.Add(Theme.Divider());
             _codeSeg = Theme.Segmented(new[] { Allowed, Blocked }, Runtime.BlockDynamicCode ? Blocked : Allowed, v => SetBlocked(v == Blocked));
             perms.Children.Add(Row("Dynamic C# code (exec)", _codeSeg, _codeLine));
-            if (cfg.Runner == "apagado") perms.Children.Add(Muted("config.json has runner = apagado (off): exec never runs."));
+            if (cfg.Runner == "off") perms.Children.Add(Muted("config.json has runner = off (off): exec never runs."));
             var why = new StackPanel();
             why.Children.Add(Muted("By default the authorized local AI can run dynamic C#, audited. Blocked: every new exec request is rejected; typed operations (plan/commit) remain available."));
             why.Children.Add(Muted("It is not a sandbox: the code runs in the Revit process with your user's permissions and its effects outside the document are not rolled back."));

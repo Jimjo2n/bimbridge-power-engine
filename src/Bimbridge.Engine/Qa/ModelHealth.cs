@@ -31,8 +31,8 @@ namespace Bimbridge.Engine.Qa
         {
             var l = ids.Distinct().OrderBy(x => x).ToList();
             var d = new Dictionary<string, object> { ["n"] = (long)l.Count, ["ids"] = l.Take(MaxSample).Cast<object>().ToList() };
-            if (l.Count > MaxSample) d["mas"] = (long)(l.Count - MaxSample);
-            if (extra != null) d["detalle"] = extra;
+            if (l.Count > MaxSample) d["more"] = (long)(l.Count - MaxSample);
+            if (extra != null) d["detail"] = extra;
             return d;
         }
 
@@ -82,7 +82,7 @@ namespace Bimbridge.Engine.Qa
             var byWarning = warnings.GroupBy(w => w.Description ?? "").OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal)
                 .Select(g => (object)new Dictionary<string, object>
                 {
-                    ["aviso"] = g.Key, ["veces"] = (long)g.Count(), ["gravedad"] = g.First().Severity ?? "",
+                    ["warning"] = g.Key, ["times"] = (long)g.Count(), ["severity"] = g.First().Severity ?? "",
                     ["ids"] = g.SelectMany(w => w.Ids).Distinct().OrderBy(x => x).Take(MaxSample).Cast<object>().ToList(),
                 }).ToList();
 
@@ -92,9 +92,9 @@ namespace Bimbridge.Engine.Qa
             {
                 var absent = elements.Where(e => !e.Params.ContainsKey(p)).Select(e => e.Id);
                 var empty = elements.Where(e => e.Params.TryGetValue(p, out var v) && string.IsNullOrWhiteSpace(v)).Select(e => e.Id);
-                missing[p] = new Dictionary<string, object> { ["sin_parametro"] = Bucket(absent), ["vacio"] = Bucket(empty) };
+                missing[p] = new Dictionary<string, object> { ["no_parameter"] = Bucket(absent), ["empty_value"] = Bucket(empty) };
             }
-            var disconnected = connectors.Where(c => !c.Connected).GroupBy(c => c.Domain ?? "desconocido").OrderBy(g => g.Key, StringComparer.Ordinal)
+            var disconnected = connectors.Where(c => !c.Connected).GroupBy(c => c.Domain ?? "unknown").OrderBy(g => g.Key, StringComparer.Ordinal)
                 .ToDictionary(g => g.Key, g => (object)Bucket(g.Select(c => c.ElementId), g.Count() + " free connectors"));
 
             var emptySheets = sheets.Where(s => s.Viewports == 0 && s.Schedules == 0).Select(s => s.Id);
@@ -105,23 +105,23 @@ namespace Bimbridge.Engine.Qa
             var problems = warnings.Count + dups.Sum(g => g.Count - 1) + connectors.Count(c => !c.Connected);
             return new Dictionary<string, object>
             {
-                ["resumen"] = new Dictionary<string, object>
+                ["summary"] = new Dictionary<string, object>
                 {
-                    ["avisos"] = (long)warnings.Count, ["tipos_de_aviso"] = (long)byWarning.Count,
-                    ["grupos_duplicados"] = (long)dups.Count, ["elementos_sobrantes"] = (long)dups.Sum(g => g.Count - 1),
-                    ["conectores_libres"] = (long)connectors.Count(c => !c.Connected), ["laminas_vacias"] = (long)emptySheets.Count(),
-                    ["vistas_sin_lamina"] = (long)unplaced.Count(), ["elementos_revisados"] = (long)elements.Count, ["conectores_revisados"] = (long)connectors.Count,
-                    ["problemas"] = (long)problems,
+                    ["warnings"] = (long)warnings.Count, ["warning_types"] = (long)byWarning.Count,
+                    ["duplicate_groups"] = (long)dups.Count, ["leftover_elements"] = (long)dups.Sum(g => g.Count - 1),
+                    ["free_connectors"] = (long)connectors.Count(c => !c.Connected), ["empty_sheets"] = (long)emptySheets.Count(),
+                    ["views_without_sheet"] = (long)unplaced.Count(), ["elements_reviewed"] = (long)elements.Count, ["reviewed_connectors"] = (long)connectors.Count,
+                    ["problems"] = (long)problems,
                 },
-                ["avisos"] = byWarning,
-                ["duplicados"] = dups.Take(MaxSample).Select(g => (object)g.Cast<object>().ToList()).ToList(),
-                ["parametros_requeridos"] = missing,
-                ["conectores_desconectados"] = disconnected,
-                ["documentacion"] = new Dictionary<string, object>
+                ["warnings"] = byWarning,
+                ["duplicates"] = dups.Take(MaxSample).Select(g => (object)g.Cast<object>().ToList()).ToList(),
+                ["required_parameters"] = missing,
+                ["disconnected_connectors"] = disconnected,
+                ["documentation"] = new Dictionary<string, object>
                 {
-                    ["laminas_vacias"] = Bucket(emptySheets), ["vistas_sin_lamina"] = Bucket(unplaced), ["nombres_de_vista_repetidos"] = Bucket(dupViewNames),
+                    ["empty_sheets"] = Bucket(emptySheets), ["views_without_sheet"] = Bucket(unplaced), ["repeated_view_names"] = Bucket(dupViewNames),
                 },
-                ["nota"] = "Read only. Duplicate = same category, family, type and level at the same position and rotation (±" + (DuplicateTolerance * 304.8).ToString("0.#", CultureInfo.InvariantCulture) + " mm, ±0.5°).",
+                ["note"] = "Read only. Duplicate = same category, family, type and level at the same position and rotation (±" + (DuplicateTolerance * 304.8).ToString("0.#", CultureInfo.InvariantCulture) + " mm, ±0.5°).",
             };
         }
     }

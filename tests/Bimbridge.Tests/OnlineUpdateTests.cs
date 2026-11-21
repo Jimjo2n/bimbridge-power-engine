@@ -80,11 +80,11 @@ namespace Bimbridge.Tests
         public void Compare_DistinguishesNewVersion_SameVersionOtherCommit_UpToDate_AndOlder()
         {
             var r = OnlineUpdate.Pick("[" + Release("v0.9.1") + "]", Repo, false, out _);
-            Assert.Equal("nueva", OnlineUpdate.Compare(new Version(0, 9, 0), "abc1234", r));
-            Assert.Equal("anterior", OnlineUpdate.Compare(new Version(0, 9, 2), "abc1234", r));
-            Assert.Equal("mismo_version_otro_commit", OnlineUpdate.Compare(new Version(0, 9, 1, 0), "abc1234", r));
-            Assert.Equal("al_dia", OnlineUpdate.Compare(new Version(0, 9, 1), "0123456", r));
-            Assert.Equal("al_dia", OnlineUpdate.Compare(new Version(0, 9, 1), null, r));            // without a known commit it is not claimed to be different
+            Assert.Equal("new", OnlineUpdate.Compare(new Version(0, 9, 0), "abc1234", r));
+            Assert.Equal("previous", OnlineUpdate.Compare(new Version(0, 9, 2), "abc1234", r));
+            Assert.Equal("same_version_other_commit", OnlineUpdate.Compare(new Version(0, 9, 1, 0), "abc1234", r));
+            Assert.Equal("up_to_date", OnlineUpdate.Compare(new Version(0, 9, 1), "0123456", r));
+            Assert.Equal("up_to_date", OnlineUpdate.Compare(new Version(0, 9, 1), null, r));            // without a known commit it is not claimed to be different
             Assert.Equal("abc1234", OnlineUpdate.CommitOf("0.9.1+ABC1234"));
             Assert.Null(OnlineUpdate.CommitOf("0.9.1"));
             Assert.Null(OnlineUpdate.CommitOf("0.9.1+no-es-hex"));
@@ -144,7 +144,7 @@ namespace Bimbridge.Tests
         [Fact]
         public void Download_AnyMismatch_LeavesNothingInstallable()
         {
-            var bytes = Encoding.ASCII.GetBytes("instalador");
+            var bytes = Encoding.ASCII.GetBytes("installer");
             // Hash differs from the published one (tampered or corrupt).
             var ex = Assert.Throws<OnlineUpdateException>(() => Run(Encoding.ASCII.GetBytes("instalad0r"), Sha(bytes), new Version(0, 9, 1), out _));
             Assert.Contains("does not match", ex.Message);
@@ -158,7 +158,7 @@ namespace Bimbridge.Tests
             Assert.Empty(Leftovers());
             // The release publishes no hash for the installer.
             var r = OnlineUpdate.Pick("[" + Release("v0.9.1") + "]", Repo, false, out _);
-            Assert.Throws<OnlineUpdateException>(() => OnlineUpdate.Download(r, Path.Combine(_dir, "cache", "x.exe"), (u, m) => "nada", (u, d, m) => File.WriteAllBytes(d, bytes)));
+            Assert.Throws<OnlineUpdateException>(() => OnlineUpdate.Download(r, Path.Combine(_dir, "cache", "x.exe"), (u, m) => "nothing", (u, d, m) => File.WriteAllBytes(d, bytes)));
             // Network failure midway: no temp file is left.
             Updates.VersionReader = _ => new Version(0, 9, 1);
             Assert.Throws<IOException>(() => OnlineUpdate.Download(r, Path.Combine(_dir, "cache", "x.exe"), (u, m) => Sha(bytes) + "  Bimbridge.Setup.exe",

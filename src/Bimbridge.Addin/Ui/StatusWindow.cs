@@ -226,7 +226,7 @@ namespace Bimbridge.Addin.Ui
             _pause.Content = paused ? "Resume AI" : "Pause AI";
 
             // Same rows for the figure, the chip and the Activity error list.
-            var errorRows = activity.AsEnumerable().Reverse().Where(e => Str(e, "op") != "ping" && IsError(Str(e, "estado"))).ToList();
+            var errorRows = activity.AsEnumerable().Reverse().Where(e => Str(e, "op") != "ping" && IsError(Str(e, "status"))).ToList();
             var errors = errorRows.Count;
             FillHero(sessions, errors, now, paused);
             FillSystem();
@@ -239,7 +239,7 @@ namespace Bimbridge.Addin.Ui
 
             var anonymous = sessions.Count(x => x.AgentName == null);
             Flag(_agentsFold, anonymous == 0 ? null : anonymous == 1 ? "1 without identity" : anonymous + " without identity", Theme.Amber);
-            var review = ops.Recent.Count(r => r.Retry == "reconciliar_antes" || r.Retry == "revisar_diferencias");
+            var review = ops.Recent.Count(r => r.Retry == "reconcile_first" || r.Retry == "review_differences");
             var inFlight = ops.Running.Count > 0 ? ops.Running.Count + " in progress" : null;
             if (opsError != null) Flag(_opsFold, "unavailable", Theme.Red);
             else if (review > 0) Flag(_opsFold, review + " to review" + (inFlight != null ? " · " + inFlight : ""), Theme.Amber);
@@ -263,7 +263,7 @@ namespace Bimbridge.Addin.Ui
             var levels = Runtime.Config.Levels;
             var hold = Runtime.Hold.On || !levels.Contains("W");
             var running = sessions.Sum(x => x.Active);
-            var active = sessions.Count(x => AgentIdentity.Presence(x, now) != "inactivo");
+            var active = sessions.Count(x => AgentIdentity.Presence(x, now) != "inactive");
             var blocked = _lastBlock != null && _lastBlock.Blocked;
 
             // The agent count lives only here (there is no longer a "Connected agents" figure), also when paused or blocked.
@@ -352,14 +352,14 @@ namespace Bimbridge.Addin.Ui
             _agents.Children.Clear();
             if (sessions.Count == 0)
                 _agents.Children.Add(Theme.Label("No agent connected. When Claude or Codex open a conversation with the MCP they will appear here; " +
-                                                 "with ctx agente=\"name\" they identify themselves with the chat title.", 13, false, Theme.Muted));
+                                                 "with ctx agent=\"name\" they identify themselves with the chat title.", 13, false, Theme.Muted));
             foreach (var s in sessions.OrderBy(x => x.ConnectedUtc))
             {
                 if (_agents.Children.Count > 0) _agents.Children.Add(Theme.Divider());
                 var card = new StackPanel();
                 var head = new WrapPanel();
                 var presence = AgentIdentity.Presence(s, now);
-                var dot = Theme.Dot(presence == "ejecutando" ? Theme.Amber : presence == "activo" ? Theme.Green : Theme.Slate);
+                var dot = Theme.Dot(presence == "running_now" ? Theme.Amber : presence == "active" ? Theme.Green : Theme.Slate);
                 dot.Margin = new Thickness(0, 0, 8, 0);
                 head.Children.Add(dot);
                 head.Children.Add(Theme.Chip(s.DisplayName, s.AgentName == null ? Theme.Slate : Theme.ClientColor(s.ClientName)));
@@ -367,9 +367,9 @@ namespace Bimbridge.Addin.Ui
                 {
                     Margin = new Thickness(8, 0, 0, 0), TextWrapping = TextWrapping.Wrap,
                     Text = presence + " · " + Theme.ClientName(s.ClientName) + (s.ClientVersion != null ? " " + s.ClientVersion : "") +
-                           " · identity " + (s.AgentName == null ? "insufficient: no reads or changes until it registers" + (s.IdentityNote != null ? " (" + s.IdentityNote + ")" : "") : "declarada (" + s.IdentitySource + ") · " + s.AgentId) +
+                           " · identity " + (s.AgentName == null ? "insufficient: no reads or changes until it registers" + (s.IdentityNote != null ? " (" + s.IdentityNote + ")" : "") : "declared (" + s.IdentitySource + ") · " + s.AgentId) +
                            (s.Principal != null ? " · user " + s.Principal + " (verified)" : ""),
-                    Foreground = Theme.B(presence == "inactivo" ? Theme.Muted : Theme.Ink), VerticalAlignment = VerticalAlignment.Center,
+                    Foreground = Theme.B(presence == "inactive" ? Theme.Muted : Theme.Ink), VerticalAlignment = VerticalAlignment.Center,
                 });
                 card.Children.Add(head);
                 var detail = "session " + s.Id + " · connected " + Theme.Ago(s.ConnectedUtc) + " · last activity " + Theme.Ago(s.LastSeenUtc) +
@@ -389,7 +389,7 @@ namespace Bimbridge.Addin.Ui
                     _agents.Children.Add(new TextBlock
                     {
                         TextWrapping = TextWrapping.Wrap,
-                        Text = (c.AgentName ?? "(unnamed) · " + c.ClientName) + " · " + (c.Reason == "conexion_cerrada" ? "connection closed" : c.Reason) +
+                        Text = (c.AgentName ?? "(unnamed) · " + c.ClientName) + " · " + (c.Reason == "connection_closed" ? "connection closed" : c.Reason) +
                                " " + Theme.Ago(c.ClosedUtc) + " · " + c.Requests + " requests, " + c.Errors + " errors",
                         FontSize = 12, Foreground = Theme.B(Theme.Muted), Margin = new Thickness(2, 2, 0, 0),
                     });
@@ -407,8 +407,8 @@ namespace Bimbridge.Addin.Ui
             _opsList.Children.Clear();
             if (error != null) { Kv("Status", "unavailable: " + error, _opsHead); return; }
             if (scheduler != null)
-                Kv("Scheduler", "in progress " + scheduler["en_curso"] + " of " + scheduler["max_en_curso"] + " · queued " + scheduler["en_cola"] + " · max per agent " + scheduler["max_por_agente"] +
-                                   " · rejected because the queue was full " + scheduler["rechazadas_por_cola_llena"], _opsHead);
+                Kv("Scheduler", "in progress " + scheduler["running"] + " of " + scheduler["max_running"] + " · queued " + scheduler["queued"] + " · max per agent " + scheduler["max_per_agent"] +
+                                   " · rejected because the queue was full " + scheduler["rejected_queue_full"], _opsHead);
             if (running.Count == 0) Kv("In progress", "none", _opsHead);
             foreach (var j in running)
             {
@@ -439,9 +439,9 @@ namespace Bimbridge.Addin.Ui
             if (recent.Count == 0) _opsList.Children.Add(Theme.Label("No finished operations with this filter.", 13, false, Theme.Muted));
             foreach (var r in recent)
             {
-                var bad = r.Retry == "reconciliar_antes" || r.Retry == "revisar_diferencias";
-                var advice = r.Retry == "no_necesario" ? "" : r.Retry == "reintentable" ? " · can be repeated (nothing was applied)"
-                           : r.Retry == "revisar_diferencias" ? " · REVIEW: applied but does not match what was requested" : " · CHECK the model before repeating";
+                var bad = r.Retry == "reconcile_first" || r.Retry == "review_differences";
+                var advice = r.Retry == "not_needed" ? "" : r.Retry == "retryable" ? " · can be repeated (nothing was applied)"
+                           : r.Retry == "review_differences" ? " · REVIEW: applied but does not match what was requested" : " · CHECK the model before repeating";
                 _opsList.Children.Add(new TextBlock
                 {
                     Text = r.FinishedUtc.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture) + " · " + r.JobId + " · " + r.Kind + " · " + r.State + " · " + FormatMs(r.Ms) + advice +
@@ -462,12 +462,12 @@ namespace Bimbridge.Addin.Ui
                 var notice = Theme.Notice("Document blocked: " + _lastBlock.Message, Theme.Amber, out _);
                 notice.Margin = new Thickness(0, 0, 0, 6);
                 _safety.Children.Add(notice);
-                var how = Theme.Label("The AI resolves it with job op=reconciliar plan_id=…; if it cannot be proven, a person with Revit closed uses AgentHost plan-store.", 12, false, Theme.Muted);
+                var how = Theme.Label("The AI resolves it with job op=reconcile plan_id=…; if it cannot be proven, a person with Revit closed uses AgentHost plan-store.", 12, false, Theme.Muted);
                 how.Margin = new Thickness(0, 0, 0, 10);
                 _safety.Children.Add(how);
             }
-            var execs = (Runtime.Journal?.Recent(200) ?? new List<Dictionary<string, object>>()).Where(e => Str(e, "op") == "exec" || Str(e, "op") == "exec_codigo").Reverse().Take(5).ToList();
-            Kv("Latest dynamic runs", execs.Count == 0 ? "none" : string.Join(" · ", execs.Select(e => (Str(e, "agente") ?? "unnamed") + " " + Str(e, "estado"))), _safety);
+            var execs = (Runtime.Journal?.Recent(200) ?? new List<Dictionary<string, object>>()).Where(e => Str(e, "op") == "exec" || Str(e, "op") == "exec_code").Reverse().Take(5).ToList();
+            Kv("Latest dynamic runs", execs.Count == 0 ? "none" : string.Join(" · ", execs.Select(e => (Str(e, "agent") ?? "unnamed") + " " + Str(e, "status"))), _safety);
         }
 
         /// <summary>
@@ -494,7 +494,7 @@ namespace Bimbridge.Addin.Ui
         private void FillPerf(List<Dictionary<string, object>> activity)
         {
             _perf.Children.Clear();
-            var groups = activity.Where(e => Str(e, "op") != "ping" && Str(e, "op") != "conectar" && Str(e, "op") != "desconectar" && e.ContainsKey("ms"))
+            var groups = activity.Where(e => Str(e, "op") != "ping" && Str(e, "op") != "connect" && Str(e, "op") != "disconnect" && e.ContainsKey("ms"))
                 .GroupBy(e => Str(e, "op")).OrderByDescending(g => g.Count()).ToList();
             if (groups.Count == 0) { _perf.Children.Add(Theme.Label("No requests yet.", 13, false, Theme.Muted)); return; }
             // Table: operation on the left, figures right-aligned with fixed-width digits.
@@ -523,7 +523,7 @@ namespace Bimbridge.Addin.Ui
                 var ms = g.Select(e => Convert.ToInt64(e["ms"], CultureInfo.InvariantCulture)).OrderBy(x => x).ToList();
                 var med = ms[(ms.Count - 1) / 2];
                 var p95 = ms.Count >= 20 ? FormatMs(ms[(int)Math.Ceiling(ms.Count * 0.95) - 1]) : "—";
-                var err = g.Count(e => IsError(Str(e, "estado")));
+                var err = g.Count(e => IsError(Str(e, "status")));
                 var r = table.RowDefinitions.Count;
                 table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                 Cell(r, 0, g.Key, Theme.Ink);
@@ -533,7 +533,7 @@ namespace Bimbridge.Addin.Ui
                 Cell(r, 4, err.ToString(CultureInfo.InvariantCulture), err > 0 ? Theme.Darken(Theme.Red, 0.8) : Theme.Muted);
             }
             _perf.Children.Add(table);
-            var notes = Theme.Label("p95 only with 20 or more samples. Tokens: the MCP client does not report them; estimates are in the metricas tool.", 12, false, Theme.Muted);
+            var notes = Theme.Label("p95 only with 20 or more samples. Tokens: the MCP client does not report them; estimates are in the metrics tool.", 12, false, Theme.Muted);
             notes.Margin = new Thickness(0, 10, 0, 0);
             _perf.Children.Add(notes);
         }
@@ -594,10 +594,10 @@ namespace Bimbridge.Addin.Ui
 
         private static UIElement ActivityRow(Dictionary<string, object> e)
         {
-            var author = Str(e, "autor") ?? "";
-            var agent = Str(e, "agente");
+            var author = Str(e, "author") ?? "";
+            var agent = Str(e, "agent");
             var op = Str(e, "op") ?? "";
-            var status = Str(e, "estado") ?? "";
+            var status = Str(e, "status") ?? "";
             var ms = e.TryGetValue("ms", out var m) ? Convert.ToInt64(m, CultureInfo.InvariantCulture) : 0;
             DateTime t;
             DateTime.TryParse(Str(e, "t"), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out t);
@@ -611,8 +611,8 @@ namespace Bimbridge.Addin.Ui
             grid.Children.Add(time);
 
             var human = author == VersionRegistry.HumanAuthor;
-            var who = human ? "You" : agent ?? Theme.ClientName(Str(e, "cliente") ?? author) + " (unnamed)";
-            var chip = Theme.Chip(who, human ? Theme.Navy : Theme.ClientColor(Str(e, "cliente") ?? author));
+            var who = human ? "You" : agent ?? Theme.ClientName(Str(e, "client") ?? author) + " (unnamed)";
+            var chip = Theme.Chip(who, human ? Theme.Navy : Theme.ClientColor(Str(e, "client") ?? author));
             Grid.SetColumn(chip, 1);
             grid.Children.Add(chip);
 
@@ -634,8 +634,8 @@ namespace Bimbridge.Addin.Ui
             if (status == Status.Error) return (op + ": error; see log", Theme.Darken(Theme.Red, 0.8));
             switch (op)
             {
-                case "conectar": return ("Connected", Theme.Ink);
-                case "desconectar": return ("Disconnected", Theme.Muted);
+                case "connect": return ("Connected", Theme.Ink);
+                case "disconnect": return ("Disconnected", Theme.Muted);
                 case "context": return ("Checked Revit status" + dur, Theme.Ink);
                 case "query": case "get": return ("Query" + dur, Theme.Ink);
                 case "check": return ("Audit" + dur, Theme.Ink);
@@ -649,14 +649,14 @@ namespace Bimbridge.Addin.Ui
                     if (status == PlanStatus.Trialed) return ("Trial: applied, verified and rolled back" + dur, Theme.Darken(Theme.Green, 0.8));
                     if (status == Status.Conflict) return ("Change not applied: the model had changed", Theme.Darken(Theme.Amber, 0.75));
                     return ("Change not applied (" + status + ")", Theme.Darken(Theme.Red, 0.8));
-                case "aplicar_cola":
+                case "apply_queue":
                     if (status == PlanStatus.Applied) return ("You applied a plan from the queue" + dur, Theme.Darken(Theme.Green, 0.8));
                     if (status == PlanStatus.Conflict) return ("A queued plan was skipped: the model had changed", Theme.Darken(Theme.Amber, 0.75));
                     return ("Queued plan: " + status, Theme.Darken(Theme.Red, 0.8));
-                case "retener": return (status == "si" ? "Turned on Hold mode" : "Went back to Live mode", Theme.Ink);
-                case "pausar": return (status == "si" ? "Paused the AI" : "Resumed the AI", Theme.Ink);
-                case "descartar":
-                case "descartar_cola": return ("Discarded changes from the queue", Theme.Muted);
+                case "hold": return (status == "yes" ? "Turned on Hold mode" : "Went back to Live mode", Theme.Ink);
+                case "pause": return (status == "yes" ? "Paused the AI" : "Resumed the AI", Theme.Ink);
+                case "discard":
+                case "discard_queue": return ("Discarded changes from the queue", Theme.Muted);
                 default: return (op + " · " + status + dur, Theme.Muted);
             }
         }
@@ -666,23 +666,23 @@ namespace Bimbridge.Addin.Ui
         {
             try
             {
-                var dir = Path.Combine(Home.Root, "exportes");
+                var dir = Path.Combine(Home.Root, "exports");
                 Directory.CreateDirectory(dir);
                 var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
                 var recent = Runtime.Journal?.Recent(200) ?? new List<Dictionary<string, object>>();
-                File.WriteAllLines(Path.Combine(dir, "actividad_" + stamp + ".jsonl"), recent.Select(e => Json.Write(e)));
-                var csv = new StringBuilder("t,agente,cliente,op,status,ms,doc,traza\n");
+                File.WriteAllLines(Path.Combine(dir, "activity_" + stamp + ".jsonl"), recent.Select(e => Json.Write(e)));
+                var csv = new StringBuilder("t,agent,client,op,status,ms,doc,trace\n");
                 foreach (var e in recent)
-                    csv.Append(string.Join(",", new[] { "t", "agente", "cliente", "op", "estado", "ms", "doc", "traza" }.Select(k => Csv(Str(e, k))))).Append('\n');
-                File.WriteAllText(Path.Combine(dir, "actividad_" + stamp + ".csv"), csv.ToString(), new UTF8Encoding(true));
+                    csv.Append(string.Join(",", new[] { "t", "agent", "client", "op", "status", "ms", "doc", "trace" }.Select(k => Csv(Str(e, k))))).Append('\n');
+                File.WriteAllText(Path.Combine(dir, "activity_" + stamp + ".csv"), csv.ToString(), new UTF8Encoding(true));
                 var now = DateTime.UtcNow;
                 var sessions = (Runtime.Sessions?.All() ?? new List<Session>()).Select(s => (object)new Dictionary<string, object>
                 {
-                    ["sesion"] = s.Id, ["agente"] = s.AgentName, ["fuente_identidad"] = s.IdentitySource, ["cliente"] = s.ClientName, ["version_cliente"] = s.ClientVersion,
-                    ["principal"] = s.Principal, ["estado"] = AgentIdentity.Presence(s, now), ["solicitudes"] = s.Requests, ["errores"] = s.Errors, ["en_ejecucion"] = s.Active,
-                    ["ms_acumulados"] = s.TotalMs, ["conectada"] = s.ConnectedUtc.ToString("o", CultureInfo.InvariantCulture), ["ultima_actividad"] = s.LastSeenUtc.ToString("o", CultureInfo.InvariantCulture),
+                    ["session"] = s.Id, ["agent"] = s.AgentName, ["identity_source"] = s.IdentitySource, ["client"] = s.ClientName, ["client_version_name"] = s.ClientVersion,
+                    ["main"] = s.Principal, ["status"] = AgentIdentity.Presence(s, now), ["requests"] = s.Requests, ["errors"] = s.Errors, ["executing"] = s.Active,
+                    ["accumulated_ms"] = s.TotalMs, ["connected"] = s.ConnectedUtc.ToString("o", CultureInfo.InvariantCulture), ["last_activity"] = s.LastSeenUtc.ToString("o", CultureInfo.InvariantCulture),
                 }).ToList();
-                File.WriteAllText(Path.Combine(dir, "sesiones_" + stamp + ".json"), Json.Write(new Dictionary<string, object> { ["sesiones"] = sessions }));
+                File.WriteAllText(Path.Combine(dir, "sessions_" + stamp + ".json"), Json.Write(new Dictionary<string, object> { ["sessions"] = sessions }));
                 OpenFolder(dir);
             }
             catch (Exception ex) { MessageBox.Show("Could not export: " + ex.Message, Brand.Product); }

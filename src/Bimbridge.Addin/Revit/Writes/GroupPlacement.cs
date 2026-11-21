@@ -37,12 +37,12 @@ namespace Bimbridge.Addin.Revit.Writes
             if (group == null || group.Location is not LocationPoint location || location.Point.DistanceTo(Point(target)) > Tolerance)
                 return "origin";
             if (target.ContainsKey("gtype") && Ids.ToLong(group.GetTypeId()) != WriteKit.L(target, "gtype")) return "type";
-            if (target.ContainsKey("nivel") && Ids.ToLong(group.get_Parameter(BuiltInParameter.GROUP_LEVEL)?.AsElementId()) != WriteKit.L(target, "nivel"))
+            if (target.ContainsKey("level") && Ids.ToLong(group.get_Parameter(BuiltInParameter.GROUP_LEVEL)?.AsElementId()) != WriteKit.L(target, "level"))
                 return "level";
             if (target.ContainsKey("rot") && ManifestQc.RotDiff(location.Rotation * 180 / Math.PI, WriteKit.D(target, "rot"), 0) > 0.1)
                 return "rotation";
             if (target.ContainsKey("ws") && group.WorksetId.IntegerValue != WriteKit.L(target, "ws")) return "workset";
-            if (target.ContainsKey("firma_miembros") && WriteKit.S(target, "firma_miembros") != Signature(group)) return "members relative to the prototype";
+            if (target.ContainsKey("member_signature") && WriteKit.S(target, "member_signature") != Signature(group)) return "members relative to the prototype";
             return null;
         }
     }

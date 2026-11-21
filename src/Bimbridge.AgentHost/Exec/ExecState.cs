@@ -11,19 +11,19 @@ namespace Bimbridge.AgentHost
     /// </summary>
     public static class OpState
     {
-        public const string Validated = "validada";
-        public const string Running = "en_ejecucion";
-        public const string Executed = "ejecutada";
-        public const string Verified = "verificada";
-        public const string Failed = "fallida";
+        public const string Validated = "validated";
+        public const string Running = "executing";
+        public const string Executed = "executed";
+        public const string Verified = "verified";
+        public const string Failed = "failed";
         /// <summary>There is or may be an effect, but not enough evidence to certify the result. Not repeated.</summary>
-        public const string NeedsVerification = "requiere_verificacion";
+        public const string NeedsVerification = "requires_verification";
         /// <summary>Partial or uncertain effect: a person decides. Not repeated.</summary>
-        public const string NeedsReconciliation = "requiere_reconciliar";
-        public const string Blocked = "bloqueada";
-        public const string Cancelled = "cancelada";
+        public const string NeedsReconciliation = "requires_reconcile";
+        public const string Blocked = "blocked";
+        public const string Cancelled = "cancelled";
         /// <summary>alpha3: TEMPORARY write, verified and reverted (trial mode against Revit). Final; never counts as applied.</summary>
-        public const string Trialed = "ensayada";
+        public const string Trialed = "trialed";
 
         public static readonly string[] All = { Validated, Running, Executed, Verified, Failed, NeedsVerification, NeedsReconciliation, Blocked, Cancelled, Trialed };
         public static readonly string[] Final = { Verified, Failed, NeedsVerification, NeedsReconciliation, Blocked, Cancelled, Trialed };
@@ -44,7 +44,7 @@ namespace Bimbridge.AgentHost
 
         /// <summary>
         /// beta1 §6: run-contract name for each existing state (no parallel enum). AUTHORIZED is not an operation state:
-        /// it is "validada" with a current authorization for the plan (GrantStore); that is why it is requested separately.
+        /// it is "validated" with a current authorization for the plan (GrantStore); that is why it is requested separately.
         /// REJECTED = the operation never wrote (blocked or failed before running); ROLLED_BACK = reverted trial.
         /// </summary>
         public static string DirectiveName(string state, bool authorized = false, bool wroteNothing = false)
@@ -69,20 +69,20 @@ namespace Bimbridge.AgentHost
     /// <summary>Error classification (stable: agents use it to decide).</summary>
     public static class ErrorClass
     {
-        public const string Precondition = "precondicion";
-        public const string NoTargets = "sin_objetivos";
-        public const string BackendRejection = "rechazo_backend";
-        public const string Transient = "transitorio";
-        public const string Verification = "verificacion";
-        public const string PartialEffect = "efecto_parcial";
-        public const string UncertainEffect = "efecto_incierto";
-        public const string InsufficientEvidence = "evidencia_insuficiente";
-        public const string Dependency = "dependencia";
-        public const string Cancellation = "cancelacion";
-        public const string DifferentDocument = "documento_distinto";
-        public const string CorruptState = "estado_corrupto";
-        public const string PlanInUse = "plan_en_uso";
-        public const string Internal = "interno";
+        public const string Precondition = "precondition";
+        public const string NoTargets = "no_targets";
+        public const string BackendRejection = "backend_rejection";
+        public const string Transient = "transient";
+        public const string Verification = "verification";
+        public const string PartialEffect = "partial_effect";
+        public const string UncertainEffect = "uncertain_effect";
+        public const string InsufficientEvidence = "insufficient_evidence";
+        public const string Dependency = "dependency";
+        public const string Cancellation = "cancellation";
+        public const string DifferentDocument = "different_document";
+        public const string CorruptState = "corrupt_status";
+        public const string PlanInUse = "plan_in_use";
+        public const string Internal = "internal";
     }
 
     /// <summary>Mutable state of an operation (the only mutable part of the run).</summary>
@@ -104,11 +104,11 @@ namespace Bimbridge.AgentHost
 
         public Dictionary<string, object> ToJson()
         {
-            var d = new Dictionary<string, object> { ["estado"] = State, ["intento"] = (long)Attempt, ["seq"] = LastSeq };
-            if (Result != null) d["resultado"] = Result;
-            if (Evidence != null) d["evidencia"] = Evidence;
+            var d = new Dictionary<string, object> { ["status"] = State, ["attempt"] = (long)Attempt, ["seq"] = LastSeq };
+            if (Result != null) d["result"] = Result;
+            if (Evidence != null) d["evidence"] = Evidence;
             if (Error != null) d["error"] = Error;
-            if (Note != null) d["nota"] = Note;
+            if (Note != null) d["note"] = Note;
             return d;
         }
     }
@@ -116,9 +116,9 @@ namespace Bimbridge.AgentHost
     /// <summary>State of the plan as a whole (derived from the journal).</summary>
     public static class PlanRunState
     {
-        public const string Active = "activo";
-        public const string Paused = "pausado";
-        public const string Cancelled = "cancelado";
+        public const string Active = "active";
+        public const string Paused = "paused";
+        public const string Cancelled = "cancelled";
     }
 
     /// <summary>A recovery diagnostic. Severity: info | aviso | error (error = cannot be recovered automatically).</summary>
@@ -128,7 +128,7 @@ namespace Bimbridge.AgentHost
         public Diagnostic(string severity, string code, string detail) { Severity = severity; Code = code; Detail = detail; }
         public override string ToString() => Severity + ":" + Code + (Detail == null ? "" : " — " + Detail);
         public static Diagnostic Info(string c, string d = null) => new Diagnostic("info", c, d);
-        public static Diagnostic Warn(string c, string d = null) => new Diagnostic("aviso", c, d);
+        public static Diagnostic Warn(string c, string d = null) => new Diagnostic("warning", c, d);
         public static Diagnostic Error(string c, string d = null) => new Diagnostic("error", c, d);
         public static bool AnyError(IEnumerable<Diagnostic> ds) => ds.Any(d => d.Severity == "error");
     }

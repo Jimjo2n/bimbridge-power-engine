@@ -57,12 +57,12 @@ namespace Bimbridge.Engine
 
         public Dictionary<string, object> Progress()
         {
-            var d = new Dictionary<string, object> { ["job_id"] = Id, ["tipo"] = Kind, ["estado_job"] = Status };
+            var d = new Dictionary<string, object> { ["job_id"] = Id, ["type"] = Kind, ["job_status"] = Status };
             if (!IsFinal)
             {
-                if (Total > 0) d["progreso"] = Done + "/" + Total;
-                if (!string.IsNullOrEmpty(Phase)) d["fase"] = Phase;
-                d["segundos"] = (long)(DateTime.UtcNow - CreatedUtc).TotalSeconds;
+                if (Total > 0) d["progress"] = Done + "/" + Total;
+                if (!string.IsNullOrEmpty(Phase)) d["phase"] = Phase;
+                d["seconds"] = (long)(DateTime.UtcNow - CreatedUtc).TotalSeconds;
             }
             return d;
         }
@@ -70,10 +70,10 @@ namespace Bimbridge.Engine
 
     public static class JobStatus
     {
-        public const string InProgress = "en_proceso";
-        public const string Done = "listo";
+        public const string InProgress = "in_progress";
+        public const string Done = "ready";
         public const string Error = "error";
-        public const string Cancelled = "cancelado";
+        public const string Cancelled = "cancelled";
     }
 
     public sealed class JobStore
@@ -130,9 +130,9 @@ namespace Bimbridge.Engine
             FireFinal(j);
         }
 
-        /// <summary>Does the result declare differences between what was requested and what was verified? ("diferencias" key with at least one element).</summary>
+        /// <summary>Does the result declare differences between what was requested and what was verified? ("differences" key with at least one element).</summary>
         public static bool HasDifferences(Dictionary<string, object> result) =>
-            result != null && result.TryGetValue("diferencias", out var d) && d is System.Collections.ICollection c && c.Count > 0;
+            result != null && result.TryGetValue("differences", out var d) && d is System.Collections.ICollection c && c.Count > 0;
 
         public void Fail(Job j, string status, string error)
         {
@@ -189,7 +189,7 @@ namespace Bimbridge.Engine
 
         /// <summary>
         /// Starts the job body and guarantees a final status: if the body ends without completing or failing the job, or throws an
-        /// exception, the job ends in error with the reason. It never stays "en_proceso" forever.
+        /// exception, the job ends in error with the reason. It never stays "in_progress" forever.
         /// Issue #7: returns void on purpose. The job is supervised (the continuation observes any exception) and whoever
         /// wants to wait for it uses <see cref="Job.Work"/> or <see cref="WhenFinal"/>; that way callers have no unobserved tasks (CS4014).
         /// </summary>
@@ -290,7 +290,7 @@ namespace Bimbridge.Engine
         public static string Key(string docKey, long rev, string signature, string recipe, IDictionary<string, object> args)
         {
             var parts = args == null ? new List<string>() :
-                args.Where(kv => !kv.Key.StartsWith("_", StringComparison.Ordinal) && kv.Key != "save_as" && kv.Key != "page" && kv.Key != "nuevo")
+                args.Where(kv => !kv.Key.StartsWith("_", StringComparison.Ordinal) && kv.Key != "save_as" && kv.Key != "page" && kv.Key != "new")
                     .OrderBy(kv => kv.Key, StringComparer.Ordinal)
                     .Select(kv => kv.Key + "=" + Protocol.Json.Write(kv.Value)).ToList();
             return (docKey ?? "") + "|" + rev.ToString(CultureInfo.InvariantCulture) + "|" + (signature ?? "") + "|" + recipe + "|" + string.Join("&", parts);

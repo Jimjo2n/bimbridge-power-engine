@@ -85,7 +85,7 @@ namespace Bimbridge.Tests
             // A new instance (restart) opens without quarantine and the chain is valid.
             var reopened = new AuditLog(p);
             Assert.Empty(reopened.Quarantined);
-            reopened.Append("r", "tras_recuperar", "ok");
+            reopened.Append("r", "after_recover", "ok");
             var v = AuditLog.Verify(p);
             Assert.True(v.Ok, string.Join("; ", v.Errors));
             Assert.Equal(0, v.HeadLag);
@@ -93,7 +93,7 @@ namespace Bimbridge.Tests
             var lines = Lines(p);
             foreach (var o in outcomes)
             {
-                var mine = lines.Where(l => Arg.GetString(l, "autor") == o.Author).ToList();
+                var mine = lines.Where(l => Arg.GetString(l, "author") == o.Author).ToList();
                 Assert.True(mine.Count <= 1, "duplicate of " + o.Author);                    // never twice
                 if (o.Error == null)
                 {
@@ -111,7 +111,7 @@ namespace Bimbridge.Tests
         {
             var p = NewAudit();
             new AuditLog(p).Append("s", "genesis", "ok");
-            var a = new AuditLog(p) { CrashPoint = pt => pt == "tras_fsync_antes_cabeza" };
+            var a = new AuditLog(p) { CrashPoint = pt => pt == "after_fsync_before_head" };
             Assert.Throws<AuditCrashException>(() => a.Append("a", "op", "ok"));
             var v = AuditLog.Verify(p);
             Assert.True(v.Ok, string.Join("; ", v.Errors));
@@ -127,13 +127,13 @@ namespace Bimbridge.Tests
         {
             var p = NewAudit();
             new AuditLog(p).Append("s", "genesis", "ok");
-            var outcomes = CrashDuringBatch(p, n, "tras_fsync_antes_cabeza");
+            var outcomes = CrashDuringBatch(p, n, "after_fsync_before_head");
             Assert.Single(outcomes, o => o.Error is AuditCrashException);                    // the leader "died"
             // The survivors get their seq: their line is intact and durable (sealed by the recovery record).
             Assert.All(outcomes.Where(o => !(o.Error is AuditCrashException)), o => Assert.Null(o.Error));
-            Assert.Contains(Lines(p), l => Arg.GetString(l, "op") == "recuperacion_reclamos");
+            Assert.Contains(Lines(p), l => Arg.GetString(l, "op") == "claims_recovery");
             AssertIntegrity(p, outcomes);
-            Assert.Equal(n, Lines(p).Count(l => Arg.GetString(l, "autor")?.StartsWith("w") == true));   // the n entries, once each
+            Assert.Equal(n, Lines(p).Count(l => Arg.GetString(l, "author")?.StartsWith("w") == true));   // the n entries, once each
         }
 
         [Fact]
@@ -146,7 +146,7 @@ namespace Bimbridge.Tests
             var writers = Enumerable.Range(0, 16).Select(_ => new AuditLog(p)
             {
                 // After the leader crashes, any survivor that takes the lock dies before reconciling (deterministic).
-                CrashPoint = pt => pt == "tras_fsync_antes_cabeza" ? Interlocked.Exchange(ref fired, 1) == 0 : (pt == "antes_bloqueo" || pt == "inicio_lider") && Volatile.Read(ref fired) == 1,
+                CrashPoint = pt => pt == "after_fsync_before_head" ? Interlocked.Exchange(ref fired, 1) == 0 : (pt == "before_lock" || pt == "leader_start") && Volatile.Read(ref fired) == 1,
                 LockWait = TimeSpan.FromSeconds(8), ClaimWait = TimeSpan.FromMilliseconds(200),
             }).ToList();
             var tasks = new List<Task<object>>();
@@ -166,13 +166,13 @@ namespace Bimbridge.Tests
             Assert.Equal(16, v.HeadLag);
             var reopened = new AuditLog(p);
             Assert.Empty(reopened.Quarantined);
-            Assert.Contains(Lines(p), l => Arg.GetString(l, "op") == "recuperacion_cabeza");
+            Assert.Contains(Lines(p), l => Arg.GetString(l, "op") == "head_recovery");
             Assert.Equal(0, AuditLog.Verify(p).HeadLag);
         }
 
         [Theory]
-        [InlineData("tras_reclamo")]
-        [InlineData("antes_escribir")]
+        [InlineData("after_claim")]
+        [InlineData("before_write")]
         public void Batch_CrashBeforeWriting_NothingConfirmed_NothingRewritten(string point)
         {
             var p = NewAudit();
@@ -180,7 +180,7 @@ namespace Bimbridge.Tests
             var outcomes = CrashDuringBatch(p, 16, point);
             Assert.All(outcomes, o => Assert.NotNull(o.Error));                              // nobody confirmed: nothing was written
             Assert.All(outcomes.Where(o => o.Error is JournalUnavailableException), o => Assert.Contains("no", o.Error.Message));
-            Assert.DoesNotContain(Lines(p), l => Arg.GetString(l, "autor")?.StartsWith("w") == true);
+            Assert.DoesNotContain(Lines(p), l => Arg.GetString(l, "author")?.StartsWith("w") == true);
             AssertIntegrity(p, outcomes);
         }
 
@@ -189,16 +189,16 @@ namespace Bimbridge.Tests
         {
             var p = NewAudit();
             new AuditLog(p).Append("s", "genesis", "ok");
-            var outcomes = CrashDuringBatch(p, 16, "durante_escritura");
+            var outcomes = CrashDuringBatch(p, 16, "during_write");
             Assert.All(outcomes, o => Assert.NotNull(o.Error));                              // the batch was left incomplete: nobody confirmed
-            Assert.DoesNotContain(Lines(p), l => Arg.GetString(l, "autor")?.StartsWith("w") == true);
+            Assert.DoesNotContain(Lines(p), l => Arg.GetString(l, "author")?.StartsWith("w") == true);
             Assert.NotEmpty(Directory.GetFiles(Path.GetDirectoryName(p), "*.fragmento-*")); // what was set aside is kept as evidence
             AssertIntegrity(p, outcomes);
         }
 
         [Theory]
-        [InlineData("tras_escribir_antes_fsync")]
-        [InlineData("tras_cabeza")]
+        [InlineData("after_write_before_fsync")]
+        [InlineData("after_head")]
         public void Batch_CrashAfterWrite_EntriesConfirmedOnceBySurvivors(string point)
         {
             var p = NewAudit();
@@ -206,12 +206,12 @@ namespace Bimbridge.Tests
             var outcomes = CrashDuringBatch(p, 16, point);
             Assert.All(outcomes.Where(o => !(o.Error is AuditCrashException)), o => Assert.Null(o.Error));
             AssertIntegrity(p, outcomes);
-            Assert.Equal(16, Lines(p).Count(l => Arg.GetString(l, "autor")?.StartsWith("w") == true));
+            Assert.Equal(16, Lines(p).Count(l => Arg.GetString(l, "author")?.StartsWith("w") == true));
         }
 
         [Theory]
-        [InlineData("antes_confirmar")]
-        [InlineData("tras_confirmar_parcial")]
+        [InlineData("before_commit")]
+        [InlineData("after_partial_commit")]
         public void Batch_CrashWhileConfirming_PersistedOnce_FailuresAreConservativeNotFalse(string point)
         {
             var p = NewAudit();
@@ -219,7 +219,7 @@ namespace Bimbridge.Tests
             var outcomes = CrashDuringBatch(p, 16, point);
             // Everything was persisted once. Whoever got no confirmation fails conservatively (reconcilable by its cid in the
             // journal); nobody gets a confirmation for something that is not written.
-            Assert.Equal(16, Lines(p).Count(l => Arg.GetString(l, "autor")?.StartsWith("w") == true));
+            Assert.Equal(16, Lines(p).Count(l => Arg.GetString(l, "author")?.StartsWith("w") == true));
             AssertIntegrity(p, outcomes);
         }
 
@@ -228,11 +228,11 @@ namespace Bimbridge.Tests
         {
             var p = NewAudit();
             new AuditLog(p).Append("s", "genesis", "ok");
-            var a = new AuditLog(p) { CrashPoint = pt => pt == "antes_bloqueo" };
+            var a = new AuditLog(p) { CrashPoint = pt => pt == "before_lock" };
             Assert.Throws<AuditCrashException>(() => a.Append("a", "op", "ok"));
             Assert.Equal(0, Pending(p));
             AssertIntegrity(p, new List<Outcome>());
-            Assert.DoesNotContain(Lines(p), l => Arg.GetString(l, "autor") == "a");
+            Assert.DoesNotContain(Lines(p), l => Arg.GetString(l, "author") == "a");
         }
 
         [Fact]
@@ -245,7 +245,7 @@ namespace Bimbridge.Tests
             var lines = File.ReadAllLines(p).Where(l => l.Length > 0).ToList();
             Home.WriteAtomic(AuditLog.HeadPath(p), Json.Write(new Dictionary<string, object>
             {
-                ["seq"] = 2L, ["ultimo"] = Home.Sha256Hex(lines[1]), ["longitud"] = 0L,
+                ["seq"] = 2L, ["last"] = Home.Sha256Hex(lines[1]), ["length"] = 0L,
             }));
             var v = AuditLog.Verify(p);
             Assert.False(v.Ok);
@@ -255,9 +255,9 @@ namespace Bimbridge.Tests
         }
 
         [Theory]
-        [InlineData("reparacion_tras_fragmento_tmp")]
-        [InlineData("reparacion_antes_truncar")]
-        [InlineData("reparacion_tras_truncar")]
+        [InlineData("repair_after_tmp_fragment")]
+        [InlineData("repair_before_truncate")]
+        [InlineData("repair_after_truncate")]
         public void TailRepair_CrashAtAnyStep_NeverLosesTheFragmentOrConfirmedRecords(string point)
         {
             // AUD-10: the set-aside fragment is durable before truncating; a crash at any step leaves the journal recoverable.
@@ -265,14 +265,14 @@ namespace Bimbridge.Tests
             var a = new AuditLog(p);
             for (var i = 0; i < 3; i++) a.Append("s", "op" + i, "ok");
             var b = new AuditLog(p) { CrashPoint = x => x == point };
-            var torn = System.Text.Encoding.UTF8.GetBytes("{\"seq\":4,\"cortado");
+            var torn = System.Text.Encoding.UTF8.GetBytes("{\"seq\":4,\"cut");
             using (var f = new FileStream(p, FileMode.Append)) f.Write(torn, 0, torn.Length);
             Assert.Throws<AuditCrashException>(() => b.Append("s", "op3", "ok"));
             var frags = Directory.GetFiles(Path.GetDirectoryName(p), Path.GetFileName(p) + ".fragmento-*").Where(f => !f.EndsWith(".tmp", StringComparison.Ordinal)).ToList();
-            if (point != "reparacion_tras_fragmento_tmp")
+            if (point != "repair_after_tmp_fragment")
                 Assert.Contains(frags, f => File.ReadAllBytes(f).SequenceEqual(torn));   // the fragment exists and is intact
-            if (point != "reparacion_tras_truncar")
-                Assert.EndsWith("cortado", File.ReadAllText(p));                     // without a confirmed fragment nothing is truncated
+            if (point != "repair_after_truncate")
+                Assert.EndsWith("cut", File.ReadAllText(p));                     // without a confirmed fragment nothing is truncated
             var c = new AuditLog(p);                                                   // reopen: repairs and continues
             c.Append("s", "op3", "ok");
             Assert.Empty(c.Quarantined);

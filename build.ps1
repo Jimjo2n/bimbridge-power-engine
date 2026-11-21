@@ -73,16 +73,16 @@ Copy-Item native/power_engine/target/release/bimbridge_power_engine.dll dist/bri
 Copy-Item native/power_engine/target/release/bimbridge-power-engine.exe $pe/
 & $pythonPath -I -B tools/power_engine/vendor_python.py "$pe/python"
 if ($LASTEXITCODE -ne 0) { throw "Python Worker packaging failed" }
-$hello = '{"pe":1,"id":"build","job":"hola","args":{"pe_min":1,"pe_max":1}}'
+$hello = '{"pe":1,"id":"build","job":"hello","args":{"pe_min":1,"pe_max":1}}'
 $helloFile = Join-Path $PSScriptRoot "obj\hello.jsonl"
 New-Item -ItemType Directory -Force (Split-Path $helloFile) | Out-Null
 [IO.File]::WriteAllText($helloFile, $hello + "`n", (New-Object System.Text.UTF8Encoding($false)))
 $pyHello = cmd /c "`"`"$pythonPath`" -I -S -B `"$pe/python/run_worker.py`" < `"$helloFile`"`"" | ConvertFrom-Json
-if ($LASTEXITCODE -ne 0 -or $pyHello.code -ne "OK" -or "pdf_grids" -notin $pyHello.result.capacidades) {
+if ($LASTEXITCODE -ne 0 -or $pyHello.code -ne "OK" -or "pdf_grids" -notin $pyHello.result.capabilities) {
   throw "The payload Python worker does not advertise pdf_grids with its packaged dependencies"
 }
 $rustHello = cmd /c "`"`"$PSScriptRoot\dist\bridge\power_engine\bimbridge-power-engine.exe`" < `"$helloFile`"`"" | ConvertFrom-Json
-if ($LASTEXITCODE -ne 0 -or $rustHello.code -ne "OK" -or "components" -notin $rustHello.result.capacidades) {
+if ($LASTEXITCODE -ne 0 -or $rustHello.code -ne "OK" -or "components" -notin $rustHello.result.capabilities) {
   throw "Rust IPC handshake failed in the payload"
 }
 $required = @(
@@ -122,7 +122,7 @@ Get-ChildItem -Recurse -File addin, bridge | Sort-Object FullName | ForEach-Obje
   $files[$rel] = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant()
 }
 Pop-Location
-@{ version = $ver; commit = $env:SourceRevisionId; estado = "NATIVE_ACCEPTANCE_PENDING"; requeridos = $required; archivos = $files } | ConvertTo-Json -Depth 3 | Set-Content -Encoding UTF8 dist/manifest.json
+@{ version = $ver; commit = $env:SourceRevisionId; status = "NATIVE_ACCEPTANCE_PENDING"; required = $required; files = $files } | ConvertTo-Json -Depth 3 | Set-Content -Encoding UTF8 dist/manifest.json
 Compress-Archive -Path dist/addin, dist/bridge, dist/manifest.json -DestinationPath $payload
 $testFilter = if ($SkipBenchmarks) { " --filter 'FullyQualifiedName!~MeasurementTests&FullyQualifiedName!~Bench_'" } else { '' }
 Run "dotnet test tests/Bimbridge.Tests$testFilter -- RunConfiguration.MaxCpuCount=1 xUnit.MaxParallelThreads=1"

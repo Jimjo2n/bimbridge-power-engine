@@ -37,7 +37,7 @@ namespace Bimbridge.Engine.Workflows
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["instancia"] = InstanceIdentity, ["documento"] = DocumentIdentity, ["revit"] = Version, ["session_id"] = SessionId,
+            ["instance"] = InstanceIdentity, ["document"] = DocumentIdentity, ["revit"] = Version, ["session_id"] = SessionId,
         };
     }
 
@@ -119,33 +119,33 @@ namespace Bimbridge.Engine.Workflows
         {
             var findings = new List<object>();
             string verdict;
-            void F(string code, string text) => findings.Add(new Dictionary<string, object> { ["codigo"] = code, ["detalle"] = text });
+            void F(string code, string text) => findings.Add(new Dictionary<string, object> { ["code"] = code, ["detail"] = text });
 
-            if (o.BridgeInstalled == false) { verdict = "bridge_no_instalado"; F(verdict, "the Bridge executable is not installed"); }
-            else if (o.ClientRegistrations.Count > 0 && o.ClientRegistrations.Values.All(v => !v)) { verdict = "cliente_sin_registro"; F(verdict, "the Bridge is installed but no MCP client has it registered: " + string.Join(", ", o.ClientRegistrations.Keys)); }
-            else if (o.HelloOk == false) { verdict = "bridge_sin_respuesta"; F(verdict, "the Bridge did not complete the greeting (hello)"); }
-            else if (o.ToolsListed.HasValue && o.ToolsListed.Value == 0) { verdict = "bridge_sin_herramientas"; F(verdict, "tools/list returned no tools"); }
+            if (o.BridgeInstalled == false) { verdict = "bridge_not_installed"; F(verdict, "the Bridge executable is not installed"); }
+            else if (o.ClientRegistrations.Count > 0 && o.ClientRegistrations.Values.All(v => !v)) { verdict = "client_unregistered"; F(verdict, "the Bridge is installed but no MCP client has it registered: " + string.Join(", ", o.ClientRegistrations.Keys)); }
+            else if (o.HelloOk == false) { verdict = "bridge_no_response"; F(verdict, "the Bridge did not complete the greeting (hello)"); }
+            else if (o.ToolsListed.HasValue && o.ToolsListed.Value == 0) { verdict = "bridge_no_tools"; F(verdict, "tools/list returned no tools"); }
             else if (o.ToolsListed > 0 && o.ToolsVisibleToAgent.HasValue && o.ToolsVisibleToAgent.Value == 0)
-            { verdict = "herramientas_no_expuestas_al_agente"; F(verdict, "the Bridge responds and lists " + o.ToolsListed + " tools, but the client does not expose them to the agent: this is a client registration/permissions problem, not a Revit one"); }
-            else if (o.ToolsPermitted.HasValue && o.ToolsPermitted.Value == 0) { verdict = "herramientas_no_permitidas"; F(verdict, "the client exposes the tools but the policy allows none"); }
-            else if (o.Instances != null && o.Instances.Count == 0) { verdict = "revit_no_conectado"; F(verdict, "the Bridge works but no Revit instance with the add-in is connected"); }
-            else if (o.Instances != null && o.Instances.Count > 1) { verdict = "varias_instancias"; F(verdict, "there are " + o.Instances.Count + " Revit instances: each operation must give the version or pid"); }
-            else verdict = o.HelloOk == true ? "ok" : "sin_medir";
+            { verdict = "tools_not_exposed_to_agent"; F(verdict, "the Bridge responds and lists " + o.ToolsListed + " tools, but the client does not expose them to the agent: this is a client registration/permissions problem, not a Revit one"); }
+            else if (o.ToolsPermitted.HasValue && o.ToolsPermitted.Value == 0) { verdict = "tools_not_allowed"; F(verdict, "the client exposes the tools but the policy allows none"); }
+            else if (o.Instances != null && o.Instances.Count == 0) { verdict = "revit_not_connected"; F(verdict, "the Bridge works but no Revit instance with the add-in is connected"); }
+            else if (o.Instances != null && o.Instances.Count > 1) { verdict = "multiple_instances"; F(verdict, "there are " + o.Instances.Count + " Revit instances: each operation must give the version or pid"); }
+            else verdict = o.HelloOk == true ? "ok" : "unmeasured";
 
-            if (o.UiExecutorAvailable != true) F("sin_ejecutor_ui", "there is no authorized UI executor: interactive native workflows end in a manual handoff");
+            if (o.UiExecutorAvailable != true) F("no_ui_executor", "there is no authorized UI executor: interactive native workflows end in a manual handoff");
             if (!string.IsNullOrEmpty(o.BridgeBuild) && !string.IsNullOrEmpty(productBuild) && o.BridgeBuild != productBuild)
-                F("builds_distintos", "the Bridge is " + o.BridgeBuild + " and the engine is " + productBuild);
+                F("different_builds", "the Bridge is " + o.BridgeBuild + " and the engine is " + productBuild);
 
             return new Dictionary<string, object>
             {
-                ["veredicto"] = verdict,
+                ["verdict"] = verdict,
                 ["build"] = productBuild ?? "",
-                ["hallazgos"] = findings,
-                ["instancias"] = (o.Instances ?? new List<RevitInstance>()).Select(i => (object)new Dictionary<string, object>
+                ["findings"] = findings,
+                ["instances"] = (o.Instances ?? new List<RevitInstance>()).Select(i => (object)new Dictionary<string, object>
                 {
-                    ["pid"] = (long)i.Pid, ["revit"] = i.Version, ["build"] = i.Build ?? "", ["documentos"] = (long)i.Documents.Count,
+                    ["pid"] = (long)i.Pid, ["revit"] = i.Version, ["build"] = i.Build ?? "", ["documents"] = (long)i.Documents.Count,
                 }).ToList(),
-                ["ejecutor_ui"] = o.UiExecutorAvailable == true,
+                ["ui_executor"] = o.UiExecutorAvailable == true,
             };
         }
     }

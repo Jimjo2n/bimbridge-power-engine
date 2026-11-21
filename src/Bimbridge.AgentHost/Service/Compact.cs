@@ -22,9 +22,9 @@ namespace Bimbridge.AgentHost
             var sb = new StringBuilder(op.Id).Append(' ').Append(op.Operation);
             switch (op.Operation)
             {
-                case "fijar_parametro": sb.Append(' ').Append(op.Param("parametro")).Append('=').Append(op.Param("valor")); if (op.Param("unidades") != null) sb.Append(' ').Append(op.Param("unidades")); break;
-                case "consultar": sb.Append(' ').Append(op.Param("categoria")); break;
-                case "verificar_qc": sb.Append(' ').Append(op.Param("receta")); break;
+                case "set_parameter": sb.Append(' ').Append(op.Param("parameter")).Append('=').Append(op.Param("value")); if (op.Param("units") != null) sb.Append(' ').Append(op.Param("units")); break;
+                case "query_check": sb.Append(' ').Append(op.Param("category")); break;
+                case "verify_qc": sb.Append(' ').Append(op.Param("recipe")); break;
             }
             var scope = string.Join("/", op.Scope.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => Values.Show(kv.Value)));
             if (scope.Length > 0) sb.Append(" [").Append(scope).Append(']');
@@ -109,8 +109,8 @@ namespace Bimbridge.AgentHost
         }
 
         /// <summary>
-        /// Final report: writes the full detail to informe.json (in the plan folder) and returns a summary + the reference.
-        /// Every unverified operation appears in "sin_resolver" with its state, error class, note, dependencies and source requirement.
+        /// Final report: writes the full detail to report.json (in the plan folder) and returns a summary + the reference.
+        /// Every unverified operation appears in "unresolved" with its state, error class, note, dependencies and source requirement.
         /// </summary>
         public static Dictionary<string, object> Report(string dir, ValidatedPlan plan, ExecJournal st)
         {
@@ -118,29 +118,29 @@ namespace Bimbridge.AgentHost
             {
                 var o = plan.ById[id]; var r = st.Ops[id];
                 var d = r.ToJson();
-                d["id"] = id; d["operacion"] = o.Operation; d["etiqueta"] = Label(o);
-                d["depende_de"] = o.DependsOn.Cast<object>().ToList();
-                if (o.Source != null) d["fuente"] = o.Source.ToJson();
-                d["autorizacion_derivada"] = o.Authorization.Cast<object>().ToList();
+                d["id"] = id; d["operation"] = o.Operation; d["tag"] = Label(o);
+                d["depends_on"] = o.DependsOn.Cast<object>().ToList();
+                if (o.Source != null) d["source"] = o.Source.ToJson();
+                d["derived_authorization"] = o.Authorization.Cast<object>().ToList();
                 return d;
             }).ToList();
-            var unresolved = ops.Where(d => (string)d["estado"] != OpState.Verified && (string)d["estado"] != OpState.Trialed).ToList();
+            var unresolved = ops.Where(d => (string)d["status"] != OpState.Verified && (string)d["status"] != OpState.Trialed).ToList();
             var full = new Dictionary<string, object>
             {
-                ["plan"] = plan.Hash, ["objetivo"] = plan.Objective, ["documento"] = new Dictionary<string, object> { ["clave"] = plan.DocKey, ["huella"] = plan.DocPrint },
-                ["seq"] = st.Seq, ["plan_estado"] = st.PlanState, ["t"] = Home.Now(),
-                ["por_estado"] = Counts(plan, st).Where(kv => kv.Value > 0).ToDictionary(kv => kv.Key, kv => (object)(long)kv.Value),
-                ["por_error"] = st.Ops.Values.Where(r => r.Error != null && r.State != OpState.Verified).GroupBy(r => r.Error).ToDictionary(g => g.Key, g => (object)(long)g.Count()),
-                ["sin_resolver"] = unresolved.Cast<object>().ToList(),
-                ["operaciones"] = ops.Cast<object>().ToList(),
+                ["plan"] = plan.Hash, ["target"] = plan.Objective, ["document"] = new Dictionary<string, object> { ["key"] = plan.DocKey, ["fingerprint"] = plan.DocPrint },
+                ["seq"] = st.Seq, ["plan_status"] = st.PlanState, ["t"] = Home.Now(),
+                ["by_status"] = Counts(plan, st).Where(kv => kv.Value > 0).ToDictionary(kv => kv.Key, kv => (object)(long)kv.Value),
+                ["by_error"] = st.Ops.Values.Where(r => r.Error != null && r.State != OpState.Verified).GroupBy(r => r.Error).ToDictionary(g => g.Key, g => (object)(long)g.Count()),
+                ["unresolved"] = unresolved.Cast<object>().ToList(),
+                ["operations"] = ops.Cast<object>().ToList(),
             };
-            var path = Path.Combine(dir, "informe.json");
+            var path = Path.Combine(dir, "report.json");
             Home.WriteAtomic(path, Json.Write(full));
             return new Dictionary<string, object>
             {
-                ["resumen"] = Summary(plan, st), ["sin_resolver"] = (long)unresolved.Count,
-                ["por_estado"] = full["por_estado"], ["por_error"] = full["por_error"], ["detalle"] = path,
-                ["sha256_detalle"] = Home.FileSha256(path),
+                ["summary"] = Summary(plan, st), ["unresolved"] = (long)unresolved.Count,
+                ["by_status"] = full["by_status"], ["by_error"] = full["by_error"], ["detail"] = path,
+                ["detail_sha256"] = Home.FileSha256(path),
             };
         }
 

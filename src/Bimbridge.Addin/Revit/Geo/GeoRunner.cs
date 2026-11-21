@@ -22,7 +22,7 @@ namespace Bimbridge.Addin.Revit.Geo
     ///   3 candidates for each element (plan grid, no API calls)
     ///   4 candidate meshes (once per element; link meshes are cached while the links stay loaded)
     ///   5 extras: levels, views, rooms and spaces
-    /// Computation (rays, classes) runs off the Revit thread and in parallel. Only "choques" goes back to Revit for the
+    /// Computation (rays, classes) runs off the Revit thread and in parallel. Only "clashes" goes back to Revit for the
     /// exact boolean of the pairs the rays could not decide.
     /// </summary>
     internal sealed class GeoRunner
@@ -56,7 +56,7 @@ namespace Bimbridge.Addin.Revit.Geo
         // ---- compute output
         public List<Dictionary<string, object>> Rows;
         public List<string> Cols;
-        public string ClassField = "clase";
+        public string ClassField = "class";
         public Dictionary<string, string> SetNames = new Dictionary<string, string>();
         public long CalcMs;
 
@@ -113,9 +113,9 @@ namespace Bimbridge.Addin.Revit.Geo
             _job = job;
         }
 
-        private bool MeasuresBodies => Spec.Recipe == "montaje" || Spec.Recipe == "holgura" || Spec.Recipe == "choques";
-        private bool UsesIndex => MeasuresBodies || Spec.Recipe == "cerca" || Spec.Recipe == "muro";
-        public bool NeedsExact => Spec.Recipe == "choques" && _pairs.Count > 0;
+        private bool MeasuresBodies => Spec.Recipe == "mounting" || Spec.Recipe == "clearance" || Spec.Recipe == "clashes";
+        private bool UsesIndex => MeasuresBodies || Spec.Recipe == "near" || Spec.Recipe == "wall";
+        public bool NeedsExact => Spec.Recipe == "clashes" && _pairs.Count > 0;
         public bool ModelChanged => _reg != null && _reg.Rev != Rev;
 
         private void Phase(string p)
@@ -176,7 +176,7 @@ namespace Bimbridge.Addin.Revit.Geo
                 case Stage.Index: return Stage.Candidates;
                 case Stage.Candidates: return Stage.Meshes;
                 case Stage.Meshes: return Stage.Levels;
-                case Stage.Levels: return Spec.Recipe == "rango_vista" ? Stage.Views : Spec.Recipe == "cuarto" ? Stage.Rooms : Stage.Done;
+                case Stage.Levels: return Spec.Recipe == "view_range" ? Stage.Views : Spec.Recipe == "room" ? Stage.Rooms : Stage.Done;
                 default: return Stage.Done;
             }
         }
@@ -185,7 +185,7 @@ namespace Bimbridge.Addin.Revit.Geo
         {
             var doc = DocTarget.Resolve(app, out var docError);
             if (doc == null) { Error = docError; return true; }
-            if (doc.IsFamilyDocument) { Error = Status.NotSupported + ": geo checks project models (montaje, choques, ranges); the target is a family. For faces and connectors use fam caras / fam info, or exec"; return true; }
+            if (doc.IsFamilyDocument) { Error = Status.NotSupported + ": geo checks project models (mounting, clashes, ranges); the target is a family. For faces and connectors use fam faces / fam info, or exec"; return true; }
             _doc = doc;
             DocKey = DocumentTracker.KeyOf(doc);
             DocTitle = doc.Title;
@@ -196,7 +196,7 @@ namespace Bimbridge.Addin.Revit.Geo
             _meshesBuiltAtStart = _index.MeshesBuilt;
             _reusedAtStart = _index.HostReused;
 
-            if (Spec.Recipe == "indice")
+            if (Spec.Recipe == "index")
             {
                 IndexInfo = _index.Stats();
                 return true;
@@ -215,11 +215,11 @@ namespace Bimbridge.Addin.Revit.Geo
                     _against.Add(bic);
                 }
             }
-            if (UsesIndex || Spec.Recipe == "cuarto")
+            if (UsesIndex || Spec.Recipe == "room")
             {
-                _sources = GeoIndex.Sources(doc, Spec.IncludeHost || Spec.Recipe == "cuarto", Spec.IncludeLinks, Spec.Links, Warnings);
+                _sources = GeoIndex.Sources(doc, Spec.IncludeHost || Spec.Recipe == "room", Spec.IncludeLinks, Spec.Links, Warnings);
                 _index.Prune(_sources);
-                if (UsesIndex && _sources.Count == 0) { Error = "Nothing to measure against: no host and no loaded links matching vinculos=."; return true; }
+                if (UsesIndex && _sources.Count == 0) { Error = "Nothing to measure against: no host and no loaded links matching links=."; return true; }
             }
             Signature = GeoIndex.Signature(_sources);
 
@@ -250,7 +250,7 @@ namespace Bimbridge.Addin.Revit.Geo
         }
 
         private static string UnknownCategory(string name) =>
-            "unknown category: " + name + " (use API names such as LightingFixtures, Floors, StructuralFraming, or aliases: losas, vigas, columnas, rampas, escaleras, muros)";
+            "unknown category: " + name + " (use API names such as LightingFixtures, Floors, StructuralFraming, or aliases: slabs, beams, columns, ramps, stairs, walls)";
 
         private static string IdsDigest(IEnumerable<long> ids)
         {
@@ -320,8 +320,8 @@ namespace Bimbridge.Addin.Revit.Geo
             var v = Virtual;
             Element e;
             try { e = _doc.GetElement(Ids.ToId(v.TemplateId)); } catch (Exception) { e = null; }
-            if (e == null) { Error = "place montaje: reference instance " + v.TemplateId + " no longer exists"; return true; }
-            if (!(e.Location is LocationPoint lp) || lp.Point == null) { Error = "place montaje: the reference instance has no insertion point"; return true; }
+            if (e == null) { Error = "place mounting: reference instance " + v.TemplateId + " no longer exists"; return true; }
+            if (!(e.Location is LocationPoint lp) || lp.Point == null) { Error = "place mounting: the reference instance has no insertion point"; return true; }
             var builder = new TriMeshBuilder();
             var solids = new List<Solid>();
             try
@@ -330,8 +330,8 @@ namespace Bimbridge.Addin.Revit.Geo
                 if (ge != null) global::Bimbridge.Addin.Revit.Geo.Bodies.CollectSolids(ge, solids, _doc, Spec.ExcludeSubcategories);
                 foreach (var so in solids) global::Bimbridge.Addin.Revit.Geo.Bodies.AddSolid(so, builder, null);
             }
-            catch (Exception ex) { Error = "place montaje: could not read the type's body (" + ex.Message + "); give elev"; return true; }
-            if (builder.Count == 0) { Error = "place montaje: the type has no measurable solid body; give elev"; return true; }
+            catch (Exception ex) { Error = "place mounting: could not read the type's body (" + ex.Message + "); give elev"; return true; }
+            if (builder.Count == 0) { Error = "place mounting: the type has no measurable solid body; give elev"; return true; }
             var origin = lp.Point;
             double rot0;
             try { rot0 = lp.Rotation; } catch (Exception) { rot0 = 0; }
@@ -411,16 +411,16 @@ namespace Bimbridge.Addin.Revit.Geo
             var b = t.Box;
             switch (Spec.Recipe)
             {
-                case "montaje":
-                case "holgura":
+                case "mounting":
+                case "clearance":
                     return Spec.Up
                         ? new Box3(b.MinX, b.MinY, b.MinZ - GeoCompute.BelowMargin, b.MaxX, b.MaxY, b.MaxZ + Spec.MaxRange)
                         : new Box3(b.MinX, b.MinY, b.MinZ - Spec.MaxRange, b.MaxX, b.MaxY, b.MaxZ + GeoCompute.BelowMargin);
-                case "choques":
+                case "clashes":
                     return b.Grow(Spec.Tolerance, Spec.Tolerance);
-                case "cerca":
+                case "near":
                     return new Box3(b.MinX - Spec.Radius, b.MinY - Spec.Radius, b.MinZ - Spec.Radius, b.MaxX + Spec.Radius, b.MaxY + Spec.Radius, b.MaxZ + Spec.MaxRange);
-                case "muro":
+                case "wall":
                     return b.Grow(Spec.Radius, Spec.Tolerance);
                 default:
                     return b;
@@ -465,7 +465,7 @@ namespace Bimbridge.Addin.Revit.Geo
                 var item = _items[_meshNext++];
                 if (_job != null) _job.Done = _meshNext;
                 if (needMesh) _index.EnsureMesh(item, _reg, Rev, null);
-                if (Spec.Recipe == "muro") _index.EnsureWallLine(item);
+                if (Spec.Recipe == "wall") _index.EnsureWallLine(item);
                 if (item.Body.Label == null) item.Body.Label = GeoIndex.LabelOf(item);
                 if (sw.ElapsedMilliseconds >= deadline) return false;
             }
@@ -476,7 +476,7 @@ namespace Bimbridge.Addin.Revit.Geo
 
         private bool ReadLevels()
         {
-            if (Spec.Recipe != "nivel_real" && Spec.Recipe != "rango_vista") return true;
+            if (Spec.Recipe != "actual_level" && Spec.Recipe != "view_range") return true;
             _levelElems = new FilteredElementCollector(_doc).OfClass(typeof(Level)).Cast<Level>().OrderBy(l => l.ProjectElevation).ToList();
             foreach (var lv in _levelElems) Levels.Add(new GeoLevel { Name = lv.Name, Elevation = lv.ProjectElevation });
             return true;
@@ -516,7 +516,7 @@ namespace Bimbridge.Addin.Revit.Geo
             var arg = (Spec.Views ?? "rcp").Trim();
             var all = new FilteredElementCollector(_doc).OfClass(typeof(ViewPlan)).Cast<ViewPlan>().Where(v => !v.IsTemplate).ToList();
             IEnumerable<ViewPlan> chosen;
-            if (arg.Equals("rcp", StringComparison.OrdinalIgnoreCase) || arg.Equals("rcp_todos", StringComparison.OrdinalIgnoreCase))
+            if (arg.Equals("rcp", StringComparison.OrdinalIgnoreCase) || arg.Equals("rcp_all", StringComparison.OrdinalIgnoreCase))
             {
                 chosen = all.Where(v => v.ViewType == ViewType.CeilingPlan);
                 if (arg.Equals("rcp", StringComparison.OrdinalIgnoreCase))
@@ -527,7 +527,7 @@ namespace Bimbridge.Addin.Revit.Geo
                     chosen = chosen.Where(v => withTags.Contains(Ids.ToLong(v.Id)));
                 }
             }
-            else if (arg.Equals("plantas", StringComparison.OrdinalIgnoreCase))
+            else if (arg.Equals("floor_plans", StringComparison.OrdinalIgnoreCase))
                 chosen = all.Where(v => v.ViewType == ViewType.FloorPlan);
             else
             {
@@ -535,7 +535,7 @@ namespace Bimbridge.Addin.Revit.Geo
                 foreach (var part in arg.Split(','))
                 {
                     if (!long.TryParse(part.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
-                    { Error = "views: rcp, rcp_todos, plantas or comma-separated view ids"; return list; }
+                    { Error = "views: rcp, rcp_all, floor_plans or comma-separated view ids"; return list; }
                     if (!(_doc.GetElement(Ids.ToId(id)) is ViewPlan vp))
                     { Error = "views: " + id + " is neither a floor plan nor a ceiling plan"; return list; }
                     list.Add(vp);
@@ -608,14 +608,14 @@ namespace Bimbridge.Addin.Revit.Geo
             if (_roomSources == null)
             {
                 _roomSources = new List<GeoSource>();
-                var wantRooms = Spec.Source != "espacios";
-                _hostSpaces = Spec.Source != "cuartos" && Count(_doc, BuiltInCategory.OST_MEPSpaces) > 0;
+                var wantRooms = Spec.Source != "spaces";
+                _hostSpaces = Spec.Source != "rooms" && Count(_doc, BuiltInCategory.OST_MEPSpaces) > 0;
                 if (wantRooms)
                     foreach (var s in _sources)
                         if (Count(s.Doc, BuiltInCategory.OST_Rooms) > 0) _roomSources.Add(s);
                 if (_roomSources.Count == 0 && !_hostSpaces)
                 {
-                    Warnings.Add("there are no rooms (neither in the model nor in loaded links) and no MEP spaces: everything will come out sin_cuarto");
+                    Warnings.Add("there are no rooms (neither in the model nor in loaded links) and no MEP spaces: everything will come out no_room");
                     return true;
                 }
                 _next = 0;
@@ -672,55 +672,55 @@ namespace Bimbridge.Addin.Revit.Geo
             var sw = Stopwatch.StartNew();
             switch (Spec.Recipe)
             {
-                case "montaje":
-                case "holgura":
+                case "mounting":
+                case "clearance":
                     Rows = GeoCompute.Mount(Targets, Bodies, Spec, Stats);
                     Cols = Spec.Points > 1
-                        ? new List<string> { "id", "lvl", "clase", "gap", "gap_max", "pts", "contra", "pend", "cuerpo" }
-                        : new List<string> { "id", "lvl", "clase", "gap", "contra", "cuerpo" };
+                        ? new List<string> { "id", "lvl", "class", "gap", "gap_max", "pts", "against", "pend", "body" }
+                        : new List<string> { "id", "lvl", "class", "gap", "against", "body" };
                     if (Spec.SurfaceReference)
-                        Cols.AddRange(new[] { "elemento_id", "vinculo_id", "cara_x", "cara_y", "cara_z", "cara_lado" });
-                    SetNames = new Dictionary<string, string> { [MountClass.Embedded] = "$empotradas", [MountClass.Floating] = "$flotando", [MountClass.NoSurface] = "$sin_superficie" };
+                        Cols.AddRange(new[] { "element_id", "link_id", "face_x", "face_y", "face_z", "face_side" });
+                    SetNames = new Dictionary<string, string> { [MountClass.Embedded] = "$empotradas", [MountClass.Floating] = "$flotando", [MountClass.NoSurface] = "$no_surface" };
                     break;
-                case "choques":
+                case "clashes":
                     _screened = GeoCompute.ClashScreen(Targets, Bodies, Spec, _pairs, Stats);
-                    Cols = new List<string> { "id", "lvl", "clase", "contra", "prof", "vol", "n", "metodo" };
-                    SetNames = new Dictionary<string, string> { ["choque"] = "$choques", ["no_evaluable"] = "$no_evaluables" };
+                    Cols = new List<string> { "id", "lvl", "class", "against", "prof", "vol", "n", "method" };
+                    SetNames = new Dictionary<string, string> { ["clash"] = "$choques", ["not_evaluable"] = "$no_evaluables" };
                     if (_pairs.Count == 0) Rows = GeoCompute.MergeClashes(Targets, Bodies, _screened, null, Spec.MinVolume);
                     break;
-                case "cerca":
+                case "near":
                     Rows = GeoCompute.Near(Targets, Bodies, Spec);
-                    Cols = new List<string> { "id", "lvl", "clase", "otro", "dist_xy", "dz", "n" };
-                    SetNames = new Dictionary<string, string> { ["choque"] = "$cerca_choque", ["encima"] = "$cerca_encima", ["debajo"] = "$cerca_debajo", ["cerca"] = "$cerca" };
+                    Cols = new List<string> { "id", "lvl", "class", "other", "dist_xy", "dz", "n" };
+                    SetNames = new Dictionary<string, string> { ["clash"] = "$cerca_choque", ["above"] = "$cerca_encima", ["below"] = "$cerca_debajo", ["near"] = "$cerca" };
                     break;
-                case "muro":
+                case "wall":
                     Rows = GeoCompute.Wall(Targets, Bodies, Spec);
-                    Cols = new List<string> { "id", "lvl", "clase", "dist", "muro", "lado" };
-                    SetNames = new Dictionary<string, string> { ["penetra"] = "$penetra_muro", ["separada"] = "$separadas_muro", ["sin_muro"] = "$sin_muro" };
+                    Cols = new List<string> { "id", "lvl", "class", "dist", "wall", "side" };
+                    SetNames = new Dictionary<string, string> { ["penetrates"] = "$penetra_muro", ["separated"] = "$separadas_muro", ["no_wall"] = "$no_wall" };
                     break;
-                case "nivel_real":
+                case "actual_level":
                     Rows = GeoCompute.RealLevel(Targets, Levels);
-                    Cols = new List<string> { "id", "lvl", "nivel_real", "clase", "z", "dz" };
-                    SetNames = new Dictionary<string, string> { ["distinto"] = "$nivel_distinto" };
+                    Cols = new List<string> { "id", "lvl", "actual_level", "class", "z", "dz" };
+                    SetNames = new Dictionary<string, string> { ["different"] = "$nivel_distinto" };
                     break;
-                case "duplicados":
+                case "duplicates":
                     Rows = GeoCompute.Duplicates(Targets, Spec);
-                    Cols = new List<string> { "id", "lvl", "clase", "igual_a", "dist" };
-                    SetNames = new Dictionary<string, string> { ["sobrante"] = "$duplicados" };
+                    Cols = new List<string> { "id", "lvl", "class", "equal_to", "dist" };
+                    SetNames = new Dictionary<string, string> { ["leftover"] = "$duplicados" };
                     break;
-                case "cuarto":
+                case "room":
                     Rows = GeoCompute.Rooms(Targets, Spec.Source);
-                    Cols = Spec.Source == "espacios" ? new List<string> { "id", "lvl", "clase", "espacio" }
-                         : Spec.Source == "cuartos" ? new List<string> { "id", "lvl", "clase", "cuarto" }
-                         : new List<string> { "id", "lvl", "clase", "cuarto", "espacio" };
-                    SetNames = new Dictionary<string, string> { ["sin_cuarto"] = "$sin_cuarto" };
+                    Cols = Spec.Source == "spaces" ? new List<string> { "id", "lvl", "class", "space" }
+                         : Spec.Source == "rooms" ? new List<string> { "id", "lvl", "class", "room" }
+                         : new List<string> { "id", "lvl", "class", "room", "space" };
+                    SetNames = new Dictionary<string, string> { ["no_room"] = "$no_room" };
                     break;
-                case "rango_vista":
+                case "view_range":
                     Rows = GeoCompute.ViewRange(Targets, Views);
-                    Cols = new List<string> { "vista", "id", "lvl", "clase", "zbot", "ztop", "bajo", "alto" };
+                    Cols = new List<string> { "view", "id", "lvl", "class", "zbot", "ztop", "low", "high" };
                     SetNames = new Dictionary<string, string>
                     {
-                        [ViewBand.Above] = "$rango_encima", [ViewBand.Below] = "$rango_debajo", ["ajena"] = "$ajenas_en_vista", ["fuera"] = "$fuera_de_recorte",
+                        [ViewBand.Above] = "$rango_encima", [ViewBand.Below] = "$rango_debajo", ["foreign"] = "$ajenas_en_vista", ["outside"] = "$outside_crop",
                     };
                     break;
             }
@@ -799,7 +799,7 @@ namespace Bimbridge.Addin.Revit.Geo
 
         public void FinishClashes()
         {
-            if (Spec.Recipe != "choques" || Rows != null) return;
+            if (Spec.Recipe != "clashes" || Rows != null) return;
             var sw = Stopwatch.StartNew();
             Rows = GeoCompute.MergeClashes(Targets, Bodies, _screened ?? new List<Dictionary<string, object>>(), _exact, Spec.MinVolume);
             CalcMs += sw.ElapsedMilliseconds;
@@ -822,17 +822,17 @@ namespace Bimbridge.Addin.Revit.Geo
         public Outcome ToOutcome()
         {
             var extra = new Dictionary<string, object>();
-            if (_sources.Any(s => !s.IsHost)) extra["fuentes"] = string.Join("+", _sources.Select(s => s.IsHost ? "host" : s.Short));
-            if (Stats.Rays > 0) extra["rayos"] = (long)Stats.Rays;
+            if (_sources.Any(s => !s.IsHost)) extra["sources"] = string.Join("+", _sources.Select(s => s.IsHost ? "host" : s.Short));
+            if (Stats.Rays > 0) extra["rays"] = (long)Stats.Rays;
             if (Stats.Inconsistent > 0)
-                extra["rayos_dudosos"] = (long)Stats.Inconsistent + " (open or odd mesh at that point: not used for the height)";
-            if (Stats.BoxFallback > 0) extra["sin_malla"] = (long)Stats.BoxFallback + " elements measured with their box (cuerpo=caja)";
-            if (_pairs.Count > 0) extra["booleanas"] = (long)_pairs.Count;
+                extra["doubtful_rays"] = (long)Stats.Inconsistent + " (open or odd mesh at that point: not used for the height)";
+            if (Stats.BoxFallback > 0) extra["no_mesh"] = (long)Stats.BoxFallback + " elements measured with their box (body=box)";
+            if (_pairs.Count > 0) extra["booleans"] = (long)_pairs.Count;
             if (_parts.Count > 1)
-                extra["partes_cuerpo"] = _parts.OrderByDescending(kv => kv.Value).ToDictionary(kv => kv.Key, kv => (object)(long)kv.Value);
+                extra["body_parts"] = _parts.OrderByDescending(kv => kv.Value).ToDictionary(kv => kv.Key, kv => (object)(long)kv.Value);
             var warn = Warnings.Distinct().Take(6).Cast<object>().ToList();
-            if (warn.Count > 0) extra["avisos"] = warn;
-            return new Outcome { Rows = Rows ?? new List<Dictionary<string, object>>(), Cols = Cols ?? new List<string> { "id", "clase" }, ClassField = ClassField, SetNames = SetNames, Extra = extra };
+            if (warn.Count > 0) extra["warnings"] = warn;
+            return new Outcome { Rows = Rows ?? new List<Dictionary<string, object>>(), Cols = Cols ?? new List<string> { "id", "class" }, ClassField = ClassField, SetNames = SetNames, Extra = extra };
         }
 
         public static Dictionary<string, object> Summarize(GeoSpec spec, Outcome o, out Dictionary<string, long[]> sets)

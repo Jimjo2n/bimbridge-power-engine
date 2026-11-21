@@ -20,7 +20,7 @@ namespace Bimbridge.Engine
     /// </summary>
     public sealed class Correlation
     {
-        public const string TraceArg = "_traza";
+        public const string TraceArg = "_trace";
 
         public string AgentId { get; private set; }
         public string SessionId { get; private set; }
@@ -123,10 +123,10 @@ namespace Bimbridge.Engine
         /// <summary>Identity registration: ctx with agente= (or desregistrar=true, which only removes the name).</summary>
         public static bool IsRegistration(Request req) =>
             req.Op == Wire.OpContext && req.Args != null &&
-            (!string.IsNullOrWhiteSpace(Arg.GetString(req.Args, "agente")) || Arg.GetBool(req.Args, "desregistrar") == true);
+            (!string.IsNullOrWhiteSpace(Arg.GetString(req.Args, "agent")) || Arg.GetBool(req.Args, "unregister") == true);
 
         public static string RefusalMessage(Session s) =>
             "this session has no agent name" + (s?.IdentityNote != null ? " (" + s.IdentityNote + ")" : "") +
-            ": register with revit ctx agente=\"Name\" or set BIMBRIDGE_AGENT in the bridge. Without a name no reads or changes are allowed.";
+            ": register with revit ctx agent=\"Name\" or set BIMBRIDGE_AGENT in the bridge. Without a name no reads or changes are allowed.";
     }
 }

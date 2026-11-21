@@ -22,22 +22,22 @@ namespace Bimbridge.Tests
 
         public static OpDraft Set(string param, object value, string unit = "mm", string cat = Cat, string level = null, long? expectElems = null, long? expectChanged = null, bool allowEmpty = false, params string[] deps)
         {
-            var op = new OpDraft { Operation = "fijar_parametro", AllowEmpty = allowEmpty };
-            op.Params["parametro"] = param; op.Params["valor"] = value; if (unit != null) op.Params["unidades"] = unit;
-            if (cat != null) op.Scope["categoria"] = cat;
-            if (level != null) op.Scope["nivel"] = level;
-            if (expectElems != null) op.Expected["elementos"] = expectElems.Value;
-            if (expectChanged != null) op.Expected["cambiados"] = expectChanged.Value;
+            var op = new OpDraft { Operation = "set_parameter", AllowEmpty = allowEmpty };
+            op.Params["parameter"] = param; op.Params["value"] = value; if (unit != null) op.Params["units"] = unit;
+            if (cat != null) op.Scope["category"] = cat;
+            if (level != null) op.Scope["level"] = level;
+            if (expectElems != null) op.Expected["elements"] = expectElems.Value;
+            if (expectChanged != null) op.Expected["changed"] = expectChanged.Value;
             op.DependsOn.AddRange(deps);
             return op;
         }
 
-        public static OpDraft Query(string cat = Cat) { var op = new OpDraft { Operation = "consultar" }; op.Params["categoria"] = cat; return op; }
-        public static OpDraft Qc(params string[] deps) { var op = new OpDraft { Operation = "verificar_qc" }; op.Params["receta"] = "qc_manifiesto"; op.DependsOn.AddRange(deps); return op; }
+        public static OpDraft Query(string cat = Cat) { var op = new OpDraft { Operation = "query_check" }; op.Params["category"] = cat; return op; }
+        public static OpDraft Qc(params string[] deps) { var op = new OpDraft { Operation = "verify_qc" }; op.Params["recipe"] = "qc_manifest"; op.DependsOn.AddRange(deps); return op; }
 
         public static PlanDraft Plan(params OpDraft[] ops)
         {
-            var p = new PlanDraft { Objective = "prueba", DocKey = Doc, DocPrint = Print, LengthUnit = "mm", Coordinates = "interno_revit" };
+            var p = new PlanDraft { Objective = "test", DocKey = Doc, DocPrint = Print, LengthUnit = "mm", Coordinates = "revit_internal" };
             p.Sources.Add(new SourceDoc { Id = "src-1", Name = "especificacion.txt", Sha256 = SrcSha });
             p.Ops.AddRange(ops);
             return p.AssignIds();
@@ -46,11 +46,11 @@ namespace Bimbridge.Tests
         /// <summary>AH-01 base plan: query → set Mounting Height (expects 5 elements and 5 changes) → QC.</summary>
         public static PlanDraft BasePlan(long expect = 5) => Plan(Query(), Set("Mounting Height", 2700L, expectElems: expect, expectChanged: expect, level: "L03", deps: new[] { "#0" }), Qc("#1"));
 
-        public static string WritePlan(string dir, PlanDraft p) { var f = Path.Combine(dir, "plan_entrada.json"); File.WriteAllText(f, Json.Write(p.ToJson())); return f; }
+        public static string WritePlan(string dir, PlanDraft p) { var f = Path.Combine(dir, "plan_input.json"); File.WriteAllText(f, Json.Write(p.ToJson())); return f; }
 
         public static string Model(string dir, int fixturesL03 = 5, Dictionary<string, object> config = null, params string[] extra)
         {
-            var m = Path.Combine(dir, "modelo");
+            var m = Path.Combine(dir, "model");
             DurableSimModel.Create(m, Doc, Print, new[] { Cat + "=" + fixturesL03 + "@L03" }.Concat(extra), config);
             return m;
         }
@@ -82,8 +82,8 @@ namespace Bimbridge.Tests
             var path = Path.Combine(stateDir, "control", "plan", "lease.json");
             if (!File.Exists(path)) return;
             var lease = Json.ParseObject(File.ReadAllText(path));
-            if (Arg.GetBool(lease, "liberada") == true) return;
-            lease["vence"] = "2000-01-01T00:00:00Z";
+            if (Arg.GetBool(lease, "released") == true) return;
+            lease["expires"] = "2000-01-01T00:00:00Z";
             File.WriteAllText(path, Json.Write(lease));
         }
 
@@ -119,13 +119,13 @@ namespace Bimbridge.Tests
         }
 
         public static List<Dictionary<string, object>> Journal(string stateDir) =>
-            File.ReadAllLines(Path.Combine(stateDir, "diario.jsonl")).Where(l => l.Length > 0).Select(Json.ParseObject).ToList();
+            File.ReadAllLines(Path.Combine(stateDir, "journal.jsonl")).Where(l => l.Length > 0).Select(Json.ParseObject).ToList();
 
         public static int Transitions(string stateDir, string op, string to) =>
-            Journal(stateDir).Count(r => Arg.GetString(r, "ev") == "transicion" && Arg.GetString(r, "op") == op && Arg.GetString(r, "a") == to);
+            Journal(stateDir).Count(r => Arg.GetString(r, "ev") == "transition" && Arg.GetString(r, "op") == op && Arg.GetString(r, "a") == to);
 
         public static List<Dictionary<string, object>> Notes(string stateDir, string op) =>
-            Journal(stateDir).Where(r => Arg.GetString(r, "ev") == "nota" && Arg.GetString(r, "op") == op).ToList();
+            Journal(stateDir).Where(r => Arg.GetString(r, "ev") == "note" && Arg.GetString(r, "op") == op).ToList();
 
         /// <summary>Recovers the state from disk into a new object (read only).</summary>
         public static ExecJournal Read(string stateDir, out ValidatedPlan plan, out List<Diagnostic> diags)

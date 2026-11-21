@@ -54,7 +54,7 @@ namespace Bimbridge.AgentHost
                     if (!_ch.Reader.TryRead(out var id)) continue;
                     lock (_lock)
                     {
-                        if (!_q.TryGetValue(id, out var st) || st != St.Queued) { OnLost?.Invoke(id, "cola_inconsistente"); continue; }
+                        if (!_q.TryGetValue(id, out var st) || st != St.Queued) { OnLost?.Invoke(id, "inconsistent_queue"); continue; }
                         _q[id] = St.Running;
                     }
                     try { run(id); }
@@ -73,7 +73,7 @@ namespace Bimbridge.AgentHost
                 _q.Remove(id);
                 if (again && _ch.Writer.TryWrite(id)) { _q[id] = St.Queued; return; }
             }
-            if (again) OnLost?.Invoke(id, "queue full; recovered on restart or with reanudar");
+            if (again) OnLost?.Invoke(id, "queue full; recovered on restart or with resume");
         }
     }
 }

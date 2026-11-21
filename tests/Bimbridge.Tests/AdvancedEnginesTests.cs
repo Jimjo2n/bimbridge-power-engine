@@ -29,18 +29,18 @@ namespace Bimbridge.Tests
             foreach (var eng in new[] { null, new PowerEngineDispatcher(PowerEngineEnv.Options("rust_ffi")) })
             {
                 var r = MepNetwork.Analyze(segs, engine: eng);
-                Assert.Equal("discrepancias", r["veredicto"]);
-                Assert.Single((List<object>)r["toca_sin_conectar"]);
-                Assert.Single((List<object>)r["conectado_con_hueco"]);
-                Assert.Contains((List<object>)r["incompatibles"], x => ((string)((Dictionary<string, object>)x)["motivo"]).StartsWith("diameter"));
-                var near = (List<object>)r["cerca_sin_conectar"];
+                Assert.Equal("discrepancies", r["verdict"]);
+                Assert.Single((List<object>)r["touches_unconnected"]);
+                Assert.Single((List<object>)r["connected_with_gap"]);
+                Assert.Contains((List<object>)r["incompatible_items"], x => ((string)((Dictionary<string, object>)x)["reason"]).StartsWith("diameter"));
+                var near = (List<object>)r["near_unconnected"];
                 Assert.Single(near);
-                Assert.Equal(new List<object> { "c3", "c4" }, ((Dictionary<string, object>)near[0])["tramos"]);
-                Assert.Single((List<object>)r["conectado_fuera_del_conjunto"]);
-                var layers = (Dictionary<string, object>)r["capas"];
+                Assert.Equal(new List<object> { "c3", "c4" }, ((Dictionary<string, object>)near[0])["segments"]);
+                Assert.Single((List<object>)r["connected_outside_set"]);
+                var layers = (Dictionary<string, object>)r["layers"];
                 // continuity: {c1,c2,c3}, {c4}, {c5}, {c6}, {c7}; physical: {c1,c2}, {c3}, {c4}, {c5,c6}, {c7}
-                Assert.Equal(5L, ((Dictionary<string, object>)layers["continuidad"])["componentes"]);
-                Assert.Equal(5L, ((Dictionary<string, object>)layers["conexion_fisica"])["componentes"]);
+                Assert.Equal(5L, ((Dictionary<string, object>)layers["continuity"])["components"]);
+                Assert.Equal(5L, ((Dictionary<string, object>)layers["physical_connection"])["components"]);
                 eng?.Dispose();
             }
             Assert.Throws<ArgumentException>(() => MepNetwork.Analyze(new List<RunSegment> { S("x", 0, 0, 1, 0), S("x", 1, 0, 2, 0) }));
@@ -54,7 +54,7 @@ namespace Bimbridge.Tests
                 new RiserNode { Id = "P1", Kind = "panel", Level = "L01", LevelElevFt = 0 },
                 new RiserNode { Id = "J2", Kind = "union", Level = "L02", LevelElevFt = 12 },
                 new RiserNode { Id = "J3", Kind = "union", Level = "L03", LevelElevFt = 24 },   // open end (junction with no outlet)
-                new RiserNode { Id = "D2", Kind = "dispositivo", Level = "L02", LevelElevFt = 12 },
+                new RiserNode { Id = "D2", Kind = "device", Level = "L02", LevelElevFt = 12 },
                 new RiserNode { Id = "F-7", Kind = "terminal", Level = "L02", LevelElevFt = 12 },
                 new RiserNode { Id = "F-7", Kind = "terminal", Level = "L03", LevelElevFt = 24 },  // valid repeated ID (feeder)
                 new RiserNode { Id = "X9", Kind = "union", Level = "L03", LevelElevFt = 24 },   // invalid repeat
@@ -62,24 +62,24 @@ namespace Bimbridge.Tests
             };
             var edges = new List<RiserEdge>
             {
-                new RiserEdge { From = "P1", To = "J2", Kind = "fisico", PhysicalId = "c-101" },
-                new RiserEdge { From = "J2", To = "J3", Kind = "diagrama" },
-                new RiserEdge { From = "J2", To = "D2", Kind = "fisico", PhysicalId = "c-102" },
-                new RiserEdge { From = "P1", To = "F-7", Kind = "fisico", PhysicalId = "c-103" },
-                new RiserEdge { From = "X9", To = "D2", Kind = "fisico", PhysicalId = "c-104" },
+                new RiserEdge { From = "P1", To = "J2", Kind = "physical", PhysicalId = "c-101" },
+                new RiserEdge { From = "J2", To = "J3", Kind = "diagram" },
+                new RiserEdge { From = "J2", To = "D2", Kind = "physical", PhysicalId = "c-102" },
+                new RiserEdge { From = "P1", To = "F-7", Kind = "physical", PhysicalId = "c-103" },
+                new RiserEdge { From = "X9", To = "D2", Kind = "physical", PhysicalId = "c-104" },
                 new RiserEdge { From = "J3", To = "NOEXISTE" },
             };
             var r = RiserGraph.Analyze(nodes, edges, new[] { "F-7" }, new[] { ("J3", "D2") });
-            Assert.Equal("revisar", r["veredicto"]);
-            Assert.Single((List<object>)r["solo_diagrama"]);
-            Assert.Contains("J3", (List<object>)r["extremos_abiertos"]);
-            Assert.Equal(new List<object> { "X9" }, r["ids_repetidos_invalidos"]);
-            Assert.Equal(new List<object> { "F-7" }, r["ids_repetidos_validos"]);
-            Assert.Equal(new List<object> { "J3→D2" }, r["ramas_faltantes"]);
-            Assert.Single((List<object>)r["aristas_sin_nodo"]);
-            Assert.True((long)r["componentes_fisicos"] > (long)r["componentes_diagrama"]);
-            var drawing = (Dictionary<string, object>)r["dibujo"];
-            Assert.True(drawing.ContainsKey("cruces"));
+            Assert.Equal("review", r["verdict"]);
+            Assert.Single((List<object>)r["diagram_only"]);
+            Assert.Contains("J3", (List<object>)r["open_ends"]);
+            Assert.Equal(new List<object> { "X9" }, r["repeated_invalid_ids"]);
+            Assert.Equal(new List<object> { "F-7" }, r["repeated_valid_ids"]);
+            Assert.Equal(new List<object> { "J3→D2" }, r["missing_branches"]);
+            Assert.Single((List<object>)r["edges_without_node"]);
+            Assert.True((long)r["physical_components"] > (long)r["diagram_components"]);
+            var drawing = (Dictionary<string, object>)r["drafting"];
+            Assert.True(drawing.ContainsKey("crossings"));
         }
 
         private static GroupInstance G(string id, string type, double ox, double oy, double rot, bool mirror, params (string T, double X, double Y)[] local)
@@ -107,15 +107,15 @@ namespace Bimbridge.Tests
                 G("U5", "UNIT B", 0, 300, 0, false, unit),
             };
             var r = GroupVariants.Analyze(groups);
-            var a = (Dictionary<string, object>)((List<object>)r["tipos"])[0];
-            Assert.Equal("UNIT A", a["tipo_grupo"]);
-            Assert.Equal(2L, a["variantes"]);
-            Assert.Equal(3L, ((Dictionary<string, object>)a["referencia"])["instancias"]);
-            var dev = (Dictionary<string, object>)((List<object>)a["desviaciones"])[0];
-            Assert.Equal(new List<object> { "U4" }, dev["instancias"]);
-            Assert.Single((List<object>)dev["faltan"]);
-            Assert.StartsWith("G|", (string)((List<object>)dev["faltan"])[0]);
-            Assert.Equal(new List<object> { "U3" }, a["espejadas"]);
+            var a = (Dictionary<string, object>)((List<object>)r["types"])[0];
+            Assert.Equal("UNIT A", a["group_type"]);
+            Assert.Equal(2L, a["variants"]);
+            Assert.Equal(3L, ((Dictionary<string, object>)a["reference"])["instances"]);
+            var dev = (Dictionary<string, object>)((List<object>)a["deviations"])[0];
+            Assert.Equal(new List<object> { "U4" }, dev["instances"]);
+            Assert.Single((List<object>)dev["missing_items"]);
+            Assert.StartsWith("G|", (string)((List<object>)dev["missing_items"])[0]);
+            Assert.Equal(new List<object> { "U3" }, a["mirrored"]);
         }
 
         [Fact]
@@ -124,14 +124,14 @@ namespace Bimbridge.Tests
             var tags = Enumerable.Range(0, 12).Select(i => new TagRequest { Id = "t" + i, X = 1 + (i % 4) * 0.5, Y = 1 + (i / 4) * 0.4 }).ToList();
             var obstacles = tags.Select(t => new Box { Id = "sym-" + t.Id, X0 = t.X - 0.04, X1 = t.X + 0.04, Y0 = t.Y - 0.04, Y1 = t.Y + 0.04 }).ToList();
             var r = AnnotationLayout.Layout(tags, obstacles);
-            Assert.Equal(0L, r["colisiones"]);
-            Assert.True((bool)r["legible"]);
-            Assert.False((bool)AnnotationLayout.Layout(tags, obstacles, textHeightIn: 1.0 / 16)["legible"]);
+            Assert.Equal(0L, r["collisions"]);
+            Assert.True((bool)r["readable"]);
+            Assert.False((bool)AnnotationLayout.Layout(tags, obstacles, textHeightIn: 1.0 / 16)["readable"]);
             // crowded anchor: the tag moves away and gets a leader
             var crowd = new List<Box> { new Box { X0 = 4.0, X1 = 6.0, Y0 = 4.0, Y1 = 6.0 } };
             var one = AnnotationLayout.Layout(new List<TagRequest> { new TagRequest { Id = "x", X = 5, Y = 5 } }, crowd);
-            var tag = (Dictionary<string, object>)((List<object>)one["etiquetas"])[0];
-            Assert.True((bool)tag["colision"] || (bool)tag["leader"]);
+            var tag = (Dictionary<string, object>)((List<object>)one["tags_list"])[0];
+            Assert.True((bool)tag["collision"] || (bool)tag["leader"]);
         }
     }
 }

@@ -128,7 +128,7 @@ namespace Bimbridge.Tests
             Directory.CreateDirectory(Path.GetDirectoryName(_p.ConfigFile));
             File.WriteAllText(_p.ConfigFile, "{\"enabled\":false,\"levels\":\"R\"}");
             Directory.CreateDirectory(Path.GetDirectoryName(_p.CodexConfig));
-            File.WriteAllText(_p.CodexConfig, "[mcp_servers.bimbridge]\ncommand = \"viejo.exe\"\nstartup_timeout_sec = 30\n\n[mcp_servers.bimbridge.env]\nBIMBRIDGE_PROFILE = \"completo\"\n\n[otra]\nx = 1\n");
+            File.WriteAllText(_p.CodexConfig, "[mcp_servers.bimbridge]\ncommand = \"viejo.exe\"\nstartup_timeout_sec = 30\n\n[mcp_servers.bimbridge.env]\nBIMBRIDGE_PROFILE = \"complete\"\n\n[otra]\nx = 1\n");
             var core = new SetupCore(_p);
             core.Install(Payload(), new InstallOptions { Versions = { "2024" }, Levels = "RPW", Codex = true }, "0.5.0");
             var cfg = Json.ParseObject(File.ReadAllText(_p.ConfigFile));
@@ -137,7 +137,7 @@ namespace Bimbridge.Tests
             var toml = File.ReadAllText(_p.CodexConfig);
             Assert.Contains("startup_timeout_sec = 30", toml);
             Assert.Contains("[mcp_servers.bimbridge.env]", toml);
-            Assert.Contains("BIMBRIDGE_PROFILE = \"completo\"", toml);
+            Assert.Contains("BIMBRIDGE_PROFILE = \"complete\"", toml);
             Assert.Contains("[otra]", toml);
             Assert.DoesNotContain("viejo.exe", toml);
             Assert.Contains("Bimbridge.Bridge.exe", toml);
@@ -164,8 +164,8 @@ namespace Bimbridge.Tests
             var manifest = new System.Collections.Generic.Dictionary<string, object>
             {
                 ["version"] = "0.9.0",
-                ["requeridos"] = files.Keys.Cast<object>().ToList(),
-                ["archivos"] = files.ToDictionary(kv => kv.Key, kv => (object)Sha(kv.Value)),
+                ["required"] = files.Keys.Cast<object>().ToList(),
+                ["files"] = files.ToDictionary(kv => kv.Key, kv => (object)Sha(kv.Value)),
             };
             var ms = new MemoryStream();
             using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, true))
@@ -217,7 +217,7 @@ namespace Bimbridge.Tests
                 core.Install(zip, new InstallOptions { Versions = SetupCore.SupportedVersions.ToList(), Levels = "RPW" }, "0.6.0");
                 var diag = core.Diagnose();
                 foreach (var v in SetupCore.SupportedVersions)
-                    Assert.Equal(true, ((System.Collections.Generic.Dictionary<string, object>)((System.Collections.Generic.Dictionary<string, object>)diag["addin"])[v])["coinciden"]);
+                    Assert.Equal(true, ((System.Collections.Generic.Dictionary<string, object>)((System.Collections.Generic.Dictionary<string, object>)diag["addin"])[v])["match"]);
                 Assert.True(File.Exists(Path.Combine(_p.AddinsDir("2026"), "Bimbridge", "recipes", "tag_fixtures.cs")));
                 Assert.True(File.Exists(Path.Combine(_p.BinDir, "Bimbridge.AgentHost.exe")));
                 Assert.True(File.Exists(Path.Combine(_p.BinDir, "power_engine", "bimbridge-power-engine.exe")));
@@ -248,11 +248,11 @@ namespace Bimbridge.Tests
             var core = new SetupCore(_p);
             core.Install(SignedPayload(), new InstallOptions { Versions = { "2024", "2026" }, Levels = "RPW" }, "0.6.0");
             var d = core.Diagnose();
-            Assert.Equal("0.6.0", d["instalada"]);
+            Assert.Equal("0.6.0", d["installed"]);
             var addin = (System.Collections.Generic.Dictionary<string, object>)d["addin"];
             var y24 = (System.Collections.Generic.Dictionary<string, object>)addin["2024"];
-            Assert.Equal(true, y24["coinciden"]);
-            Assert.Equal(false, y24["reinicio_pendiente"]);
+            Assert.Equal(true, y24["match"]);
+            Assert.Equal(false, y24["restart_pending"]);
             Assert.Equal("not installed", addin["2023"]);
             var cfg = (System.Collections.Generic.Dictionary<string, object>)d["config"];
             Assert.Equal(false, cfg["enabled"]);
@@ -261,13 +261,13 @@ namespace Bimbridge.Tests
 
             // Someone changes the DLL and a set-aside file is left in use: the diagnostics report it.
             var dll = Path.Combine(_p.AddinsDir("2026"), "Bimbridge", "Bimbridge.Addin.dll");
-            File.WriteAllText(dll, "otra");
+            File.WriteAllText(dll, "other");
             File.WriteAllText(dll + Updates.LeftoverMark + "1", "old");
             d = core.Diagnose();
             var y26 = (System.Collections.Generic.Dictionary<string, object>)((System.Collections.Generic.Dictionary<string, object>)d["addin"])["2026"];
-            Assert.Equal(false, y26["coinciden"]);
-            Assert.Equal(true, y26["reinicio_pendiente"]);
-            Assert.Contains("changed", string.Join(",", (System.Collections.Generic.List<object>)y26["diferencias"]));
+            Assert.Equal(false, y26["match"]);
+            Assert.Equal(true, y26["restart_pending"]);
+            Assert.Contains("changed", string.Join(",", (System.Collections.Generic.List<object>)y26["differences"]));
 
             // Revit open with the add-in loaded: the current process descriptor counts as "alive".
             var inst = Path.Combine(_p.Home, "instances");
@@ -275,9 +275,9 @@ namespace Bimbridge.Tests
             var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
             File.WriteAllText(Path.Combine(inst, pid + ".json"), Json.Write(new InstanceDescriptor { Pid = pid, RevitVersion = "2026", PipeName = "x", Protocol = 1, AddinVersion = "0.5.0.0", StartedUtc = "2026-10-20T00:00:00Z" }.ToJson()));
             d = core.Diagnose();
-            var open = (System.Collections.Generic.List<object>)d["revit_abiertos"];
+            var open = (System.Collections.Generic.List<object>)d["open_revits"];
             Assert.Single(open);
-            Assert.Equal(false, ((System.Collections.Generic.Dictionary<string, object>)open[0])["coincide_con_instalada"]);
+            Assert.Equal(false, ((System.Collections.Generic.Dictionary<string, object>)open[0])["matches_installed"]);
         }
 
         [Fact]

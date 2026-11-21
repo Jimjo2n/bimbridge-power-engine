@@ -70,16 +70,16 @@ namespace Bimbridge.Tests
                 new ModelHealth.View { Id = 202, Name = "T", Kind = "FloorPlan", IsTemplate = true }, new ModelHealth.View { Id = 203, Name = "3D", Kind = "ThreeD" },
             };
             var r = ModelHealth.Report(warnings, new[] { a, b, c }, conns, sheets, views, new[] { "Circuit Number" });
-            var s = (Dictionary<string, object>)r["resumen"];
-            Assert.Equal(3L, s["avisos"]); Assert.Equal(2L, s["tipos_de_aviso"]);
-            Assert.Equal(2L, s["conectores_libres"]); Assert.Equal(1L, s["laminas_vacias"]); Assert.Equal(1L, s["vistas_sin_lamina"]);
-            var first = (Dictionary<string, object>)((List<object>)r["avisos"])[0];
-            Assert.Equal(2L, first["veces"]);
+            var s = (Dictionary<string, object>)r["summary"];
+            Assert.Equal(3L, s["warnings"]); Assert.Equal(2L, s["warning_types"]);
+            Assert.Equal(2L, s["free_connectors"]); Assert.Equal(1L, s["empty_sheets"]); Assert.Equal(1L, s["views_without_sheet"]);
+            var first = (Dictionary<string, object>)((List<object>)r["warnings"])[0];
+            Assert.Equal(2L, first["times"]);
             Assert.Equal(new object[] { 1L, 2L, 3L }, ((List<object>)first["ids"]).ToArray());
-            var p = (Dictionary<string, object>)((Dictionary<string, object>)r["parametros_requeridos"])["Circuit Number"];
-            Assert.Equal(1L, ((Dictionary<string, object>)p["vacio"])["n"]);
-            Assert.Equal(1L, ((Dictionary<string, object>)p["sin_parametro"])["n"]);
-            var dc = (Dictionary<string, object>)r["conectores_desconectados"];
+            var p = (Dictionary<string, object>)((Dictionary<string, object>)r["required_parameters"])["Circuit Number"];
+            Assert.Equal(1L, ((Dictionary<string, object>)p["empty_value"])["n"]);
+            Assert.Equal(1L, ((Dictionary<string, object>)p["no_parameter"])["n"]);
+            var dc = (Dictionary<string, object>)r["disconnected_connectors"];
             Assert.Equal(2, dc.Count);
         }
     }

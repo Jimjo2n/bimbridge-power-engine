@@ -130,14 +130,14 @@ namespace Bimbridge.AgentHost
             double Med(List<double> l) { var s = l.OrderBy(x => x).ToList(); return Math.Round(s[s.Count / 2], 3); }
             return new Dictionary<string, object>
             {
-                ["kernel"] = "TriMesh.Extent (vertical mounting)", ["lenguaje"] = "C# " + Environment.Version, ["simd"] = TriMesh.SimdAvailable && TriMesh.SimdEnabled,
-                ["triangulos"] = (long)(tri.Length / 9), ["puntos"] = (long)(pts.Length / 2), ["aciertos"] = (long)hits, ["rondas"] = (long)rounds,
-                ["entrada_bytes"] = (long)bytes.Length, ["serializar_ms"] = Math.Round(serMs, 3), ["deserializar_ms"] = Math.Round(deserMs, 3),
-                ["indice_ms_mediana"] = Med(build), ["consulta_ms_mediana"] = Med(query),
-                ["consulta_ns_por_punto"] = Math.Round(Med(query) * 1e6 / Math.Max(1, pts.Length / 2), 1),
-                ["asignado_bytes_mediana"] = alloc.OrderBy(x => x).ElementAt(alloc.Count / 2),
-                ["memoria_proceso_mb"] = Math.Round(Process.GetCurrentProcess().PeakWorkingSet64 / 1048576.0, 1),
-                ["digest"] = digest, ["sha256_entrada"] = RequirementExtractor.Sha256Hex(bytes),
+                ["kernel"] = "TriMesh.Extent (vertical mounting)", ["language"] = "C# " + Environment.Version, ["simd"] = TriMesh.SimdAvailable && TriMesh.SimdEnabled,
+                ["triangles"] = (long)(tri.Length / 9), ["points"] = (long)(pts.Length / 2), ["hits"] = (long)hits, ["rounds"] = (long)rounds,
+                ["input_bytes"] = (long)bytes.Length, ["serialize_ms"] = Math.Round(serMs, 3), ["deserialize_ms"] = Math.Round(deserMs, 3),
+                ["index_ms_median"] = Med(build), ["query_ms_median"] = Med(query),
+                ["query_ns_per_point"] = Math.Round(Med(query) * 1e6 / Math.Max(1, pts.Length / 2), 1),
+                ["allocated_bytes_median"] = alloc.OrderBy(x => x).ElementAt(alloc.Count / 2),
+                ["process_memory_mb"] = Math.Round(Process.GetCurrentProcess().PeakWorkingSet64 / 1048576.0, 1),
+                ["digest"] = digest, ["input_sha256"] = RequirementExtractor.Sha256Hex(bytes),
             };
         }
     }

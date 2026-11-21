@@ -40,7 +40,7 @@ namespace Bimbridge.Engine
         public static List<OpSpec> ParseAll(IDictionary<string, object> args)
         {
             if (!args.TryGetValue("ops", out var raw) || !(raw is List<object> list) || list.Count == 0)
-                throw new QueryException("plan needs ops: [{op, ids, ...}]. Operations: " + OpCatalog.KindList + " (detail: guide tema=escritura)");
+                throw new QueryException("plan needs ops: [{op, ids, ...}]. Operations: " + OpCatalog.KindList + " (detail: guide topic=write)");
             if (list.Count > MaxOps) throw new QueryException("maximum " + MaxOps + " operations per plan");
             var result = new List<OpSpec>();
             foreach (var item in list)
@@ -62,7 +62,7 @@ namespace Bimbridge.Engine
         {
             var s = new OpSpec { Kind = (Arg.GetString(o, "op") ?? "").Trim().ToLowerInvariant(), Index = index };
             if (!OpCatalog.ByKind.TryGetValue(s.Kind, out var info))
-                throw new QueryException("unknown op '" + s.Kind + "'. Use: " + OpCatalog.KindList + " (detail: guide tema=escritura)");
+                throw new QueryException("unknown op '" + s.Kind + "'. Use: " + OpCatalog.KindList + " (detail: guide topic=write)");
             foreach (var kv in o) s.Args[kv.Key] = kv.Value;
 
             foreach (var x in Arg.GetStringList(o, "ids"))
@@ -79,7 +79,7 @@ namespace Bimbridge.Engine
                     throw new QueryException("ids: '" + x + "' is not an id, a $set or @n");
                 s.Ids.Add(id);
             }
-            foreach (var key in new[] { "view", "hoja", "vista", "tipo", "origen" })
+            foreach (var key in new[] { "view", "sheet", "type", "origin" })
             {
                 var v = Arg.GetString(o, key);
                 if (v != null && v.StartsWith("@") && int.TryParse(v.Substring(1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var n))
@@ -112,15 +112,15 @@ namespace Bimbridge.Engine
                 case "set_elevation":
                     if (o.TryGetValue("ft", out var ft) && ft != null)
                     {
-                        if (!(ft is double || ft is long)) throw new QueryException("set_elevation: ft must be a number in feet (or use valor with units)");
+                        if (!(ft is double || ft is long)) throw new QueryException("set_elevation: ft must be a number in feet (or use value with units)");
                         s.Ft = Convert.ToDouble(ft, CultureInfo.InvariantCulture);
                     }
-                    else if (o.TryGetValue("valor", out var value) && value != null)
+                    else if (o.TryGetValue("value", out var value) && value != null)
                     {
-                        if (!Lengths.TryFeet(value, out var f, out var err)) throw new QueryException("set_elevation valor: " + err);
+                        if (!Lengths.TryFeet(value, out var f, out var err)) throw new QueryException("set_elevation value: " + err);
                         s.Ft = f;
                     }
-                    else throw new QueryException("set_elevation: missing ft (feet) or valor (\"10' - 9\\\"\", \"3277 mm\")");
+                    else throw new QueryException("set_elevation: missing ft (feet) or value (\"10' - 9\\\"\", \"3277 mm\")");
                     if (s.Ft < -1000 || s.Ft > 1000) throw new QueryException("set_elevation: out of range");
                     break;
                 case "set_workset":
@@ -133,13 +133,13 @@ namespace Bimbridge.Engine
                     if (s.Type == null && !hasIds) throw new QueryException("set_type_param: give type \"Family: Type\" or instance ids");
                     break;
                 case "snap_to_surface":
-                    if (s.RefOps.Count > 0) throw new QueryException("snap_to_surface measures elements that already exist: do not use @n (to place flush use place with montaje=losa)");
-                    var side = (Arg.GetString(o, "lado") ?? "arriba").Trim().ToLowerInvariant();
-                    if (side != "arriba" && side != "abajo") throw new QueryException("snap_to_surface lado: arriba (default) or abajo");
-                    OpCatalog.Length(o, "holgura", "snap_to_surface");
+                    if (s.RefOps.Count > 0) throw new QueryException("snap_to_surface measures elements that already exist: do not use @n (to place flush use place with mounting=slab)");
+                    var side = (Arg.GetString(o, "side") ?? "up").Trim().ToLowerInvariant();
+                    if (side != "up" && side != "down") throw new QueryException("snap_to_surface side: up (default) or down");
+                    OpCatalog.Length(o, "clearance", "snap_to_surface");
                     OpCatalog.Length(o, "max", "snap_to_surface");
-                    var pts = OpCatalog.Number(o, "puntos", "snap_to_surface");
-                    if (pts.HasValue && pts != 1 && pts != 5 && pts != 9) throw new QueryException("snap_to_surface puntos: 1, 5 or 9");
+                    var pts = OpCatalog.Number(o, "points", "snap_to_surface");
+                    if (pts.HasValue && pts != 1 && pts != 5 && pts != 9) throw new QueryException("snap_to_surface points: 1, 5 or 9");
                     break;
                 case "move":
                     if (o.ContainsKey("to"))
@@ -156,129 +156,129 @@ namespace Bimbridge.Engine
                     break;
                 case "rotate":
                     OpCatalog.Number(o, "deg", "rotate");
-                    if (o.TryGetValue("centro", out var c) && c is List<object>) OpCatalog.Point(c, "rotate centro", false);
+                    if (o.TryGetValue("center", out var c) && c is List<object>) OpCatalog.Point(c, "rotate center", false);
                     break;
                 case "mirror":
-                    var axis = OpCatalog.Points(o["eje"], "mirror eje", 2, 2, false);
-                    if (Math.Abs(axis[0][0] - axis[1][0]) + Math.Abs(axis[0][1] - axis[1][1]) < 1e-6) throw new QueryException("mirror eje: the two points are equal");
+                    var axis = OpCatalog.Points(o["axis"], "mirror axis", 2, 2, false);
+                    if (Math.Abs(axis[0][0] - axis[1][0]) + Math.Abs(axis[0][1] - axis[1][1]) < 1e-6) throw new QueryException("mirror axis: the two points are equal");
                     break;
                 case "copy":
-                    if (!o.ContainsKey("nivel"))
+                    if (!o.ContainsKey("level"))
                     {
                         var anyc = false;
                         foreach (var k in new[] { "dx", "dy", "dz" }) anyc |= OpCatalog.Length(o, k, "copy").HasValue;
-                        if (!anyc) throw new QueryException("copy: give dx/dy/dz or nivel");
+                        if (!anyc) throw new QueryException("copy: give dx/dy/dz or level");
                     }
                     break;
                 case "place":
-                    var placePoints = OpCatalog.Points(o["puntos"], "place puntos", 1, 5000);
-                    if (o.TryGetValue("items_fuente", out var rawItems))
+                    var placePoints = OpCatalog.Points(o["points"], "place points", 1, 5000);
+                    if (o.TryGetValue("source_items", out var rawItems))
                     {
                         if (!(rawItems is List<object> items) || items.Count != placePoints.Count ||
                             items.Any(item => !(item is string text) || string.IsNullOrWhiteSpace(text)) ||
                             items.Distinct().Count() != items.Count)
-                            throw new QueryException("place: items_fuente requires a unique identifier per point");
+                            throw new QueryException("place: source_items requires a unique identifier per point");
                     }
                     OpCatalog.Length(o, "elev", "place");
-                    OpCatalog.Length(o, "holgura", "place");
+                    OpCatalog.Length(o, "clearance", "place");
                     OpCatalog.Number(o, "rot", "place");
-                    var mounting = Arg.GetString(o, "montaje");
-                    if (mounting != null && !string.Equals(mounting, "losa", StringComparison.OrdinalIgnoreCase) && !string.Equals(mounting, "piso", StringComparison.OrdinalIgnoreCase))
-                        throw new QueryException("place montaje: losa (top face under what is above) or piso (base on what is below)");
-                    if (mounting != null && o.ContainsKey("elev")) throw new QueryException("place: use elev or montaje, not both");
+                    var mounting = Arg.GetString(o, "mounting");
+                    if (mounting != null && !string.Equals(mounting, "slab", StringComparison.OrdinalIgnoreCase) && !string.Equals(mounting, "floor", StringComparison.OrdinalIgnoreCase))
+                        throw new QueryException("place mounting: slab (top face under what is above) or floor (base on what is below)");
+                    if (mounting != null && o.ContainsKey("elev")) throw new QueryException("place: use elev or mounting, not both");
                     if (o.TryGetValue("params", out var pr) && pr != null && !(pr is Dictionary<string, object>))
                         throw new QueryException("place params: {\"Parameter\": value}");
                     break;
                 case "tag":
                     if (o.TryGetValue("offset", out var off) && off != null) OpCatalog.Point(off, "tag offset", false);
-                    var orientation = Arg.GetString(o, "orientacion");
-                    if (orientation != null && orientation != "horizontal" && orientation != "vertical") throw new QueryException("tag orientacion: horizontal or vertical");
+                    var orientation = Arg.GetString(o, "orientation");
+                    if (orientation != null && orientation != "horizontal" && orientation != "vertical") throw new QueryException("tag orientation: horizontal or vertical");
                     break;
                 case "tag_move":
                     if (o.TryGetValue("head", out var h) && h != null) OpCatalog.Point(h, "tag_move head", false);
                     foreach (var k in new[] { "dx", "dy" }) OpCatalog.Length(o, k, "tag_move");
                     foreach (var k in new[] { "dxp", "dyp" }) OpCatalog.Number(o, k, "tag_move");
-                    if (o.TryGetValue("extremo", out var ex) && ex != null) OpCatalog.Point(ex, "tag_move extremo", false);
-                    if (o.TryGetValue("codo", out var co) && co != null) OpCatalog.Point(co, "tag_move codo", false);
-                    if (!new[] { "head", "dx", "dy", "dxp", "dyp", "leader", "extremo", "codo", "orientacion" }.Any(o.ContainsKey))
-                        throw new QueryException("tag_move: give head, dx/dy, dxp/dyp, leader, extremo, codo or orientacion");
+                    if (o.TryGetValue("end", out var ex) && ex != null) OpCatalog.Point(ex, "tag_move end", false);
+                    if (o.TryGetValue("elbow", out var co) && co != null) OpCatalog.Point(co, "tag_move elbow", false);
+                    if (!new[] { "head", "dx", "dy", "dxp", "dyp", "leader", "end", "elbow", "orientation" }.Any(o.ContainsKey))
+                        throw new QueryException("tag_move: give head, dx/dy, dxp/dyp, leader, end, elbow or orientation");
                     break;
                 case "group_place":
-                    OpCatalog.Points(o["puntos"], "group_place puntos", 1, 1000);
+                    OpCatalog.Points(o["points"], "group_place points", 1, 1000);
                     OpCatalog.Number(o, "rot", "group_place");
-                    if (o.ContainsKey("reutilizar") && !Arg.GetBool(o, "reutilizar").HasValue)
-                        throw new QueryException("group_place reutilizar: give true or false");
-                    if (o.ContainsKey("prototipo") && (!(Arg.GetLong(o, "prototipo") is long prototype) || prototype <= 0))
-                        throw new QueryException("group_place prototipo: give the positive ID of the reference group");
+                    if (o.ContainsKey("reuse") && !Arg.GetBool(o, "reuse").HasValue)
+                        throw new QueryException("group_place reuse: give true or false");
+                    if (o.ContainsKey("prototype") && (!(Arg.GetLong(o, "prototype") is long prototype) || prototype <= 0))
+                        throw new QueryException("group_place prototype: give the positive ID of the reference group");
                     break;
                 case "group_variant":
                     if (s.Ids.Count != 1 || s.Ids[0] <= 0 || s.Set != null || s.RefOps.Count != 0 ||
-                        !(o["reglas"] is Dictionary<string, object> groupRules) || groupRules.Count == 0 ||
+                        !(o["rules"] is Dictionary<string, object> groupRules) || groupRules.Count == 0 ||
                         groupRules.Any(pair => string.IsNullOrWhiteSpace(pair.Key) ||
                             !(pair.Value is string targetType) || string.IsNullOrWhiteSpace(targetType)))
-                        throw new QueryException("group_variant: give the ID of a group and reglas {old type: new type}");
+                        throw new QueryException("group_variant: give the ID of a group and rules {old type: new type}");
                     break;
                 case "view_create":
-                    var vt = (Arg.GetString(o, "tipo") ?? "").Trim().ToLowerInvariant();
-                    var allowed = new[] { "plano", "rcp", "seccion", "callout", "3d", "duplicar", "dibujo" };
-                    if (Array.IndexOf(allowed, vt) < 0) throw new QueryException("view_create tipo: " + string.Join(", ", allowed));
-                    if ((vt == "plano" || vt == "rcp") && Arg.GetString(o, "nivel") == null) throw new QueryException("view_create " + vt + ": missing nivel");
-                    if ((vt == "duplicar" || vt == "callout") && Arg.GetString(o, "origen") == null) throw new QueryException("view_create " + vt + ": missing origen (view)");
-                    if ((vt == "seccion" || vt == "callout") && !o.ContainsKey("caja")) throw new QueryException("view_create " + vt + ": missing caja [[x0,y0,z0],[x1,y1,z1]]");
-                    if (o.ContainsKey("caja")) OpCatalog.Points(o["caja"], "view_create caja", 2, 2);
-                    var option = Arg.GetString(o, "opcion");
-                    if (option != null && option != "duplicar" && option != "detalles" && option != "dependiente") throw new QueryException("view_create opcion: duplicar, detalles or dependiente");
+                    var vt = (Arg.GetString(o, "type") ?? "").Trim().ToLowerInvariant();
+                    var allowed = new[] { "plan", "rcp", "section", "callout", "3d", "duplicate", "drafting" };
+                    if (Array.IndexOf(allowed, vt) < 0) throw new QueryException("view_create type: " + string.Join(", ", allowed));
+                    if ((vt == "plan" || vt == "rcp") && Arg.GetString(o, "level") == null) throw new QueryException("view_create " + vt + ": missing level");
+                    if ((vt == "duplicate" || vt == "callout") && Arg.GetString(o, "source") == null) throw new QueryException("view_create " + vt + ": missing source (view)");
+                    if ((vt == "section" || vt == "callout") && !o.ContainsKey("box")) throw new QueryException("view_create " + vt + ": missing box [[x0,y0,z0],[x1,y1,z1]]");
+                    if (o.ContainsKey("box")) OpCatalog.Points(o["box"], "view_create box", 2, 2);
+                    var option = Arg.GetString(o, "option");
+                    if (option != null && option != "duplicate" && option != "with_detailing" && option != "dependent") throw new QueryException("view_create option: duplicate, with_detailing or dependent");
                     break;
                 case "view_set":
-                    if (!new[] { "plantilla", "rango", "escala", "detalle", "nombre", "recorte", "scope_box", "caja_seccion" }.Any(o.ContainsKey))
-                        throw new QueryException("view_set: give plantilla, rango, escala, detalle, nombre, recorte, scope_box or caja_seccion");
-                    if (o.TryGetValue("rango", out var rg) && rg != null)
+                    if (!new[] { "template", "range", "scale", "detail", "name", "crop", "scope_box", "section_box" }.Any(o.ContainsKey))
+                        throw new QueryException("view_set: give template, range, scale, detail, name, crop, scope_box or section_box");
+                    if (o.TryGetValue("range", out var rg) && rg != null)
                     {
-                        if (!(rg is Dictionary<string, object> rd) || rd.Count == 0) throw new QueryException("view_set rango: {top:[\"NIVEL\",offset], corte:[…], fondo:[…], profundidad:[…]}");
+                        if (!(rg is Dictionary<string, object> rd) || rd.Count == 0) throw new QueryException("view_set range: {top:[\"LEVEL\",offset], cut:[…], bottom:[…], depth:[…]}");
                         foreach (var kv in rd)
                         {
-                            if (Array.IndexOf(new[] { "top", "corte", "fondo", "profundidad" }, kv.Key) < 0) throw new QueryException("view_set rango: keys top, corte, fondo, profundidad");
-                            if (!(kv.Value is List<object> pair) || pair.Count != 2) throw new QueryException("view_set rango " + kv.Key + ": [\"LEVEL\", offset] (level: name, actual, arriba, abajo or ilimitado)");
-                            if (!Lengths.TryFeet(pair[1], out _, out var err)) throw new QueryException("view_set rango " + kv.Key + ": " + err);
+                            if (Array.IndexOf(new[] { "top", "cut", "bottom", "depth" }, kv.Key) < 0) throw new QueryException("view_set range: keys top, cut, bottom, depth");
+                            if (!(kv.Value is List<object> pair) || pair.Count != 2) throw new QueryException("view_set range " + kv.Key + ": [\"LEVEL\", offset] (level: name, actual, up, down or unlimited)");
+                            if (!Lengths.TryFeet(pair[1], out _, out var err)) throw new QueryException("view_set range " + kv.Key + ": " + err);
                         }
                     }
-                    if (o.ContainsKey("caja_seccion")) OpCatalog.Points(o["caja_seccion"], "view_set caja_seccion", 2, 2);
-                    var det = Arg.GetString(o, "detalle");
-                    if (det != null && det != "fino" && det != "medio" && det != "bajo") throw new QueryException("view_set detalle: fino, medio or bajo");
-                    OpCatalog.Number(o, "escala", "view_set");
+                    if (o.ContainsKey("section_box")) OpCatalog.Points(o["section_box"], "view_set section_box", 2, 2);
+                    var det = Arg.GetString(o, "detail");
+                    if (det != null && det != "fine" && det != "medium" && det != "coarse") throw new QueryException("view_set detail: fine, medium or coarse");
+                    OpCatalog.Number(o, "scale", "view_set");
                     break;
                 case "view_hide":
                 case "view_override":
                     if (!o.ContainsKey("ids") && !o.ContainsKey("cats")) throw new QueryException(s.Kind + ": give ids or cats");
-                    OpCatalog.Number(o, "transparencia", s.Kind);
-                    OpCatalog.Number(o, "grosor", s.Kind);
+                    OpCatalog.Number(o, "transparency", s.Kind);
+                    OpCatalog.Number(o, "line_weight", s.Kind);
                     break;
                 case "text_note":
-                    OpCatalog.Point(o["punto"], "text_note punto", false);
-                    var linked = o.ContainsKey("luminaria");
-                    if (linked && (!(Arg.GetLong(o, "luminaria") is long lightId) || lightId <= 0 || o.ContainsKey("texto")))
-                        throw new QueryException("text_note: luminaria requires its positive ID and generates the text from the model");
-                    if (!linked && string.IsNullOrWhiteSpace(Arg.GetString(o, "texto")))
-                        throw new QueryException("text_note: give texto or luminaria");
-                    foreach (var key in new[] { "codigo_param", "altura_param", "descontar_tipo_param" })
+                    OpCatalog.Point(o["point"], "text_note point", false);
+                    var linked = o.ContainsKey("fixture");
+                    if (linked && (!(Arg.GetLong(o, "fixture") is long lightId) || lightId <= 0 || o.ContainsKey("text")))
+                        throw new QueryException("text_note: fixture requires its positive ID and generates the text from the model");
+                    if (!linked && string.IsNullOrWhiteSpace(Arg.GetString(o, "text")))
+                        throw new QueryException("text_note: give text or fixture");
+                    foreach (var key in new[] { "code_param", "height_param", "subtract_type_param" })
                         if (o.TryGetValue(key, out var name) && (!linked || !(name is string param) || string.IsNullOrWhiteSpace(param)))
-                            throw new QueryException("text_note: " + key + " requires a luminaria and the name of a parameter");
-                    foreach (var key in new[] { "negrita", "subrayado" })
+                            throw new QueryException("text_note: " + key + " requires a fixture and the name of a parameter");
+                    foreach (var key in new[] { "bold", "underline" })
                         if (o.ContainsKey(key) && !Arg.GetBool(o, key).HasValue)
                             throw new QueryException("text_note " + key + ": give true or false");
                     break;
                 case "annotation_rebind":
                     if (s.Ids.Count != 1 || s.Ids[0] <= 0 || s.Set != null || s.RefOps.Count != 0)
                         throw new QueryException("annotation_rebind: give the ID of a single annotation");
-                    if (o.ContainsKey("destino") == o.ContainsKey("refs_estables"))
-                        throw new QueryException("annotation_rebind: give destino or refs_estables");
-                    if (o.ContainsKey("destino") && (!(Arg.GetLong(o, "destino") is long destination) || destination <= 0))
-                        throw new QueryException("annotation_rebind: destino must be a positive ID");
-                    if (o.TryGetValue("refs_estables", out var stableRefs) &&
+                    if (o.ContainsKey("target") == o.ContainsKey("stable_refs"))
+                        throw new QueryException("annotation_rebind: give target or stable_refs");
+                    if (o.ContainsKey("target") && (!(Arg.GetLong(o, "target") is long destination) || destination <= 0))
+                        throw new QueryException("annotation_rebind: target must be a positive ID");
+                    if (o.TryGetValue("stable_refs", out var stableRefs) &&
                         (!(stableRefs is List<object> stable) || stable.Count < 2 || stable.Count > 100 ||
                          stable.Any(x => !(x is string reference) || string.IsNullOrWhiteSpace(reference)) ||
                          stable.Distinct().Count() != stable.Count))
-                        throw new QueryException("annotation_rebind: refs_estables requires 2 to 100 non-repeated references");
+                        throw new QueryException("annotation_rebind: stable_refs requires 2 to 100 non-repeated references");
                     break;
                 case "level_create":
                 case "grid_create":
@@ -296,67 +296,67 @@ namespace Bimbridge.Engine
                     break;
                 case "filled_region":
                 {
-                    var fp = OpCatalog.Points(o["puntos"], "filled_region puntos", 3, 200, false);
+                    var fp = OpCatalog.Points(o["points"], "filled_region points", 3, 200, false);
                     var le = Draw2D.ValidateLoop(fp);
                     if (le != null) throw new QueryException("filled_region: " + le);
                     break;
                 }
                 case "detail_line":
                 {
-                    var lp = OpCatalog.Points(o["puntos"], "detail_line puntos", 2, Draw2D.MaxVertices, false);
-                    Draw2D.Segments(lp, Arg.GetBool(o, "cerrado") == true, out var le);
+                    var lp = OpCatalog.Points(o["points"], "detail_line points", 2, Draw2D.MaxVertices, false);
+                    Draw2D.Segments(lp, Arg.GetBool(o, "closed") == true, out var le);
                     if (le != null) throw new QueryException("detail_line: " + le);
                     break;
                 }
                 case "detail_rect":
                 {
-                    var ec = OpCatalog.Points(o["esquinas"], "detail_rect esquinas", 2, 2, false);
+                    var ec = OpCatalog.Points(o["corners"], "detail_rect corners", 2, 2, false);
                     Draw2D.Rect(ec[0], ec[1], out var le);
                     if (le != null) throw new QueryException("detail_rect: " + le);
                     break;
                 }
                 case "detail_arc":
                 {
-                    OpCatalog.Point(o["centro"], "detail_arc centro", false);
-                    if (!Lengths.TryFeet(o["radio"], out var rad, out var rerr)) throw new QueryException("detail_arc radio: " + rerr);
-                    var a0 = OpCatalog.Number(o, "inicio", "detail_arc") ?? throw new QueryException("detail_arc: missing inicio (degrees)");
-                    var a1 = OpCatalog.Number(o, "fin", "detail_arc") ?? throw new QueryException("detail_arc: missing fin (degrees)");
+                    OpCatalog.Point(o["center"], "detail_arc center", false);
+                    if (!Lengths.TryFeet(o["radius"], out var rad, out var rerr)) throw new QueryException("detail_arc radius: " + rerr);
+                    var a0 = OpCatalog.Number(o, "start", "detail_arc") ?? throw new QueryException("detail_arc: missing start (degrees)");
+                    var a1 = OpCatalog.Number(o, "end", "detail_arc") ?? throw new QueryException("detail_arc: missing end (degrees)");
                     var ae = Draw2D.ValidateArc(rad, a0, a1);
                     if (ae != null) throw new QueryException("detail_arc: " + ae);
                     break;
                 }
                 case "detail_polygon":
                 {
-                    var pc = OpCatalog.Point(o["centro"], "detail_polygon centro", false);
-                    if (!Lengths.TryFeet(o["radio"], out var rad, out var rerr)) throw new QueryException("detail_polygon radio: " + rerr);
-                    var sides = OpCatalog.Number(o, "lados", "detail_polygon") ?? 0;
+                    var pc = OpCatalog.Point(o["center"], "detail_polygon center", false);
+                    if (!Lengths.TryFeet(o["radius"], out var rad, out var rerr)) throw new QueryException("detail_polygon radius: " + rerr);
+                    var sides = OpCatalog.Number(o, "sides", "detail_polygon") ?? 0;
                     Draw2D.RegularPolygon(pc, rad, (int)sides, OpCatalog.Number(o, "rot", "detail_polygon") ?? 0, out var pe);
                     if (pe != null) throw new QueryException("detail_polygon: " + pe);
                     break;
                 }
                 case "detail_component":
-                    OpCatalog.Point(o["punto"], "detail_component punto", false);
+                    OpCatalog.Point(o["point"], "detail_component point", false);
                     OpCatalog.Number(o, "rot", "detail_component");
                     break;
                 case "dimension":
                 {
-                    var dl = OpCatalog.Points(o["linea"], "dimension linea", 2, 2, false);
+                    var dl = OpCatalog.Points(o["line"], "dimension line", 2, 2, false);
                     Draw2D.Segments(dl, false, out var segErr);
-                    if (segErr != null) throw new QueryException("dimension linea: " + segErr);
+                    if (segErr != null) throw new QueryException("dimension line: " + segErr);
                     var refs = (Arg.GetString(o, "refs") ?? "").Split(',').Where(x => x.Trim().Length > 0).ToList();
                     if (refs.Count < 2) throw new QueryException("dimension refs: at least 2 detail line ids");
                     if (refs.Any(x => x.Trim().StartsWith("@", StringComparison.Ordinal))) throw new QueryException("dimension refs: in 0.8.0 only existing ids (no @n of the same plan): create the lines in one plan and dimension in the next");
                     break;
                 }
                 case "sheet_place":
-                    if (o.TryGetValue("punto", out var sp) && sp != null) OpCatalog.Point(sp, "sheet_place punto", false);
+                    if (o.TryGetValue("point", out var sp) && sp != null) OpCatalog.Point(sp, "sheet_place point", false);
                     break;
                 case "sheet_set":
                 {
-                    if (string.IsNullOrWhiteSpace(Arg.GetString(o, "nombre"))) throw new QueryException("sheet_set: missing nombre");
-                    var hs = o.TryGetValue("hojas", out var hv) && hv is List<object> hl ? hl.Select(x => Convert.ToString(x, System.Globalization.CultureInfo.InvariantCulture)?.Trim() ?? "").ToList() : null;
-                    if (hs == null || hs.Count == 0 || hs.Count > 1000 || hs.Any(x => x.Length == 0)) throw new QueryException("sheet_set hojas: list of 1 to 1000 sheets (number, name or id)");
-                    if (hs.Any(x => x.StartsWith("@", StringComparison.Ordinal))) throw new QueryException("sheet_set hojas: no @n; create the sheets in one plan and save the set in the next");
+                    if (string.IsNullOrWhiteSpace(Arg.GetString(o, "name"))) throw new QueryException("sheet_set: missing name");
+                    var hs = o.TryGetValue("sheets", out var hv) && hv is List<object> hl ? hl.Select(x => Convert.ToString(x, System.Globalization.CultureInfo.InvariantCulture)?.Trim() ?? "").ToList() : null;
+                    if (hs == null || hs.Count == 0 || hs.Count > 1000 || hs.Any(x => x.Length == 0)) throw new QueryException("sheet_set sheets: list of 1 to 1000 sheets (number, name or id)");
+                    if (hs.Any(x => x.StartsWith("@", StringComparison.Ordinal))) throw new QueryException("sheet_set sheets: no @n; create the sheets in one plan and save the set in the next");
                     break;
                 }
             }
@@ -375,7 +375,7 @@ namespace Bimbridge.Engine
         /// <summary>Element that changes; 0 if the entry creates a new one.</summary>
         public long Id;
         public string Op;
-        /// <summary>What changes: parameter name, "type", "elev", "ws", "exists", "loc", "nuevo"…</summary>
+        /// <summary>What changes: parameter name, "type", "elev", "ws", "exists", "loc", "new"…</summary>
         public string Key;
         /// <summary>Canonical value (text) when planned. On apply it is compared with the current one: if it differs, there is a conflict.</summary>
         public string Before;
@@ -407,14 +407,23 @@ namespace Bimbridge.Engine
             return d;
         }
 
+        /// <summary>Held plans written by 0.9.3 or earlier store view_create kinds with their legacy names.</summary>
+        private static object LegacyTargetValues(string op, object t)
+        {
+            if (op == "view_create" && t is IDictionary<string, object> d)
+                foreach (var k in new[] { "type", "option" })
+                    if (d.TryGetValue(k, out var v) && v is string s) d[k] = LegacyAliases.Token(s);
+            return t;
+        }
+
         public static PlanEntry FromJson(Dictionary<string, object> o) => new PlanEntry
         {
             Id = Arg.GetLong(o, "id") ?? 0,
             Op = Arg.GetString(o, "op"),
-            Key = Arg.GetString(o, "key"),
+            Key = LegacyAliases.EntryKey(Arg.GetString(o, "key")),
             Before = Arg.GetString(o, "before"),
             After = Arg.GetString(o, "after"),
-            Target = o.TryGetValue("target", out var t) ? t : null,
+            Target = o.TryGetValue("target", out var t) ? LegacyTargetValues(Arg.GetString(o, "op"), t) : null,
             OpIndex = (int)(Arg.GetLong(o, "n") ?? 0),
             Show = Arg.GetString(o, "show"),
             Ref = (int)(Arg.GetLong(o, "ref") ?? 0),
@@ -482,19 +491,19 @@ namespace Bimbridge.Engine
 
     public static class PlanStatus
     {
-        public const string Ready = "listo";            // planned, waiting for commit
-        public const string InProgress = "en_proceso";
-        public const string Held = "retenido";      // in the Revit queue, waiting for the user to apply it
-        public const string Applied = "aplicado";
-        public const string Conflict = "conflicto";
-        public const string RolledBack = "revertido";
-        public const string Discarded = "descartado";
-        public const string Expired = "vencido";
+        public const string Ready = "ready";            // planned, waiting for commit
+        public const string InProgress = "in_progress";
+        public const string Held = "held";      // in the Revit queue, waiting for the user to apply it
+        public const string Applied = "applied";
+        public const string Conflict = "conflict";
+        public const string RolledBack = "reverted";
+        public const string Discarded = "discarded";
+        public const string Expired = "expired";
         /// <summary>alpha3: result of commit modo=ensayo (applied, verified and REVERTED). Not a plan state:
-        /// the plan goes back to "listo". Never equivalent to applied.</summary>
-        public const string Trialed = "ensayado";
+        /// the plan goes back to "ready". Never equivalent to applied.</summary>
+        public const string Trialed = "trialed";
         /// <summary>Uncertain result already checked and recorded. Terminal: never returns to listo.</summary>
-        public const string Reconciled = "reconciliado";
+        public const string Reconciled = "reconciled";
     }
 
     public sealed class Plan : IJsonWritable
@@ -544,7 +553,7 @@ namespace Bimbridge.Engine
 
         public object ToJson() => new Dictionary<string, object>
         {
-            ["id"] = Id, ["session"] = SessionId, ["client"] = Client, ["doc_key"] = DocKey, ["doc_title"] = DocTitle, ["doc_id"] = DocId, ["tarea"] = Task,
+            ["id"] = Id, ["session"] = SessionId, ["client"] = Client, ["doc_key"] = DocKey, ["doc_title"] = DocTitle, ["doc_id"] = DocId, ["task"] = Task,
             ["summary"] = Summary, ["created_utc"] = CreatedUtc.ToString("o", CultureInfo.InvariantCulture),
             ["status"] = Status, ["status_detail"] = StatusDetail,
             ["held_utc"] = HeldUtc?.ToString("o", CultureInfo.InvariantCulture),
@@ -554,13 +563,13 @@ namespace Bimbridge.Engine
             ["created_by_op"] = CreatedByOp.ToDictionary(k => k.Key.ToString(CultureInfo.InvariantCulture), k => (object)k.Value.Cast<object>().ToList()),
             ["applied_batches"] = (long)AppliedBatches, ["total_batches"] = (long)TotalBatches,
             ["reconciliation"] = Reconciliation,
-            ["origen"] = BoundToken, ["origen_clave"] = BoundKey, ["origen_huella"] = BoundHash,
-            ["intento_id"] = ReceiptAttempt, ["intento_sesion"] = ReceiptSession, ["intento_agente"] = ReceiptAgent, ["intento_doc"] = ReceiptDocPrint,
+            ["origin"] = BoundToken, ["origin_key"] = BoundKey, ["origin_fingerprint"] = BoundHash,
+            ["attempt_id"] = ReceiptAttempt, ["attempt_session"] = ReceiptSession, ["attempt_agent"] = ReceiptAgent, ["attempt_doc"] = ReceiptDocPrint,
         };
 
         public static Plan FromJson(string json)
         {
-            var o = Json.ParseObject(json);
+            var o = LegacyAliases.NormalizeRecord(Json.ParseObject(json));
             var p = new Plan
             {
                 Id = Arg.GetString(o, "id"),
@@ -569,7 +578,7 @@ namespace Bimbridge.Engine
                 DocKey = Arg.GetString(o, "doc_key"),
                 DocTitle = Arg.GetString(o, "doc_title"),
                 DocId = Arg.GetString(o, "doc_id"),
-                Task = Arg.GetString(o, "tarea"),
+                Task = Arg.GetString(o, "task"),
                 Summary = Arg.GetString(o, "summary"),
                 CreatedUtc = DateTime.Parse(Arg.GetString(o, "created_utc") ?? DateTime.UtcNow.ToString("o"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
                 Status = Arg.GetString(o, "status") ?? PlanStatus.Held,
@@ -592,9 +601,9 @@ namespace Bimbridge.Engine
             p.AppliedBatches = (int)(Arg.GetLong(o, "applied_batches") ?? 0);
             p.TotalBatches = (int)(Arg.GetLong(o, "total_batches") ?? 0);
             if (o.TryGetValue("reconciliation", out var rec) && rec is Dictionary<string, object> recd) p.Reconciliation = recd;
-            p.BoundToken = Arg.GetString(o, "origen"); p.BoundKey = Arg.GetString(o, "origen_clave"); p.BoundHash = Arg.GetString(o, "origen_huella");
-            p.ReceiptAttempt = Arg.GetString(o, "intento_id"); p.ReceiptSession = Arg.GetString(o, "intento_sesion");
-            p.ReceiptAgent = Arg.GetString(o, "intento_agente"); p.ReceiptDocPrint = Arg.GetString(o, "intento_doc");
+            p.BoundToken = Arg.GetString(o, "origin"); p.BoundKey = Arg.GetString(o, "origin_key"); p.BoundHash = Arg.GetString(o, "origin_fingerprint");
+            p.ReceiptAttempt = Arg.GetString(o, "attempt_id"); p.ReceiptSession = Arg.GetString(o, "attempt_session");
+            p.ReceiptAgent = Arg.GetString(o, "attempt_agent"); p.ReceiptDocPrint = Arg.GetString(o, "attempt_doc");
             return p;
         }
 
@@ -604,31 +613,31 @@ namespace Bimbridge.Engine
             var d = new Dictionary<string, object>
             {
                 ["plan_id"] = Id,
-                ["estado_plan"] = Status,
-                ["elementos"] = (long)ElementCount,
-                ["cambios"] = (long)Entries.Count,
-                ["por_op"] = Entries.GroupBy(x => x.Op).ToDictionary(g => g.Key, g => (object)(long)g.Count()),
-                ["cols"] = new List<object> { "id", "op", "campo", "antes", "despues" },
-                ["filas"] = Entries.Take(maxRows).Select(x => (object)new object[]
+                ["plan_status"] = Status,
+                ["elements"] = (long)ElementCount,
+                ["changes"] = (long)Entries.Count,
+                ["per_op"] = Entries.GroupBy(x => x.Op).ToDictionary(g => g.Key, g => (object)(long)g.Count()),
+                ["cols"] = new List<object> { "id", "op", "field", "before", "after" },
+                ["rows"] = Entries.Take(maxRows).Select(x => (object)new object[]
                 {
-                    x.Ref > 0 ? "@" + x.Ref : x.Id == 0 ? (object)"nuevo" : x.Id, x.Op, x.Key,
+                    x.Ref > 0 ? "@" + x.Ref : x.Id == 0 ? (object)"new" : x.Id, x.Op, x.Key,
                     ResultTable.Trim(ShowValue(x, x.Before, true)), ResultTable.Trim(x.Show ?? ShowValue(x, x.After, false)),
                 }).ToList(),
             };
-            if (BoundKey != null) d["clave_vinculada"] = BoundKey;   // AUD-19: the commit uses it even if clave= is not passed
+            if (BoundKey != null) d["linked_key"] = BoundKey;   // AUD-19: the commit uses it even if clave= is not passed
             var created = CreationCount;
-            if (created > 0) d["nuevos"] = (long)created;
-            if (Entries.Count > maxRows) d["filas_omitidas"] = (long)(Entries.Count - maxRows);
-            if (Warnings.Count > 0) d["avisos"] = Warnings.Cast<object>().ToList();
-            if (!string.IsNullOrEmpty(StatusDetail)) d["detalle"] = StatusDetail;
+            if (created > 0) d["new_items"] = (long)created;
+            if (Entries.Count > maxRows) d["skipped_rows"] = (long)(Entries.Count - maxRows);
+            if (Warnings.Count > 0) d["warnings"] = Warnings.Cast<object>().ToList();
+            if (!string.IsNullOrEmpty(StatusDetail)) d["detail"] = StatusDetail;
             if (Created.Count > 0)
             {
-                d["creados"] = (long)Created.Count;
-                d["ids_creados"] = Created.Take(50).Cast<object>().ToList();
+                d["created"] = (long)Created.Count;
+                d["created_ids"] = Created.Take(50).Cast<object>().ToList();
             }
-            if (Verification != null) d["verificacion"] = Verification;
-            if (Reconciliation != null) d["reconciliacion"] = Reconciliation;
-            if (StorageWarning != null) d["almacenamiento"] = StorageWarning;
+            if (Verification != null) d["verification"] = Verification;
+            if (Reconciliation != null) d["reconciliation"] = Reconciliation;
+            if (StorageWarning != null) d["storage"] = StorageWarning;
             return d;
         }
 
@@ -638,7 +647,7 @@ namespace Bimbridge.Engine
             if (v == null) return "";
             if (before && e.Id == 0) return "—";
             if (v.StartsWith("\u0000", StringComparison.Ordinal)) return v.Substring(1);
-            if (e.Key == "exists") return v == "1" ? "existe" : "borrado";
+            if (e.Key == "exists") return v == "1" ? "exists" : "deleted";
             if ((e.Key == "elev" || e.Key == "offset") && double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var ft))
                 return Lengths.FeetInches16(ft) + " (" + Math.Round(ft, 4).ToString(CultureInfo.InvariantCulture) + " ft)";
             return v;
@@ -688,7 +697,7 @@ namespace Bimbridge.Engine
                 var root = Environment.GetEnvironmentVariable("BIMBRIDGE_HOME");
                 if (string.IsNullOrEmpty(root))
                     root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bimbridge");
-                return Path.Combine(root, "cola");
+                return LegacyAliases.ResolveExisting(root, Path.Combine(root, "queue"));
             }
         }
 
@@ -709,7 +718,7 @@ namespace Bimbridge.Engine
             lock (_lock) return _plans.TryGetValue(id.Trim(), out var p) ? p : null;
         }
 
-        /// <summary>Moves to "vencido" the ready plans older than the limit. Held plans do not expire.</summary>
+        /// <summary>Moves to "expired" the ready plans older than the limit. Held plans do not expire.</summary>
         public int ExpireOld(TimeSpan maxAge)
         {
             var n = 0;
@@ -868,25 +877,25 @@ namespace Bimbridge.Engine
             {
                 var record = new Dictionary<string, object>
                 {
-                    ["utc"] = _now().ToString("o", CultureInfo.InvariantCulture), ["autor"] = author, ["resultado"] = check.ToJson(),
+                    ["utc"] = _now().ToString("o", CultureInfo.InvariantCulture), ["author"] = author, ["result"] = check.ToJson(),
                 };
                 if (!check.Verified && check.Verdict != ReconcileCheck.ManualHuman)
                 {
                     lock (_lock)
                     {
                         if (p.Reconciliation == null) GroupAbort.PreserveInterrupted(p, "no prior evidence");
-                        if (!(p.Reconciliation.TryGetValue("intentos", out var a) && a is List<object> attempts)) p.Reconciliation["intentos"] = attempts = new List<object>();
+                        if (!(p.Reconciliation.TryGetValue("attempts", out var a) && a is List<object> attempts)) p.Reconciliation["attempts"] = attempts = new List<object>();
                         attempts.Add(record);
                     }
                     try { Persist(p); }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { lock (_lock) p.StorageWarning = "could not note the attempt: " + ex.Message; }
                     return;
                 }
-                var archive = new Dictionary<string, object> { ["registro"] = record, ["plan"] = Json.Parse(Json.Write(p)) };
+                var archive = new Dictionary<string, object> { ["record"] = record, ["plan"] = Json.Parse(Json.Write(p)) };
                 var stamp = _now().ToString("yyyyMMddHHmmssfff", CultureInfo.InvariantCulture);
                 try
                 {
-                    WriteFile(Path.Combine(DocDir(p.DocKey), "reconciliados", p.Id + "-" + stamp + ".json"), Json.Write(archive));
+                    WriteFile(Path.Combine(DocDir(p.DocKey), "reconciled", p.Id + "-" + stamp + ".json"), Json.Write(archive));
                     DeleteFile(p);
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
@@ -913,12 +922,12 @@ namespace Bimbridge.Engine
             if (string.IsNullOrWhiteSpace(justification)) throw new ArgumentException("missing justification");
             if (fileName != Path.GetFileName(fileName) || !fileName.StartsWith("P-", StringComparison.Ordinal)) throw new ArgumentException("invalid file: " + fileName);
             var src = Path.Combine(docDir, fileName);
-            var dest = Path.Combine(docDir, "cuarentena");
+            var dest = LegacyAliases.ResolveExisting(docDir, Path.Combine(docDir, "quarantine"));
             Directory.CreateDirectory(dest);
             var stamp = _now().ToString("yyyyMMddHHmmssfff", CultureInfo.InvariantCulture);
-            WriteFile(Path.Combine(dest, fileName + "." + stamp + ".registro.json"), Json.Write(new Dictionary<string, object>
+            WriteFile(Path.Combine(dest, fileName + "." + stamp + ".record.json"), Json.Write(new Dictionary<string, object>
             {
-                ["utc"] = _now().ToString("o", CultureInfo.InvariantCulture), ["autor"] = author, ["justificacion"] = justification, ["archivo"] = fileName,
+                ["utc"] = _now().ToString("o", CultureInfo.InvariantCulture), ["author"] = author, ["justification"] = justification, ["file"] = fileName,
                 ["sha256"] = Home.FileSha256(src),
             }));
             File.Move(src, Path.Combine(dest, fileName + "." + stamp));
@@ -935,7 +944,7 @@ namespace Bimbridge.Engine
                 var limit = DateTime.UtcNow + LockWait;
                 while (handle == null)
                 {
-                    try { handle = new FileStream(Path.Combine(dir, ".bloqueo"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
+                    try { handle = new FileStream(Path.Combine(dir, ".lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
                     catch (IOException) when (DateTime.UtcNow < limit) { System.Threading.Thread.Sleep(25); }
                 }
             }

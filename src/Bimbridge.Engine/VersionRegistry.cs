@@ -13,7 +13,7 @@ namespace Bimbridge.Engine
     public sealed class VersionRegistry
     {
         /// <summary>Author used when the change was not made by any MCP session (operator by hand, Undo, another add-in).</summary>
-        public const string HumanAuthor = "usuario";
+        public const string HumanAuthor = "user";
 
         private readonly object _lock = new object();
         private readonly Dictionary<long, Entry> _elements = new Dictionary<long, Entry>();

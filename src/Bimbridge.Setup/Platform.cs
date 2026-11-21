@@ -48,7 +48,7 @@ namespace Bimbridge.Setup
         public static FileStream LockInstallation(SetupPaths paths)
         {
             Directory.CreateDirectory(paths.Home);
-            return new FileStream(Path.Combine(paths.Home, "instalador.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            return new FileStream(Path.Combine(paths.Home, "installer.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         }
 
         // ---------------- Claude Code ----------------
@@ -272,7 +272,7 @@ namespace Bimbridge.Setup
                     // 0.6.0: compact diagnostics (installed / loaded / bridge / hashes / restart pending). Read-only.
                     var text = Bimbridge.Protocol.Json.Write(core.Diagnose());
                     Directory.CreateDirectory(paths.Home);
-                    File.WriteAllText(Path.Combine(paths.Home, "diagnostico.json"), text);
+                    File.WriteAllText(Path.Combine(paths.Home, "diagnostics.json"), text);
                     Console.WriteLine(text);
                     return 0;
                 }
@@ -299,7 +299,7 @@ namespace Bimbridge.Setup
                 var conflicts = core.DetectConflicts(Platform.ProductVersion);
                 if (conflicts.Count > 0 && !c.Replace)
                 {
-                    Console.Error.WriteLine("Nothing was installed: " + string.Join("; ", conflicts) + ". If this is a lab profile and you want to replace it, repeat with /reemplazar (a backup is created).");
+                    Console.Error.WriteLine("Nothing was installed: " + string.Join("; ", conflicts) + ". If this is a lab profile and you want to replace it, repeat with /replace (a backup is created).");
                     return 5;
                 }
                 if (Platform.RevitRunning())
@@ -333,7 +333,7 @@ namespace Bimbridge.Setup
             var undo = InstallBackup.Restore(paths, dir, DateTime.UtcNow);
             if (!SetupPaths.IsSandbox && !File.Exists(paths.InstallRecord)) { Platform.UnregisterClaude(); Platform.UnregisterUninstall(); }
             Console.WriteLine("Restored from " + dir);
-            Console.WriteLine("To undo: /restaurar=\"" + undo + "\"");
+            Console.WriteLine("To undo: /restore=\"" + undo + "\"");
             return 0;
         }
 
@@ -390,13 +390,13 @@ namespace Bimbridge.Setup
                 CachedSetup = v => { var f = paths.CachedSetup(v); return File.Exists(f) ? f : null; },
                 Log = Console.WriteLine,
             };
-            // 0.9.0: current keys and profile (not those in pendiente.json) to re-verify provenance right before installing.
+            // 0.9.0: current keys and profile (not those in pending.json) to re-verify provenance right before installing.
             UpdateConfig.Load(UpdateConfig.DefaultPath, out var keys, out var policy);
             host.Keys = () => keys;
             host.Policy = () => policy;
             var r = PendingApplier.Run(paths.UpdatesDir, host, TimeSpan.FromHours(24));
-            var status = Convert.ToString(r["estado"]);
-            return Report(paths, status == "aplicada_verificada" ? 0 : 1, "ZIP: " + status + " — " + r["mensaje"]);
+            var status = Convert.ToString(r["status"]);
+            return Report(paths, status == "applied_verified" ? 0 : 1, "ZIP: " + status + " — " + r["message"]);
         }
 
         private static int Report(SetupPaths p, int code, string text)
@@ -404,7 +404,7 @@ namespace Bimbridge.Setup
             try
             {
                 Directory.CreateDirectory(p.UpdatesDir);
-                File.WriteAllText(Path.Combine(p.UpdatesDir, "ultima.txt"), code + "\n" + DateTime.Now.ToString("yyyy-MM-dd HH:mm") + "\n" + text);
+                File.WriteAllText(Path.Combine(p.UpdatesDir, "last.txt"), code + "\n" + DateTime.Now.ToString("yyyy-MM-dd HH:mm") + "\n" + text);
             }
             catch (Exception) { }
             (code == 0 ? Console.Out : Console.Error).WriteLine(text);

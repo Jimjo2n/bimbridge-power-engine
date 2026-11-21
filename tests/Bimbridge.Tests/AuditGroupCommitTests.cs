@@ -59,7 +59,7 @@ namespace Bimbridge.Tests
             Assert.True(v.Ok, string.Join("; ", v.Errors));
             Assert.Equal(2, v.Lines);
             var last = Lines(p).Last();
-            Assert.Equal("b", Arg.GetString(last, "autor"));
+            Assert.Equal("b", Arg.GetString(last, "author"));
             Assert.False(string.IsNullOrEmpty(Arg.GetString(last, "cid")));   // entry that went through the queue: identifiable
             Assert.Empty(Pending(p));
         }
@@ -87,7 +87,7 @@ namespace Bimbridge.Tests
             Assert.Equal(new long[] { 2, 3, 4, 5 }, seqs.OrderBy(x => x).ToArray());
             Assert.Equal(seqs.Count, seqs.Distinct().Count());
             var lines = Lines(p);
-            Assert.Equal(new[] { "s", "w1", "w2", "w3", "w4" }, lines.Select(l => Arg.GetString(l, "autor")).ToArray());
+            Assert.Equal(new[] { "s", "w1", "w2", "w3", "w4" }, lines.Select(l => Arg.GetString(l, "author")).ToArray());
             for (var i = 0; i < 4; i++) Assert.Equal(seqs[i], Convert.ToInt64(lines[i + 1]["seq"]));   // each writer gets ITS seq
             Assert.True(AuditLog.Verify(p).Ok);
         }
@@ -119,7 +119,7 @@ namespace Bimbridge.Tests
             Task<long> t;
             using (HoldLock(p))
             {
-                t = Task.Run(() => b.Append("b", "intencion_x", "intencion"));
+                t = Task.Run(() => b.Append("b", "intent_x", "intent"));
                 WaitFor(() => Pending(p).Length == 1, "entry queued");
                 // A leader claims it (same primitive: exclusive open that deletes on close) and "crashes" before writing and confirming.
                 using (new FileStream(Pending(p)[0], FileMode.Open, FileAccess.Read, FileShare.None, 4096, FileOptions.DeleteOnClose)) { }
@@ -128,7 +128,7 @@ namespace Bimbridge.Tests
                 Assert.Contains("claimed", ex.InnerException.Message);
             }
             Assert.Single(Lines(p));                           // the follower does not rewrite it: no duplicates
-            b.Append("b", "despues", "ok");
+            b.Append("b", "after", "ok");
             Assert.Equal(2, AuditLog.Verify(p).Lines);
         }
 
@@ -163,9 +163,9 @@ namespace Bimbridge.Tests
             Task<long> tf, tl;
             using (HoldLock(p))
             {
-                tl = Task.Run(() => leader.Append("lider", "op", "ok"));
+                tl = Task.Run(() => leader.Append("leader", "op", "ok"));
                 WaitFor(() => Pending(p).Length == 1, "leader queued");
-                tf = Task.Run(() => follower.Append("seguidor", "op", "ok"));
+                tf = Task.Run(() => follower.Append("follower", "op", "ok"));
                 WaitFor(() => Pending(p).Length == 2, "follower queued");
             }
             // Whoever takes the lock first writes the batch. If it is the faulty leader, both get an error; if it is the follower, it writes both
@@ -189,17 +189,17 @@ namespace Bimbridge.Tests
             var id = Guid.NewGuid().ToString("N");
             File.WriteAllText(Path.Combine(p + ".pend", DateTime.UtcNow.Ticks.ToString("D19") + "-" + id + ".json"), Json.Write(new Dictionary<string, object>
             {
-                ["id"] = id, ["autor"] = "muerto", ["op"] = "exec", ["estado"] = "intencion", ["pid"] = 1L, ["t"] = "2026-11-10T00:00:00Z",
-                ["extra"] = new Dictionary<string, object> { ["intencion"] = "abc123", ["objetivo"] = "doc" },
+                ["id"] = id, ["author"] = "dead", ["op"] = "exec", ["status"] = "intent", ["pid"] = 1L, ["t"] = "2026-11-10T00:00:00Z",
+                ["extra"] = new Dictionary<string, object> { ["intent"] = "abc123", ["target"] = "doc" },
             }), new UTF8Encoding(false));
             var c = new AuditLog(p);
             Assert.Equal(3, c.Append("c", "op", "ok"));       // the next leader writes the orphan entry first, then its own
             var lines = Lines(p);
-            Assert.Equal(new[] { "s", "muerto", "c" }, lines.Select(l => Arg.GetString(l, "autor")).ToArray());
+            Assert.Equal(new[] { "s", "dead", "c" }, lines.Select(l => Arg.GetString(l, "author")).ToArray());
             Assert.Equal(id, Arg.GetString(lines[1], "cid"));
             Assert.True(AuditLog.Verify(p).Ok);
             // The orphan intent has no result: it stays pending reconciliation, never as completed.
-            Assert.Contains(AuditLog.PendingIntents(p), x => Arg.GetString(x, "intencion") == "abc123");
+            Assert.Contains(AuditLog.PendingIntents(p), x => Arg.GetString(x, "intent") == "abc123");
         }
 
         [Fact]

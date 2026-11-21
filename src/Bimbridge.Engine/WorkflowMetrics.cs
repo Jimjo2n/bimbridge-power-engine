@@ -51,12 +51,12 @@ namespace Bimbridge.Engine
         {
             var d = new Dictionary<string, object>
             {
-                ["observadas"] = Names.Where(_observed.ContainsKey).ToDictionary(n => n, n => (object)_observed[n]),
+                ["observed"] = Names.Where(_observed.ContainsKey).ToDictionary(n => n, n => (object)_observed[n]),
             };
-            if (_estimated.Count > 0) d["estimadas"] = Names.Where(_estimated.ContainsKey).ToDictionary(n => n, n => (object)_estimated[n]);
+            if (_estimated.Count > 0) d["estimated"] = Names.Where(_estimated.ContainsKey).ToDictionary(n => n, n => (object)_estimated[n]);
             var missing = Names.Where(n => !_observed.ContainsKey(n) && !_estimated.ContainsKey(n)).ToList();
-            if (missing.Count > 0) d["no_instrumentadas"] = missing.Cast<object>().ToList();
-            if (_observed.TryGetValue("payload_bytes", out var b)) d["tokens_estimados"] = b / 4;
+            if (missing.Count > 0) d["not_instrumented"] = missing.Cast<object>().ToList();
+            if (_observed.TryGetValue("payload_bytes", out var b)) d["estimated_tokens"] = b / 4;
             return d;
         }
     }

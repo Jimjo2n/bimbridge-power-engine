@@ -77,17 +77,17 @@ namespace BimBridge.PowerEngine.Workflows
                 if (lead[i]) leaders++;
                 outTags.Add(new Dictionary<string, object>
                 {
-                    ["id"] = t.Id, ["centro_in"] = new List<object> { R((b.X0 + b.X1) / 2), R((b.Y0 + b.Y1) / 2) },
+                    ["id"] = t.Id, ["center_in"] = new List<object> { R((b.X0 + b.X1) / 2), R((b.Y0 + b.Y1) / 2) },
                     ["offset_in"] = new List<object> { R((b.X0 + b.X1) / 2 - t.X), R((b.Y0 + b.Y1) / 2 - t.Y) },
-                    ["leader"] = lead[i], ["colision"] = collide,
+                    ["leader"] = lead[i], ["collision"] = collide,
                 });
             }
             return new Dictionary<string, object>
             {
-                ["etiquetas"] = outTags, ["colisiones"] = (long)collisions, ["con_leader"] = (long)leaders,
-                ["legible"] = textHeightIn + 1e-9 >= MinTextHeightIn,
-                ["altura_texto_in"] = R(textHeightIn),
-                ["nota"] = "Proposal in paper inches (offset = what tag/tag_move uses). Placing and verifying in Revit remains NATIVE_TEST_PENDING.",
+                ["tags_list"] = outTags, ["collisions"] = (long)collisions, ["with_leader"] = (long)leaders,
+                ["readable"] = textHeightIn + 1e-9 >= MinTextHeightIn,
+                ["text_height_in"] = R(textHeightIn),
+                ["note"] = "Proposal in paper inches (offset = what tag/tag_move uses). Placing and verifying in Revit remains NATIVE_TEST_PENDING.",
             };
         }
 

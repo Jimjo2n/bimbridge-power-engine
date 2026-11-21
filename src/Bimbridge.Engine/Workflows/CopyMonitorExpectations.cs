@@ -74,15 +74,15 @@ namespace Bimbridge.Engine.Workflows
 
         public string ToText() => Json.Write(new Dictionary<string, object>
         {
-            ["esquema"] = Schema, ["anfitrion"] = HostIdentity, ["vinculo"] = LinkIdentity, ["revision_vinculo"] = LinkRevision, ["categoria"] = Category,
-            ["transformacion"] = new Dictionary<string, object>
+            ["schema"] = Schema, ["host"] = HostIdentity, ["link"] = LinkIdentity, ["link_revision"] = LinkRevision, ["category"] = Category,
+            ["transformation"] = new Dictionary<string, object>
             {
                 ["dx"] = Transform.Dx, ["dy"] = Transform.Dy, ["dz"] = Transform.Dz, ["rot"] = Transform.RotationDeg,
                 ["bx"] = Vec(Transform.BasisX), ["by"] = Vec(Transform.BasisY), ["bz"] = Vec(Transform.BasisZ),
             },
-            ["mapeo"] = Mappings.Select(m => (object)new Dictionary<string, object> { ["origen"] = m.Source, ["destino"] = m.Target, ["excluido"] = m.Excluded }).ToList(),
-            ["origen"] = Source.OrderBy(s => s.UniqueId, StringComparer.Ordinal).Select(s => (object)new List<object> { s.UniqueId, s.Category, s.Family, s.Type, s.Level, s.X, s.Y, s.Z, s.RotationDeg }).ToList(),
-            ["huella_origen"] = SourceFingerprint, ["huella"] = Fingerprint,
+            ["mapping"] = Mappings.Select(m => (object)new Dictionary<string, object> { ["origin"] = m.Source, ["target"] = m.Target, ["excluded"] = m.Excluded }).ToList(),
+            ["origin"] = Source.OrderBy(s => s.UniqueId, StringComparer.Ordinal).Select(s => (object)new List<object> { s.UniqueId, s.Category, s.Family, s.Type, s.Level, s.X, s.Y, s.Z, s.RotationDeg }).ToList(),
+            ["origin_fingerprint"] = SourceFingerprint, ["fingerprint"] = Fingerprint,
         });
 
         private static object Vec(double[] a) => a == null ? null : (object)a.Select(x => (object)x).ToList();
@@ -95,19 +95,19 @@ namespace Bimbridge.Engine.Workflows
             try
             {
                 var d = Json.ParseObject(text);
-                if (Arg.GetString(d, "esquema") != Schema) throw new System.IO.InvalidDataException("expectations with unknown schema");
-                var t = (Dictionary<string, object>)d["transformacion"];
+                if (Arg.GetString(d, "schema") != Schema) throw new System.IO.InvalidDataException("expectations with unknown schema");
+                var t = (Dictionary<string, object>)d["transformation"];
                 var e = new CopyMonitorExpectations
                 {
-                    HostIdentity = Arg.GetString(d, "anfitrion"), LinkIdentity = Arg.GetString(d, "vinculo"), LinkRevision = Arg.GetString(d, "revision_vinculo"), Category = Arg.GetString(d, "categoria"),
+                    HostIdentity = Arg.GetString(d, "host"), LinkIdentity = Arg.GetString(d, "link"), LinkRevision = Arg.GetString(d, "link_revision"), Category = Arg.GetString(d, "category"),
                     Transform = new LinkTransform { Dx = D(t["dx"]), Dy = D(t["dy"]), Dz = D(t["dz"]), RotationDeg = D(t["rot"]), BasisX = Arr(t["bx"]), BasisY = Arr(t["by"]), BasisZ = Arr(t["bz"]) },
-                    Mappings = ((List<object>)d["mapeo"]).Cast<Dictionary<string, object>>().Select(m => new TypeMapping { Source = Arg.GetString(m, "origen"), Target = Arg.GetString(m, "destino"), Excluded = Arg.GetBool(m, "excluido") == true }).ToList(),
-                    Source = ((List<object>)d["origen"]).Cast<List<object>>().Select(r => new SourceFixture
+                    Mappings = ((List<object>)d["mapping"]).Cast<Dictionary<string, object>>().Select(m => new TypeMapping { Source = Arg.GetString(m, "origin"), Target = Arg.GetString(m, "target"), Excluded = Arg.GetBool(m, "excluded") == true }).ToList(),
+                    Source = ((List<object>)d["origin"]).Cast<List<object>>().Select(r => new SourceFixture
                     {
                         UniqueId = (string)r[0], Category = (string)r[1], Family = (string)r[2], Type = (string)r[3], Level = (string)r[4], X = D(r[5]), Y = D(r[6]), Z = D(r[7]), RotationDeg = D(r[8]),
                     }).ToList(),
                 };
-                if (e.Fingerprint != Arg.GetString(d, "huella")) throw new System.IO.InvalidDataException("the saved expectations do not match their fingerprint");
+                if (e.Fingerprint != Arg.GetString(d, "fingerprint")) throw new System.IO.InvalidDataException("the saved expectations do not match their fingerprint");
                 return e;
             }
             catch (Exception ex) when (ex is FormatException || ex is InvalidCastException || ex is KeyNotFoundException || ex is ArgumentException || ex is InvalidOperationException)

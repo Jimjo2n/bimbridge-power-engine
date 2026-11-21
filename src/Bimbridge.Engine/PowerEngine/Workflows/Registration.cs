@@ -18,8 +18,8 @@ namespace BimBridge.PowerEngine.Workflows
 
     public sealed class RegistrationOptions
     {
-        /// <summary>"semejanza" (uniform scale + rotation + translation; the usual case for a scaled drawing) or "afin" (6 parameters).</summary>
-        public string Mode = "semejanza";
+        /// <summary>"similarity" (uniform scale + rotation + translation; the usual case for a scaled drawing) or "affine" (6 parameters).</summary>
+        public string Mode = "similarity";
         /// <summary>Maximum acceptable residual per anchor, in feet (default 3").</summary>
         public double TolFt = 0.25;
         /// <summary>Expected Revit scale (96 = 1/8"=1'-0") read from the titleblock; null = not cross-checked.</summary>
@@ -36,7 +36,7 @@ namespace BimBridge.PowerEngine.Workflows
     {
         public string Name; public double ResidualFt; public bool Used; public bool Outlier;
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
-        { ["ancla"] = Name, ["residuo_ft"] = Math.Round(ResidualFt, 5), ["usada"] = Used, ["invalida"] = Outlier };
+        { ["anchor"] = Name, ["residual_ft"] = Math.Round(ResidualFt, 5), ["used"] = Used, ["invalid"] = Outlier };
     }
 
     public sealed class RegistrationResult
@@ -55,11 +55,11 @@ namespace BimBridge.PowerEngine.Workflows
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["estado"] = State, ["motivo"] = Reason, ["matriz"] = M?.Select(v => (object)Math.Round(v, 12)).ToList(),
-            ["pies_por_pt"] = Math.Round(FtPerPt, 9), ["escala_revit"] = Math.Round(RevitScale, 3), ["giro_deg"] = Math.Round(RotationDeg, 4),
-            ["traslacion_ft"] = new List<object> { Math.Round(Tx, 5), Math.Round(Ty, 5) }, ["reflejado"] = Reflected,
-            ["rms_ft"] = Math.Round(RmsFt, 5), ["max_ft"] = Math.Round(MaxFt, 5), ["anclas"] = Anchors.Select(a => (object)a.ToJson()).ToList(),
-            ["avisos"] = Warnings.Cast<object>().ToList(),
+            ["status"] = State, ["reason"] = Reason, ["matrix"] = M?.Select(v => (object)Math.Round(v, 12)).ToList(),
+            ["feet_per_pt"] = Math.Round(FtPerPt, 9), ["revit_scale"] = Math.Round(RevitScale, 3), ["rotation_deg"] = Math.Round(RotationDeg, 4),
+            ["translation_ft"] = new List<object> { Math.Round(Tx, 5), Math.Round(Ty, 5) }, ["reflected"] = Reflected,
+            ["rms_ft"] = Math.Round(RmsFt, 5), ["max_ft"] = Math.Round(MaxFt, 5), ["anchors"] = Anchors.Select(a => (object)a.ToJson()).ToList(),
+            ["warnings"] = Warnings.Cast<object>().ToList(),
         };
     }
 
@@ -79,15 +79,15 @@ namespace BimBridge.PowerEngine.Workflows
         public static RegistrationResult Solve(IList<Anchor> anchors, RegistrationOptions o = null)
         {
             o = o ?? new RegistrationOptions();
-            var affine = string.Equals(o.Mode, "afin", StringComparison.OrdinalIgnoreCase);
+            var affine = string.Equals(o.Mode, "affine", StringComparison.OrdinalIgnoreCase);
             var min = affine ? 3 : 2;
             var res = new RegistrationResult();
             var list = (anchors ?? new List<Anchor>()).Where(a => a != null).ToList();
             foreach (var a in list)
-                if (!Finite(a.Px, a.Py, a.Mx, a.My)) return Fail(res, "ancla_invalida", "anchor " + a.Name + " has non-finite coordinates");
+                if (!Finite(a.Px, a.Py, a.Mx, a.My)) return Fail(res, "invalid_anchor", "anchor " + a.Name + " has non-finite coordinates");
             var dupNames = list.GroupBy(a => a.Name ?? "").Where(g => g.Count() > 1 && g.Key.Length > 0).Select(g => g.Key).ToList();
-            if (dupNames.Count > 0) return Fail(res, "ancla_invalida", "repeated anchors: " + string.Join(", ", dupNames));
-            if (list.Count < min) return Fail(res, "anclas_insuficientes", "at least " + min + " anchors are needed (" + o.Mode + "); there are " + list.Count);
+            if (dupNames.Count > 0) return Fail(res, "invalid_anchor", "repeated anchors: " + string.Join(", ", dupNames));
+            if (list.Count < min) return Fail(res, "insufficient_anchors", "at least " + min + " anchors are needed (" + o.Mode + "); there are " + list.Count);
 
             var used = new List<Anchor>(list);
             var outliers = new HashSet<Anchor>();
@@ -97,7 +97,7 @@ namespace BimBridge.PowerEngine.Workflows
             {
                 string err;
                 m = affine ? FitAffine(used, out err) : FitSimilarity(used, o.AllowReflection, out refl, out err);
-                if (m == null) return Fail(res, "degenerado", err);
+                if (m == null) return Fail(res, "degenerate", err);
                 var worst = used.OrderByDescending(a => Residual(m, a)).First();
                 var wr = Residual(m, worst);
                 // with exactly the minimum number of anchors the residual is 0 by construction: a bad anchor cannot be detected
@@ -120,9 +120,9 @@ namespace BimBridge.PowerEngine.Workflows
             if (outliers.Count > 0) res.Warnings.Add("invalid anchors discarded: " + string.Join(", ", outliers.Select(a => a.Name)));
             if (refl) res.Warnings.Add("the best solution is a reflection: the page or the model is mirrored");
 
-            if (res.MaxFt > o.TolFt) Fail(res, "residuo_excesivo", "maximum residual " + res.MaxFt.ToString("0.###", CultureInfo.InvariantCulture) + " ft > " + o.TolFt.ToString("0.###", CultureInfo.InvariantCulture) + " ft with " + used.Count + " anchors");
+            if (res.MaxFt > o.TolFt) Fail(res, "excessive_residual", "maximum residual " + res.MaxFt.ToString("0.###", CultureInfo.InvariantCulture) + " ft > " + o.TolFt.ToString("0.###", CultureInfo.InvariantCulture) + " ft with " + used.Count + " anchors");
             else if (o.ExpectedRevitScale.HasValue && Math.Abs(res.RevitScale / o.ExpectedRevitScale.Value - 1) > o.ScaleTolerance)
-                Fail(res, "escala_incoherente", "measured scale 1:" + res.RevitScale.ToString("0.##", CultureInfo.InvariantCulture) + " versus 1:" + o.ExpectedRevitScale.Value.ToString("0.##", CultureInfo.InvariantCulture) + " from the titleblock: mismatched anchors or sheet not to scale");
+                Fail(res, "inconsistent_scale", "measured scale 1:" + res.RevitScale.ToString("0.##", CultureInfo.InvariantCulture) + " versus 1:" + o.ExpectedRevitScale.Value.ToString("0.##", CultureInfo.InvariantCulture) + " from the titleblock: mismatched anchors or sheet not to scale");
             res.M = o.LinkTransform != null ? BimBridge.PowerEngine.GeometryKernels.Compose(o.LinkTransform, m) : m;
             return res;
         }

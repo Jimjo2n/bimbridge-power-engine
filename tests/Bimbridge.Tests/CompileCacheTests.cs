@@ -58,7 +58,7 @@ namespace Bimbridge.Tests
             Assert.Equal(1, cache.Failures);
             Assert.Same(u, cache.GetOrCompile("k", () => throw new InvalidOperationException("must not compile"), out var fc3));
             Assert.True(fc3);
-            Assert.Equal(1L, (long)cache.Stats()["guardados"]);
+            Assert.Equal(1L, (long)cache.Stats()["saved_items"]);
         }
 
         [Fact]
@@ -117,7 +117,7 @@ namespace Bimbridge.Tests
         public void EntryLimit_IsExactUnderConcurrentDistinctKeys_AndFailuresFreeTheirSlot()
         {
             var cache = new CompileCache<Unit>(maxEntries: 10);
-            Assert.Null(cache.GetOrCompile("falla", null, () => null, out _, out _));   // a failure does not use up a slot
+            Assert.Null(cache.GetOrCompile("fail", null, () => null, out _, out _));   // a failure does not use up a slot
             var ok = 0;
             var threads = Enumerable.Range(0, 64).Select(i => new Thread(() =>
             {

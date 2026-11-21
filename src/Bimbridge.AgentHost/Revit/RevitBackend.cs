@@ -85,11 +85,11 @@ namespace Bimbridge.AgentHost
             var rec = new Dictionary<string, object>
             {
                 ["t"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture), ["op"] = op, ["ms"] = sw.ElapsedMilliseconds,
-                ["bytes_peticion"] = (long)reqBytes, ["bytes_respuesta"] = (long)Json.Write(r.ToJson()).Length, ["estado"] = r.State,
+                ["request_bytes"] = (long)reqBytes, ["response_bytes"] = (long)Json.Write(r.ToJson()).Length, ["status"] = r.State,
                 ["pid"] = (long)(_c.Instance?.Pid ?? ExpectedPid), ["pipe"] = _c.FixedTarget?.Pipe,
             };
-            if (attempts > 1) rec["intentos"] = (long)attempts;
-            if (args != null && args.TryGetValue("modo", out var m)) rec["modo"] = m;
+            if (attempts > 1) rec["attempts"] = (long)attempts;
+            if (args != null && args.TryGetValue("mode", out var m)) rec["mode"] = m;
             Calls.Add(rec);
             OnCall?.Invoke(rec);
             return r;
@@ -143,58 +143,58 @@ namespace Bimbridge.AgentHost
 
         private RevitBackend(RevitLink link, string mode) { _link = link; WriteMode = mode; }
 
-        /// <summary>Connects and pins identity. mode: "ensayo" | "persistente" | "lectura".</summary>
+        /// <summary>Connects and pins identity. mode: "trial" | "persistent" | "read".</summary>
         public static RevitBackend Open(RevitLink link, string mode, out string error)
         {
             error = null;
-            if (mode != "ensayo" && mode != "persistente" && mode != "lectura") { error = "mode must be lectura, ensayo or persistente"; return null; }
+            if (mode != "trial" && mode != "persistent" && mode != "read") { error = "mode must be read, trial or persistent"; return null; }
             var b = new RevitBackend(link, mode);
             var r = link.Call(Wire.OpContext, new Dictionary<string, object>(), false);
             if (r.State != Status.Ok || !(r.Data is Dictionary<string, object> d)) { error = "context: " + r.State + " " + r.Warning; return null; }
             b.Context = d;
             var pid = Arg.GetLong(d, "pid");
             if (pid != link.ExpectedPid) { error = "the Revit that answered has pid " + pid + ", not " + link.ExpectedPid + "; not continuing"; return null; }
-            b.DocKey = Arg.GetString(d, "clave_doc");
-            b.DocPrint = Arg.GetString(d, "huella_doc");
+            b.DocKey = Arg.GetString(d, "doc_key");
+            b.DocPrint = Arg.GetString(d, "doc_fingerprint");
             b._docHandle = Arg.GetString(d, "doc");
-            if (b.DocKey == null || b._docHandle == null) { error = "the add-in did not report the active document identity (clave_doc/doc): add-in older than alpha3 or no document"; return null; }
-            if (mode != "lectura")
+            if (b.DocKey == null || b._docHandle == null) { error = "the add-in did not report the active document identity (doc_key/doc): add-in older than alpha3 or no document"; return null; }
+            if (mode != "read")
             {
                 // rc1 P0 fail-closed: a missing or non-boolean flag is NOT "safe"; the explicit value is required.
-                foreach (var flag in new[] { "worksharing", "solo_lectura", "modificado", "retener" })
+                foreach (var flag in new[] { "worksharing", "read_only", "modified", "hold" })
                     if (Arg.GetBool(d, flag) == null) { error = "the add-in did not report '" + flag + "' as a boolean; without it nothing is written (fail-closed)"; return null; }
                 if (string.IsNullOrEmpty(b.DocPrint)) { error = "the add-in did not report the document fingerprint; without strong identity nothing is written"; return null; }
-                var levels = Arg.GetString(d, "niveles_mcp") ?? "";
+                var levels = Arg.GetString(d, "mcp_levels") ?? "";
                 if (levels.IndexOf('W') < 0) { error = "the add-in of that Revit does not allow changes (levels " + levels + "); the user decides that"; return null; }
             }
-            if (mode == "persistente")
+            if (mode == "persistent")
             {
-                if (Arg.GetBool(d, "worksharing") != false) { error = "persistente rejected: the document is workshared"; return null; }
-                if (Arg.GetBool(d, "solo_lectura") != false) { error = "persistente rejected: read-only document"; return null; }
-                var docPath = Arg.GetString(d, "ruta") ?? "";
+                if (Arg.GetBool(d, "worksharing") != false) { error = "persistent rejected: the document is workshared"; return null; }
+                if (Arg.GetBool(d, "read_only") != false) { error = "persistent rejected: read-only document"; return null; }
+                var docPath = Arg.GetString(d, "path") ?? "";
                 if (docPath.Length == 0 || docPath.StartsWith("BIM 360", StringComparison.OrdinalIgnoreCase) || docPath.StartsWith("Autodesk Docs", StringComparison.OrdinalIgnoreCase) || b.DocKey.StartsWith("nube:", StringComparison.OrdinalIgnoreCase))
-                { error = "persistente rejected: the document is not a local file (" + docPath + ")"; return null; }
-                if (Arg.GetBool(d, "retener") != false || (Arg.GetLong(d, "cola_retenida") ?? 0) > 0)
-                { error = "persistente rejected: Hold/queue active in Revit (the user would apply the change later; it cannot be reconciled)"; return null; }
+                { error = "persistent rejected: the document is not a local file (" + docPath + ")"; return null; }
+                if (Arg.GetBool(d, "hold") != false || (Arg.GetLong(d, "held_queue") ?? 0) > 0)
+                { error = "persistent rejected: Hold/queue active in Revit (the user would apply the change later; it cannot be reconciled)"; return null; }
             }
             return b;
         }
 
         // =====================================================================================================
 
-        public const string QcLightingTags = "qc_luminarias_tags";
+        public const string QcLightingTags = "qc_fixture_tags";
 
-        private static bool IsWrite(ValidatedOp op) => op.Operation == "fijar_parametro" || op.Operation == "fijar_parametro_lote";
+        private static bool IsWrite(ValidatedOp op) => op.Operation == "set_parameter" || op.Operation == "set_parameter_batch";
 
         /// <summary>Expected value per id: the same one for fijar_parametro; the one from the map for fijar_parametro_lote.</summary>
         private static Func<long, string> Expected(ValidatedOp op)
         {
-            if (op.Operation == "fijar_parametro_lote")
+            if (op.Operation == "set_parameter_batch")
             {
-                var map = ((IDictionary<string, object>)op.Params["valores"]).ToDictionary(kv => long.Parse(kv.Key, CultureInfo.InvariantCulture), kv => Values.Show(kv.Value));
+                var map = ((IDictionary<string, object>)op.Params["values"]).ToDictionary(kv => long.Parse(kv.Key, CultureInfo.InvariantCulture), kv => Values.Show(kv.Value));
                 return id => map.TryGetValue(id, out var v) ? v : null;
             }
-            var value = Values.Show(op.Params["valor"]);
+            var value = Values.Show(op.Params["value"]);
             return _ => value;
         }
 
@@ -202,17 +202,17 @@ namespace Bimbridge.AgentHost
         private ExecResult RunQc(ValidatedOp op, out long deviations)
         {
             deviations = -1;
-            var a = new Dictionary<string, object> { [Wire.DocArg] = _docHandle, ["name"] = "lighting_audit", ["tags"] = "uno" };
-            var lvl = op.ScopeValue("nivel"); if (lvl != null) a["lvl"] = new List<object> { lvl };
+            var a = new Dictionary<string, object> { [Wire.DocArg] = _docHandle, ["name"] = "lighting_audit", ["tags"] = "one" };
+            var lvl = op.ScopeValue("level"); if (lvl != null) a["lvl"] = new List<object> { lvl };
             var r = _link.Call(Wire.OpCheck, a, false);
             if (r.State != Status.Ok || !(r.Data is Dictionary<string, object> d)) return ExecResult.Fail(ErrorClass.BackendRejection, "check: " + r.State + " " + r.Warning);
             long N(string k, string f = "n") => d.TryGetValue(k, out var v) && v is Dictionary<string, object> b ? (Arg.GetLong(b, f) ?? -1) : -1;
-            var untagged = N("sin_tag"); var orphans = N("tags_huerfanos"); var dup = N("tags_duplicados", "sobrantes");
-            if (untagged < 0 || orphans < 0 || dup < 0) return ExecResult.Fail(ErrorClass.BackendRejection, "check: incomplete add-in response (sin_tag/tags_huerfanos/tags_duplicados); not certified");
+            var untagged = N("untagged"); var orphans = N("orphan_tags"); var dup = N("duplicate_tags", "leftovers");
+            if (untagged < 0 || orphans < 0 || dup < 0) return ExecResult.Fail(ErrorClass.BackendRejection, "check: incomplete add-in response (untagged/orphan_tags/duplicate_tags); not certified");
             deviations = untagged + orphans + dup;
             var ok = new ExecResult { Ok = true };
-            ok.Data["desviaciones"] = deviations; ok.Data["sin_tag"] = untagged; ok.Data["tags_huerfanos"] = orphans; ok.Data["tags_duplicados_sobrantes"] = dup;
-            ok.Data["luminarias"] = Arg.GetLong(d, "luminarias") ?? -1;
+            ok.Data["deviations"] = deviations; ok.Data["untagged"] = untagged; ok.Data["orphan_tags"] = orphans; ok.Data["leftover_duplicate_tags"] = dup;
+            ok.Data["fixtures"] = Arg.GetLong(d, "fixtures") ?? -1;
             return ok;
         }
 
@@ -226,15 +226,15 @@ namespace Bimbridge.AgentHost
         {
             switch (op.Operation)
             {
-                case "consultar": return null;
-                case "fijar_parametro":
-                    if (op.Param("unidades") != "texto") return "no_soportado_alpha3: fijar_parametro against Revit only with unidades=texto (values with units are compared in alpha2/beta1)";
-                    if (op.Params.ContainsKey("tolerancia")) return "no_soportado_alpha3: tolerancia does not apply to text";
+                case "query_check": return null;
+                case "set_parameter":
+                    if (op.Param("units") != "text") return "no_soportado_alpha3: set_parameter against Revit only with units=text (values with units are compared in alpha2/beta1)";
+                    if (op.Params.ContainsKey("tolerance")) return "no_soportado_alpha3: tolerance does not apply to text";
                     return null;
-                case "fijar_parametro_lote": return null;   // text values per id (validated by IrValidator)
-                case "verificar_qc":
-                    return op.Param("receta") == QcLightingTags ? null : "no_soportado_rc1: verificar_qc against Revit only with receta=" + QcLightingTags + " (read-only)";
-                case "verificar_independiente": return null;
+                case "set_parameter_batch": return null;   // text values per id (validated by IrValidator)
+                case "verify_qc":
+                    return op.Param("recipe") == QcLightingTags ? null : "no_soportado_rc1: verify_qc against Revit only with recipe=" + QcLightingTags + " (read-only)";
+                case "verify_independent": return null;
                 default: return "no_soportado_rc1: " + op.Operation + " is not in the alpha3 Revit catalog";
             }
         }
@@ -242,12 +242,12 @@ namespace Bimbridge.AgentHost
         /// <summary>Reads (ids, parameter value) from the operation scope. Read-only.</summary>
         private List<(long Id, string Value)> Read(ValidatedOp op, out string error)
         {
-            var rows = ReadRows(op, new[] { op.Param("parametro") }, out error);
+            var rows = ReadRows(op, new[] { op.Param("parameter") }, out error);
             if (rows == null) return null;
             var res = rows.Select(r => (r.Id, r.Values[0])).ToList();
             var ids = ScopeIds(op);
             if (ids != null && (res.Count != ids.Count || res.Any(x => !ids.Contains(x.Item1))))
-            { error = "alcance.ids: the document does not contain exactly those elements with that filter (" + res.Count + "/" + ids.Count + ")"; return null; }
+            { error = "scope.ids: the document does not contain exactly those elements with that filter (" + res.Count + "/" + ids.Count + ")"; return null; }
             return res;
         }
 
@@ -259,8 +259,8 @@ namespace Bimbridge.AgentHost
             var a = new Dictionary<string, object> { [Wire.DocArg] = _docHandle, ["page_size"] = (long)AddinMaxPageSize, ["f"] = f };
             var ids = ScopeIds(op);
             if (ids != null) a["ids"] = ids.Select(x => (object)x.ToString(CultureInfo.InvariantCulture)).ToList();
-            var cat = op.ScopeValue("categoria"); if (cat != null) a["cat"] = new List<object> { cat };
-            var lvl = op.ScopeValue("nivel"); if (lvl != null) a["lvl"] = new List<object> { lvl };
+            var cat = op.ScopeValue("category"); if (cat != null) a["cat"] = new List<object> { cat };
+            var lvl = op.ScopeValue("level"); if (lvl != null) a["lvl"] = new List<object> { lvl };
             var r = _link.Call(Wire.OpQuery, a, false);
             if (r.State != Status.Ok || !(r.Data is Dictionary<string, object> d)) { error = "query: " + r.State + " " + r.Warning; return null; }
             var total = Arg.GetLong(d, "total");
@@ -303,26 +303,26 @@ namespace Bimbridge.AgentHost
         private ExecResult RunIndependent(ValidatedOp op, out long deviations)
         {
             deviations = -1;
-            var keyParam = op.Param("parametro_clave");
-            var attr = op.Param("parametro");
+            var keyParam = op.Param("key_parameter");
+            var attr = op.Param("parameter");
             var fields = attr == null ? new[] { keyParam } : new[] { keyParam, attr };
             var rows = ReadRows(op, fields, out var err);
             if (rows == null) return ExecResult.Fail(ErrorClass.BackendRejection, err);
             var input = new Engine.Workflow.IndependentVerifier.Input
             {
-                ExpectedSource = new Engine.Workflow.SourceRef { Id = op.Param("fuente_id"), Kind = op.Param("fuente_tipo"), Revision = op.Param("fuente_revision"),
-                                                                 Sha256 = op.Param("fuente_sha256"), DerivedFrom = SplitList(op.Param("fuente_derivada_de")) },
-                BuildSources = { new Engine.Workflow.SourceRef { Id = op.Param("fuente_construccion"), Sha256 = op.Param("fuente_construccion_sha256"), DerivedFrom = SplitList(op.Param("construccion_derivada_de")) } },
-                BuildPlanFingerprint = op.Param("huella_plan"), RequiredRevision = op.Param("revision_exigida"),
+                ExpectedSource = new Engine.Workflow.SourceRef { Id = op.Param("source_id"), Kind = op.Param("source_type_kind"), Revision = op.Param("source_revision"),
+                                                                 Sha256 = op.Param("source_sha256"), DerivedFrom = SplitList(op.Param("source_derived_from")) },
+                BuildSources = { new Engine.Workflow.SourceRef { Id = op.Param("source_construction"), Sha256 = op.Param("source_construction_sha256"), DerivedFrom = SplitList(op.Param("construction_derived_from")) } },
+                BuildPlanFingerprint = op.Param("plan_fingerprint"), RequiredRevision = op.Param("required_revision"),
                 CompareAttrs = attr == null ? new string[0] : new[] { attr },
             };
-            foreach (var kv in (IDictionary<string, object>)op.Params["esperado"])
+            foreach (var kv in (IDictionary<string, object>)op.Params["expected"])
             {
                 var it = new Engine.Workflow.IndependentVerifier.Item { Key = kv.Key };
                 if (attr != null) it.Attrs[attr] = Values.Show(kv.Value);
                 input.Expected.Add(it);
             }
-            if (op.Params.TryGetValue("excepciones", out var ex) && ex is IDictionary<string, object> exm)
+            if (op.Params.TryGetValue("exceptions", out var ex) && ex is IDictionary<string, object> exm)
                 foreach (var kv in exm) input.Exceptions[kv.Key] = Values.Show(kv.Value);
             foreach (var row in rows)
             {
@@ -332,10 +332,10 @@ namespace Bimbridge.AgentHost
                 input.Observed.Add(it);
             }
             var v = Engine.Workflow.IndependentVerifier.Verify(input);
-            if (v.State != "ok" && v.State != "diferencias") return ExecResult.Fail(ErrorClass.Precondition, "verificar_independiente: " + v.State + " — " + v.Reason);
+            if (v.State != "ok" && v.State != "differences") return ExecResult.Fail(ErrorClass.Precondition, "verify_independent: " + v.State + " — " + v.Reason);
             deviations = v.Missing.Count + v.Extra.Count + v.Duplicates.Count + v.Mismatches.Count;
             var ok = new ExecResult { Ok = true };
-            ok.Data["desviaciones"] = deviations;
+            ok.Data["deviations"] = deviations;
             foreach (var kv in v.ToJson()) ok.Data[kv.Key] = kv.Value;
             return ok;
         }
@@ -344,14 +344,14 @@ namespace Bimbridge.AgentHost
         {
             var u = Unsupported(op);
             if (u != null) return new Preflight { Error = u };
-            if (op.Operation == "consultar")
+            if (op.Operation == "query_check")
             {
-                var r = _link.Call(Wire.OpQuery, new Dictionary<string, object> { [Wire.DocArg] = _docHandle, ["cat"] = new List<object> { op.Param("categoria") }, ["count"] = true }, false);
+                var r = _link.Call(Wire.OpQuery, new Dictionary<string, object> { [Wire.DocArg] = _docHandle, ["cat"] = new List<object> { op.Param("category") }, ["count"] = true }, false);
                 if (r.State != Status.Ok || !(r.Data is Dictionary<string, object> d)) return new Preflight { Error = "query: " + r.State + " " + r.Warning };
                 return new Preflight { Targets = (int)(Arg.GetLong(d, "total") ?? 0) };
             }
-            if (op.Operation == "verificar_qc" || op.Operation == "verificar_independiente") return new Preflight { Targets = 1 };
-            if (WriteMode == "lectura") return new Preflight { Error = "writes not authorized by the operator (lectura mode)" };
+            if (op.Operation == "verify_qc" || op.Operation == "verify_independent") return new Preflight { Targets = 1 };
+            if (WriteMode == "read") return new Preflight { Error = "writes not authorized by the operator (read mode)" };
             var rows = Read(op, out var err);
             if (rows == null) return new Preflight { Error = err };
             if (rows.Count > MaxTargets) return new Preflight { Error = "maximum " + MaxTargets + " targets per operation (the plan diff is checked row by row); there are " + rows.Count };
@@ -360,17 +360,17 @@ namespace Bimbridge.AgentHost
 
         public ExecResult Execute(ValidatedOp op, ExecContext ctx)
         {
-            if (op.Operation == "consultar")
+            if (op.Operation == "query_check")
             {
                 var p = Prepare(op);
                 if (p.Error != null) return ExecResult.Fail(ErrorClass.BackendRejection, p.Error);
                 var ok = new ExecResult { Ok = true };
-                ok.Data["elementos"] = (long)p.Targets;
+                ok.Data["elements"] = (long)p.Targets;
                 return ok;
             }
-            if (op.Operation == "verificar_qc") return RunQc(op, out _);
-            if (op.Operation == "verificar_independiente") return RunIndependent(op, out _);
-            var param = op.Param("parametro");
+            if (op.Operation == "verify_qc") return RunQc(op, out _);
+            if (op.Operation == "verify_independent") return RunIndependent(op, out _);
+            var param = op.Param("parameter");
             var expected = Expected(op);
             // 1. baseline (before any write): values and relations the trial must restore
             var rows = Read(op, out var err);
@@ -382,7 +382,7 @@ namespace Bimbridge.AgentHost
             // 2. typed plan (does not write; the add-in validates parameter type, read-only, edit permissions)
             // rc1: one plan with one set_param operation per distinct value (batch = several values, a single commit/TransactionGroup).
             var groups = bl.Ids.GroupBy(i => expected(i)).ToList();
-            if (groups.Any(g => g.Key == null)) return ExecResult.Fail(ErrorClass.Precondition, "fijar_parametro_lote: there are targets with no value in the map");
+            if (groups.Any(g => g.Key == null)) return ExecResult.Fail(ErrorClass.Precondition, "set_parameter_batch: there are targets with no value in the map");
             var opsJson = groups.Select(g => (object)new Dictionary<string, object> { ["op"] = "set_param", ["ids"] = string.Join(",", g), ["name"] = param, ["value"] = g.Key }).ToList();
             var pr = _link.Call(Wire.OpPlan, new Dictionary<string, object>
             {
@@ -399,37 +399,37 @@ namespace Bimbridge.AgentHost
             var unchanged = bl.Ids.Where(i => bl.Values[i] == expected(i)).ToList();
             var expectChanged = bl.Ids.Count - unchanged.Count;
             if (planned.Count != expectChanged)
-            { Drop(planId); return ExecResult.Fail(ErrorClass.Precondition, "the add-in planned " + planned.Count + " changes and " + expectChanged + " were expected" + " (" + Arg.GetString(pd, "detalle") + ")"); }
+            { Drop(planId); return ExecResult.Fail(ErrorClass.Precondition, "the add-in planned " + planned.Count + " changes and " + expectChanged + " were expected" + " (" + Arg.GetString(pd, "detail") + ")"); }
             if (expectChanged == 0)
             {
                 Drop(planId);
                 var same = new ExecResult { Ok = true };
-                same.Data["elementos"] = (long)bl.Ids.Count; same.Data["cambiados"] = 0L; same.Data["ya_estaba"] = true;
-                if (WriteMode == "ensayo") { same.Data["ensayo"] = true; _trialEvidence[op.Id] = new Dictionary<string, object> { ["sin_cambios"] = true }; }
+                same.Data["elements"] = (long)bl.Ids.Count; same.Data["changed"] = 0L; same.Data["already_there"] = true;
+                if (WriteMode == "trial") { same.Data["trial"] = true; _trialEvidence[op.Id] = new Dictionary<string, object> { ["unchanged"] = true }; }
                 return same;
             }
 
             // 4. commit (trial or apply). From here on, a transport failure = uncertain effect.
             var args = new Dictionary<string, object> { ["plan_id"] = planId };
-            if (WriteMode == "ensayo") args["modo"] = "ensayo";
+            if (WriteMode == "trial") args["mode"] = "trial";
             else args[Wire.KeyArg] = op.Id + "#" + ctx.Fencing.ToString(CultureInfo.InvariantCulture);
             Faults.Hit("backend.antes_enviar", op.Id);
             var cr = _link.Call(Wire.OpCommit, args, true);
-            Faults.Hit("backend.tras_commit", op.Id);   // the add-in may have applied and the AgentHost crashes before recording
+            Faults.Hit("backend.after_commit", op.Id);   // the add-in may have applied and the AgentHost crashes before recording
             if (Faults.Fire("backend.respuesta_perdida", op.Id))   // NRT-07: the add-in applied, but the IPC response is lost
                 cr = Response.Fail(cr.Id, Status.Unknown, "simulated: commit response lost in the pipe (the real effect is unknown)");
             var cd = cr.Data as Dictionary<string, object>;
-            if (WriteMode == "ensayo")
+            if (WriteMode == "trial")
             {
-                if (cr.State == "ensayado" && cd != null)
+                if (cr.State == "trialed" && cd != null)
                 {
-                    var trial = cd.TryGetValue("ensayo", out var ev) ? ev as Dictionary<string, object> : null;
+                    var trial = cd.TryGetValue("trial", out var ev) ? ev as Dictionary<string, object> : null;
                     var res = new ExecResult { Ok = true };
-                    res.Data["elementos"] = (long)bl.Ids.Count;
-                    res.Data["cambiados"] = (long)planned.Count;
-                    res.Data["ensayo"] = true;
+                    res.Data["elements"] = (long)bl.Ids.Count;
+                    res.Data["changed"] = (long)planned.Count;
+                    res.Data["trial"] = true;
                     res.Data["plan_id"] = planId;
-                    if (trial != null) res.Data["evidencia_addin"] = trial;
+                    if (trial != null) res.Data["addin_evidence"] = trial;
                     _trialEvidence[op.Id] = trial ?? new Dictionary<string, object>();
                     return res;
                 }
@@ -440,10 +440,10 @@ namespace Bimbridge.AgentHost
             if (cr.State == Status.Ok && cd != null)
             {
                 var res = new ExecResult { Ok = true };
-                res.Data["elementos"] = (long)bl.Ids.Count;
-                res.Data["cambiados"] = (long)planned.Count;
+                res.Data["elements"] = (long)bl.Ids.Count;
+                res.Data["changed"] = (long)planned.Count;
                 res.Data["plan_id"] = planId;
-                if (cd.TryGetValue("verificacion", out var vv)) res.Data["verificacion_addin"] = vv;
+                if (cd.TryGetValue("verification", out var vv)) res.Data["addin_verification"] = vv;
                 return res;
             }
             if (cr.State == Status.Conflict || cr.State == Status.RolledBack || cr.State == Status.Invalid || cr.State == Status.Rejected)
@@ -454,11 +454,11 @@ namespace Bimbridge.AgentHost
         private static List<long> PlannedIds(Dictionary<string, object> pd)
         {
             var ids = new List<long>();
-            if (pd.TryGetValue("filas", out var f) && f is List<object> rows)
+            if (pd.TryGetValue("rows", out var f) && f is List<object> rows)
                 foreach (var row in rows.OfType<List<object>>())
                     if (row.Count > 0 && row[0] is long l) ids.Add(l);
-            var total = Arg.GetLong(pd, "cambios") ?? ids.Count;
-            if (total != ids.Count) throw new InvalidOperationException("the plan returned " + total + " changes but only " + ids.Count + " rows (filas_omitidas); alpha3 requires seeing all of them");
+            var total = Arg.GetLong(pd, "changes") ?? ids.Count;
+            if (total != ids.Count) throw new InvalidOperationException("the plan returned " + total + " changes but only " + ids.Count + " rows (skipped_rows); alpha3 requires seeing all of them");
             return ids;
         }
 
@@ -479,7 +479,7 @@ namespace Bimbridge.AgentHost
             if (rows.Count == 0) return new Observation { Effect = Effect.NoTargets, Detail = "the scope selects no elements" };
             var have = rows.Count(x => x.Value == expected(x.Id));
             _baselines.TryGetValue(op.Id, out var bl);
-            if (WriteMode == "ensayo")
+            if (WriteMode == "trial")
             {
                 // a trial never leaves an effect: if the baseline exists and matches, there was no persistent effect.
                 if (bl != null && rows.All(x => bl.Values.TryGetValue(x.Id, out var b0) && b0 == x.Value)) return new Observation { Effect = Effect.NotObserved, Detail = "trial: the model matches the baseline" };
@@ -493,10 +493,10 @@ namespace Bimbridge.AgentHost
 
         public PostcheckResult CheckPostconditions(ValidatedOp op, ExecContext ctx)
         {
-            if (op.Operation == "consultar") return new PostcheckResult { State = PostState.Satisfied, Detail = "query" };
-            if (op.Operation == "verificar_qc" || op.Operation == "verificar_independiente")
+            if (op.Operation == "query_check") return new PostcheckResult { State = PostState.Satisfied, Detail = "query" };
+            if (op.Operation == "verify_qc" || op.Operation == "verify_independent")
             {
-                var q = op.Operation == "verificar_qc" ? RunQc(op, out var dev) : RunIndependent(op, out dev);
+                var q = op.Operation == "verify_qc" ? RunQc(op, out var dev) : RunIndependent(op, out dev);
                 if (!q.Ok) return new PostcheckResult { State = PostState.NotEvaluable, Detail = q.Error ?? "check without data" };
                 var pq = new PostcheckResult { State = dev == 0 ? PostState.Satisfied : PostState.NotSatisfied, Detail = "deviations = " + dev };
                 foreach (var kv in q.Data) pq.Evidence[kv.Key] = kv.Value;
@@ -506,29 +506,29 @@ namespace Bimbridge.AgentHost
             if (rows == null) return new PostcheckResult { State = PostState.NotEvaluable, Detail = err };
             var expected = Expected(op);
             var post = new PostcheckResult();
-            post.Evidence["releidos"] = (long)rows.Count;
-            if (WriteMode == "ensayo")
+            post.Evidence["reread"] = (long)rows.Count;
+            if (WriteMode == "trial")
             {
                 if (!_baselines.TryGetValue(op.Id, out var bl) || !_trialEvidence.TryGetValue(op.Id, out var ev))
                     return new PostcheckResult { State = PostState.NotEvaluable, Detail = "no baseline or trial evidence in this process (it restarted): not certified" };
                 var restored = rows.Count(x => bl.Values.TryGetValue(x.Id, out var b0) && b0 == x.Value);
-                post.Evidence["restaurados_relectura"] = (long)restored;
-                post.Evidence["linea_base"] = bl.Ids.Select(i => (object)(i + "=" + (bl.Values[i] ?? "<null>"))).ToList();
+                post.Evidence["restored_reread"] = (long)restored;
+                post.Evidence["baseline"] = bl.Ids.Select(i => (object)(i + "=" + (bl.Values[i] ?? "<null>"))).ToList();
                 foreach (var kv in ev) post.Evidence["addin_" + kv.Key] = kv.Value;
-                var noChanges = ev.ContainsKey("sin_cambios");
-                var group = ev.TryGetValue("grupo_estado", out var g) ? Convert.ToString(g, CultureInfo.InvariantCulture) : null;
-                var tempOk = ev.TryGetValue("temporal_ok", out var t) && t is bool tb && tb;
-                var restOk = ev.TryGetValue("restauracion_ok", out var ro) && ro is bool rb && rb;
+                var noChanges = ev.ContainsKey("unchanged");
+                var group = ev.TryGetValue("group_status", out var g) ? Convert.ToString(g, CultureInfo.InvariantCulture) : null;
+                var tempOk = ev.TryGetValue("temporary_ok", out var t) && t is bool tb && tb;
+                var restOk = ev.TryGetValue("restoration_ok", out var ro) && ro is bool rb && rb;
                 var ok = restored == rows.Count && rows.Count == bl.Ids.Count && (noChanges || (group == "RolledBack" && tempOk && restOk));
                 post.State = ok ? PostState.Satisfied : PostState.NotSatisfied;
                 post.Detail = ok ? (noChanges ? "no changes needed; model intact" : "temporary value verified by the add-in, group " + group + ", independent re-read = baseline (" + restored + "/" + rows.Count + ")")
-                                 : "group " + (group ?? "?") + ", temporal_ok " + tempOk + ", add-in restoration " + restOk + ", re-read " + restored + "/" + rows.Count;
+                                 : "group " + (group ?? "?") + ", temporary_ok " + tempOk + ", add-in restoration " + restOk + ", re-read " + restored + "/" + rows.Count;
                 return post;
             }
             var have = rows.Count(x => x.Value == expected(x.Id));
-            post.Evidence["con_valor"] = (long)have;
+            post.Evidence["with_value"] = (long)have;
             post.State = have == rows.Count ? PostState.Satisfied : PostState.NotSatisfied;
-            post.Detail = have + "/" + rows.Count + " targets with " + op.Param("parametro") + " = expected value";
+            post.Detail = have + "/" + rows.Count + " targets with " + op.Param("parameter") + " = expected value";
             return post;
         }
 

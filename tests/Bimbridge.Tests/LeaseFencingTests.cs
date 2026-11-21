@@ -50,7 +50,7 @@ namespace Bimbridge.Tests
             var root = NewRoot();
             var startAt = DateTime.UtcNow.AddSeconds(4).Ticks.ToString();
             // Generous lock wait: a STOREERR from a saturated CPU is not what is measured here (see the next case).
-            var procs = Enumerable.Range(0, 20).Select(i => Start("180000", new[] { root, "t1", "dueno" + i, "acquire", "60000", startAt })).ToList();
+            var procs = Enumerable.Range(0, 20).Select(i => Start("180000", new[] { root, "t1", "owner" + i, "acquire", "60000", startAt })).ToList();
             var outs = procs.Select(p => { var o = p.StandardOutput.ReadToEnd().Trim(); p.WaitForExit(240000); p.Dispose(); return o; }).ToList();
             var seen = string.Join(" | ", outs.GroupBy(o => o).Select(g => g.Count() + "x " + g.Key));
             Assert.True(outs.Count(o => o.StartsWith("WIN")) == 1, seen);
@@ -108,7 +108,7 @@ namespace Bimbridge.Tests
         public void Lease_LegacyFileWithoutFencing_ReadsAsZero_NextAcquireIsOne()
         {
             var root = NewRoot(); Directory.CreateDirectory(Path.Combine(root, "t"));
-            File.WriteAllText(Path.Combine(root, "t", "lease.json"), "{\"dueno\":\"X\",\"instancia\":\"i\",\"vence\":\"2000-01-01T00:00:00Z\"}");
+            File.WriteAllText(Path.Combine(root, "t", "lease.json"), "{\"owner\":\"X\",\"instance\":\"i\",\"expires\":\"2000-01-01T00:00:00Z\"}");
             var s = new TaskStore(root);
             Assert.Equal(0, s.GetCurrentLease("t").Fencing);
             Assert.True(s.TryLease("t", "Y", "i", TimeSpan.FromMinutes(1), DateTime.UtcNow, out var l));

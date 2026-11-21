@@ -58,48 +58,48 @@ namespace Bimbridge.AgentHost
             var cmd = a.Length > 0 ? a[0] : "";
             switch (cmd)
             {
-                case "validar":
+                case "validate":
                 {
                     var errs = IrValidator.Validate(PlanDraft.Parse(File.ReadAllText(a[1])), out var vp);
                     Console.WriteLine(errs.Count == 0 ? "valid " + vp.Hash + " · " + vp.Ops.Count + " operations" : string.Join(Environment.NewLine, errs));
                     return errs.Count == 0 ? 0 : 1;
                 }
-                case "modelo":
+                case "model":
                 {
-                    if (a.Length >= 3 && a[1] == "crear")
+                    if (a.Length >= 3 && a[1] == "create")
                     {
                         var cfg = Opt(a, "--config");
                         DurableSimModel.Create(a[2], Opt(a, "--clave"), Opt(a, "--huella"), Multi(a, "--elementos"), cfg == null ? null : Json.ParseObject(cfg));
                         Console.WriteLine("model created " + a[2]);
                         return 0;
                     }
-                    if (a.Length >= 3 && a[1] == "compactar") { DurableSimModel.Open(a[2]).Compact(); Console.WriteLine("compacted"); return 0; }
+                    if (a.Length >= 3 && a[1] == "compact") { DurableSimModel.Open(a[2]).Compact(); Console.WriteLine("compacted"); return 0; }
                     break;
                 }
-                case "ejecutar":
+                case "run":
                     if (a.Length >= 3) return Execute(a);
                     break;
-                case "estado":
+                case "status":
                     if (a.Length >= 2) return Inspect(a);
                     break;
-                case "pausar":
-                case "reanudar":
-                case "cancelar":
+                case "pause":
+                case "resume":
+                case "cancel":
                     if (a.Length >= 2) return Control(a);
                     break;
-                case "servicio":
+                case "service":
                     if (a.Length >= 2) return ServiceMain.Run(a[1], Opt(a, "--tuberia", "Bimbridge.AgentHost." + Environment.UserName), int.Parse(Opt(a, "--cola", "16")), int.Parse(Opt(a, "--trabajadores", "2")));
                     break;
-                case "cliente":
+                case "client":
                     if (a.Length >= 3) { Console.WriteLine(ServiceClient.Send(a[1], a[2], TimeSpan.FromSeconds(30))); return 0; }
                     break;
-                case "documento":
+                case "document":
                     if (a.Length >= 2) return DocumentCli.Run(a);
                     break;
                 case "plan-store":
                     if (a.Length >= 2) return PlanStoreCli.Run(a);
                     break;
-                case "escenario":
+                case "scenario":
                     if (a.Length >= 2) { Console.WriteLine(Scenario.Generate(a[1], int.Parse(Opt(a, "--n", "1000")))); return 0; }
                     break;
                 case "revit":
@@ -134,24 +134,24 @@ namespace Bimbridge.AgentHost
                     Console.WriteLine(Json.Write(MountKernelBench.Run(int.Parse(Opt(a, "--puntos", "20000")), int.Parse(Opt(a, "--triangulos", "20000")), int.Parse(Opt(a, "--rondas", "5")))));
                     return 0;
             }
-            Console.Error.WriteLine("usage: validar | modelo crear|compactar | ejecutar [--revit-pid N --escritura lectura|ensayo|persistente] | revit instancias|identidad|nrt04 | estado | pausar | reanudar | cancelar | servicio | cliente | documento | escenario | banco-kernel | power-engine estado|bench|calibrar | paquete-actualizacion | generar-clave");
+            Console.Error.WriteLine("usage: validate | model create|compact | run [--revit-pid N --escritura read|trial|persistent] | revit instances|identity|nrt04 | status | pause | resume | cancel | service | client | document | scenario | banco-kernel | power-engine status|bench|calibrate | paquete-actualizacion | generar-clave");
             return 64;
         }
 
-        /// <summary>power-engine estado | bench [--rondas 5 --docx f --pdf f --salida f.json] | calibrar --salida calibracion.json</summary>
+        /// <summary>power-engine estado | bench [--rondas 5 --docx f --pdf f --salida f.json] | calibrate --out calibration.json</summary>
         private static int PowerEngineCli(string[] a)
         {
             var baseDir = AppContext.BaseDirectory;
             var cfg = Bimbridge.Engine.EngineConfig.Load();
             var opt = BimBridge.PowerEngine.PowerCommands.OptionsFrom(cfg, baseDir);
             opt.PythonExe = Opt(a, "--python", opt.PythonExe); opt.PythonWorkerScript = Opt(a, "--worker-python", opt.PythonWorkerScript); opt.RustWorkerExe = Opt(a, "--rust-worker", opt.RustWorkerExe);
-            var sub = a.Length > 1 ? a[1] : "estado";
-            if (sub == "estado")
+            var sub = a.Length > 1 ? a[1] : "status";
+            if (sub == "status")
             {
                 using (var pe = new BimBridge.PowerEngine.PowerEngineDispatcher(opt)) Console.WriteLine(Json.Write(pe.Status()));
                 return 0;
             }
-            if (sub == "bench" || sub == "calibrar")
+            if (sub == "bench" || sub == "calibrate")
             {
                 var s = new BimBridge.PowerEngine.PowerEngineBench.Settings
                 {
@@ -159,13 +159,13 @@ namespace Bimbridge.AgentHost
                     DocxPath = Opt(a, "--docx"), PdfPath = Opt(a, "--pdf"), IncludeIpc = sub == "bench",
                 };
                 var r = BimBridge.PowerEngine.PowerEngineBench.Run(s);
-                var outText = Json.Write(sub == "calibrar" ? r["calibracion"] : r);
+                var outText = Json.Write(sub == "calibrate" ? r["calibration"] : r);
                 var path = Opt(a, "--salida");
                 if (path != null) File.WriteAllText(path, outText);
                 Console.WriteLine(outText);
                 return 0;
             }
-            if (sub == "flujo-pdf")
+            if (sub == "workflow-pdf")
             {
                 // power-engine flujo-pdf --pdf f.pdf --pagina 1 --nivel "LEVEL 09" --reglas reglas.json --ejes model_grids_090.json --salida DIR
                 // Writes DIR/plan.json (summary) and DIR/ops.json (list of place ops for plan→commit; campaign: --var ops=@DIR/ops.json).
@@ -186,11 +186,11 @@ namespace Bimbridge.AgentHost
                     r.Remove("ops");
                     File.WriteAllText(Path.Combine(dir, "plan.json"), Json.Write(r));
                     File.WriteAllText(Path.Combine(dir, "ops.json"), Json.Write(ops));
-                    Console.WriteLine(Json.Write(new Dictionary<string, object> { ["estado"] = r["estado"], ["ops"] = (long)ops.Count, ["salida"] = Path.GetFullPath(dir) }));
-                    return Arg.GetString(r, "estado")?.StartsWith("listo", StringComparison.Ordinal) == true ? 0 : 3;
+                    Console.WriteLine(Json.Write(new Dictionary<string, object> { ["status"] = r["status"], ["ops"] = (long)ops.Count, ["out"] = Path.GetFullPath(dir) }));
+                    return Arg.GetString(r, "status")?.StartsWith("ready", StringComparison.Ordinal) == true ? 0 : 3;
                 }
             }
-            Console.Error.WriteLine("usage: power-engine estado | flujo-pdf --pdf f --nivel N --reglas r.json --ejes e.json --salida DIR | bench [--rondas N --docx f --pdf f --salida f.json] | calibrar [--salida f.json]");
+            Console.Error.WriteLine("usage: power-engine status | workflow-pdf --pdf f --nivel N --reglas r.json --ejes e.json --salida DIR | bench [--rondas N --docx f --pdf f --salida f.json] | calibrate [--salida f.json]");
             return 64;
         }
 
@@ -211,12 +211,12 @@ namespace Bimbridge.AgentHost
             {
                 if (NativeGate.Check(a) is int blocked) return blocked;
                 // alpha3: real Revit. The operator chooses pid and mode; the plan cannot widen them.
-                var mode = Opt(a, "--escritura", "lectura");
+                var mode = Opt(a, "--escritura", "read");
                 var link = RevitLink.ForPid(int.Parse(Opt(a, "--revit-pid")), out var lerr);
                 if (link == null) { Console.WriteLine("error " + lerr); return 1; }
                 revit = RevitBackend.Open(link, mode, out var berr);
                 if (revit == null) { link.Dispose(); Console.WriteLine("error " + berr); return 1; }
-                if (mode != "lectura") opt.RealWrites = mode;
+                if (mode != "read") opt.RealWrites = mode;
                 var calls = Opt(a, "--llamadas");
                 if (calls != null) link.OnCall = c => File.AppendAllText(calls, Json.Write(c) + "\n");
                 backend = revit;
@@ -232,12 +232,12 @@ namespace Bimbridge.AgentHost
             {
                 PrintDiags(diags);
                 if (r == null) return 1;
-                if (!r.IsOwner) { Console.WriteLine("plan_en_uso " + Compact.Summary(r.Plan, r.State)); return 3; }
+                if (!r.IsOwner) { Console.WriteLine("plan_in_use " + Compact.Summary(r.Plan, r.State)); return 3; }
                 var cts = new CancellationTokenSource();
                 Console.CancelKeyPress += (s, e) => { e.Cancel = true; cts.Cancel(); };
                 string summary;
                 try { summary = r.Run(cts.Token); }
-                catch (PlanLease.LeaseLostException ex) { Console.WriteLine("lease_perdido " + ex.Message); return 4; }
+                catch (PlanLease.LeaseLostException ex) { Console.WriteLine("lease_lost " + ex.Message); return 4; }
                 Console.WriteLine(summary);
                 if (r.State.PlanState != PlanRunState.Active) return 5;
                 return r.State.Ops.Values.All(o => o.State == OpState.Verified || o.State == OpState.Trialed) ? 0 : 2;
@@ -252,14 +252,14 @@ namespace Bimbridge.AgentHost
             var st = ExecJournal.Recover(a[1], plan, false, null, diags);
             PrintDiags(diags.Where(d => d.Severity != "info"));
             if (st == null) return 1;
-            var what = a.Length > 2 ? a[2] : "resumen";
+            var what = a.Length > 2 ? a[2] : "summary";
             switch (what)
             {
-                case "siguiente": Console.WriteLine(Compact.NextText(plan, st)); break;
-                case "excepciones": Console.WriteLine(Compact.Exceptions(plan, st)); break;
-                case "cambios": Console.WriteLine(Compact.ChangesSince(plan, st, long.Parse(a.Length > 3 ? a[3] : "0"))); break;
-                case "fallos": Console.WriteLine(Compact.VerificationFailures(plan, st)); break;
-                case "informe": Console.WriteLine(Json.Write(Compact.Report(a[1], plan, st))); break;
+                case "next": Console.WriteLine(Compact.NextText(plan, st)); break;
+                case "exceptions": Console.WriteLine(Compact.Exceptions(plan, st)); break;
+                case "changes": Console.WriteLine(Compact.ChangesSince(plan, st, long.Parse(a.Length > 3 ? a[3] : "0"))); break;
+                case "misses": Console.WriteLine(Compact.VerificationFailures(plan, st)); break;
+                case "report": Console.WriteLine(Json.Write(Compact.Report(a[1], plan, st))); break;
                 default:
                     var holder = PlanLease.Peek(a[1]);
                     Console.WriteLine(Compact.Summary(plan, st) + (holder != null && holder.Valid(DateTime.UtcNow) ? " · owner " + holder.Owner + " f" + holder.Fencing : ""));
@@ -276,7 +276,7 @@ namespace Bimbridge.AgentHost
                 PrintDiags(diags);
                 if (r == null) return 1;
                 if (!r.IsOwner) return 3;
-                if (a[0] == "pausar") r.Pause(); else if (a[0] == "reanudar") r.Resume(); else r.Cancel();
+                if (a[0] == "pause") r.Pause(); else if (a[0] == "resume") r.Resume(); else r.Cancel();
                 Console.WriteLine(Compact.Summary(r.Plan, r.State));
                 return 0;
             }

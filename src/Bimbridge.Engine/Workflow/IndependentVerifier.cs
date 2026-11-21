@@ -58,11 +58,11 @@ namespace Bimbridge.Engine.Workflow
 
             public Dictionary<string, object> ToJson(int sample = 20)
             {
-                var d = new Dictionary<string, object> { ["estado"] = State, ["emparejados"] = (long)Matched };
-                if (Reason != null) d["motivo"] = Reason;
-                if (Independence != null) d["independencia"] = Independence;
+                var d = new Dictionary<string, object> { ["status"] = State, ["paired"] = (long)Matched };
+                if (Reason != null) d["reason"] = Reason;
+                if (Independence != null) d["independence"] = Independence;
                 void L<T>(string k, List<T> l) { if (l.Count > 0) { d[k + "_n"] = (long)l.Count; d[k] = l.Take(sample).Select(x => (object)x).ToList(); } }
-                L("omitidos", Missing); L("adicionales", Extra); L("duplicados", Duplicates); L("discrepancias", Mismatches); L("excepciones_justificadas", JustifiedExceptions);
+                L("skipped", Missing); L("additional_items", Extra); L("duplicates", Duplicates); L("discrepancies", Mismatches); L("justified_exceptions", JustifiedExceptions);
                 return d;
             }
         }
@@ -78,14 +78,14 @@ namespace Bimbridge.Engine.Workflow
             proof = null;
             var exp = input.ExpectedSource;
             if (SourceKinds.NeverIndependent(exp.Kind))
-                return ("no_independiente", "the expected items are of kind " + exp.Kind + " (model, execution plan or agent inference): never an independent source");
+                return ("not_independent", "the expected items are of kind " + exp.Kind + " (model, execution plan or agent inference): never an independent source");
             if (string.IsNullOrWhiteSpace(exp.Sha256) || exp.Sha256.Trim().Length < 32)
-                return ("independencia_no_comprobable", "the expected source " + exp.Id + " does not carry the SHA-256 of its content: it cannot be shown that it is not the same one that guided the build");
+                return ("independence_not_checkable", "the expected source " + exp.Id + " does not carry the SHA-256 of its content: it cannot be shown that it is not the same one that guided the build");
             var builds = new List<SourceRef>(input.BuildSources ?? new List<SourceRef>());
             if (!string.IsNullOrWhiteSpace(input.BuildSourceId) && !builds.Any(b => string.Equals(b.Id, input.BuildSourceId, StringComparison.OrdinalIgnoreCase)))
                 builds.Add(new SourceRef { Id = input.BuildSourceId });
             if (builds.Count == 0)
-                return ("independencia_no_comprobable", "the source or plan the build came from was not declared; without it independence cannot be verified");
+                return ("independence_not_checkable", "the source or plan the build came from was not declared; without it independence cannot be verified");
             var expIds = new HashSet<string>(exp.Identities(), StringComparer.Ordinal);
             var expLineage = new HashSet<string>(exp.Lineage(), StringComparer.Ordinal);
             foreach (var b in builds)
@@ -93,22 +93,22 @@ namespace Bimbridge.Engine.Workflow
                 var bIds = b.Identities().ToList();
                 var same = bIds.FirstOrDefault(expIds.Contains);
                 if (same != null)
-                    return ("no_independiente", "the expected items and the build share " + (same.StartsWith("sha256:", StringComparison.Ordinal) ? "the same content (" + same.Substring(0, Math.Min(23, same.Length)) + "…)" : "the same source (" + b.Id + ")") + ": it would only prove internal consistency");
+                    return ("not_independent", "the expected items and the build share " + (same.StartsWith("sha256:", StringComparison.Ordinal) ? "the same content (" + same.Substring(0, Math.Min(23, same.Length)) + "…)" : "the same source (" + b.Id + ")") + ": it would only prove internal consistency");
                 var up = bIds.FirstOrDefault(expLineage.Contains);
-                if (up != null) return ("no_independiente", "the expected source " + exp.Id + " was derived from " + up + ", which also guided the build");
+                if (up != null) return ("not_independent", "the expected source " + exp.Id + " was derived from " + up + ", which also guided the build");
                 var down = b.Lineage().FirstOrDefault(expIds.Contains);
-                if (down != null) return ("no_independiente", "the build (" + b.Id + ") was derived from the expected source itself " + exp.Id);
+                if (down != null) return ("not_independent", "the build (" + b.Id + ") was derived from the expected source itself " + exp.Id);
                 var common = b.Lineage().FirstOrDefault(expLineage.Contains);
-                if (common != null) return ("no_independiente", "the expected source and the build (" + b.Id + ") derive from the same origin (" + common + ")");
+                if (common != null) return ("not_independent", "the expected source and the build (" + b.Id + ") derive from the same origin (" + common + ")");
             }
             if (!string.IsNullOrEmpty(input.BuildPlanFingerprint) && input.Expected.Count > 0 &&
                 string.Equals(Fingerprint(input.Expected), input.BuildPlanFingerprint, StringComparison.OrdinalIgnoreCase))
-                return ("no_independiente", "the expected items are identical, element by element, to the execution plan: a copy of the plan, not an independent source");
+                return ("not_independent", "the expected items are identical, element by element, to the execution plan: a copy of the plan, not an independent source");
             proof = new Dictionary<string, object>
             {
-                ["metodo"] = "sha256+linaje", ["fuente"] = exp.Id, ["fuente_sha256"] = exp.Sha256,
-                ["construccion"] = builds.Select(b => (object)(b.Id + (b.Sha256 != null ? "@" + b.Sha256.Substring(0, Math.Min(12, b.Sha256.Length)) : ""))).ToList(),
-                ["copia_del_plan"] = input.BuildPlanFingerprint == null ? "no_comprobado" : "no",
+                ["method"] = "sha256+linaje", ["source"] = exp.Id, ["source_sha256"] = exp.Sha256,
+                ["construction"] = builds.Select(b => (object)(b.Id + (b.Sha256 != null ? "@" + b.Sha256.Substring(0, Math.Min(12, b.Sha256.Length)) : ""))).ToList(),
+                ["plan_copy"] = input.BuildPlanFingerprint == null ? "not_checked" : "no",
             };
             return null;
         }
@@ -126,11 +126,11 @@ namespace Bimbridge.Engine.Workflow
         public static Result Verify(Input input)
         {
             if (input?.ExpectedSource == null || string.IsNullOrWhiteSpace(input.ExpectedSource.Id))
-                return new Result { State = "invalido", Reason = "the independent source of the expected items is missing" };
+                return new Result { State = "invalid", Reason = "the independent source of the expected items is missing" };
             var ind = CheckIndependence(input, out var proof);
             if (ind != null) return new Result { State = ind.Value.State, Reason = ind.Value.Reason };
             if (input.RequiredRevision != null && !string.Equals(input.RequiredRevision, input.ExpectedSource.Revision, StringComparison.Ordinal))
-                return new Result { State = "revision_incorrecta", Reason = "the expected source is revision " + (input.ExpectedSource.Revision ?? "(no revision)") + " and revision " + input.RequiredRevision + " is required" };
+                return new Result { State = "wrong_revision", Reason = "the expected source is revision " + (input.ExpectedSource.Revision ?? "(no revision)") + " and revision " + input.RequiredRevision + " is required" };
 
             var res = new Result { Independence = proof };
             var usedObserved = new HashSet<int>();
@@ -193,7 +193,7 @@ namespace Bimbridge.Engine.Workflow
                 res.Extra.Add(o.ElementId);
             }
 
-            res.State = res.Missing.Count + res.Extra.Count + res.Duplicates.Count + res.Mismatches.Count == 0 ? "ok" : "diferencias";
+            res.State = res.Missing.Count + res.Extra.Count + res.Duplicates.Count + res.Mismatches.Count == 0 ? "ok" : "differences";
             return res;
         }
 

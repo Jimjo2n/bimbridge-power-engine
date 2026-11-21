@@ -19,6 +19,6 @@ namespace Bimbridge.Protocol
             name != null && name.StartsWith(TransactionPrefix, StringComparison.Ordinal);
 
         public static bool IsTemporaryTransaction(string name) =>
-            name != null && name.StartsWith(TransactionPrefix + " temporal", StringComparison.Ordinal);
+            name != null && name.StartsWith(TransactionPrefix + " temporary", StringComparison.Ordinal);
     }
 }

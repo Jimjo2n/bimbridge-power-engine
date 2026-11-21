@@ -29,7 +29,7 @@ namespace Bimbridge.Tests
         private static GroupAbort.Evidence Ev() => new GroupAbort.Evidence
         {
             Deleted = new long[] { 9, 7 }, Changed = 3, DeletedCount = 2,
-            Skipped = new Dictionary<string, List<long>> { ["motivo"] = new List<long> { 11 } }, Warnings = new[] { "aviso" },
+            Skipped = new Dictionary<string, List<long>> { ["reason"] = new List<long> { 11 } }, Warnings = new[] { "warning" },
         };
 
         [Fact]
@@ -66,10 +66,10 @@ namespace Bimbridge.Tests
             var p = Sample();
             for (long i = 200; i < 400; i++) p.Created.Add(i);
             GroupAbort.Preserve(p, "Pending", null, Ev());
-            Assert.Equal(203, ((List<object>)p.Reconciliation["ids_creados"]).Count);
-            Assert.Equal(new object[] { 7L, 9L }, ((List<object>)p.Reconciliation["ids_borrados"]).ToArray());
-            Assert.Equal(2, ((List<object>)((Dictionary<string, object>)p.Reconciliation["creados_por_op"])["@0"]).Count);
-            Assert.Single((List<object>)p.Reconciliation["entradas"]);
+            Assert.Equal(203, ((List<object>)p.Reconciliation["created_ids"]).Count);
+            Assert.Equal(new object[] { 7L, 9L }, ((List<object>)p.Reconciliation["deleted_ids"]).ToArray());
+            Assert.Equal(2, ((List<object>)((Dictionary<string, object>)p.Reconciliation["created_by_op"])["@0"]).Count);
+            Assert.Single((List<object>)p.Reconciliation["inputs"]);
         }
 
         [Fact]
@@ -78,8 +78,8 @@ namespace Bimbridge.Tests
             var store = new PlanStore(_root);
             var p = Sample();
             store.Add(p);
-            GroupAbort.Preserve(p, "Error", "fallo", Ev());
-            store.Finish(p, Status.Unknown, "incierto");
+            GroupAbort.Preserve(p, "Error", "failure", Ev());
+            store.Finish(p, Status.Unknown, "uncertain");
 
             var restarted = new PlanStore(_root);
             Assert.Equal(1, restarted.LoadPersisted(p.DocKey));
@@ -90,10 +90,10 @@ namespace Bimbridge.Tests
             Assert.Single(restarted.Unreconciled(p.DocKey));
             Assert.Equal(new long[] { 100, 101, 102 }, q.Created.ToArray());
             Assert.Equal(new long[] { 102 }, q.CreatedByOp[1].ToArray());
-            Assert.Equal("Error", q.Reconciliation["grupo_estado"]);
-            Assert.Equal(3, ((List<object>)q.Reconciliation["ids_creados"]).Count);
-            Assert.Equal(1L, q.Reconciliation["lotes_confirmados"]);
-            Assert.True(q.Describe(0).ContainsKey("reconciliacion"));
+            Assert.Equal("Error", q.Reconciliation["group_status"]);
+            Assert.Equal(3, ((List<object>)q.Reconciliation["created_ids"]).Count);
+            Assert.Equal(1L, q.Reconciliation["committed_batches"]);
+            Assert.True(q.Describe(0).ContainsKey("reconciliation"));
         }
 
         [Fact]
@@ -113,12 +113,12 @@ namespace Bimbridge.Tests
         {
             var p = Sample();
             GroupAbort.Preserve(p, "Pending", null, Ev());
-            GroupAbort.PreserveInterrupted(p, "otro");
-            Assert.Equal("Pending", p.Reconciliation["grupo_estado"]);
+            GroupAbort.PreserveInterrupted(p, "other");
+            Assert.Equal("Pending", p.Reconciliation["group_status"]);
             var q = Sample();
-            GroupAbort.PreserveInterrupted(q, "corte");
-            Assert.Equal(GroupAbort.NotObserved, q.Reconciliation["grupo_estado"]);
-            Assert.Equal("corte", q.Reconciliation["rollback_error"]);
+            GroupAbort.PreserveInterrupted(q, "cut");
+            Assert.Equal(GroupAbort.NotObserved, q.Reconciliation["group_status"]);
+            Assert.Equal("cut", q.Reconciliation["rollback_error"]);
         }
 
         /// <summary>Full abort walk in the same order as PlanApplier.AbortGroup, for each RollBack result.</summary>
@@ -143,21 +143,21 @@ namespace Bimbridge.Tests
         {
             var store = new PlanStore(_root);
             var p = new Plan { Id = "P-C", DocKey = "c:\\lab\\c.rvt", DocTitle = "c", SessionId = "s", Client = "c", CreatedUtc = DateTime.UtcNow, TotalBatches = 1, AppliedBatches = 1 };
-            p.Entries.Add(new PlanEntry { Op = "place", Id = 0, Key = "nuevo", After = "1", OpIndex = 0 });
-            p.Entries.Add(new PlanEntry { Op = "place", Id = 0, Key = "nuevo", After = "1", OpIndex = 0 });
+            p.Entries.Add(new PlanEntry { Op = "place", Id = 0, Key = "new", After = "1", OpIndex = 0 });
+            p.Entries.Add(new PlanEntry { Op = "place", Id = 0, Key = "new", After = "1", OpIndex = 0 });
             p.Created.AddRange(new long[] { 500, 501 });
             p.CreatedByOp[0] = new List<long> { 500, 501 };
             store.Add(p);
             Assert.Equal(expected, Abort(p, rollBack, new GroupAbort.Evidence { Changed = 2 }, out _));
-            store.Finish(p, Status.Unknown, "incierto");
+            store.Finish(p, Status.Unknown, "uncertain");
 
             var again = new PlanStore(_root);
             again.LoadPersisted(p.DocKey);
             var q = again.Get("P-C");
-            Assert.Equal(expected, q.Reconciliation["grupo_estado"]);
-            Assert.Equal(new object[] { 500L, 501L }, ((List<object>)q.Reconciliation["ids_creados"]).ToArray());
-            Assert.Equal(2, ((List<object>)q.Reconciliation["entradas"]).Count);
-            Assert.Equal(2L, q.Reconciliation["cambios_intentados"]);
+            Assert.Equal(expected, q.Reconciliation["group_status"]);
+            Assert.Equal(new object[] { 500L, 501L }, ((List<object>)q.Reconciliation["created_ids"]).ToArray());
+            Assert.Equal(2, ((List<object>)q.Reconciliation["inputs"]).Count);
+            Assert.Equal(2L, q.Reconciliation["attempted_changes"]);
         }
 
         [Theory]
@@ -166,7 +166,7 @@ namespace Bimbridge.Tests
         {
             var store = new PlanStore(_root);
             var p = new Plan { Id = "P-M", DocKey = "c:\\lab\\m.rvt", DocTitle = "m", SessionId = "s", Client = "c", CreatedUtc = DateTime.UtcNow, TotalBatches = 3, AppliedBatches = 2 };
-            p.Entries.Add(new PlanEntry { Op = "place", Id = 0, Key = "nuevo", After = "1", OpIndex = 0 });
+            p.Entries.Add(new PlanEntry { Op = "place", Id = 0, Key = "new", After = "1", OpIndex = 0 });
             p.Entries.Add(new PlanEntry { Op = "set_param", Ref = 1, Key = "Comments", After = "x", OpIndex = 1 });
             p.Entries.Add(new PlanEntry { Op = "delete", Id = 77, Key = "exists", Before = "1", After = "0", OpIndex = 2 });
             p.Created.AddRange(new long[] { 600, 601 });
@@ -178,19 +178,19 @@ namespace Bimbridge.Tests
                 Skipped = new Dictionary<string, List<long>> { ["no editable"] = new List<long> { 88 } }, Warnings = new[] { "w" },
             };
             Assert.Equal(expected, Abort(p, rollBack, ev, out _));
-            store.Finish(p, Status.Unknown, "incierto");
+            store.Finish(p, Status.Unknown, "uncertain");
 
             var again = new PlanStore(_root);
             again.LoadPersisted(p.DocKey);
             var r = again.Get("P-M").Reconciliation;
-            Assert.Equal(new object[] { 600L, 601L }, ((List<object>)r["ids_creados"]).ToArray());
-            Assert.Equal(new object[] { 77L, 601L }, ((List<object>)r["ids_borrados"]).ToArray());
-            Assert.Equal(2, ((List<object>)((Dictionary<string, object>)r["creados_por_op"])["@0"]).Count);
-            Assert.Equal(new object[] { 88L }, ((List<object>)((Dictionary<string, object>)r["omitidos"])["no editable"]).ToArray());
-            Assert.Equal(3, ((List<object>)r["entradas"]).Count);
-            Assert.Equal(2L, r["lotes_confirmados"]);
-            Assert.Equal(3L, r["lotes_totales"]);
-            Assert.Equal(new object[] { "w" }, ((List<object>)r["avisos"]).ToArray());
+            Assert.Equal(new object[] { 600L, 601L }, ((List<object>)r["created_ids"]).ToArray());
+            Assert.Equal(new object[] { 77L, 601L }, ((List<object>)r["deleted_ids"]).ToArray());
+            Assert.Equal(2, ((List<object>)((Dictionary<string, object>)r["created_by_op"])["@0"]).Count);
+            Assert.Equal(new object[] { 88L }, ((List<object>)((Dictionary<string, object>)r["skipped"])["no editable"]).ToArray());
+            Assert.Equal(3, ((List<object>)r["inputs"]).Count);
+            Assert.Equal(2L, r["committed_batches"]);
+            Assert.Equal(3L, r["total_batches_count"]);
+            Assert.Equal(new object[] { "w" }, ((List<object>)r["warnings"]).ToArray());
         }
 
         [Fact]
@@ -269,10 +269,10 @@ namespace Bimbridge.Tests
         {
             Put(Path.Combine(_p.AddinsDir("2024"), "Bimbridge.addin"), "viejo-addin");
             Put(Path.Combine(_p.AddinsDir("2024"), "Bimbridge", "Bimbridge.Addin.dll"), "viejo-dll");
-            Put(Path.Combine(_p.AddinsDir("2024"), "pyRevit.addin"), "ajeno");
+            Put(Path.Combine(_p.AddinsDir("2024"), "pyRevit.addin"), "foreign");
             Put(_p.BridgeExe, "viejo-puente");
             Put(_p.ConfigFile, "{\"levels\":\"R\"}");
-            Put(_p.InstallRecord, "{\"version\":\"viejo\"}");
+            Put(_p.InstallRecord, "{\"version\":\"old\"}");
             Put(_p.CodexConfig, "[otro]\nx=1\n");
         }
 
@@ -284,7 +284,7 @@ namespace Bimbridge.Tests
             Put(_p.BridgeExe, "nuevo-puente");
             Put(Path.Combine(_p.BinDir, "power_engine", "w.exe"), "worker-nuevo");
             Put(_p.ConfigFile, "{\"levels\":\"RPW\"}");
-            Put(_p.InstallRecord, "{\"version\":\"nuevo\"}");
+            Put(_p.InstallRecord, "{\"version\":\"new\"}");
             Put(_p.SetupCopy, "setup-nuevo");
             Put(_p.CodexConfig, "[otro]\nx=1\n[mcp]\n");
         }
@@ -293,7 +293,7 @@ namespace Bimbridge.Tests
         public void Restore_ReturnsFilesConfigAndRecord_RemovesNewOnes_KeepsForeignAddins()
         {
             OldInstall();
-            var dir = InstallBackup.Create(_p, new[] { "2024" }, "prueba", DateTime.UtcNow);
+            var dir = InstallBackup.Create(_p, new[] { "2024" }, "test", DateTime.UtcNow);
             NewInstall();
             var undo = InstallBackup.Restore(_p, dir, DateTime.UtcNow.AddSeconds(1));
 
@@ -303,12 +303,12 @@ namespace Bimbridge.Tests
             Assert.False(Directory.Exists(Path.Combine(_p.BinDir, "power_engine")));
             Assert.Equal("viejo-puente", File.ReadAllText(_p.BridgeExe));
             Assert.Equal("{\"levels\":\"R\"}", File.ReadAllText(_p.ConfigFile));
-            Assert.Equal("{\"version\":\"viejo\"}", File.ReadAllText(_p.InstallRecord));
+            Assert.Equal("{\"version\":\"old\"}", File.ReadAllText(_p.InstallRecord));
             Assert.False(File.Exists(_p.SetupCopy));
             // Decision in this revision: config.toml belongs to the user. The restore only restores the BIMBRIDGE section,
             // so [mcp], which NewInstall writes outside it, is kept. CodexRestore_* pins the own-section case.
             Assert.Equal("[otro]\nx=1\n[mcp]\n", File.ReadAllText(_p.CodexConfig));
-            Assert.Equal("ajeno", File.ReadAllText(Path.Combine(_p.AddinsDir("2024"), "pyRevit.addin")));
+            Assert.Equal("foreign", File.ReadAllText(Path.Combine(_p.AddinsDir("2024"), "pyRevit.addin")));
 
             // The restore can also be undone.
             InstallBackup.Restore(_p, undo, DateTime.UtcNow.AddSeconds(2));
@@ -319,7 +319,7 @@ namespace Bimbridge.Tests
         [Fact]
         public void Restore_FromNoPreviousInstall_RemovesEverythingOurs()
         {
-            var dir = InstallBackup.Create(_p, new[] { "2024" }, "limpio", DateTime.UtcNow);
+            var dir = InstallBackup.Create(_p, new[] { "2024" }, "clean", DateTime.UtcNow);
             NewInstall();
             InstallBackup.Restore(_p, dir, DateTime.UtcNow.AddSeconds(1));
             Assert.False(File.Exists(_p.InstallRecord));
@@ -331,9 +331,9 @@ namespace Bimbridge.Tests
         public void TamperedBackup_IsRejected_BeforeTouchingAnything()
         {
             OldInstall();
-            var dir = InstallBackup.Create(_p, new[] { "2024" }, "prueba", DateTime.UtcNow);
+            var dir = InstallBackup.Create(_p, new[] { "2024" }, "test", DateTime.UtcNow);
             NewInstall();
-            File.AppendAllText(Path.Combine(dir, "archivos", "bin", "Bimbridge.Bridge.exe"), "alterado");
+            File.AppendAllText(Path.Combine(dir, "files", "bin", "Bimbridge.Bridge.exe"), "tampered");
             Assert.Throws<InvalidDataException>(() => InstallBackup.Restore(_p, dir, DateTime.UtcNow));
             Assert.Equal("nuevo-puente", File.ReadAllText(_p.BridgeExe));
         }
@@ -342,7 +342,7 @@ namespace Bimbridge.Tests
         public void FailedRestore_UndoesToPriorState()
         {
             OldInstall();
-            var dir = InstallBackup.Create(_p, new[] { "2024" }, "prueba", DateTime.UtcNow);
+            var dir = InstallBackup.Create(_p, new[] { "2024" }, "test", DateTime.UtcNow);
             NewInstall();
             var locked = Path.Combine(_p.AddinsDir("2024"), "Bimbridge", "Bimbridge.Addin.dll");
             using (new FileStream(locked, FileMode.Open, FileAccess.Read, FileShare.None))

@@ -25,7 +25,7 @@ namespace Bimbridge.Addin.Revit
 
             public Dictionary<string, object> ToJson() => new Dictionary<string, object>
             {
-                ["tipo"] = Kind, ["gravedad"] = Severity, ["texto"] = Text, ["definicion"] = Guid,
+                ["type"] = Kind, ["severity"] = Severity, ["text"] = Text, ["definition"] = Guid,
                 ["ids"] = Ids.Take(50).Select(i => (object)i).ToList(),
             };
         }
@@ -34,8 +34,8 @@ namespace Bimbridge.Addin.Revit
         /// <summary>false = leave the warnings in Revit (the user will see them in the warnings dialog).</summary>
         public bool DeleteWarnings = true;
 
-        public List<string> Errors => Items.Where(i => i.Severity != "aviso").Select(i => i.Text).ToList();
-        public List<string> Warnings => Items.Where(i => i.Severity == "aviso").Select(i => i.Line()).ToList();
+        public List<string> Errors => Items.Where(i => i.Severity != "warning").Select(i => i.Text).ToList();
+        public List<string> Warnings => Items.Where(i => i.Severity == "warning").Select(i => i.Line()).ToList();
 
         public FailureProcessingResult PreprocessFailures(FailuresAccessor a)
         {
@@ -45,7 +45,7 @@ namespace Bimbridge.Addin.Revit
                 var sev = m.GetSeverity();
                 var item = new Item
                 {
-                    Severity = sev == FailureSeverity.Warning ? "aviso" : sev == FailureSeverity.Error ? "error" : sev.ToString().ToLowerInvariant(),
+                    Severity = sev == FailureSeverity.Warning ? "warning" : sev == FailureSeverity.Error ? "error" : sev.ToString().ToLowerInvariant(),
                     Guid = m.GetFailureDefinitionId()?.Guid.ToString(),
                     Text = m.GetDescriptionText(),
                 };
@@ -64,17 +64,17 @@ namespace Bimbridge.Addin.Revit
         {
             try
             {
-                if (id != null && id.Guid == BuiltInFailures.OverlapFailures.DuplicateInstances.Guid) return "duplicados";
+                if (id != null && id.Guid == BuiltInFailures.OverlapFailures.DuplicateInstances.Guid) return "duplicates";
             }
             catch (Exception) { }
             var t = (text ?? "").ToLowerInvariant();
-            if (t.Contains("identical instances") || t.Contains("instancias idénticas")) return "duplicados";
-            if (t.Contains("host") || t.Contains("anfitri")) return "anfitrion";
-            if (t.Contains("overlap") || t.Contains("superpuest")) return "superposicion";
-            if (t.Contains("constraint") || t.Contains("restricci")) return "restriccion";
-            if (t.Contains("group") || t.Contains("grupo")) return "grupo";
-            if (t.Contains("connector") || t.Contains("conector")) return "conector";
-            return "otro";
+            if (t.Contains("identical instances") || t.Contains("instancias idénticas")) return "duplicates";
+            if (t.Contains("host") || t.Contains("anfitri")) return "host";
+            if (t.Contains("overlap") || t.Contains("superpuest")) return "overlap";
+            if (t.Contains("constraint") || t.Contains("restricci")) return "constraint";
+            if (t.Contains("group") || t.Contains("grupo")) return "group";
+            if (t.Contains("connector") || t.Contains("conector")) return "connector";
+            return "other";
         }
 
         public static FailureHandlingOptions Attach(Transaction t, FailureLog log)

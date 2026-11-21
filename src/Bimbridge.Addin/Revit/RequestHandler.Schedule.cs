@@ -16,8 +16,8 @@ namespace Bimbridge.Addin.Revit
     {
         private async Task<Response> ScheduleCheck(Request request, CancellationToken ct)
         {
-            var selector = Arg.GetString(request.Args, "tabla")?.Trim();
-            if (string.IsNullOrEmpty(selector)) return Response.Fail(request.Id, Status.Invalid, "give tabla= with the ID or exact name");
+            var selector = Arg.GetString(request.Args, "schedule")?.Trim();
+            if (string.IsNullOrEmpty(selector)) return Response.Fail(request.Id, Status.Invalid, "give schedule= with the ID or exact name");
             ScheduleAudit audit;
             try { audit = new ScheduleAudit(request.Args); }
             catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalid, ex.Message); }
@@ -53,8 +53,8 @@ namespace Bimbridge.Addin.Revit
                     else if (filter.IsElementIdValue) value = Ids.ToLong(filter.GetElementIdValue());
                     filters.Add(new Dictionary<string, object>
                     {
-                        ["campo"] = field.GetName(), ["parametro_id"] = Ids.ToLong(field.ParameterId),
-                        ["operador"] = filter.FilterType.ToString(), ["valor"] = value,
+                        ["field"] = field.GetName(), ["parameter_id"] = Ids.ToLong(field.ParameterId),
+                        ["operator"] = filter.FilterType.ToString(), ["value"] = value,
                     });
                 }
 
@@ -77,22 +77,22 @@ namespace Bimbridge.Addin.Revit
                 data = audit.Compare(population, filters, cell =>
                     cell.Row >= body.NumberOfRows || cell.Column >= body.NumberOfColumns ? null :
                         schedule.GetCellText(SectionType.Body, body.FirstRowNumber + cell.Row, body.FirstColumnNumber + cell.Column));
-                data["tabla"] = schedule.Name;
-                data["tabla_id"] = Ids.ToLong(schedule.Id);
+                data["schedule"] = schedule.Name;
+                data["schedule_id"] = Ids.ToLong(schedule.Id);
                 data["doc"] = DocRegistry.Instance.IdOf(doc);
-                data["filas_cuerpo"] = (long)body.NumberOfRows;
-                data["columnas_cuerpo"] = (long)body.NumberOfColumns;
-                if (limitation != null) data["motivo_poblacion"] = limitation;
+                data["body_rows"] = (long)body.NumberOfRows;
+                data["body_columns"] = (long)body.NumberOfColumns;
+                if (limitation != null) data["population_reason"] = limitation;
                 revision = _tracker.For(doc)?.Rev ?? 0;
                 return true;
             }, highPriority: false, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!work.Ok) return FromWork(request.Id, work);
             if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
-            var outcome = Arg.GetString(data, "resultado");
+            var outcome = Arg.GetString(data, "result");
             return new Response
             {
                 Id = request.Id, Rev = revision, Data = data,
-                State = outcome == "con_diferencias" || outcome == "no_evaluable" ? Status.CompletedWithDifferences : Status.Ok,
+                State = outcome == "with_differences" || outcome == "not_evaluable" ? Status.CompletedWithDifferences : Status.Ok,
             };
         }
     }

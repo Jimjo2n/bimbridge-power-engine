@@ -24,7 +24,7 @@ namespace BimBridge.PowerEngine.Workflows
         public string Code;
         public string FamilyType;        // "Family: Type" as used by the place operation
         public double? ElevFt;           // offset above the level; null = use Mounting
-        public string Mounting;           // "losa" (underside of what is above) or another place mode
+        public string Mounting;           // "slab" (underside of what is above) or another place mode
         public string Workset;
         public string Host;              // required host (ceiling, wall, slab…) — declared constraint
         public bool Directional;         // if true, the symbol orientation matters (strips, sconces)
@@ -58,15 +58,15 @@ namespace BimBridge.PowerEngine.Workflows
         {
             var d = new Dictionary<string, object>
             {
-                ["id"] = Id, ["codigo"] = Code, ["tipo"] = FamilyType, ["nivel"] = Level, ["xy_ft"] = new List<object> { R(X), R(Y) },
-                ["giro_deg"] = Math.Round(RotDeg, 3), ["confianza"] = Confidence, ["estado"] = State,
-                ["fuente"] = new Dictionary<string, object> { ["pagina"] = (long)Page, ["punto_pt"] = new List<object> { R(Px), R(Py) } },
+                ["id"] = Id, ["code"] = Code, ["type"] = FamilyType, ["level"] = Level, ["xy_ft"] = new List<object> { R(X), R(Y) },
+                ["rotation_deg"] = Math.Round(RotDeg, 3), ["confidence"] = Confidence, ["status"] = State,
+                ["source"] = new Dictionary<string, object> { ["page"] = (long)Page, ["point_pt"] = new List<object> { R(Px), R(Py) } },
             };
             if (ElevFt.HasValue) d["elev_ft"] = R(ElevFt.Value);
-            if (Mounting != null) d["montaje"] = Mounting;
+            if (Mounting != null) d["mounting"] = Mounting;
             if (Workset != null) d["ws"] = Workset;
-            if (Host != null) d["anfitrion"] = Host;
-            if (Reason != null) d["motivo"] = Reason;
+            if (Host != null) d["host"] = Host;
+            if (Reason != null) d["reason"] = Reason;
             return d;
         }
         private static object R(double v) => Math.Round(v, 5);
@@ -74,7 +74,7 @@ namespace BimBridge.PowerEngine.Workflows
 
     public sealed class PlacementPlan
     {
-        public string State = "listo";
+        public string State = "ready";
         public RegistrationResult Registration;
         public List<PlacementItem> Place = new List<PlacementItem>();
         public List<PlacementItem> Ambiguous = new List<PlacementItem>();
@@ -85,13 +85,13 @@ namespace BimBridge.PowerEngine.Workflows
 
         public Dictionary<string, object> ToJson(bool items = true) => new Dictionary<string, object>
         {
-            ["estado"] = State, ["fuente"] = Source, ["huella_plan"] = Fingerprint,
-            ["resumen"] = new Dictionary<string, object> { ["colocar"] = (long)Place.Count, ["ambiguos"] = (long)Ambiguous.Count, ["ya_existen"] = (long)AlreadyThere.Count, ["lotes"] = (long)Batches.Count },
-            ["registro"] = Registration?.ToJson(),
-            ["colocar"] = items ? Place.Select(p => (object)p.ToJson()).ToList() : null,
-            ["ambiguos"] = Ambiguous.Select(p => (object)p.ToJson()).ToList(),
-            ["ya_existen"] = items ? AlreadyThere.Select(p => (object)p.ToJson()).ToList() : null,
-            ["lotes"] = Batches.Cast<object>().ToList(),
+            ["status"] = State, ["source"] = Source, ["plan_fingerprint"] = Fingerprint,
+            ["summary"] = new Dictionary<string, object> { ["place"] = (long)Place.Count, ["ambiguous_items"] = (long)Ambiguous.Count, ["already_exist"] = (long)AlreadyThere.Count, ["batches"] = (long)Batches.Count },
+            ["registration"] = Registration?.ToJson(),
+            ["place"] = items ? Place.Select(p => (object)p.ToJson()).ToList() : null,
+            ["ambiguous_items"] = Ambiguous.Select(p => (object)p.ToJson()).ToList(),
+            ["already_exist"] = items ? AlreadyThere.Select(p => (object)p.ToJson()).ToList() : null,
+            ["batches"] = Batches.Cast<object>().ToList(),
         };
     }
 
@@ -108,8 +108,8 @@ namespace BimBridge.PowerEngine.Workflows
         {
             var plan = new PlacementPlan { Registration = reg };
             plan.Source["id"] = o.SourceId; plan.Source["sha256"] = o.SourceSha256; plan.Source["revision"] = o.SourceRevision;
-            if (reg == null || !reg.Ok) { plan.State = "sin_registro"; return plan; }
-            if (string.IsNullOrWhiteSpace(o.Level)) { plan.State = "sin_nivel"; return plan; }
+            if (reg == null || !reg.Ok) { plan.State = "unregistered"; return plan; }
+            if (string.IsNullOrWhiteSpace(o.Level)) { plan.State = "no_level"; return plan; }
             var byCode = (rules ?? new List<TypeRule>()).GroupBy(r => r.Code ?? "", StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
             var regRot = reg.RotationDeg;
 
@@ -129,17 +129,17 @@ namespace BimBridge.PowerEngine.Workflows
                     Id = StableId(o.SourceSha256, s.Page, s.Px, s.Py, s.Code),
                 };
                 var rule = s.Code != null && byCode.TryGetValue(s.Code, out var rl) ? rl : null;
-                if (rule == null) Amb(it, "sin_tipo", "code «" + (s.Code ?? "?") + "» has no type rule: a person or the fixture schedule decides");
-                else if (rule.Count > 1) Amb(it, "tipo_ambiguo", "code «" + s.Code + "» has " + rule.Count + " type rules");
+                if (rule == null) Amb(it, "no_type", "code «" + (s.Code ?? "?") + "» has no type rule: a person or the fixture schedule decides");
+                else if (rule.Count > 1) Amb(it, "ambiguous_type", "code «" + s.Code + "» has " + rule.Count + " type rules");
                 else
                 {
                     var r = rule[0];
                     it.FamilyType = r.FamilyType; it.ElevFt = r.ElevFt; it.Mounting = r.Mounting; it.Workset = r.Workset; it.Host = r.Host;
                     var rot = r.Directional ? Norm180(s.RotDeg + regRot) : 0.0;
                     it.RotDeg = Math.Abs(rot) < o.MinRotationDeg ? 0 : rot;
-                    if (s.Confidence < o.MinConfidence) Amb(it, "confianza_baja", "confidence " + s.Confidence.ToString("0.##", CultureInfo.InvariantCulture) + " < " + o.MinConfidence.ToString("0.##", CultureInfo.InvariantCulture));
-                    else if (!it.ElevFt.HasValue && string.IsNullOrEmpty(it.Mounting)) Amb(it, "sin_altura", "the rule gives neither height nor mounting mode: nothing is invented");
-                    else it.State = "colocar";
+                    if (s.Confidence < o.MinConfidence) Amb(it, "low_confidence", "confidence " + s.Confidence.ToString("0.##", CultureInfo.InvariantCulture) + " < " + o.MinConfidence.ToString("0.##", CultureInfo.InvariantCulture));
+                    else if (!it.ElevFt.HasValue && string.IsNullOrEmpty(it.Mounting)) Amb(it, "no_height", "the rule gives neither height nor mounting mode: nothing is invented");
+                    else it.State = "place";
                 }
                 items.Add(it);
             }
@@ -154,7 +154,7 @@ namespace BimBridge.PowerEngine.Workflows
                 {
                     var keep = g.OrderByDescending(i => items[i].Confidence).ThenBy(i => i).First();
                     foreach (var i in g.Where(i => i != keep))
-                        Amb(items[i], "casi_duplicado", "within " + o.DuplicateTolFt.ToString("0.##", CultureInfo.InvariantCulture) + " ft of " + items[keep].Id + " (only that one is placed; confirm whether they are two fixtures)");
+                        Amb(items[i], "near_duplicate", "within " + o.DuplicateTolFt.ToString("0.##", CultureInfo.InvariantCulture) + " ft of " + items[keep].Id + " (only that one is placed; confirm whether they are two fixtures)");
                 }
             }
 
@@ -163,7 +163,7 @@ namespace BimBridge.PowerEngine.Workflows
                 .Where(e => string.IsNullOrWhiteSpace(e.Level) || string.Equals(e.Level, o.Level, StringComparison.OrdinalIgnoreCase)).ToList();
             if (ex.Count > 0)
             {
-                var cand = items.Where(i => i.State == "colocar").ToList();
+                var cand = items.Where(i => i.State == "place").ToList();
                 var q = new double[cand.Count * 2];
                 for (var i = 0; i < cand.Count; i++) { q[2 * i] = cand[i].X; q[2 * i + 1] = cand[i].Y; }
                 var r = new double[ex.Count * 2];
@@ -177,20 +177,20 @@ namespace BimBridge.PowerEngine.Workflows
                     if (nn.Index[i] < 0) continue;
                     var e = ex[nn.Index[i]];
                     if (!string.Equals(e.FamilyType, cand[i].FamilyType, StringComparison.Ordinal))
-                        Amb(cand[i], "conflicto_existente", "element " + e.Id + " of another type (" + e.FamilyType + ") at " + nn.Dist[i].ToString("0.###", CultureInfo.InvariantCulture) + " ft");
+                        Amb(cand[i], "existing_conflict", "element " + e.Id + " of another type (" + e.FamilyType + ") at " + nn.Dist[i].ToString("0.###", CultureInfo.InvariantCulture) + " ft");
                     else if (claims[nn.Index[i]].Count() > 1)
-                        Amb(cand[i], "existente_compartido", "element " + e.Id + " matches more than one symbol");
+                        Amb(cand[i], "shared_existing", "element " + e.Id + " matches more than one symbol");
                     else
                     {
-                        cand[i].State = "ya_existe";
+                        cand[i].State = "already_exists";
                         cand[i].Reason = "element " + e.Id + " of the same type at " + nn.Dist[i].ToString("0.###", CultureInfo.InvariantCulture) + " ft";
                     }
                 }
             }
 
-            plan.Place = items.Where(i => i.State == "colocar").ToList();
-            plan.Ambiguous = items.Where(i => i.State == "ambiguo").ToList();
-            plan.AlreadyThere = items.Where(i => i.State == "ya_existe").ToList();
+            plan.Place = items.Where(i => i.State == "place").ToList();
+            plan.Ambiguous = items.Where(i => i.State == "ambiguous").ToList();
+            plan.AlreadyThere = items.Where(i => i.State == "already_exists").ToList();
 
             // 4) "place" batches: same type, level, mounting/elev, rotation and workset; ≤ BatchMax points; stable order
             foreach (var g in plan.Place.GroupBy(i => (i.FamilyType, i.Level, i.Mounting, Elev: i.ElevFt.HasValue ? Math.Round(i.ElevFt.Value, 6) : (double?)null, Rot: Math.Round(i.RotDeg, 3), i.Workset, i.Host,
@@ -205,19 +205,19 @@ namespace BimBridge.PowerEngine.Workflows
                     var op = new Dictionary<string, object>
                     {
                         ["op"] = "place", ["type"] = g.Key.FamilyType, ["level"] = g.Key.Level,
-                        ["puntos"] = chunk.Select(i => (object)new List<object> { Math.Round(i.X, 6), Math.Round(i.Y, 6) }).ToList(),
-                        ["items_fuente"] = chunk.Select(i => (object)i.Id).ToList(),
+                        ["points"] = chunk.Select(i => (object)new List<object> { Math.Round(i.X, 6), Math.Round(i.Y, 6) }).ToList(),
+                        ["source_items"] = chunk.Select(i => (object)i.Id).ToList(),
                     };
-                    if (g.Key.Elev.HasValue) op["elev"] = g.Key.Elev.Value; else op["montaje"] = g.Key.Mounting;
+                    if (g.Key.Elev.HasValue) op["elev"] = g.Key.Elev.Value; else op["mounting"] = g.Key.Mounting;
                     if (Math.Abs(g.Key.Rot) > 0) op["rot"] = g.Key.Rot;
                     if (g.Key.Workset != null) op["ws"] = g.Key.Workset;
-                    if (!string.IsNullOrWhiteSpace(g.Key.Host)) op["anfitrion"] = g.Key.Host;
+                    if (!string.IsNullOrWhiteSpace(g.Key.Host)) op["host"] = g.Key.Host;
                     if (rule.Params.Count > 0) op["params"] = rule.Params;
-                    plan.Batches.Add(new Dictionary<string, object> { ["operacion"] = op, ["items"] = chunk.Select(i => (object)i.Id).ToList() });
+                    plan.Batches.Add(new Dictionary<string, object> { ["operation"] = op, ["items"] = chunk.Select(i => (object)i.Id).ToList() });
                 }
             }
             plan.Fingerprint = Fingerprint(plan.Place);
-            if (plan.Ambiguous.Count > 0) plan.State = plan.Place.Count > 0 ? "listo_con_ambiguedades" : "solo_ambiguedades";
+            if (plan.Ambiguous.Count > 0) plan.State = plan.Place.Count > 0 ? "ready_with_ambiguities" : "only_ambiguities";
             return plan;
         }
 
@@ -226,7 +226,7 @@ namespace BimBridge.PowerEngine.Workflows
         /// does not share the plan ids, so an accurate match is not mistaken for a copy.</summary>
         public static string Fingerprint(IEnumerable<PlacementItem> items) =>
             Bimbridge.Engine.Workflow.IndependentVerifier.Fingerprint(items.Select(i => new Bimbridge.Engine.Workflow.IndependentVerifier.Item
-            { Key = i.Id, X = i.X, Y = i.Y, Attrs = { ["tipo"] = i.FamilyType ?? "" } }));
+            { Key = i.Id, X = i.X, Y = i.Y, Attrs = { ["type"] = i.FamilyType ?? "" } }));
 
         public static string StableId(string sourceSha, int page, double px, double py, string code) =>
             "pl-" + Home.Sha256Hex((sourceSha ?? "") + "|" + page.ToString(CultureInfo.InvariantCulture) + "|" + Math.Round(px * 8).ToString(CultureInfo.InvariantCulture) + "|" +
@@ -236,18 +236,18 @@ namespace BimBridge.PowerEngine.Workflows
         public static List<SymbolCandidate> FromPdfSymbols(Dictionary<string, object> result, bool includeAmbiguous = true, bool confirmedOnly = false)
         {
             var l = new List<SymbolCandidate>();
-            foreach (Dictionary<string, object> pg in (List<object>)result["paginas"])
+            foreach (Dictionary<string, object> pg in (List<object>)result["pages"])
             {
-                var page = Convert.ToInt32(pg["pagina"], CultureInfo.InvariantCulture);
-                foreach (var key in confirmedOnly ? new[] { "confirmados" } : includeAmbiguous ? new[] { "candidatos", "ambiguos" } : new[] { "candidatos" })
+                var page = Convert.ToInt32(pg["page"], CultureInfo.InvariantCulture);
+                foreach (var key in confirmedOnly ? new[] { "committed" } : includeAmbiguous ? new[] { "candidates", "ambiguous_items" } : new[] { "candidates" })
                     foreach (Dictionary<string, object> c in (List<object>)pg[key])
                     {
-                        var p = (List<object>)c["centro_pt"];
+                        var p = (List<object>)c["center_pt"];
                         l.Add(new SymbolCandidate
                         {
                             Page = page, Px = Convert.ToDouble(p[0], CultureInfo.InvariantCulture), Py = Convert.ToDouble(p[1], CultureInfo.InvariantCulture),
-                            Code = Arg.GetString(c, "codigo"), Signature = Arg.GetString(c, "firma"), Label = Arg.GetString(c, "rotulo"),
-                            Confidence = c.TryGetValue("confianza", out var cf) && cf != null ? Convert.ToDouble(cf, CultureInfo.InvariantCulture) : 0,
+                            Code = Arg.GetString(c, "code"), Signature = Arg.GetString(c, "signature"), Label = Arg.GetString(c, "label"),
+                            Confidence = c.TryGetValue("confidence", out var cf) && cf != null ? Convert.ToDouble(cf, CultureInfo.InvariantCulture) : 0,
                             RotDeg = c.TryGetValue("rot_deg", out var rd) && rd != null ? Convert.ToDouble(rd, CultureInfo.InvariantCulture) : 0,
                         });
                     }
@@ -255,7 +255,7 @@ namespace BimBridge.PowerEngine.Workflows
             return l;
         }
 
-        private static void Amb(PlacementItem it, string status, string reason) { it.State = "ambiguo"; it.Reason = status + ": " + reason; }
+        private static void Amb(PlacementItem it, string status, string reason) { it.State = "ambiguous"; it.Reason = status + ": " + reason; }
 
         private static double Norm180(double a) { a %= 360; if (a > 180) a -= 360; if (a <= -180) a += 360; return a; }
     }

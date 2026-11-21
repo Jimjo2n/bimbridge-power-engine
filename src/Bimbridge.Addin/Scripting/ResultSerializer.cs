@@ -72,8 +72,8 @@ namespace Bimbridge.Addin.Scripting
                 case ElementId id: return Ids.ToLong(id);
                 case XYZ p: return new List<object> { Round(p.X), Round(p.Y), Round(p.Z) };
                 case UV uv: return new List<object> { Round(uv.U), Round(uv.V) };
-                case Document doc: return new Dictionary<string, object> { ["doc"] = DocRegistry.Instance.IdOf(doc), ["titulo"] = doc.Title };
-                case Parameter p: return new Dictionary<string, object> { ["nombre"] = p.Definition?.Name, ["valor"] = ScriptContext.ShowValue(p) };
+                case Document doc: return new Dictionary<string, object> { ["doc"] = DocRegistry.Instance.IdOf(doc), ["title"] = doc.Title };
+                case Parameter p: return new Dictionary<string, object> { ["name"] = p.Definition?.Name, ["value"] = ScriptContext.ShowValue(p) };
                 case Reference r:
                     try { return _doc != null ? r.ConvertToStableRepresentation(_doc) : Ids.ToLong(r.ElementId).ToString(CultureInfo.InvariantCulture); }
                     catch (Exception) { return Ids.ToLong(r.ElementId).ToString(CultureInfo.InvariantCulture); }
@@ -134,7 +134,7 @@ namespace Bimbridge.Addin.Scripting
         {
             var d = new Dictionary<string, object> { ["id"] = Ids.ToLong(e.Id) };
             try { if (e.Category != null) d["cat"] = e.Category.Name; } catch (Exception) { }
-            try { d["nombre"] = e.Name; } catch (Exception) { }
+            try { d["name"] = e.Name; } catch (Exception) { }
             return d;
         }
 

@@ -1,25 +1,25 @@
 {
- "esquema": "bimbridge.campana080/1",
+ "schema": "bimbridge.campaign080/1",
  "item": "N8-04",
- "titulo": "2D drafting",
- "estado_inicial": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW.",
+ "title": "2D drafting",
+ "initial_status": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW.",
  "variables": {},
- "pasos": [
+ "steps": [
   {
-   "nombre": "drafting view and geometry",
+   "name": "drafting view and geometry",
    "op": "plan",
    "args": {
     "ops": [
      {
       "op": "view_create",
-      "tipo": "dibujo",
-      "nombre": "BB-N8-04 DRAFTING",
-      "escala": 48
+      "type": "drafting",
+      "name": "BB-N8-04 DRAFTING",
+      "scale": 48
      },
      {
       "op": "detail_line",
       "view": "@1",
-      "puntos": [
+      "points": [
        [
         0,
         0
@@ -37,7 +37,7 @@
      {
       "op": "detail_rect",
       "view": "@1",
-      "esquinas": [
+      "corners": [
        [
         12,
         0
@@ -51,37 +51,37 @@
      {
       "op": "detail_polygon",
       "view": "@1",
-      "centro": [
+      "center": [
        20,
        2
       ],
-      "radio": 1,
-      "lados": 6
+      "radius": 1,
+      "sides": 6
      },
      {
       "op": "detail_arc",
       "view": "@1",
-      "centro": [
+      "center": [
        25,
        2
       ],
-      "radio": "6 in",
-      "inicio": 0,
-      "fin": 180
+      "radius": "6 in",
+      "start": 0,
+      "end": 180
      },
      {
       "op": "text_note",
       "view": "@1",
-      "punto": [
+      "point": [
        0,
        8
       ],
-      "texto": "BB-N8-04"
+      "text": "BB-N8-04"
      },
      {
       "op": "filled_region",
       "view": "@1",
-      "puntos": [
+      "points": [
        [
         0,
         10
@@ -103,38 +103,38 @@
     ],
     "summary": "campaign 0.8.0"
    },
-   "guardar": {
+   "save": {
     "plan": "plan_id"
    }
   },
   {
-   "nombre": "apply",
+   "name": "apply",
    "op": "commit",
    "args": {
     "plan_id": "${plan}"
    },
-   "escritura": true
+   "write": true
   },
   {
-   "nombre": "the view exists",
+   "name": "the view exists",
    "op": "catalog",
    "args": {
-    "que": "vistas",
-    "buscar": "BB-N8-04"
+    "kind": "views",
+    "search": "BB-N8-04"
    },
-   "contiene": [
+   "contains": [
     "BB-N8-04 DRAFTING"
    ]
   },
   {
-   "nombre": "invalid segment is rejected before Revit",
+   "name": "invalid segment is rejected before Revit",
    "op": "plan",
    "args": {
     "ops": [
      {
       "op": "detail_line",
       "view": 1,
-      "puntos": [
+      "points": [
        [
         0,
         0
@@ -147,7 +147,7 @@
      }
     ]
    },
-   "esperar": "invalido"
+   "wait": "invalid"
   }
  ]
 }

@@ -30,7 +30,7 @@ namespace Bimbridge.Setup
     public static class Updates
     {
         public const string Prefix = "Bimbridge.Setup";
-        public const string LeftoverMark = ".viejo-";
+        public const string LeftoverMark = ".old-";
 
         private static readonly object CacheLock = new object();
         private static readonly Dictionary<string, (long size, DateTime mtime, UpdateCandidate c)> Cache =

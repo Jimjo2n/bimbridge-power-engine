@@ -71,9 +71,9 @@ namespace Bimbridge.Addin.Revit.Writes
                 case "group_variant":
                 {
                     var target = GroupVariant.Plan(ctx, ids.Single(), op.Args);
-                    var show = "create group variant " + Arg.GetString(target, "nombre") + " from " + ids[0] +
-                        " with " + ((Dictionary<string, object>)target["cambios"]).Count + " substitutions";
-                    c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = target });
+                    var show = "create group variant " + Arg.GetString(target, "name") + " from " + ids[0] +
+                        " with " + ((Dictionary<string, object>)target["changes"]).Count + " substitutions";
+                    c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = target });
                     break;
                 }
                 case "view_create": ViewCreate(ctx, op, c); break;
@@ -139,7 +139,7 @@ namespace Bimbridge.Addin.Revit.Writes
                         e.Before = held.Item1;
                         Note("chained on " + held.Item2 + " (held): it will be applied afterwards");
                     }
-                    if (!e.IsCreation && e.Key != "nuevo" && string.Equals(e.Before, e.After, StringComparison.Ordinal)) { _unchanged++; return; }
+                    if (!e.IsCreation && e.Key != "new" && string.Equals(e.Before, e.After, StringComparison.Ordinal)) { _unchanged++; return; }
                 }
                 _ctx.Plan.Entries.Add(e);
                 Added++;
@@ -341,8 +341,8 @@ namespace Bimbridge.Addin.Revit.Writes
         private static void SetLevel(BuildContext ctx, OpSpec op, IList<long> ids, Collector c)
         {
             var lvl = ctx.Model.FindLevel(Arg.GetString(op.Args, "level"), "set_level");
-            var keep = (Arg.GetString(op.Args, "mantener") ?? "posicion").Trim().ToLowerInvariant();
-            if (keep != "posicion" && keep != "posición" && keep != "offset") throw new QueryException("set_level mantener: posicion (default) or offset");
+            var keep = (Arg.GetString(op.Args, "keep") ?? "position").Trim().ToLowerInvariant();
+            if (keep != "position" && keep != "position" && keep != "offset") throw new QueryException("set_level keep: position (default) or offset");
             var keepPosition = keep != "offset";
             foreach (var e in Editable(ctx, ids, c))
             {
@@ -371,8 +371,8 @@ namespace Bimbridge.Addin.Revit.Writes
 
         private static void Snap(BuildContext ctx, OpSpec op, IList<long> ids, Collector c)
         {
-            var up = !string.Equals(Arg.GetString(op.Args, "lado"), "abajo", StringComparison.OrdinalIgnoreCase);
-            var clearance = OpCatalog.Length(op.Args, "holgura", "snap_to_surface") ?? 0.0;
+            var up = !string.Equals(Arg.GetString(op.Args, "side"), "down", StringComparison.OrdinalIgnoreCase);
+            var clearance = OpCatalog.Length(op.Args, "clearance", "snap_to_surface") ?? 0.0;
             if (ctx.GeoErrors.TryGetValue(op.Index, out var geoError)) throw new QueryException("snap_to_surface: the geometry could not be measured: " + geoError);
             ctx.Geo.TryGetValue(op.Index, out var rows);
             var boxNote = 0;
@@ -380,17 +380,17 @@ namespace Bimbridge.Addin.Revit.Writes
             {
                 var id = Ids.ToLong(e.Id);
                 if (rows == null || !rows.TryGetValue(id, out var row)) { c.Skip("its geometry could not be measured", id); continue; }
-                var cls = row.TryGetValue("clase", out var k) ? k as string : null;
+                var cls = row.TryGetValue("class", out var k) ? k as string : null;
                 if (cls == Engine.Geo.MountClass.NoSurface) { c.Skip("there is nothing " + (up ? "above" : "below") + " within the maximum distance (the elevation is not made up)", id); continue; }
-                if (!(row.TryGetValue("mover", out var mv) && mv is double mover) || double.IsNaN(mover)) { c.Skip("could not be measured (open mesh or no body)", id); continue; }
-                if (row.ContainsKey("cuerpo")) boxNote++;
+                if (!(row.TryGetValue("move", out var mv) && mv is double mover) || double.IsNaN(mover)) { c.Skip("could not be measured (open mesh or no body)", id); continue; }
+                if (row.ContainsKey("body")) boxNote++;
                 var delta = mover - (up ? clearance : -clearance);
                 var ep = WriteKit.ElevParam(e);
                 if (ep == null || ep.IsReadOnly) { c.Skip("has no editable elevation", id); continue; }
                 var now = ep.AsDouble();
                 if (Math.Abs(delta) < 1e-6) { c.Add(new PlanEntry { Id = id, Key = "elev", Before = PlanEntry.Canon(now), After = PlanEntry.Canon(now) }); continue; }
                 var target = now + delta;
-                var show = Ft(target) + " (" + (delta > 0 ? "up " : "down ") + Lengths.Inches16(Math.Abs(delta)) + ", against " + (row.TryGetValue("contra", out var ct) ? ct : "?") + ")";
+                var show = Ft(target) + " (" + (delta > 0 ? "up " : "down ") + Lengths.Inches16(Math.Abs(delta)) + ", against " + (row.TryGetValue("against", out var ct) ? ct : "?") + ")";
                 c.Add(new PlanEntry { Id = id, Key = "elev", Before = PlanEntry.Canon(now), Target = target, After = PlanEntry.Canon(target), Show = show });
             }
             if (boxNote > 0) c.Note("snap_to_surface: " + boxNote + " measured with their bounding box (no body mesh); review them");
@@ -432,7 +432,7 @@ namespace Bimbridge.Addin.Revit.Writes
         {
             var deg = OpCatalog.Number(op.Args, "deg", "rotate") ?? 0;
             double[] center = null;
-            if (op.Args.TryGetValue("centro", out var ce) && ce is List<object>) center = OpCatalog.Point(ce, "rotate centro", false);
+            if (op.Args.TryGetValue("center", out var ce) && ce is List<object>) center = OpCatalog.Point(ce, "rotate center", false);
             var target = new Dictionary<string, object> { ["deg"] = deg };
             if (center != null) { target["cx"] = center[0]; target["cy"] = center[1]; }
             Templates(op, c, "rot", target, deg.ToString(CultureInfo.InvariantCulture) + "°");
@@ -457,11 +457,11 @@ namespace Bimbridge.Addin.Revit.Writes
 
         private static void Mirror(BuildContext ctx, OpSpec op, IList<long> ids, Collector c)
         {
-            var axisPoints = OpCatalog.Points(op.Args["eje"], "mirror eje", 2, 2, false);
-            var copy = Arg.GetBool(op.Args, "copiar") ?? false;
+            var axisPoints = OpCatalog.Points(op.Args["axis"], "mirror axis", 2, 2, false);
+            var copy = Arg.GetBool(op.Args, "copy") ?? false;
             var axis = WriteKit.List(axisPoints[0][0], axisPoints[0][1], axisPoints[1][0], axisPoints[1][1]);
-            if (!copy) Templates(op, c, "loc", new Dictionary<string, object> { ["eje"] = axis }, "mirror");
-            else Templates(op, c, "nuevo", new Dictionary<string, object> { ["eje"] = axis }, "mirrored copy of each created element");
+            if (!copy) Templates(op, c, "loc", new Dictionary<string, object> { ["axis"] = axis }, "mirror");
+            else Templates(op, c, "new", new Dictionary<string, object> { ["axis"] = axis }, "mirrored copy of each created element");
             foreach (var e in Editable(ctx, ids, c, allowPinned: copy))
             {
                 var id = Ids.ToLong(e.Id);
@@ -469,9 +469,9 @@ namespace Bimbridge.Addin.Revit.Writes
                 if (loc == null) { c.Skip("has no location", id); continue; }
                 var m = Reflect(loc, axisPoints[0][0], axisPoints[0][1], axisPoints[1][0], axisPoints[1][1]);
                 if (copy)
-                    c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = "mirrored copy of " + id, Show = "mirrored copy of " + id + " at " + WriteKit.Xyz(m), Target = new Dictionary<string, object> { ["src"] = id, ["eje"] = axis } });
+                    c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = "mirrored copy of " + id, Show = "mirrored copy of " + id + " at " + WriteKit.Xyz(m), Target = new Dictionary<string, object> { ["src"] = id, ["axis"] = axis } });
                 else
-                    c.Add(new PlanEntry { Id = id, Key = "loc", Before = WriteKit.Xyz(loc), Target = new Dictionary<string, object> { ["eje"] = axis }, After = WriteKit.Xyz(m) });
+                    c.Add(new PlanEntry { Id = id, Key = "loc", Before = WriteKit.Xyz(loc), Target = new Dictionary<string, object> { ["axis"] = axis }, After = WriteKit.Xyz(m) });
             }
         }
 
@@ -487,12 +487,12 @@ namespace Bimbridge.Addin.Revit.Writes
         private static void Copy(BuildContext ctx, OpSpec op, IList<long> ids, Collector c)
         {
             Level lvl = null;
-            if (op.Args.ContainsKey("nivel")) lvl = ctx.Model.FindLevel(Arg.GetString(op.Args, "nivel"), "copy");
+            if (op.Args.ContainsKey("level")) lvl = ctx.Model.FindLevel(Arg.GetString(op.Args, "level"), "copy");
             var v = lvl == null ? Vector(op, "copy") : null;
             var hostedNote = 0;
             var tplTarget = new Dictionary<string, object>();
-            if (lvl != null) tplTarget["nivel"] = Ids.ToLong(lvl.Id); else tplTarget["v"] = WriteKit.List(v);
-            Templates(op, c, "nuevo", tplTarget, lvl != null ? "copy of each created element on " + lvl.Name : "copy of each created element offset by " + WriteKit.Xyz(v));
+            if (lvl != null) tplTarget["level"] = Ids.ToLong(lvl.Id); else tplTarget["v"] = WriteKit.List(v);
+            Templates(op, c, "new", tplTarget, lvl != null ? "copy of each created element on " + lvl.Name : "copy of each created element offset by " + WriteKit.Xyz(v));
             foreach (var e in Editable(ctx, ids, c, allowPinned: true))
             {
                 var id = Ids.ToLong(e.Id);
@@ -503,7 +503,7 @@ namespace Bimbridge.Addin.Revit.Writes
                     var old = WriteKit.LevelOf(ctx.Doc, e);
                     if (old == null) { c.Skip("has no level", id); continue; }
                     if (old.Id == lvl.Id) { c.Skip("already on " + lvl.Name, id); continue; }
-                    t["nivel"] = Ids.ToLong(lvl.Id);
+                    t["level"] = Ids.ToLong(lvl.Id);
                     t["dz"] = lvl.ProjectElevation - old.ProjectElevation;
                     var lp = WriteKit.LevelParam(e);
                     if (lp == null || lp.IsReadOnly) hostedNote++;
@@ -514,7 +514,7 @@ namespace Bimbridge.Addin.Revit.Writes
                     t["v"] = WriteKit.List(v);
                     show = "copy of " + id + " offset by " + WriteKit.Xyz(v);
                 }
-                c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });
+                c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = t });
             }
             if (hostedNote > 0) c.Note("copy: " + hostedNote + " copies cannot change level (hosted family): they are raised by the level difference but stay associated with the original level");
         }
@@ -525,7 +525,7 @@ namespace Bimbridge.Addin.Revit.Writes
 
         private static void Place(BuildContext ctx, OpSpec op, Collector c)
         {
-            var host = Arg.GetString(op.Args, "anfitrion");
+            var host = Arg.GetString(op.Args, "host");
             if (!string.IsNullOrWhiteSpace(host))
                 throw new QueryException("place: a physical host '" + host + "' is required. This operation only places by level; specify a compatible family and rule.");
             var sourceBound = !string.IsNullOrEmpty(Arg.GetString(op.Args, SourceBinding.OpField));
@@ -536,11 +536,11 @@ namespace Bimbridge.Addin.Revit.Writes
             if (pt != FamilyPlacementType.OneLevelBased && pt != FamilyPlacementType.WorkPlaneBased)
                 throw new QueryException("place: " + sym.FamilyName + " is a " + pt + " family (it needs a host: wall, face or ceiling). Copy an existing instance with copy");
             var lvl = ctx.Model.FindLevel(Arg.GetString(op.Args, "level"), "place");
-            var points = OpCatalog.Points(op.Args["puntos"], "place puntos", 1, 5000);
-            var sourceItems = op.Args.TryGetValue("items_fuente", out var rawItems) ? rawItems as List<object> : null;
+            var points = OpCatalog.Points(op.Args["points"], "place points", 1, 5000);
+            var sourceItems = op.Args.TryGetValue("source_items", out var rawItems) ? rawItems as List<object> : null;
             var elev = OpCatalog.Length(op.Args, "elev", "place");
-            var mounting = Arg.GetString(op.Args, "montaje");
-            var clearance = OpCatalog.Length(op.Args, "holgura", "place") ?? 0.0;
+            var mounting = Arg.GetString(op.Args, "mounting");
+            var clearance = OpCatalog.Length(op.Args, "clearance", "place") ?? 0.0;
             var rot = OpCatalog.Number(op.Args, "rot", "place");
             Workset ws = null;
             if (op.Args.ContainsKey("ws")) ws = ctx.Model.FindWorkset(Arg.GetString(op.Args, "ws"), "place");
@@ -565,10 +565,10 @@ namespace Bimbridge.Addin.Revit.Writes
             }
 
             Dictionary<long, Dictionary<string, object>> geo = null;
-            var up = !string.Equals(mounting, "piso", StringComparison.OrdinalIgnoreCase);
-            if (mounting != null && ctx.GeoErrors.TryGetValue(op.Index, out var geoError)) throw new QueryException(geoError.StartsWith("place", StringComparison.Ordinal) ? geoError : "place montaje: " + geoError);
+            var up = !string.Equals(mounting, "floor", StringComparison.OrdinalIgnoreCase);
+            if (mounting != null && ctx.GeoErrors.TryGetValue(op.Index, out var geoError)) throw new QueryException(geoError.StartsWith("place", StringComparison.Ordinal) ? geoError : "place mounting: " + geoError);
             if (mounting != null && !ctx.Geo.TryGetValue(op.Index, out geo))
-                throw new QueryException("place montaje: the type's body could not be measured (there are no instances of " + sym.FamilyName + ": " + sym.Name + " in the model). Give elev");
+                throw new QueryException("place mounting: the type's body could not be measured (there are no instances of " + sym.FamilyName + ": " + sym.Name + " in the model). Give elev");
             ctx.GeoNominal.TryGetValue(op.Index, out var nominal);
 
             for (var i = 0; i < points.Count; i++)
@@ -578,27 +578,27 @@ namespace Bimbridge.Addin.Revit.Writes
                 string how = elev.HasValue ? "elev " + Ft(elev.Value) : "default elev";
                 if (geo != null)
                 {
-                    if (!geo.TryGetValue(i, out var row) || !(row.TryGetValue("mover", out var mv) && mv is double mover) || double.IsNaN(mover))
+                    if (!geo.TryGetValue(i, out var row) || !(row.TryGetValue("move", out var mv) && mv is double mover) || double.IsNaN(mover))
                     {
                         if (sourceBound) throw new QueryException("registered-source place: there is no measurable support at point " + (i + 1));
                         c.Skip("there is no measurable " + (up ? "slab above" : "floor below") + " at that point (the elevation is not made up)", i + 1);
                         continue;
                     }
                     offset = nominal + mover - (up ? clearance : -clearance);
-                    how = "flush with " + (row.TryGetValue("contra", out var ct) ? ct : "the surface") + " (elev " + Ft(offset.Value) + ")";
+                    how = "flush with " + (row.TryGetValue("against", out var ct) ? ct : "the surface") + " (elev " + Ft(offset.Value) + ")";
                 }
                 var t = new Dictionary<string, object>
                 {
                     ["sym"] = Ids.ToLong(sym.Id), ["lvl"] = Ids.ToLong(lvl.Id), ["x"] = p[0], ["y"] = p[1],
                 };
                 if (offset.HasValue) t["elev"] = offset.Value;
-                if (sourceBound) t["z_verificar"] = lvl.ProjectElevation + (offset ?? 0);
-                if (sourceItems != null) t["item_fuente"] = sourceItems[i];
+                if (sourceBound) t["z_check"] = lvl.ProjectElevation + (offset ?? 0);
+                if (sourceItems != null) t["source"] = sourceItems[i];
                 if (rot.HasValue && Math.Abs(rot.Value) > 1e-9) t["rot"] = rot.Value;
                 if (ws != null) t["ws"] = (long)ws.Id.IntegerValue;
                 if (converted.Count > 0) t["params"] = converted;
                 var show = sym.FamilyName + ": " + sym.Name + " at (" + Math.Round(p[0], 3) + ", " + Math.Round(p[1], 3) + ") " + lvl.Name + ", " + how;
-                c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });
+                c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = t });
             }
         }
 
@@ -638,7 +638,7 @@ namespace Bimbridge.Addin.Revit.Writes
             var tt = Arg.GetString(op.Args, "tag_type");
             if (tt != null) forcedType = ctx.Model.FindType(tt, "tag", x => x.Category != null && CatBic(x.Category).ToString().EndsWith("Tags", StringComparison.Ordinal), "tag types");
             var leaderArg = Arg.GetBool(op.Args, "leader");
-            var orientArg = Arg.GetString(op.Args, "orientacion");
+            var orientArg = Arg.GetString(op.Args, "orientation");
             double[] offsetPaper = op.Args.TryGetValue("offset", out var off) && off != null ? OpCatalog.Point(off, "tag offset", false) : null;
             var scale = view != null ? Math.Max(1, view.Scale) : 96;
 
@@ -646,7 +646,7 @@ namespace Bimbridge.Addin.Revit.Writes
             var tpl = new Dictionary<string, object> { ["ttype"] = forcedType != null ? Ids.ToLong(forcedType.Id) : -1L };
             if (view != null) tpl["view"] = Ids.ToLong(view.Id); else tpl["view_ref"] = (long)viewRef;
             if (leaderArg.HasValue) tpl["leader"] = leaderArg.Value;
-            if (orientArg != null) tpl["orientacion"] = orientArg;
+            if (orientArg != null) tpl["orientation"] = orientArg;
             if (offsetPaper != null) tpl["offset"] = WriteKit.List(offsetPaper[0], offsetPaper[1]);
             foreach (var r in op.RefOps.Distinct())
             {
@@ -669,7 +669,7 @@ namespace Bimbridge.Addin.Revit.Writes
                 };
                 if (view != null) t["view"] = Ids.ToLong(view.Id); else t["view_ref"] = (long)viewRef;
                 var show = "tag " + TagKit.TypeLabel(ctx.Doc, ch.TypeId) + " for " + id + " in " + (view?.Name ?? "@" + viewRef);
-                c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });
+                c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = t });
             }
             foreach (var n in notes) c.Note("tag: " + n);
         }
@@ -690,9 +690,9 @@ namespace Bimbridge.Addin.Revit.Writes
             var dxp = OpCatalog.Number(op.Args, "dxp", "tag_move") ?? 0;
             var dyp = OpCatalog.Number(op.Args, "dyp", "tag_move") ?? 0;
             var leaderArg = Arg.GetBool(op.Args, "leader");
-            var orientArg = Arg.GetString(op.Args, "orientacion");
-            double[] end = op.Args.TryGetValue("extremo", out var ex) && ex != null ? OpCatalog.Point(ex, "tag_move extremo", false) : null;
-            double[] elbow = op.Args.TryGetValue("codo", out var co) && co != null ? OpCatalog.Point(co, "tag_move codo", false) : null;
+            var orientArg = Arg.GetString(op.Args, "orientation");
+            double[] end = op.Args.TryGetValue("end", out var ex) && ex != null ? OpCatalog.Point(ex, "tag_move end", false) : null;
+            double[] elbow = op.Args.TryGetValue("elbow", out var co) && co != null ? OpCatalog.Point(co, "tag_move elbow", false) : null;
             foreach (var e in Editable(ctx, ids, c, allowGroup: true))
             {
                 var id = Ids.ToLong(e.Id);
@@ -709,10 +709,10 @@ namespace Bimbridge.Addin.Revit.Writes
                 var target = new Dictionary<string, object> { ["hx"] = nx, ["hy"] = ny, ["hz"] = now.Z, ["leader"] = newLeader, ["vertical"] = newVertical };
                 if (end != null) target["ex"] = WriteKit.List(end[0], end[1]);
                 if (elbow != null) target["co"] = WriteKit.List(elbow[0], elbow[1]);
-                if ((end != null || elbow != null) && !newLeader) c.Note("tag_move: extremo/codo only apply with leader=true");
+                if ((end != null || elbow != null) && !newLeader) c.Note("tag_move: end/elbow only apply with leader=true");
                 var after = WriteKit.Xyz(new XYZ(nx, ny, now.Z)) + "|" + (newLeader ? "L" : "-") + "|" + (newVertical ? "V" : "H");
                 var entry = new PlanEntry { Id = id, Key = "head", Before = HeadCanon(t), Target = target, After = after };
-                if (end != null || elbow != null) entry.Show = after + " (+extremo/codo)";
+                if (end != null || elbow != null) entry.Show = after + " (+end/elbow)";
                 if (entry.Before == entry.After && (end != null || elbow != null)) entry.After += "*"; // forces extremo/codo to be applied
                 c.Add(entry);
             }
@@ -724,10 +724,10 @@ namespace Bimbridge.Addin.Revit.Writes
 
         private static void GroupCreate(BuildContext ctx, OpSpec op, IList<long> ids, Collector c)
         {
-            var name = Arg.GetString(op.Args, "nombre");
+            var name = Arg.GetString(op.Args, "name");
             if (name != null)
             {
-                if (ctx.Model.Types.Any(t => t is GroupType && string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase)) || !ctx.NewNames.Add("grupo:" + name))
+                if (ctx.Model.Types.Any(t => t is GroupType && string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase)) || !ctx.NewNames.Add("group:" + name))
                     throw new QueryException("group_create: a group type named '" + name + "' already exists");
             }
             var members = Editable(ctx, ids, c, allowPinned: true).Select(e => Ids.ToLong(e.Id)).ToList();
@@ -735,9 +735,9 @@ namespace Bimbridge.Addin.Revit.Writes
             if (members.Count == 0 && refs.Count == 0) throw new QueryException("group_create: no element can be grouped");
             var t = new Dictionary<string, object> { ["ids"] = members.Cast<object>().ToList() };
             if (refs.Count > 0) t["refs"] = refs.Select(r => (object)(long)r).ToList();
-            if (name != null) t["nombre"] = name;
+            if (name != null) t["name"] = name;
             var show = "group " + (name ?? "(automatic name)") + " with " + members.Count + " elements" + (refs.Count > 0 ? " + what was created by " + string.Join(", ", refs.Select(r => "@" + r)) : "");
-            c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });
+            c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = t });
         }
 
         private static void Ungroup(BuildContext ctx, OpSpec op, IList<long> ids, Collector c)
@@ -752,25 +752,25 @@ namespace Bimbridge.Addin.Revit.Writes
 
         private static void GroupPlace(BuildContext ctx, OpSpec op, Collector c)
         {
-            var gref = KeyRef(op, "tipo");
+            var gref = KeyRef(op, "type");
             GroupType gt = null;
-            if (gref == 0) gt = ctx.Model.FindType(Arg.GetString(op.Args, "tipo"), "group_place", t => t is GroupType, "group types") as GroupType;
+            if (gref == 0) gt = ctx.Model.FindType(Arg.GetString(op.Args, "type"), "group_place", t => t is GroupType, "group types") as GroupType;
             else if (!ctx.Ops.TryGetValue(gref, out var src) || src.Kind != "group_create")
-                throw new QueryException("group_place tipo: @" + gref + " must be a group_create of this plan");
-            var level = Arg.GetString(op.Args, "nivel") is string levelName ? ctx.Model.FindLevel(levelName, op.Kind) : null;
+                throw new QueryException("group_place type: @" + gref + " must be a group_create of this plan");
+            var level = Arg.GetString(op.Args, "level") is string levelName ? ctx.Model.FindLevel(levelName, op.Kind) : null;
             var workset = Arg.GetString(op.Args, "ws") is string worksetName ? ctx.Model.FindWorkset(worksetName, op.Kind) : null;
             var rotation = OpCatalog.Number(op.Args, "rot", op.Kind);
-            var reuse = Arg.GetBool(op.Args, "reutilizar") == true;
+            var reuse = Arg.GetBool(op.Args, "reuse") == true;
             Group prototype = null;
             string signature = null;
-            if (Arg.GetLong(op.Args, "prototipo") is long sourceId)
+            if (Arg.GetLong(op.Args, "prototype") is long sourceId)
             {
                 prototype = ctx.Doc.GetElement(Ids.ToId(sourceId)) as Group;
                 if (prototype == null || gt == null || prototype.GetTypeId() != gt.Id)
                     throw new QueryException("group_place: the prototype must exist and match the type of this variant");
                 signature = GroupPlacement.Signature(prototype);
             }
-            var points = OpCatalog.Points(op.Args["puntos"], "group_place puntos", 1, 200);
+            var points = OpCatalog.Points(op.Args["points"], "group_place points", 1, 200);
             foreach (var p in points)
             {
                 var t = new Dictionary<string, object>
@@ -778,13 +778,13 @@ namespace Bimbridge.Addin.Revit.Writes
                     ["x"] = p[0], ["y"] = p[1], ["z"] = (p.Length > 2 ? p[2] : 0.0) + (level?.ProjectElevation ?? 0),
                 };
                 if (gt != null) t["gtype"] = Ids.ToLong(gt.Id); else t["gref"] = (long)gref;
-                if (level != null) t["nivel"] = Ids.ToLong(level.Id);
+                if (level != null) t["level"] = Ids.ToLong(level.Id);
                 if (rotation.HasValue) t["rot"] = rotation.Value;
                 if (workset != null) t["ws"] = (long)workset.Id.IntegerValue;
-                if (signature != null) { t["firma_miembros"] = signature; t["prototipo"] = Ids.ToLong(prototype.Id); }
+                if (signature != null) { t["member_signature"] = signature; t["prototype"] = Ids.ToLong(prototype.Id); }
                 if (reuse)
                 {
-                    t["reutilizar"] = true;
+                    t["reuse"] = true;
                     if (gt != null)
                     {
                         var matches = GroupPlacement.AtPoint(ctx.Doc, gt.Id, GroupPlacement.Point(t));
@@ -800,7 +800,7 @@ namespace Bimbridge.Addin.Revit.Writes
                 }
                 var show = "group " + (gt?.Name ?? "@" + gref) + " at (" + Math.Round(p[0], 3) + ", " + Math.Round(p[1], 3) + (p.Length > 2 ? ", " + Math.Round(p[2], 3) : "") + ")";
                 if (level != null) show += " relative to " + level.Name;
-                c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });
+                c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = t });
             }
         }
 
@@ -820,62 +820,62 @@ namespace Bimbridge.Addin.Revit.Writes
 
         private static void ViewCreate(BuildContext ctx, OpSpec op, Collector c)
         {
-            var kind = Arg.GetString(op.Args, "tipo").Trim().ToLowerInvariant();
-            var name = Arg.GetString(op.Args, "nombre");
-            var vtName = Arg.GetString(op.Args, "vista_tipo");
+            var kind = Arg.GetString(op.Args, "type").Trim().ToLowerInvariant();
+            var name = Arg.GetString(op.Args, "name");
+            var vtName = Arg.GetString(op.Args, "view_type");
             var vtype = ModelIndex.ViewTypeFor(kind);
-            if (kind == "duplicar" && KeyRef(op, "origen") == 0) vtype = ctx.Model.FindView(op.Args["origen"], "view_create", allowSheet: false).ViewType;
-            if (name != null && (ctx.Model.ViewNameTaken(name, vtype) || !ctx.NewNames.Add("vista:" + kind + ":" + name)))
+            if (kind == "duplicate" && KeyRef(op, "source") == 0) vtype = ctx.Model.FindView(op.Args["source"], "view_create", allowSheet: false).ViewType;
+            if (name != null && (ctx.Model.ViewNameTaken(name, vtype) || !ctx.NewNames.Add("view:" + kind + ":" + name)))
                 throw new QueryException("view_create: a view named '" + name + "' already exists");
-            var t = new Dictionary<string, object> { ["tipo"] = kind };
-            if (name != null) t["nombre"] = name;
-            var tpl = Arg.GetString(op.Args, "plantilla");
-            if (tpl != null) t["plantilla"] = Ids.ToLong(ctx.Model.FindTemplate(tpl, "view_create").Id);
+            var t = new Dictionary<string, object> { ["type"] = kind };
+            if (name != null) t["name"] = name;
+            var tpl = Arg.GetString(op.Args, "template");
+            if (tpl != null) t["template"] = Ids.ToLong(ctx.Model.FindTemplate(tpl, "view_create").Id);
             string show;
             switch (kind)
             {
-                case "plano":
+                case "plan":
                 case "rcp":
                 {
-                    var lvl = ctx.Model.FindLevel(Arg.GetString(op.Args, "nivel"), "view_create");
+                    var lvl = ctx.Model.FindLevel(Arg.GetString(op.Args, "level"), "view_create");
                     var vft = Vft(ctx, kind == "rcp" ? ViewFamily.CeilingPlan : ViewFamily.FloorPlan, vtName, "view_create");
-                    t["nivel"] = Ids.ToLong(lvl.Id); t["vft"] = Ids.ToLong(vft.Id);
+                    t["level"] = Ids.ToLong(lvl.Id); t["vft"] = Ids.ToLong(vft.Id);
                     show = (kind == "rcp" ? "ceiling plan" : "floor plan") + " of " + lvl.Name;
                     break;
                 }
-                case "seccion":
+                case "section":
                 {
-                    var box = OpCatalog.Points(op.Args["caja"], "view_create caja", 2, 2);
-                    var depth = OpCatalog.Length(op.Args, "profundidad", "view_create") ?? 6.0;
-                    if (Math.Abs(box[0][0] - box[1][0]) + Math.Abs(box[0][1] - box[1][1]) < 0.01) throw new QueryException("view_create seccion: the section line (x0,y0)→(x1,y1) cannot be a point");
+                    var box = OpCatalog.Points(op.Args["box"], "view_create box", 2, 2);
+                    var depth = OpCatalog.Length(op.Args, "depth", "view_create") ?? 6.0;
+                    if (Math.Abs(box[0][0] - box[1][0]) + Math.Abs(box[0][1] - box[1][1]) < 0.01) throw new QueryException("view_create section: the section line (x0,y0)→(x1,y1) cannot be a point");
                     var vft = Vft(ctx, ViewFamily.Section, vtName, "view_create");
                     t["vft"] = Ids.ToLong(vft.Id);
-                    t["caja"] = new List<object> { WriteKit.List(box[0][0], box[0][1], box[0].Length > 2 ? box[0][2] : 0), WriteKit.List(box[1][0], box[1][1], box[1].Length > 2 ? box[1][2] : 10) };
+                    t["box"] = new List<object> { WriteKit.List(box[0][0], box[0][1], box[0].Length > 2 ? box[0][2] : 0), WriteKit.List(box[1][0], box[1][1], box[1].Length > 2 ? box[1][2] : 10) };
                     t["prof"] = depth;
                     show = "section from (" + Math.Round(box[0][0], 2) + ", " + Math.Round(box[0][1], 2) + ") to (" + Math.Round(box[1][0], 2) + ", " + Math.Round(box[1][1], 2) + "), depth " + Ft(depth);
                     break;
                 }
                 case "callout":
                 {
-                    var parentRef = KeyRef(op, "origen");
+                    var parentRef = KeyRef(op, "source");
                     if (parentRef > 0) throw new QueryException("view_create callout: the parent must already exist (not @n)");
-                    var parent = ctx.Model.FindView(op.Args["origen"], "view_create", allowSheet: false);
-                    var box = OpCatalog.Points(op.Args["caja"], "view_create caja", 2, 2);
+                    var parent = ctx.Model.FindView(op.Args["source"], "view_create", allowSheet: false);
+                    var box = OpCatalog.Points(op.Args["box"], "view_create box", 2, 2);
                     ViewFamily fam;
                     var pv = ctx.Model.Types.OfType<ViewFamilyType>().FirstOrDefault(v => v.Id == parent.GetTypeId());
                     fam = pv?.ViewFamily ?? ViewFamily.FloorPlan;
                     var vft = Vft(ctx, fam, vtName, "view_create");
-                    t["origen"] = Ids.ToLong(parent.Id); t["vft"] = Ids.ToLong(vft.Id);
-                    t["caja"] = new List<object> { WriteKit.List(box[0][0], box[0][1], 0), WriteKit.List(box[1][0], box[1][1], 0) };
+                    t["origin"] = Ids.ToLong(parent.Id); t["vft"] = Ids.ToLong(vft.Id);
+                    t["box"] = new List<object> { WriteKit.List(box[0][0], box[0][1], 0), WriteKit.List(box[1][0], box[1][1], 0) };
                     show = "callout in " + parent.Name;
                     break;
                 }
-                case "dibujo":
+                case "drafting":
                 {
                     var vft = Vft(ctx, ViewFamily.Drafting, vtName, "view_create");
                     t["vft"] = Ids.ToLong(vft.Id);
-                    var esc = OpCatalog.Number(op.Args, "escala", "view_create");
-                    if (esc.HasValue) { if (esc < 1 || esc > 24000) throw new QueryException("view_create escala: 1–24000"); t["escala"] = (long)esc.Value; }
+                    var esc = OpCatalog.Number(op.Args, "scale", "view_create");
+                    if (esc.HasValue) { if (esc < 1 || esc > 24000) throw new QueryException("view_create scale: 1–24000"); t["scale"] = (long)esc.Value; }
                     show = "drafting view" + (esc.HasValue ? " 1:" + esc.Value : "");
                     break;
                 }
@@ -883,31 +883,31 @@ namespace Bimbridge.Addin.Revit.Writes
                 {
                     var vft = Vft(ctx, ViewFamily.ThreeDimensional, vtName, "view_create");
                     t["vft"] = Ids.ToLong(vft.Id);
-                    if (op.Args.ContainsKey("caja"))
+                    if (op.Args.ContainsKey("box"))
                     {
-                        var box = OpCatalog.Points(op.Args["caja"], "view_create caja", 2, 2);
-                        t["caja"] = new List<object> { WriteKit.List(box[0][0], box[0][1], box[0].Length > 2 ? box[0][2] : -1e3), WriteKit.List(box[1][0], box[1][1], box[1].Length > 2 ? box[1][2] : 1e3) };
+                        var box = OpCatalog.Points(op.Args["box"], "view_create box", 2, 2);
+                        t["box"] = new List<object> { WriteKit.List(box[0][0], box[0][1], box[0].Length > 2 ? box[0][2] : -1e3), WriteKit.List(box[1][0], box[1][1], box[1].Length > 2 ? box[1][2] : 1e3) };
                     }
-                    show = "3D view" + (op.Args.ContainsKey("caja") ? " with section box" : "");
+                    show = "3D view" + (op.Args.ContainsKey("box") ? " with section box" : "");
                     break;
                 }
-                case "duplicar":
+                case "duplicate":
                 {
-                    var srcRef = KeyRef(op, "origen");
-                    if (srcRef > 0) throw new QueryException("view_create duplicar: the source must already exist (not @n)");
-                    var src = ctx.Model.FindView(op.Args["origen"], "view_create", allowSheet: false);
-                    var opt = (Arg.GetString(op.Args, "opcion") ?? "duplicar").ToLowerInvariant();
-                    var dupOpt = opt == "detalles" ? ViewDuplicateOption.WithDetailing : opt == "dependiente" ? ViewDuplicateOption.AsDependent : ViewDuplicateOption.Duplicate;
-                    if (!src.CanViewBeDuplicated(dupOpt)) throw new QueryException("view_create duplicar: Revit does not allow duplicating '" + src.Name + "' as " + opt);
-                    t["origen"] = Ids.ToLong(src.Id); t["opcion"] = opt;
+                    var srcRef = KeyRef(op, "source");
+                    if (srcRef > 0) throw new QueryException("view_create duplicate: the source must already exist (not @n)");
+                    var src = ctx.Model.FindView(op.Args["source"], "view_create", allowSheet: false);
+                    var opt = (Arg.GetString(op.Args, "option") ?? "duplicate").ToLowerInvariant();
+                    var dupOpt = opt == "with_detailing" ? ViewDuplicateOption.WithDetailing : opt == "dependent" ? ViewDuplicateOption.AsDependent : ViewDuplicateOption.Duplicate;
+                    if (!src.CanViewBeDuplicated(dupOpt)) throw new QueryException("view_create duplicate: Revit does not allow duplicating '" + src.Name + "' as " + opt);
+                    t["origin"] = Ids.ToLong(src.Id); t["option"] = opt;
                     show = "copy (" + opt + ") of " + src.Name;
                     break;
                 }
-                default: throw new QueryException("view_create: unknown tipo");
+                default: throw new QueryException("view_create: unknown type");
             }
             if (name != null) show += " named '" + name + "'";
             if (tpl != null) show += " with template " + tpl;
-            c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });
+            c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = t });
         }
 
         /// <summary>Does the view template control that parameter? (then it cannot be changed in the view).</summary>
@@ -933,16 +933,16 @@ namespace Bimbridge.Addin.Revit.Writes
             {
                 var r = v.GetViewRange();
                 var parts = new List<string>();
-                foreach (var kv in new[] { ("top", PlanViewPlane.TopClipPlane), ("corte", PlanViewPlane.CutPlane), ("fondo", PlanViewPlane.BottomClipPlane), ("profundidad", PlanViewPlane.ViewDepthPlane) })
+                foreach (var kv in new[] { ("top", PlanViewPlane.TopClipPlane), ("cut", PlanViewPlane.CutPlane), ("bottom", PlanViewPlane.BottomClipPlane), ("depth", PlanViewPlane.ViewDepthPlane) })
                 {
                     var lid = r.GetLevelId(kv.Item2);
                     string lname;
-                    if (lid == PlanViewRange.Unlimited) lname = "ilimitado";
-                    else if (lid == PlanViewRange.Current) lname = "actual";
-                    else if (lid == PlanViewRange.LevelAbove) lname = "arriba";
-                    else if (lid == PlanViewRange.LevelBelow) lname = "abajo";
+                    if (lid == PlanViewRange.Unlimited) lname = "unlimited";
+                    else if (lid == PlanViewRange.Current) lname = "current";
+                    else if (lid == PlanViewRange.LevelAbove) lname = "up";
+                    else if (lid == PlanViewRange.LevelBelow) lname = "down";
                     else lname = doc.GetElement(lid)?.Name ?? "?";
-                    parts.Add(kv.Item1 + "=" + lname + (lname == "ilimitado" ? "" : "+" + WriteKit.Num(r.GetOffset(kv.Item2))));
+                    parts.Add(kv.Item1 + "=" + lname + (lname == "unlimited" ? "" : "+" + WriteKit.Num(r.GetOffset(kv.Item2))));
                 }
                 return string.Join("|", parts);
             }
@@ -954,14 +954,14 @@ namespace Bimbridge.Addin.Revit.Writes
             var a = op.Args;
             // Values already resolved (common to all views).
             View tpl = null; var noTpl = false;
-            if (a.ContainsKey("plantilla"))
+            if (a.ContainsKey("template"))
             {
-                var n = Arg.GetString(a, "plantilla");
-                if (n == null || n.Equals("ninguna", StringComparison.OrdinalIgnoreCase) || n.Equals("none", StringComparison.OrdinalIgnoreCase)) noTpl = true;
+                var n = Arg.GetString(a, "template");
+                if (n == null || n.Equals("none", StringComparison.OrdinalIgnoreCase) || n.Equals("none", StringComparison.OrdinalIgnoreCase)) noTpl = true;
                 else tpl = ctx.Model.FindTemplate(n, "view_set");
             }
             Dictionary<string, object> range = null;
-            if (a.TryGetValue("rango", out var rg) && rg is Dictionary<string, object> rd)
+            if (a.TryGetValue("range", out var rg) && rg is Dictionary<string, object> rd)
             {
                 range = new Dictionary<string, object>();
                 foreach (var kv in rd)
@@ -972,30 +972,30 @@ namespace Bimbridge.Addin.Revit.Writes
                     long lid;
                     switch (lname.ToLowerInvariant())
                     {
-                        case "actual": lid = -101; break;
-                        case "arriba": lid = -102; break;
-                        case "abajo": lid = -103; break;
-                        case "ilimitado": lid = -104; break;
-                        default: lid = Ids.ToLong(ctx.Model.FindLevel(lname, "view_set rango").Id); break;
+                        case "current": lid = -101; break;
+                        case "up": lid = -102; break;
+                        case "down": lid = -103; break;
+                        case "unlimited": lid = -104; break;
+                        default: lid = Ids.ToLong(ctx.Model.FindLevel(lname, "view_set range").Id); break;
                     }
                     range[kv.Key] = WriteKit.List(lid, off);
                 }
             }
             long? scale = null;
-            if (a.ContainsKey("escala"))
+            if (a.ContainsKey("scale"))
             {
-                var sc = OpCatalog.Number(a, "escala", "view_set") ?? 0;
-                if (sc < 1 || sc > 24000 || Math.Abs(sc - Math.Round(sc)) > 1e-9) throw new QueryException("view_set escala: integer (96 = 1/8\" = 1'-0\")");
+                var sc = OpCatalog.Number(a, "scale", "view_set") ?? 0;
+                if (sc < 1 || sc > 24000 || Math.Abs(sc - Math.Round(sc)) > 1e-9) throw new QueryException("view_set scale: integer (96 = 1/8\" = 1'-0\")");
                 scale = (long)Math.Round(sc);
             }
-            string detail = Arg.GetString(a, "detalle");
-            string newName = Arg.GetString(a, "nombre");
-            bool? crop = Arg.GetBool(a, "recorte");
+            string detail = Arg.GetString(a, "detail");
+            string newName = Arg.GetString(a, "name");
+            bool? crop = Arg.GetBool(a, "crop");
             Element scope = null; var noScope = false;
             if (a.ContainsKey("scope_box"))
             {
                 var n = Arg.GetString(a, "scope_box");
-                if (n == null || n.Equals("ninguno", StringComparison.OrdinalIgnoreCase) || n.Equals("none", StringComparison.OrdinalIgnoreCase)) noScope = true;
+                if (n == null || n.Equals("none", StringComparison.OrdinalIgnoreCase) || n.Equals("none", StringComparison.OrdinalIgnoreCase)) noScope = true;
                 else
                 {
                     var hits = new FilteredElementCollector(ctx.Doc).OfCategory(BuiltInCategory.OST_VolumeOfInterest).WhereElementIsNotElementType()
@@ -1004,17 +1004,17 @@ namespace Bimbridge.Addin.Revit.Writes
                     scope = hits[0];
                 }
             }
-            List<double[]> secBox = a.ContainsKey("caja_seccion") ? OpCatalog.Points(a["caja_seccion"], "view_set caja_seccion", 2, 2) : null;
+            List<double[]> secBox = a.ContainsKey("section_box") ? OpCatalog.Points(a["section_box"], "view_set section_box", 2, 2) : null;
 
             // Templates on views this plan creates (@n).
-            if (tpl != null || noTpl) Templates(op, c, "plantilla", tpl != null ? Ids.ToLong(tpl.Id) : -1L, tpl?.Name ?? "ninguna");
-            if (range != null) Templates(op, c, "rango", range, "view range");
-            if (scale.HasValue) Templates(op, c, "escala", scale.Value, scale.Value.ToString(CultureInfo.InvariantCulture));
-            if (detail != null) Templates(op, c, "detalle", detail, detail);
-            if (newName != null && op.RefOps.Count > 0) throw new QueryException("view_set nombre: set it in view_create (nombre) for new views");
-            if (crop.HasValue) Templates(op, c, "recorte", crop.Value, crop.Value ? "yes" : "no");
-            if (scope != null || noScope) Templates(op, c, "scope_box", scope != null ? Ids.ToLong(scope.Id) : -1L, scope?.Name ?? "ninguno");
-            if (secBox != null) Templates(op, c, "caja_seccion", new List<object> { WriteKit.List(secBox[0]), WriteKit.List(secBox[1]) }, "section box");
+            if (tpl != null || noTpl) Templates(op, c, "template", tpl != null ? Ids.ToLong(tpl.Id) : -1L, tpl?.Name ?? "none");
+            if (range != null) Templates(op, c, "range", range, "view range");
+            if (scale.HasValue) Templates(op, c, "scale", scale.Value, scale.Value.ToString(CultureInfo.InvariantCulture));
+            if (detail != null) Templates(op, c, "detail", detail, detail);
+            if (newName != null && op.RefOps.Count > 0) throw new QueryException("view_set name: set it in view_create (name) for new views");
+            if (crop.HasValue) Templates(op, c, "crop", crop.Value, crop.Value ? "yes" : "no");
+            if (scope != null || noScope) Templates(op, c, "scope_box", scope != null ? Ids.ToLong(scope.Id) : -1L, scope?.Name ?? "none");
+            if (secBox != null) Templates(op, c, "section_box", new List<object> { WriteKit.List(secBox[0]), WriteKit.List(secBox[1]) }, "section box");
 
             foreach (var id in ids.Distinct())
             {
@@ -1027,32 +1027,32 @@ namespace Bimbridge.Addin.Revit.Writes
                 if (tpl != null || noTpl)
                 {
                     var cur = ctx.Doc.GetElement(v.ViewTemplateId) as View;
-                    c.Add(new PlanEntry { Id = id, Key = "plantilla", Before = cur?.Name ?? "ninguna", Target = tpl != null ? Ids.ToLong(tpl.Id) : -1L, After = tpl?.Name ?? "ninguna" });
+                    c.Add(new PlanEntry { Id = id, Key = "template", Before = cur?.Name ?? "none", Target = tpl != null ? Ids.ToLong(tpl.Id) : -1L, After = tpl?.Name ?? "none" });
                 }
                 if (range != null)
                 {
                     if (!(v is ViewPlan vp)) c.Skip("view range only exists in floor plans and ceiling plans", id);
                     else if (tpl == null && ControlledByTemplate(ctx.Doc, v, BuiltInParameter.PLAN_VIEW_RANGE, out tname)) c.Skip("its template (" + tname + ") controls the view range", id);
-                    else c.Add(new PlanEntry { Id = id, Key = "rango", Before = RangeCanon(ctx.Doc, vp), Target = range, After = PredictRange(ctx.Doc, vp, range) });
+                    else c.Add(new PlanEntry { Id = id, Key = "range", Before = RangeCanon(ctx.Doc, vp), Target = range, After = PredictRange(ctx.Doc, vp, range) });
                 }
                 if (scale.HasValue)
                 {
                     if (tpl == null && ControlledByTemplate(ctx.Doc, v, BuiltInParameter.VIEW_SCALE_PULLDOWN_IMPERIAL, out tname)) c.Skip("its template (" + tname + ") controls the scale", id);
-                    else c.Add(new PlanEntry { Id = id, Key = "escala", Before = PlanEntry.Canon((long)v.Scale), Target = scale.Value, After = PlanEntry.Canon(scale.Value) });
+                    else c.Add(new PlanEntry { Id = id, Key = "scale", Before = PlanEntry.Canon((long)v.Scale), Target = scale.Value, After = PlanEntry.Canon(scale.Value) });
                 }
                 if (detail != null)
                 {
                     if (tpl == null && ControlledByTemplate(ctx.Doc, v, BuiltInParameter.VIEW_DETAIL_LEVEL, out tname)) c.Skip("its template (" + tname + ") controls the detail level", id);
-                    else c.Add(new PlanEntry { Id = id, Key = "detalle", Before = DetailName(v.DetailLevel), Target = detail, After = detail });
+                    else c.Add(new PlanEntry { Id = id, Key = "detail", Before = DetailName(v.DetailLevel), Target = detail, After = detail });
                 }
                 if (newName != null)
                 {
-                    if (!string.Equals(v.Name, newName, StringComparison.Ordinal) && (ctx.Model.ViewNameTaken(newName, v.ViewType) || !ctx.NewNames.Add("vista:" + v.ViewType + ":" + newName)))
-                        throw new QueryException("view_set nombre: a view named '" + newName + "' already exists");
-                    c.Add(new PlanEntry { Id = id, Key = "nombre", Before = v.Name, Target = newName, After = newName });
+                    if (!string.Equals(v.Name, newName, StringComparison.Ordinal) && (ctx.Model.ViewNameTaken(newName, v.ViewType) || !ctx.NewNames.Add("view:" + v.ViewType + ":" + newName)))
+                        throw new QueryException("view_set name: a view named '" + newName + "' already exists");
+                    c.Add(new PlanEntry { Id = id, Key = "name", Before = v.Name, Target = newName, After = newName });
                 }
                 if (crop.HasValue)
-                    c.Add(new PlanEntry { Id = id, Key = "recorte", Before = v.CropBoxActive ? "1" : "0", Target = crop.Value, After = crop.Value ? "1" : "0" });
+                    c.Add(new PlanEntry { Id = id, Key = "crop", Before = v.CropBoxActive ? "1" : "0", Target = crop.Value, After = crop.Value ? "1" : "0" });
                 if (scope != null || noScope)
                 {
                     var sp = v.get_Parameter(BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP);
@@ -1060,24 +1060,24 @@ namespace Bimbridge.Addin.Revit.Writes
                     else
                     {
                         var cur = ctx.Doc.GetElement(sp.AsElementId());
-                        c.Add(new PlanEntry { Id = id, Key = "scope_box", Before = cur?.Name ?? "ninguno", Target = scope != null ? Ids.ToLong(scope.Id) : -1L, After = scope?.Name ?? "ninguno" });
+                        c.Add(new PlanEntry { Id = id, Key = "scope_box", Before = cur?.Name ?? "none", Target = scope != null ? Ids.ToLong(scope.Id) : -1L, After = scope?.Name ?? "none" });
                     }
                 }
                 if (secBox != null)
                 {
-                    if (!(v is View3D v3)) c.Skip("caja_seccion only in 3D views", id);
-                    else c.Add(new PlanEntry { Id = id, Key = "caja_seccion", Before = SectionBoxCanon(v3), Target = new List<object> { WriteKit.List(secBox[0]), WriteKit.List(secBox[1]) }, After = BoxCanon(secBox[0], secBox[1]) });
+                    if (!(v is View3D v3)) c.Skip("section_box only in 3D views", id);
+                    else c.Add(new PlanEntry { Id = id, Key = "section_box", Before = SectionBoxCanon(v3), Target = new List<object> { WriteKit.List(secBox[0]), WriteKit.List(secBox[1]) }, After = BoxCanon(secBox[0], secBox[1]) });
                 }
             }
         }
 
-        public static string DetailName(ViewDetailLevel d) => d == ViewDetailLevel.Fine ? "fino" : d == ViewDetailLevel.Medium ? "medio" : d == ViewDetailLevel.Coarse ? "bajo" : "";
+        public static string DetailName(ViewDetailLevel d) => d == ViewDetailLevel.Fine ? "fine" : d == ViewDetailLevel.Medium ? "medium" : d == ViewDetailLevel.Coarse ? "coarse" : "";
 
         public static string SectionBoxCanon(View3D v)
         {
             try
             {
-                if (!v.IsSectionBoxActive) return "sin caja";
+                if (!v.IsSectionBoxActive) return "no box";
                 var b = v.GetSectionBox();
                 var t = b.Transform ?? Transform.Identity;
                 return WriteKit.Xyz(t.OfPoint(b.Min)) + ";" + WriteKit.Xyz(t.OfPoint(b.Max));
@@ -1100,10 +1100,10 @@ namespace Bimbridge.Addin.Revit.Writes
                 var l = (List<object>)kv.Value;
                 var lid = Convert.ToInt64(l[0], CultureInfo.InvariantCulture);
                 var off = Convert.ToDouble(l[1], CultureInfo.InvariantCulture);
-                var lname = lid == -101 ? "actual" : lid == -102 ? "arriba" : lid == -103 ? "abajo" : lid == -104 ? "ilimitado" : doc.GetElement(Ids.ToId(lid))?.Name ?? "?";
-                now[kv.Key] = lname + (lname == "ilimitado" ? "" : "+" + WriteKit.Num(off));
+                var lname = lid == -101 ? "current" : lid == -102 ? "up" : lid == -103 ? "down" : lid == -104 ? "unlimited" : doc.GetElement(Ids.ToId(lid))?.Name ?? "?";
+                now[kv.Key] = lname + (lname == "unlimited" ? "" : "+" + WriteKit.Num(off));
             }
-            return string.Join("|", new[] { "top", "corte", "fondo", "profundidad" }.Where(now.ContainsKey).Select(k => k + "=" + now[k]));
+            return string.Join("|", new[] { "top", "cut", "bottom", "depth" }.Where(now.ContainsKey).Select(k => k + "=" + now[k]));
         }
 
         private static (View view, int viewRef) ViewArg(BuildContext ctx, OpSpec op, string op2)
@@ -1117,7 +1117,7 @@ namespace Bimbridge.Addin.Revit.Writes
         private static void ViewHide(BuildContext ctx, OpSpec op, IList<long> ids, Collector c)
         {
             var (view, viewRef) = ViewArg(ctx, op, "view_hide");
-            var hide = Arg.GetBool(op.Args, "ocultar") ?? true;
+            var hide = Arg.GetBool(op.Args, "hide") ?? true;
             var vkey = view != null ? Ids.ToLong(view.Id).ToString(CultureInfo.InvariantCulture) : "@" + viewRef;
             var ht = new Dictionary<string, object> { ["hide"] = hide };
             if (view != null) ht["view"] = Ids.ToLong(view.Id); else ht["view_ref"] = (long)viewRef;
@@ -1177,16 +1177,16 @@ namespace Bimbridge.Addin.Revit.Writes
                 if (!WriteKit.TryColor(color, out _)) throw new QueryException("view_override color: #RRGGBB, e.g. #D27300");
                 t0["color"] = color.Trim().StartsWith("#") ? color.Trim().ToUpperInvariant() : "#" + color.Trim().ToUpperInvariant();
             }
-            if (a.ContainsKey("medio_tono")) t0["halftone"] = Arg.GetBool(a, "medio_tono") ?? true;
-            var tr = OpCatalog.Number(a, "transparencia", "view_override");
-            if (tr.HasValue) { if (tr < 0 || tr > 100) throw new QueryException("view_override transparencia: 0 to 100"); t0["transp"] = (long)Math.Round(tr.Value); }
-            var w = OpCatalog.Number(a, "grosor", "view_override");
-            if (w.HasValue) { if (w < 1 || w > 16) throw new QueryException("view_override grosor: 1 to 16"); t0["weight"] = (long)Math.Round(w.Value); }
-            if (t0.Count == 0) throw new QueryException("view_override: specify color, medio_tono, transparencia, grosor or reset");
+            if (a.ContainsKey("halftone")) t0["halftone"] = Arg.GetBool(a, "halftone") ?? true;
+            var tr = OpCatalog.Number(a, "transparency", "view_override");
+            if (tr.HasValue) { if (tr < 0 || tr > 100) throw new QueryException("view_override transparency: 0 to 100"); t0["transp"] = (long)Math.Round(tr.Value); }
+            var w = OpCatalog.Number(a, "line_weight", "view_override");
+            if (w.HasValue) { if (w < 1 || w > 16) throw new QueryException("view_override line_weight: 1 to 16"); t0["weight"] = (long)Math.Round(w.Value); }
+            if (t0.Count == 0) throw new QueryException("view_override: specify color, halftone, transparency, line_weight or reset");
             var vkey = view != null ? Ids.ToLong(view.Id).ToString(CultureInfo.InvariantCulture) : "@" + viewRef;
             var ot = new Dictionary<string, object>(t0);
             if (view != null) ot["view"] = Ids.ToLong(view.Id); else ot["view_ref"] = (long)viewRef;
-            Templates(op, c, "graficos@" + vkey, ot, WriteKit.Overrides(Merge(ctx.Doc, new OverrideGraphicSettings(), t0)));
+            Templates(op, c, "graphics@" + vkey, ot, WriteKit.Overrides(Merge(ctx.Doc, new OverrideGraphicSettings(), t0)));
 
             foreach (var id in ids.Distinct())
             {
@@ -1197,12 +1197,12 @@ namespace Bimbridge.Addin.Revit.Writes
                 {
                     t["view"] = Ids.ToLong(view.Id);
                     var cur = view.GetElementOverrides(e.Id);
-                    c.Add(new PlanEntry { Id = id, Key = "graficos@" + vkey, Before = WriteKit.Overrides(cur), Target = t, After = WriteKit.Overrides(Merge(ctx.Doc, cur, t)) });
+                    c.Add(new PlanEntry { Id = id, Key = "graphics@" + vkey, Before = WriteKit.Overrides(cur), Target = t, After = WriteKit.Overrides(Merge(ctx.Doc, cur, t)) });
                 }
                 else
                 {
                     t["view_ref"] = (long)viewRef;
-                    c.Add(new PlanEntry { Id = id, Key = "graficos@" + vkey, Before = "", Target = t, After = WriteKit.Overrides(Merge(ctx.Doc, new OverrideGraphicSettings(), t)) });
+                    c.Add(new PlanEntry { Id = id, Key = "graphics@" + vkey, Before = "", Target = t, After = WriteKit.Overrides(Merge(ctx.Doc, new OverrideGraphicSettings(), t)) });
                 }
             }
             foreach (var cn in Arg.GetStringList(a, "cats"))
@@ -1264,11 +1264,11 @@ namespace Bimbridge.Addin.Revit.Writes
 
         private static void SheetCreate(BuildContext ctx, OpSpec op, Collector c)
         {
-            var number = Arg.GetString(op.Args, "numero").Trim();
-            var name = Arg.GetString(op.Args, "nombre").Trim();
-            if (ctx.Model.Sheets.Any(s => string.Equals(s.SheetNumber, number, StringComparison.OrdinalIgnoreCase)) || !ctx.NewNames.Add("hoja:" + number))
+            var number = Arg.GetString(op.Args, "number").Trim();
+            var name = Arg.GetString(op.Args, "name").Trim();
+            if (ctx.Model.Sheets.Any(s => string.Equals(s.SheetNumber, number, StringComparison.OrdinalIgnoreCase)) || !ctx.NewNames.Add("sheet:" + number))
                 throw new QueryException("sheet_create: sheet " + number + " already exists");
-            var tbName = Arg.GetString(op.Args, "cajetin");
+            var tbName = Arg.GetString(op.Args, "titleblock");
             ElementType tb;
             if (tbName != null) tb = ctx.Model.FindType(tbName, "sheet_create", t => t.Category != null && CatBic(t.Category) == BuiltInCategory.OST_TitleBlocks, "titleblocks");
             else
@@ -1277,86 +1277,86 @@ namespace Bimbridge.Addin.Revit.Writes
                 if (tb == null) throw new QueryException("sheet_create: the model has no loaded titleblocks");
                 c.Note("sheet_create: default titleblock " + tb.FamilyName + ": " + tb.Name);
             }
-            var t2 = new Dictionary<string, object> { ["tb"] = Ids.ToLong(tb.Id), ["numero"] = number, ["nombre"] = name };
+            var t2 = new Dictionary<string, object> { ["tb"] = Ids.ToLong(tb.Id), ["number"] = number, ["name"] = name };
             var show = "sheet " + number + " - " + name + " (" + tb.FamilyName + ": " + tb.Name + ")";
-            c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t2 });
+            c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = t2 });
         }
 
         /// <summary>0.8.0: persistent sheet set (ViewSheetSet). Replacing requires reemplazar=true; otherwise an existing set is a clear error.</summary>
         private static void SheetSetOp(BuildContext ctx, OpSpec op, Collector c)
         {
-            var name = Arg.GetString(op.Args, "nombre").Trim();
-            var replace = Arg.GetBool(op.Args, "reemplazar") ?? false;
+            var name = Arg.GetString(op.Args, "name").Trim();
+            var replace = Arg.GetBool(op.Args, "replace") ?? false;
             var existing = new FilteredElementCollector(ctx.Doc).OfClass(typeof(ViewSheetSet)).Cast<ViewSheetSet>()
                 .FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase));
-            if (existing != null && !replace) throw new QueryException("sheet_set: the set '" + name + "' already exists; use reemplazar=true to replace it");
-            if (!ctx.NewNames.Add("conjunto:" + name)) throw new QueryException("sheet_set: the plan already saves a set '" + name + "'");
+            if (existing != null && !replace) throw new QueryException("sheet_set: the set '" + name + "' already exists; use replace=true to replace it");
+            if (!ctx.NewNames.Add("sheet_set:" + name)) throw new QueryException("sheet_set: the plan already saves a set '" + name + "'");
             var sheets = new List<ViewSheet>();
-            foreach (var h in (List<object>)op.Args["hojas"])
+            foreach (var h in (List<object>)op.Args["sheets"])
             {
                 var s = ctx.Model.FindSheet(h, "sheet_set");
                 if (s.IsPlaceholder) throw new QueryException("sheet_set: " + s.SheetNumber + " is a placeholder; it is not printed");
                 if (!sheets.Any(x => x.Id == s.Id)) sheets.Add(s);
             }
-            var t = new Dictionary<string, object> { ["nombre"] = name, ["hojas"] = sheets.Select(s => (object)Ids.ToLong(s.Id)).ToList() };
-            if (op.Args.TryGetValue("preset_pdf", out var preset)) t["preset_pdf"] = SheetSetPdf.ValidatePreset(preset);
-            if (existing != null) t["reemplaza"] = Ids.ToLong(existing.Id);
+            var t = new Dictionary<string, object> { ["name"] = name, ["sheets"] = sheets.Select(s => (object)Ids.ToLong(s.Id)).ToList() };
+            if (op.Args.TryGetValue("pdf_preset", out var preset)) t["pdf_preset"] = SheetSetPdf.ValidatePreset(preset);
+            if (existing != null) t["replaces"] = Ids.ToLong(existing.Id);
             var before = existing == null ? "" : existing.Views.Size + " views";
             var show = "set '" + name + "': " + sheets.Count + " sheets (" + string.Join(", ", sheets.Take(6).Select(s => s.SheetNumber)) + (sheets.Count > 6 ? "…" : "") + ")";
-            if (t.ContainsKey("preset_pdf")) show += ", preset PDF " + Json.Write(t["preset_pdf"]);
-            c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = before, After = show, Show = show, Target = t });
+            if (t.ContainsKey("pdf_preset")) show += ", preset PDF " + Json.Write(t["pdf_preset"]);
+            c.Add(new PlanEntry { Id = 0, Key = "new", Before = before, After = show, Show = show, Target = t });
         }
 
         private static void SheetPlace(BuildContext ctx, OpSpec op, Collector c)
         {
-            var sheetRef = KeyRef(op, "hoja");
-            var viewRef = KeyRef(op, "vista");
-            ViewSheet sheet = sheetRef > 0 ? null : ctx.Model.FindSheet(op.Args["hoja"], "sheet_place");
-            View view = viewRef > 0 ? null : ctx.Model.FindView(op.Args["vista"], "sheet_place", allowSheet: false);
+            var sheetRef = KeyRef(op, "sheet");
+            var viewRef = KeyRef(op, "view");
+            ViewSheet sheet = sheetRef > 0 ? null : ctx.Model.FindSheet(op.Args["sheet"], "sheet_place");
+            View view = viewRef > 0 ? null : ctx.Model.FindView(op.Args["view"], "sheet_place", allowSheet: false);
             if (sheet != null && view != null && !Viewport.CanAddViewToSheet(ctx.Doc, sheet.Id, view.Id))
                 throw new QueryException("sheet_place: Revit does not allow placing '" + view.Name + "' on " + sheet.SheetNumber + " (is it already on another sheet, or is it a template?)");
             var t = new Dictionary<string, object>();
-            if (sheet != null) t["hoja"] = Ids.ToLong(sheet.Id); else t["hoja_ref"] = (long)sheetRef;
-            if (view != null) t["vista"] = Ids.ToLong(view.Id); else t["vista_ref"] = (long)viewRef;
-            if (op.Args.TryGetValue("punto", out var pt) && pt != null)
+            if (sheet != null) t["sheet"] = Ids.ToLong(sheet.Id); else t["sheet_ref"] = (long)sheetRef;
+            if (view != null) t["view"] = Ids.ToLong(view.Id); else t["view_ref_of"] = (long)viewRef;
+            if (op.Args.TryGetValue("point", out var pt) && pt != null)
             {
-                var p = OpCatalog.Point(pt, "sheet_place punto", false);
+                var p = OpCatalog.Point(pt, "sheet_place point", false);
                 t["x"] = p[0]; t["y"] = p[1];
             }
-            var vpt = Arg.GetString(op.Args, "viewport_tipo");
+            var vpt = Arg.GetString(op.Args, "viewport_type");
             if (vpt != null) t["vptype"] = Ids.ToLong(ctx.Model.FindType(vpt, "sheet_place", x => string.Equals(x.FamilyName, "Viewport", StringComparison.OrdinalIgnoreCase) || x.GetType().Name == "ElementType" && x.Category == null, "viewport types").Id);
             var show = (view?.Name ?? "@" + viewRef) + " on " + (sheet != null ? sheet.SheetNumber : "@" + sheetRef) + (t.ContainsKey("x") ? "" : " (titleblock center)") + (vpt != null ? ", viewport " + vpt : "");
-            c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });
+            c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = t });
         }
 
         private static void TextNoteOp(BuildContext ctx, OpSpec op, Collector c)
         {
             var (view, viewRef) = ViewArg(ctx, op, "text_note");
-            var p = OpCatalog.Point(op.Args["punto"], "text_note punto", false);
-            var text = Arg.GetString(op.Args, "texto");
-            var tn = Arg.GetString(op.Args, "tipo");
+            var p = OpCatalog.Point(op.Args["point"], "text_note point", false);
+            var text = Arg.GetString(op.Args, "text");
+            var tn = Arg.GetString(op.Args, "type");
             ElementId typeId = tn != null ? ctx.Model.FindType(tn, "text_note", x => x is TextNoteType, "text types").Id : ctx.Doc.GetDefaultElementTypeId(ElementTypeGroup.TextNoteType);
-            if (typeId == null || typeId == ElementId.InvalidElementId) throw new QueryException("text_note: there is no default text type; give tipo");
-            var t = new Dictionary<string, object> { ["x"] = p[0], ["y"] = p[1], ["texto"] = text, ["ttype"] = Ids.ToLong(typeId) };
-            if (Arg.GetLong(op.Args, "luminaria") is long light)
+            if (typeId == null || typeId == ElementId.InvalidElementId) throw new QueryException("text_note: there is no default text type; give type");
+            var t = new Dictionary<string, object> { ["x"] = p[0], ["y"] = p[1], ["text"] = text, ["ttype"] = Ids.ToLong(typeId) };
+            if (Arg.GetLong(op.Args, "fixture") is long light)
             {
                 var config = LightingCallout.Bind(ctx.Doc, light, op.Args);
                 var uid = Arg.GetString(config, "uid");
-                var key = "llamada:" + (view?.UniqueId ?? "@" + viewRef) + ":" + uid;
+                var key = "callout:" + (view?.UniqueId ?? "@" + viewRef) + ":" + uid;
                 if (!ctx.NewNames.Add(key) || (view != null && LightingCallout.InView(ctx.Doc, view.Id)
                     .Any(note => Arg.GetString(LightingCallout.Read(note), "uid") == uid)))
                     throw new QueryException("a managed callout for this fixture already exists in the view. Use text_note_refresh");
                 var state = LightingCallout.Observe(ctx.Doc, config);
                 text = state.Text;
-                t["texto"] = text;
-                t["llamada"] = config;
-                t["huella_origen"] = LightingCallout.Fingerprint(config, state.Text, state.Point, state.TypeUid);
+                t["text"] = text;
+                t["callout"] = config;
+                t["origin_fingerprint"] = LightingCallout.Fingerprint(config, state.Text, state.Point, state.TypeUid);
             }
-            foreach (var key in new[] { "negrita", "subrayado" })
+            foreach (var key in new[] { "bold", "underline" })
                 if (Arg.GetBool(op.Args, key) is bool value) t[key] = value;
             if (view != null) t["view"] = Ids.ToLong(view.Id); else t["view_ref"] = (long)viewRef;
             var show = "note '" + (text.Length > 40 ? text.Substring(0, 40) + "…" : text) + "' in " + (view?.Name ?? "@" + viewRef);
-            c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });
+            c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = t });
         }
 
         private static void RefreshTextNotes(BuildContext ctx, IList<long> ids, Collector c)
@@ -1373,7 +1373,7 @@ namespace Bimbridge.Addin.Revit.Writes
                 var futureSource = LightingCallout.Fingerprint(future, state.Text, state.Point, state.TypeUid);
                 var position = LightingCallout.Reposition(note, view, config, state.Point);
                 var show = "Regenerate callout " + id + ": " + note.Text + " → " + state.Text;
-                c.Add(new PlanEntry { Id = id, Key = "llamada_luminaria", Before = LightingCallout.NoteFingerprint(note, config, source),
+                c.Add(new PlanEntry { Id = id, Key = "fixture_callout", Before = LightingCallout.NoteFingerprint(note, config, source),
                     After = LightingCallout.NoteFingerprint(state.Text, position, future, futureSource), Show = show, Target = new Dictionary<string, object>() });
             }
         }
@@ -1385,20 +1385,20 @@ namespace Bimbridge.Addin.Revit.Writes
             if (original == null || original.Pinned) throw new QueryException("the annotation must exist and be unpinned");
             if (!ctx.NewNames.Add("annotation_rebind:" + id)) throw new QueryException("the annotation is already in another replacement in the plan");
             var data = new Dictionary<string, object> { ["original"] = id };
-            foreach (var key in new[] { "destino", "refs_estables" })
+            foreach (var key in new[] { "target", "stable_refs" })
                 if (op.Args.TryGetValue(key, out var value)) data[key] = value;
             var references = AnnotationRepair.ResolveTargets(ctx.Doc, original, data);
-            data["original_firma"] = AnnotationRepair.Fingerprint(original);
-            data["refs_destino"] = references.Select(r => (object)r.ConvertToStableRepresentation(ctx.Doc)).ToList();
+            data["original_signature"] = AnnotationRepair.Fingerprint(original);
+            data["target_refs"] = references.Select(r => (object)r.ConvertToStableRepresentation(ctx.Doc)).ToList();
             var show = "repair annotation " + id + " in view " + Ids.ToLong(original.OwnerViewId) +
                 " with references to " + string.Join(", ", references.Select(r => Ids.ToLong(r.ElementId)));
-            c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = data });
+            c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = data });
         }
 
         private static void FilledRegionOp(BuildContext ctx, OpSpec op, Collector c)
         {
             var (view, viewRef) = ViewArg(ctx, op, "filled_region");
-            var pts = OpCatalog.Points(op.Args["puntos"], "filled_region puntos", 3, 200, false);
+            var pts = OpCatalog.Points(op.Args["points"], "filled_region points", 3, 200, false);
             double area2 = 0;
             for (var i = 0; i < pts.Count; i++)
             {
@@ -1406,13 +1406,13 @@ namespace Bimbridge.Addin.Revit.Writes
                 area2 += a[0] * b[1] - b[0] * a[1];
             }
             if (Math.Abs(area2) < 1e-6) throw new QueryException("filled_region: the polygon has no area");
-            var tn = Arg.GetString(op.Args, "tipo");
+            var tn = Arg.GetString(op.Args, "type");
             ElementId typeId = tn != null ? ctx.Model.FindType(tn, "filled_region", x => x is FilledRegionType, "filled region types").Id : ctx.Doc.GetDefaultElementTypeId(ElementTypeGroup.FilledRegionType);
-            if (typeId == null || typeId == ElementId.InvalidElementId) throw new QueryException("filled_region: there is no default type; give tipo");
+            if (typeId == null || typeId == ElementId.InvalidElementId) throw new QueryException("filled_region: there is no default type; give type");
             var t = new Dictionary<string, object> { ["pts"] = pts.Select(p => (object)WriteKit.List(p[0], p[1])).ToList(), ["frtype"] = Ids.ToLong(typeId) };
             if (view != null) t["view"] = Ids.ToLong(view.Id); else t["view_ref"] = (long)viewRef;
             var show = "region " + (tn ?? "default") + " with " + pts.Count + " vertices (" + Math.Round(Math.Abs(area2) / 2, 1) + " ft²) in " + (view?.Name ?? "@" + viewRef);
-            c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });
+            c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = t });
         }
     
         // ---------------- 0.8.0: 2D drafting (geometry and validation shared in Engine.Draw2D) ----------------
@@ -1420,7 +1420,7 @@ namespace Bimbridge.Addin.Revit.Writes
         /// <summary>Line style (subcategory of Lines) → id of its projection GraphicsStyle; null = the view's.</summary>
         private static long? LineStyle(BuildContext ctx, OpSpec op, string kind)
         {
-            var name = Arg.GetString(op.Args, "estilo");
+            var name = Arg.GetString(op.Args, "style");
             if (name == null) return null;
             var lines = ctx.Doc.Settings.Categories.get_Item(BuiltInCategory.OST_Lines);
             var sub = lines?.SubCategories.Cast<Category>().FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
@@ -1450,15 +1450,15 @@ namespace Bimbridge.Addin.Revit.Writes
             switch (kind)
             {
                 case "detail_rect":
-                    var ec = OpCatalog.Points(op.Args["esquinas"], "detail_rect esquinas", 2, 2, false);
+                    var ec = OpCatalog.Points(op.Args["corners"], "detail_rect corners", 2, 2, false);
                     pts = Draw2D.Rect(ec[0], ec[1], out err); closed = true; break;
                 case "detail_polygon":
-                    var pc = OpCatalog.Point(op.Args["centro"], "detail_polygon centro", false);
-                    Lengths.TryFeet(op.Args["radio"], out var rad, out _);
-                    pts = Draw2D.RegularPolygon(pc, rad, (int)(OpCatalog.Number(op.Args, "lados", kind) ?? 0), OpCatalog.Number(op.Args, "rot", kind) ?? 0, out err); closed = true; break;
+                    var pc = OpCatalog.Point(op.Args["center"], "detail_polygon center", false);
+                    Lengths.TryFeet(op.Args["radius"], out var rad, out _);
+                    pts = Draw2D.RegularPolygon(pc, rad, (int)(OpCatalog.Number(op.Args, "sides", kind) ?? 0), OpCatalog.Number(op.Args, "rot", kind) ?? 0, out err); closed = true; break;
                 default:
-                    pts = OpCatalog.Points(op.Args["puntos"], "detail_line puntos", 2, Draw2D.MaxVertices, false);
-                    closed = Arg.GetBool(op.Args, "cerrado") == true; err = null; break;
+                    pts = OpCatalog.Points(op.Args["points"], "detail_line points", 2, Draw2D.MaxVertices, false);
+                    closed = Arg.GetBool(op.Args, "closed") == true; err = null; break;
             }
             if (err != null) throw new QueryException(kind + ": " + err);
             var segs = Draw2D.Segments(pts, closed, out err);
@@ -1466,34 +1466,34 @@ namespace Bimbridge.Addin.Revit.Writes
             var t = new Dictionary<string, object> { ["pts"] = pts.Select(p => (object)WriteKit.List(p[0], p[1])).ToList(), ["closed"] = closed };
             var gs = LineStyle(ctx, op, kind); if (gs.HasValue) t["gs"] = gs.Value;
             ViewTarget(t, view, viewRef);
-            var show = segs.Count + " detail line(s)" + (Arg.GetString(op.Args, "estilo") != null ? " (" + Arg.GetString(op.Args, "estilo") + ")" : "") + " in " + (view?.Name ?? "@" + viewRef);
-            c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });
+            var show = segs.Count + " detail line(s)" + (Arg.GetString(op.Args, "style") != null ? " (" + Arg.GetString(op.Args, "style") + ")" : "") + " in " + (view?.Name ?? "@" + viewRef);
+            c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = t });
         }
 
         private static void DetailArcOp(BuildContext ctx, OpSpec op, Collector c)
         {
             var (view, viewRef) = ViewArg(ctx, op, "detail_arc");
-            var cen = OpCatalog.Point(op.Args["centro"], "detail_arc centro", false);
-            Lengths.TryFeet(op.Args["radio"], out var rad, out _);
-            var a0 = OpCatalog.Number(op.Args, "inicio", "detail_arc") ?? 0; var a1 = OpCatalog.Number(op.Args, "fin", "detail_arc") ?? 0;
+            var cen = OpCatalog.Point(op.Args["center"], "detail_arc center", false);
+            Lengths.TryFeet(op.Args["radius"], out var rad, out _);
+            var a0 = OpCatalog.Number(op.Args, "start", "detail_arc") ?? 0; var a1 = OpCatalog.Number(op.Args, "end", "detail_arc") ?? 0;
             var e = Draw2D.ValidateArc(rad, a0, a1); if (e != null) throw new QueryException("detail_arc: " + e);
             var t = new Dictionary<string, object> { ["c"] = WriteKit.List(cen[0], cen[1]), ["r"] = rad, ["a0"] = a0, ["a1"] = a1 };
             var gs = LineStyle(ctx, op, "detail_arc"); if (gs.HasValue) t["gs"] = gs.Value;
             ViewTarget(t, view, viewRef);
             var show = "arc r=" + Ft(rad) + " from " + a0 + "° to " + a1 + "° in " + (view?.Name ?? "@" + viewRef);
-            c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });
+            c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = t });
         }
 
         private static void DetailComponentOp(BuildContext ctx, OpSpec op, Collector c)
         {
             var (view, viewRef) = ViewArg(ctx, op, "detail_component");
-            var spec = Arg.GetString(op.Args, "tipo");
+            var spec = Arg.GetString(op.Args, "type");
             var sym = ctx.Model.FindType(spec, "detail_component", x => x is FamilySymbol fs && (fs.Family?.FamilyPlacementType == FamilyPlacementType.ViewBased), "loaded detail components / symbols") as FamilySymbol;
-            var p = OpCatalog.Point(op.Args["punto"], "detail_component punto", false);
+            var p = OpCatalog.Point(op.Args["point"], "detail_component point", false);
             var t = new Dictionary<string, object> { ["sym"] = Ids.ToLong(sym.Id), ["x"] = p[0], ["y"] = p[1], ["rot"] = OpCatalog.Number(op.Args, "rot", "detail_component") ?? 0.0 };
             ViewTarget(t, view, viewRef);
             var show = "component " + sym.FamilyName + ": " + sym.Name + " in " + (view?.Name ?? "@" + viewRef);
-            c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });
+            c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = t });
         }
 
         private static void DimensionOp(BuildContext ctx, OpSpec op, Collector c)
@@ -1507,13 +1507,13 @@ namespace Bimbridge.Addin.Revit.Writes
                 if (e == null || !(e.GeometryCurve is Line)) throw new QueryException("dimension refs: " + r + " is not a straight detail line");
                 if (e.OwnerViewId != view.Id) throw new QueryException("dimension refs: line " + r + " does not belong to view " + view.Name);
             }
-            var ln = OpCatalog.Points(op.Args["linea"], "dimension linea", 2, 2, false);
+            var ln = OpCatalog.Points(op.Args["line"], "dimension line", 2, 2, false);
             var t = new Dictionary<string, object> { ["refs"] = refs.Cast<object>().ToList(), ["l"] = new List<object> { WriteKit.List(ln[0][0], ln[0][1]), WriteKit.List(ln[1][0], ln[1][1]) } };
-            var tn = Arg.GetString(op.Args, "tipo");
+            var tn = Arg.GetString(op.Args, "type");
             if (tn != null) t["dtype"] = Ids.ToLong(ctx.Model.FindType(tn, "dimension", x => x is DimensionType, "dimension types").Id);
             ViewTarget(t, view, viewRef);
             var show = "dimension between " + refs.Count + " lines in " + view.Name;
-            c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = show, Show = show, Target = t });
+            c.Add(new PlanEntry { Id = 0, Key = "new", Before = "", After = show, Show = show, Target = t });
         }
     }
 }

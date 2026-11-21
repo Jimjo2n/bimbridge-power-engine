@@ -1,28 +1,28 @@
 {
- "esquema": "bimbridge.campana080/1",
+ "schema": "bimbridge.campaign080/1",
  "item": "N8-11",
- "titulo": "Visibility and representation",
- "estado_inicial": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW.",
+ "title": "Visibility and representation",
+ "initial_status": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW.",
  "variables": {
-  "vista": "id of a floor plan or RCP view with fixtures (or BB-N8-02 RCP)"
+  "view": "id of a floor plan or RCP view with fixtures (or BB-N8-02 RCP)"
  },
- "pasos": [
+ "steps": [
   {
-   "nombre": "fixture and tag audit per view",
+   "name": "fixture and tag audit per view",
    "op": "check",
    "args": {
     "name": "lighting_audit",
     "views": [
-     "${vista}"
+     "${view}"
     ],
-    "tags": "ignorar"
+    "tags": "ignore"
    }
   },
   {
-   "nombre": "capture of the view",
+   "name": "capture of the view",
    "op": "capture",
    "args": {
-    "view": "${vista}",
+    "view": "${view}",
     "px": 1600
    }
   }

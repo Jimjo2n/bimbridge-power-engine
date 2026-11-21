@@ -11,15 +11,15 @@ namespace Bimbridge.AgentHost
 {
     /// <summary>
     /// 0.8.0: generic native campaign harness. Each item (N8-01…N8-13) is a JSON steps file:
-    /// { "item", "titulo", "estado_inicial", "pasos": [ { "nombre", "op", "args", "escritura", "esperar", "contiene", "no_contiene", "guardar" } ] }.
-    /// - ${var} is replaced by variables from --var name=value or by what earlier steps saved ("guardar": {"plan": "plan_id"}).
-    /// - "esperar": expected status (ok, rechazado, invalido…); "contiene"/"no_contiene": texts in the JSON response.
+    /// { "item", "title", "initial_status", "steps": [ { "name", "op", "args", "write", "wait", "contains", "not_contains", "save" } ] }.
+    /// - ${var} is replaced by variables from --var name=value or by what earlier steps saved ("save": {"plan": "plan_id"}).
+    /// - "wait": expected status (ok, rechazado, invalido…); "contains"/"not_contains": texts in the JSON response.
     /// - The document is pinned in the preflight (path = --ruta-esperada, local, non-workshared) and injected into every step: no step picks the document.
     /// Without BIMBRIDGE_REVIT_NATIVE=AUTORIZADO and --revit-disponible nothing runs (NativeGate).
     /// </summary>
     public static class Campaign080
     {
-        public const string Schema = "bimbridge.campana080/1";
+        public const string Schema = "bimbridge.campaign080/1";
 
         public sealed class StepResult
         {
@@ -32,32 +32,32 @@ namespace Bimbridge.AgentHost
         public static Dictionary<string, object> RunSteps(Dictionary<string, object> spec, Func<string, Dictionary<string, object>, bool, Response> call,
                                                           string docHandle, Dictionary<string, string> vars)
         {
-            if (Arg.GetString(spec, "esquema") != Schema) throw new FormatException("schema differs from " + Schema);
+            if (Arg.GetString(spec, "schema") != Schema) throw new FormatException("schema differs from " + Schema);
             var item = Arg.GetString(spec, "item") ?? throw new FormatException("missing item");
-            var steps = spec.TryGetValue("pasos", out var ps) && ps is List<object> pl ? pl.OfType<Dictionary<string, object>>().ToList() : throw new FormatException("missing pasos");
+            var steps = spec.TryGetValue("steps", out var ps) && ps is List<object> pl ? pl.OfType<Dictionary<string, object>>().ToList() : throw new FormatException("missing steps");
             vars = new Dictionary<string, string>(vars ?? new Dictionary<string, string>(), StringComparer.Ordinal);
             var results = new List<StepResult>();
             var stopped = false;
             foreach (var s in steps)
             {
-                var r = new StepResult { Name = Arg.GetString(s, "nombre") ?? ("step " + (results.Count + 1)), Op = Arg.GetString(s, "op"), Expected = Arg.GetString(s, "esperar") ?? Status.Ok };
+                var r = new StepResult { Name = Arg.GetString(s, "name") ?? ("step " + (results.Count + 1)), Op = Arg.GetString(s, "op"), Expected = Arg.GetString(s, "wait") ?? Status.Ok };
                 results.Add(r);
                 if (stopped) { r.Reason = "not run: a previous step failed"; continue; }
                 Dictionary<string, object> args;
                 try { args = (Dictionary<string, object>)Subst(s.TryGetValue("args", out var a) ? a : new Dictionary<string, object>(), vars); }
                 catch (KeyNotFoundException ex) { r.Reason = ex.Message; stopped = true; continue; }
                 // the preflight pins the document; only a NEGATIVE step marked doc_explicito keeps its own doc (to check the rejection)
-                if (r.Op != Wire.OpContext && r.Op != Wire.OpDocs && !(Arg.GetBool(s, "doc_explicito") ?? false)) args[Wire.DocArg] = docHandle;
+                if (r.Op != Wire.OpContext && r.Op != Wire.OpDocs && !(Arg.GetBool(s, "explicit_doc") ?? false)) args[Wire.DocArg] = docHandle;
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                var resp = call(r.Op, args, Arg.GetBool(s, "escritura") ?? false);
+                var resp = call(r.Op, args, Arg.GetBool(s, "write") ?? false);
                 r.Ms = sw.ElapsedMilliseconds;
                 r.State = resp.State;
                 var json = Json.Write(resp.ToJson());
                 var problems = new List<string>();
                 if (!string.Equals(resp.State, r.Expected, StringComparison.Ordinal)) problems.Add("status " + resp.State + " (expected " + r.Expected + ")" + (resp.Warning != null ? ": " + resp.Warning : ""));
-                foreach (var t in Arg.GetStringList(s, "contiene") ?? new List<string>()) { var tt = SubstText(t, vars); if (json.IndexOf(tt, StringComparison.Ordinal) < 0) problems.Add("does not contain '" + tt + "'"); }
-                foreach (var t in Arg.GetStringList(s, "no_contiene") ?? new List<string>()) { var tt = SubstText(t, vars); if (json.IndexOf(tt, StringComparison.Ordinal) >= 0) problems.Add("contains '" + tt + "'"); }
-                if (s.TryGetValue("guardar", out var g) && g is Dictionary<string, object> gd && resp.Data is Dictionary<string, object> dd)
+                foreach (var t in Arg.GetStringList(s, "contains") ?? new List<string>()) { var tt = SubstText(t, vars); if (json.IndexOf(tt, StringComparison.Ordinal) < 0) problems.Add("does not contain '" + tt + "'"); }
+                foreach (var t in Arg.GetStringList(s, "not_contains") ?? new List<string>()) { var tt = SubstText(t, vars); if (json.IndexOf(tt, StringComparison.Ordinal) >= 0) problems.Add("contains '" + tt + "'"); }
+                if (s.TryGetValue("save", out var g) && g is Dictionary<string, object> gd && resp.Data is Dictionary<string, object> dd)
                     foreach (var kv in gd)
                     {
                         var v = Pick(dd, Convert.ToString(kv.Value, CultureInfo.InvariantCulture));
@@ -71,8 +71,8 @@ namespace Bimbridge.AgentHost
             var pass = results.Count > 0 && results.All(x => x.Ok);
             return new Dictionary<string, object>
             {
-                ["item"] = item, ["titulo"] = Arg.GetString(spec, "titulo"), ["resultado"] = pass ? "APROBADA" : "FALLIDA",
-                ["pasos"] = results.Select(x => (object)new Dictionary<string, object> { ["nombre"] = x.Name, ["op"] = x.Op, ["estado"] = x.State, ["esperado"] = x.Expected, ["ok"] = x.Ok, ["ms"] = x.Ms, ["motivo"] = x.Reason }).ToList(),
+                ["item"] = item, ["title"] = Arg.GetString(spec, "title"), ["result"] = pass ? "PASSED" : "FAILED",
+                ["steps"] = results.Select(x => (object)new Dictionary<string, object> { ["name"] = x.Name, ["op"] = x.Op, ["status"] = x.State, ["expected"] = x.Expected, ["ok"] = x.Ok, ["ms"] = x.Ms, ["reason"] = x.Reason }).ToList(),
             };
         }
 
@@ -136,7 +136,7 @@ namespace Bimbridge.AgentHost
     {
         /// <summary>
         /// revit campana080 --revit-pid N --ruta-esperada C:\...\copia.rvt --autorizo-persistente --pasos N8-04.json --salida DIR [--var x=y ...]
-        /// Common identity and preflight (CampaignPreflight): actual path = authorized, local, non-workshared; otherwise BLOQUEADA and no step is sent.
+        /// Common identity and preflight (CampaignPreflight): actual path = authorized, local, non-workshared; otherwise BLOCKED and no step is sent.
         /// </summary>
         private static int RunCampaign080(string[] a)
         {
@@ -155,21 +155,21 @@ namespace Bimbridge.AgentHost
             using (link)
             {
                 Directory.CreateDirectory(o.OutDir);
-                link.OnCall = c => File.AppendAllText(Path.Combine(o.OutDir, "llamadas.jsonl"), Json.Write(c) + "\n");
-                var report = new Dictionary<string, object> { ["campana"] = "0.8.0", ["version"] = BuildInfo.Informational, ["inicio"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture) };
+                link.OnCall = c => File.AppendAllText(Path.Combine(o.OutDir, "calls.jsonl"), Json.Write(c) + "\n");
+                var report = new Dictionary<string, object> { ["campaign"] = "0.8.0", ["version"] = BuildInfo.Informational, ["start"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture) };
                 var b = CampaignPreflight(link, o, report, out var why);
                 var name = (Arg.GetString(spec, "item") ?? "item").ToLowerInvariant();
-                if (b == null) { report["resultado"] = "BLOQUEADA"; report["motivo"] = why; File.WriteAllText(Path.Combine(o.OutDir, name + "_informe.json"), Json.Write(report)); Console.WriteLine("BLOQUEADA: " + why); return 3; }
+                if (b == null) { report["result"] = "BLOCKED"; report["reason"] = why; File.WriteAllText(Path.Combine(o.OutDir, name + "_report.json"), Json.Write(report)); Console.WriteLine("BLOCKED: " + why); return 3; }
                 using (b)
                 {
-                    if (b.Context.GetValueOrDefault("worksharing") is bool ws && ws) { Console.WriteLine("BLOQUEADA: workshared document"); return 3; }
+                    if (b.Context.GetValueOrDefault("worksharing") is bool ws && ws) { Console.WriteLine("BLOCKED: workshared document"); return 3; }
                     var res = Campaign080.RunSteps(spec, (op, args, write) => link.Call(op, args, write), Convert.ToString(b.Context.GetValueOrDefault("doc"), CultureInfo.InvariantCulture), vars);
                     foreach (var kv in res) report[kv.Key] = kv.Value;
-                    report["metricas"] = Bench.Benchmarks.Wire(link.Calls);
-                    report["fin"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
-                    File.WriteAllText(Path.Combine(o.OutDir, name + "_informe.json"), Json.Write(report));
-                    Console.WriteLine(res["item"] + " " + res["resultado"]);
-                    return (string)res["resultado"] == "APROBADA" ? 0 : 1;
+                    report["metrics"] = Bench.Benchmarks.Wire(link.Calls);
+                    report["end"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+                    File.WriteAllText(Path.Combine(o.OutDir, name + "_report.json"), Json.Write(report));
+                    Console.WriteLine(res["item"] + " " + res["result"]);
+                    return (string)res["result"] == "PASSED" ? 0 : 1;
                 }
             }
         }

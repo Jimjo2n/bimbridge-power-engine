@@ -14,8 +14,8 @@ namespace Bimbridge.Protocol
 
         // Operations
         public const string OpHello = "hello";
-        public const string WriteReceiptFeature = "recibo_escritura";
-        public const string LargeResultFeature = "resultado_fuera_de_trama";
+        public const string WriteReceiptFeature = "write_receipt";
+        public const string LargeResultFeature = "out_of_frame_result";
         public const string OpPing = "ping";
         public const string OpContext = "context";
         public const string OpQuery = "query";
@@ -38,12 +38,12 @@ namespace Bimbridge.Protocol
         /// <summary>Document operations: save, save as, sync, PDF, close.</summary>
         public const string OpDoc = "doc";
         /// <summary>0.6.0: long resumable tasks (start, status, wait, cancel, resume, reconcile, summary…).</summary>
-        public const string OpTask = "tarea";
+        public const string OpTask = "task";
         /// <summary>Args key with the target document (dN handle, path or title). Without it: the document active when the request arrives, fixed for the whole request.</summary>
         public const string DocArg = "doc";
         /// <summary>Idempotency key: the same key on the same document is not applied again.</summary>
-        public const string KeyArg = "clave";
-        public const string TaskArg = "tarea";
+        public const string KeyArg = "key";
+        public const string TaskArg = "task";
         /// <summary>Optional args key with the name of the tool the AI saw (e.g. "get"), journal only.</summary>
         public const string ToolArg = "_tool";
     }
@@ -52,50 +52,50 @@ namespace Bimbridge.Protocol
     public static class Status
     {
         public const string Ok = "ok";
-        public const string Queued = "en_cola";
-        public const string InProgress = "en_proceso";
+        public const string Queued = "queued";
+        public const string InProgress = "in_progress";
         /// <summary>The change is in the Revit queue; the user will apply it with the "Apply queue" button.</summary>
-        public const string Held = "retenido";
-        public const string Conflict = "conflicto";
-        public const string RevitBusy = "revit_ocupado";
-        public const string RolledBack = "revertido";
-        public const string Expired = "vencido";
-        public const string Rejected = "rechazado";
-        public const string Invalid = "invalido";
-        public const string RevitUnavailable = "revit_no_disponible";
+        public const string Held = "held";
+        public const string Conflict = "conflict";
+        public const string RevitBusy = "revit_busy";
+        public const string RolledBack = "reverted";
+        public const string Expired = "expired";
+        public const string Rejected = "rejected";
+        public const string Invalid = "invalid";
+        public const string RevitUnavailable = "revit_unavailable";
         public const string Incompatible = "incompatible";
         public const string Error = "error";
         /// <summary>The request deadline passed and the work was cancelled inside Revit.</summary>
-        public const string TimedOut = "tiempo_agotado";
+        public const string TimedOut = "timed_out";
         /// <summary>The operation does not apply to this document type or Revit version (says which, and what alternative exists).</summary>
-        public const string NotSupported = "no_soportado";
+        public const string NotSupported = "not_supported";
         /// <summary>The pinned document or Revit is no longer open. Not redirected to another one.</summary>
-        public const string TargetUnavailable = "destino_no_disponible";
+        public const string TargetUnavailable = "target_unavailable";
         /// <summary>A user decision is needed (e.g. Hold is on, ambiguous data left unresolved).</summary>
-        public const string NeedsUser = "necesita_usuario";
+        public const string NeedsUser = "needs_user";
         /// <summary>An operation with that key started and its end is not recorded (Revit closed or was cut off): reconcile before repeating.</summary>
-        public const string Interrupted = "interrumpido";
+        public const string Interrupted = "interrupted";
         /// <summary>Applied, but the follow-up verification found differences from what was requested (they are listed).</summary>
-        public const string CompletedWithDifferences = "completado_con_diferencias";
+        public const string CompletedWithDifferences = "completed_with_differences";
 
         // 0.6.0: semantic statuses that tell apart what was applied, what was rolled back and what is unknown.
         /// <summary>One part was committed and another was not (e.g. tx=ninguna with a failure halfway, or one document yes and another no). Reconcile before repeating.</summary>
-        public const string Partial = "parcial";
+        public const string Partial = "partial";
         /// <summary>It cannot be known whether it was applied (the evidence was lost). Reconcile before repeating.</summary>
-        public const string Unknown = "desconocido";
+        public const string Unknown = "unknown";
         /// <summary>The changes were committed, but producing the response failed. Nothing was rolled back.</summary>
-        public const string AppliedResultError = "aplicado_error_resultado";
-        public const string CancelRequested = "cancelacion_solicitada";
+        public const string AppliedResultError = "applied_result_error";
+        public const string CancelRequested = "cancellation_requested";
         /// <summary>Cancellation confirmed: what was committed before cancelling stays applied and is listed.</summary>
-        public const string Cancelled = "cancelado";
+        public const string Cancelled = "cancelled";
         /// <summary>The task is waiting on context (user pause, open dialog, closed document). It keeps its progress.</summary>
-        public const string WaitingContext = "esperando_contexto";
+        public const string WaitingContext = "waiting_for_context";
         /// <summary>The operation journal is unavailable: a write with clave= is not applied when its idempotency cannot be guaranteed.</summary>
-        public const string JournalUnavailable = "diario_no_disponible";
+        public const string JournalUnavailable = "journal_unavailable";
         /// <summary>A name matches several documents or elements: candidates are returned, the first one is not picked.</summary>
-        public const string Ambiguous = "ambiguo";
+        public const string Ambiguous = "ambiguous";
         /// <summary>Another task or barrier holds the document; the write was not applied.</summary>
-        public const string DocumentBusy = "documento_ocupado";
+        public const string DocumentBusy = "document_busy";
 
         /// <summary>Terminal statuses that confirm NOTHING was applied (can be retried with the same key).</summary>
         public static bool ConfirmsNothingApplied(string s) =>
@@ -119,7 +119,7 @@ namespace Bimbridge.Protocol
         public object ToJson()
         {
             var data = new Dictionary<string, object> { ["id"] = Id, ["op"] = Op, ["args"] = Args, ["deadline_ms"] = DeadlineMs };
-            if (AttemptId != null) data["intento_id"] = AttemptId;
+            if (AttemptId != null) data["attempt_id"] = AttemptId;
             return data;
         }
 
@@ -149,10 +149,10 @@ namespace Bimbridge.Protocol
 
         public object ToJson()
         {
-            var d = new Dictionary<string, object> { ["id"] = Id, ["estado"] = State };
+            var d = new Dictionary<string, object> { ["id"] = Id, ["status"] = State };
             if (Rev.HasValue) d["rev"] = Rev.Value;
-            if (Data != null) d["datos"] = Data;
-            if (!string.IsNullOrEmpty(Warning)) d["aviso"] = Warning;
+            if (Data != null) d["data"] = Data;
+            if (!string.IsNullOrEmpty(Warning)) d["warning"] = Warning;
             return d;
         }
 

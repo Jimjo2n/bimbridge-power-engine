@@ -33,9 +33,9 @@ namespace Bimbridge.Engine.Families
 
             public Dictionary<string, object> ToJson(bool full = false)
             {
-                var d = new Dictionary<string, object> { ["nombre"] = Name, ["carpeta"] = System.IO.Path.GetDirectoryName(Relative) ?? "", ["revit"] = RevitVersion.HasValue ? (object)(long)RevitVersion.Value : "desconocida" };
-                if (CatalogTypes.Count > 0) d["tipos_catalogo"] = CatalogTypes.Take(full ? 500 : 12).Cast<object>().ToList();
-                if (full) { d["ruta"] = Path; d["bytes"] = Size; d["modificado"] = new DateTime(MtimeTicks, DateTimeKind.Utc).ToString("o", CultureInfo.InvariantCulture); }
+                var d = new Dictionary<string, object> { ["name"] = Name, ["folder"] = System.IO.Path.GetDirectoryName(Relative) ?? "", ["revit"] = RevitVersion.HasValue ? (object)(long)RevitVersion.Value : "unknown" };
+                if (CatalogTypes.Count > 0) d["catalog_types"] = CatalogTypes.Take(full ? 500 : 12).Cast<object>().ToList();
+                if (full) { d["path"] = Path; d["bytes"] = Size; d["modified"] = new DateTime(MtimeTicks, DateTimeKind.Utc).ToString("o", CultureInfo.InvariantCulture); }
                 return d;
             }
         }
@@ -224,7 +224,7 @@ namespace Bimbridge.Engine.Families
             error = null;
             if (RootOf(path) == null) { error = "the path is not inside an authorized family folder"; return null; }
             var full = Normalize(path);
-            if (!_byPath.TryGetValue(full, out var e)) { error = "the family is not in the index; refresh the library (fam buscar refrescar=true)"; return null; }
+            if (!_byPath.TryGetValue(full, out var e)) { error = "the family is not in the index; refresh the library (fam search refresh=true)"; return null; }
             var fi = new FileInfo(full);
             if (!fi.Exists) { error = "the file no longer exists"; return null; }
             if (fi.Length != e.Size || fi.LastWriteTimeUtc.Ticks != e.MtimeTicks) { error = "the file changed since it was indexed; refresh and choose again"; return null; }

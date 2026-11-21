@@ -285,7 +285,7 @@ namespace Bimbridge.Engine.Coverage
                 Engine("F35-HISTORY-001", "F35", "long operations", "Operation history with filters, cancellation and safe-retry advice", "Operation history and safe retry", "QUERY",
                     "each finished job is persisted with status, duration and whether it is retryable or requires reconciliation; in-progress ones with progress",
                     new[] { "src/Bimbridge.Engine/OperationHistory.cs", "src/Bimbridge.Engine/Jobs.cs" }, new[] { "OperationHistoryTests" },
-                    "history and JobStore with synthetic jobs", "query via check name=historial (own scope; others' only with historial_compartido) and the \"Long operations\" section of the status panel with filter and Cancel; the WPF window has no automated test"),
+                    "history and JobStore with synthetic jobs", "query via check name=history (own scope; others' only with shared_history) and the \"Long operations\" section of the status panel with filter and Cancel; the WPF window has no automated test"),
                 Engine("F35-SCHED-001", "F35", "long operations", "Long-operation scheduler across agents", "Long-operation scheduler", "UPDATE",
                     "global and per-agent limit, one operation at a time per document, fair sharing, bounded queue with refusal, and cancellation while queued without effects",
                     new[] { "src/Bimbridge.Engine/OperationScheduler.cs" }, new[] { "OperationSchedulerTests" },

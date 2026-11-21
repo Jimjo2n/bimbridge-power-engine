@@ -18,7 +18,7 @@ namespace Bimbridge.Tests
     public class SourceBindingTests : IDisposable
     {
         private readonly string _dir = Path.Combine(Path.GetTempPath(), "bb_src_" + Guid.NewGuid().ToString("N"));
-        private string JournalPath => Path.Combine(_dir, "operaciones.jsonl");
+        private string JournalPath => Path.Combine(_dir, "operations.jsonl");
         public SourceBindingTests() { Directory.CreateDirectory(_dir); }
         public void Dispose() { try { Directory.Delete(_dir, true); } catch (IOException) { } }
 
@@ -28,10 +28,10 @@ namespace Bimbridge.Tests
             p.Source["id"] = "E-201"; p.Source["sha256"] = sha; p.Source["revision"] = revision;
             p.Batches.Add(new Dictionary<string, object>
             {
-                ["operacion"] = new Dictionary<string, object>
+                ["operation"] = new Dictionary<string, object>
                 {
                     ["op"] = "place", ["type"] = "F: A", ["level"] = "LEVEL 02", ["elev"] = 9.25,
-                    ["puntos"] = new List<object> { new List<object> { 1.0 + shiftX, 2.0 }, new List<object> { 3.0, 4.0 } },
+                    ["points"] = new List<object> { new List<object> { 1.0 + shiftX, 2.0 }, new List<object> { 3.0, 4.0 } },
                 },
                 ["items"] = new List<object>(),
             });
@@ -40,7 +40,7 @@ namespace Bimbridge.Tests
         }
 
         /// <summary>What the agent receives and forwards to plan: the ops of the first executable plan.</summary>
-        private static List<object> OpsOf(PlacementPlan p) => (List<object>)((Dictionary<string, object>)((List<object>)PdfToPlan.Execution(p)["planes"])[0])["ops"];
+        private static List<object> OpsOf(PlacementPlan p) => (List<object>)((Dictionary<string, object>)((List<object>)PdfToPlan.Execution(p)["plans"])[0])["ops"];
 
         /// <summary>A commit as the engine does it. <paramref name="apply"/> = final status (null = interrupted without a final record).</summary>
         private OperationJournal.BeginKind Commit(OperationJournal j, List<object> ops, string doc, string givenKey, string apply, ref int applied,
@@ -59,13 +59,13 @@ namespace Bimbridge.Tests
         public void EveryOpCarriesItsOrigin_AndTheEngineDerivesTheSameKeyTheWorkflowAnnounced()
         {
             var e = PdfToPlan.Execution(Plan());
-            var one = (Dictionary<string, object>)((List<object>)e["planes"])[0];
+            var one = (Dictionary<string, object>)((List<object>)e["plans"])[0];
             var ops = (List<object>)one["ops"];
             Assert.All(ops.Cast<Dictionary<string, object>>(), o => Assert.StartsWith(SourceBinding.TokenPrefix, (string)o[SourceBinding.OpField]));
             var bound = SourceBinding.Resolve(ops);
             Assert.Equal(one[Wire.KeyArg], bound.Key);
-            var origin = (Dictionary<string, object>)one["origen"];
-            Assert.Equal("sha-pdf-1", origin["sha256"]); Assert.Equal("B", origin["revision"]); Assert.Equal(bound.Hash, origin["huella_operaciones"]);
+            var origin = (Dictionary<string, object>)one["origin"];
+            Assert.Equal("sha-pdf-1", origin["sha256"]); Assert.Equal("B", origin["revision"]); Assert.Equal(bound.Hash, origin["operations_fingerprint"]);
             // Operations with an origin pass typed validation (place accepts the field).
             OpSpec.ParseAll(new Dictionary<string, object> { ["ops"] = ops });
             // Operations without an origin: normal plan, no binding.
@@ -149,7 +149,7 @@ namespace Bimbridge.Tests
         public void MixedOrForgedOrigins_AreRejectedAtPlanTime()
         {
             var ops = OpsOf(Plan());
-            var plain = new Dictionary<string, object> { ["op"] = "place", ["type"] = "F: A", ["level"] = "L", ["puntos"] = new List<object> { new List<object> { 0.0, 0.0 } } };
+            var plain = new Dictionary<string, object> { ["op"] = "place", ["type"] = "F: A", ["level"] = "L", ["points"] = new List<object> { new List<object> { 0.0, 0.0 } } };
             Assert.Throws<QueryException>(() => SourceBinding.Resolve(new List<object> { ops[0], plain }));
             var otherSource = OpsOf(Plan(sha: "sha-pdf-2"));
             Assert.Throws<QueryException>(() => SourceBinding.Resolve(new List<object> { ops[0], otherSource[0] }));
@@ -158,7 +158,7 @@ namespace Bimbridge.Tests
             Assert.Throws<ArgumentException>(() => SourceBinding.Token("pdf", "x", null, "B", "r", "h", 1));
             // Without the source SHA-256 the workflow is not executable.
             var noSha = Plan(); noSha.Source.Remove("sha256");
-            Assert.Equal(false, PdfToPlan.Execution(noSha)["ejecutable"]);
+            Assert.Equal(false, PdfToPlan.Execution(noSha)["executable"]);
         }
     }
 }

@@ -69,7 +69,7 @@ namespace Bimbridge.Engine
 
             if (RecipeForm.IsMatch(body) || ClassForm.IsMatch(body))
             {
-                w.Kind = RecipeForm.IsMatch(body) ? "receta" : "clase";
+                w.Kind = RecipeForm.IsMatch(body) ? "recipe" : "class";
                 sb.Append("namespace ").Append(Namespace).Append(" {\n");
                 sb.Append("#line ").Append(userStart + 1).Append(" \"script\"\n");
                 sb.Append(body).Append("\n#line default\n}\n");
@@ -78,7 +78,7 @@ namespace Bimbridge.Engine
             }
 
             var isExpr = IsExpression(body);
-            w.Kind = isExpr ? "expresión" : "cuerpo";
+            w.Kind = isExpr ? "expression" : "body";
             sb.Append("namespace ").Append(Namespace).Append(" {\n");
             sb.Append("public static class ").Append(className).Append(" {\n");
             sb.Append("public static object ").Append(EntryMethod).Append("(").Append(ContextType).Append(" ctx) {\n");

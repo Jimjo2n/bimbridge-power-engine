@@ -14,7 +14,7 @@ namespace Bimbridge.Tests
     /// <summary>Acceptance A (§3): single normalizer, durable identity, journal with correct states and durable writes.</summary>
     public class IdentityJournalTests
     {
-        private static string Tmp(string name = "operaciones.jsonl") => Path.Combine(Path.GetTempPath(), "bimbridge-a-" + Guid.NewGuid().ToString("N"), name);
+        private static string Tmp(string name = "operations.jsonl") => Path.Combine(Path.GetTempPath(), "bimbridge-a-" + Guid.NewGuid().ToString("N"), name);
         private static OperationJournal Journal(string path = null) => new OperationJournal(path ?? Tmp());
 
         // ---------- shared normalizer ----------
@@ -23,17 +23,17 @@ namespace Bimbridge.Tests
         [InlineData(null, OpSemantics.ModeQuery)]
         [InlineData("", OpSemantics.ModeQuery)]
         [InlineData(" Consulta ", OpSemantics.ModeQuery)]
-        // alpha3: "prueba" is no longer a query: it is an alias for trial (requires W). Intentional, more restrictive change.
+        // alpha3: "test" is no longer a query: it is an alias for trial (requires W). Intentional, more restrictive change.
         [InlineData("PRUEBA", OpSemantics.ModeTrial)]
         [InlineData("read", OpSemantics.ModeQuery)]
         [InlineData(" Ejecutar ", OpSemantics.ModeRun)]
-        [InlineData("escribir", OpSemantics.ModeRun)]
+        [InlineData("write", OpSemantics.ModeRun)]
         [InlineData("RUN", OpSemantics.ModeRun)]
-        [InlineData("aplicar", OpSemantics.ModeRun)]
+        [InlineData("apply", OpSemantics.ModeRun)]
         public void ExecMode_Aliases_AndSpaces(string raw, string expected)
         {
             var a = new Dictionary<string, object>();
-            if (raw != null) a["modo"] = raw;
+            if (raw != null) a["mode"] = raw;
             Assert.Equal(expected, OpSemantics.ExecMode(a, out var err));
             Assert.Null(err);
         }
@@ -41,7 +41,7 @@ namespace Bimbridge.Tests
         [Fact]
         public void UnknownMode_IsInvalid_NeverRead_AndNeverRetargeted()
         {
-            var a = new Dictionary<string, object> { ["modo"] = "delete_all" };
+            var a = new Dictionary<string, object> { ["mode"] = "delete_all" };
             Assert.Null(OpSemantics.ExecMode(a, out var err));
             Assert.NotNull(err);
             Assert.Equal(OpSemantics.Kind.Invalid, OpSemantics.Classify(Wire.OpExec, a, out _));
@@ -52,16 +52,16 @@ namespace Bimbridge.Tests
         [Theory]
         [InlineData(Wire.OpFam, "info", OpSemantics.Kind.Read)]
         [InlineData(Wire.OpFam, " Conector ", OpSemantics.Kind.Write)]
-        [InlineData(Wire.OpFam, "borrar", OpSemantics.Kind.Invalid)]
-        [InlineData(Wire.OpTask, "estado", OpSemantics.Kind.Read)]
-        [InlineData(Wire.OpTask, "esperar", OpSemantics.Kind.Read)]
-        [InlineData(Wire.OpTask, "iniciar", OpSemantics.Kind.Write)]
-        [InlineData(Wire.OpTask, "reconciliar", OpSemantics.Kind.Write)]
-        [InlineData(Wire.OpTask, "inventar", OpSemantics.Kind.Invalid)]
-        [InlineData(Wire.OpDoc, "guardar", OpSemantics.Kind.Write)]
+        [InlineData(Wire.OpFam, "delete", OpSemantics.Kind.Invalid)]
+        [InlineData(Wire.OpTask, "status", OpSemantics.Kind.Read)]
+        [InlineData(Wire.OpTask, "wait", OpSemantics.Kind.Read)]
+        [InlineData(Wire.OpTask, "start", OpSemantics.Kind.Write)]
+        [InlineData(Wire.OpTask, "reconcile", OpSemantics.Kind.Write)]
+        [InlineData(Wire.OpTask, "invent", OpSemantics.Kind.Invalid)]
+        [InlineData(Wire.OpDoc, "save", OpSemantics.Kind.Write)]
         public void Classify_SameSemanticsEverywhere(string op, string action, OpSemantics.Kind kind)
         {
-            Assert.Equal(kind, OpSemantics.Classify(op, new Dictionary<string, object> { ["accion"] = action }, out _));
+            Assert.Equal(kind, OpSemantics.Classify(op, new Dictionary<string, object> { ["action"] = action }, out _));
         }
 
         [Fact]
@@ -69,27 +69,27 @@ namespace Bimbridge.Tests
         {
             var a = new Dictionary<string, object>
             {
-                ["b"] = 2L, ["a"] = new Dictionary<string, object> { ["z"] = 1.0, ["y"] = new List<object> { 1L, "x" }, ["clave"] = "internal" },
-                ["clave"] = "k1", ["_tool"] = "exec", ["deadline_ms"] = 5000L,
+                ["b"] = 2L, ["a"] = new Dictionary<string, object> { ["z"] = 1.0, ["y"] = new List<object> { 1L, "x" }, ["key"] = "internal" },
+                ["key"] = "k1", ["_tool"] = "exec", ["deadline_ms"] = 5000L,
             };
             var b = new Dictionary<string, object>
             {
-                ["a"] = new Dictionary<string, object> { ["clave"] = "internal", ["y"] = new List<object> { 1L, "x" }, ["z"] = 1L },
-                ["b"] = 2.0, ["clave"] = "OTHER", ["page"] = 3L,
+                ["a"] = new Dictionary<string, object> { ["key"] = "internal", ["y"] = new List<object> { 1L, "x" }, ["z"] = 1L },
+                ["b"] = 2.0, ["key"] = "OTHER", ["page"] = 3L,
             };
             Assert.Equal(OpSemantics.Canonical(a), OpSemantics.Canonical(b));
-            var c = new Dictionary<string, object>(b) { ["a"] = new Dictionary<string, object> { ["clave"] = "different", ["y"] = new List<object> { 1L, "x" }, ["z"] = 1L } };
+            var c = new Dictionary<string, object>(b) { ["a"] = new Dictionary<string, object> { ["key"] = "different", ["y"] = new List<object> { 1L, "x" }, ["z"] = 1L } };
             Assert.NotEqual(OpSemantics.Canonical(a), OpSemantics.Canonical(c));
         }
 
         [Fact]
         public void Hash_IncludesResolvedCode_NotJustFileName()
         {
-            var args = new Dictionary<string, object> { ["archivo"] = @"C:\x\script.cs", ["modo"] = "ejecutar" };
+            var args = new Dictionary<string, object> { ["file"] = @"C:\x\script.cs", ["mode"] = "run" };
             var h1 = OperationJournal.HashArgs(Wire.OpExec, args, "return 1;");
             var h2 = OperationJournal.HashArgs(Wire.OpExec, args, "return 2;");
             Assert.NotEqual(h1, h2);
-            Assert.Equal(h1, OperationJournal.HashArgs(Wire.OpExec, new Dictionary<string, object>(args) { ["clave"] = "other" }, "return 1;"));
+            Assert.Equal(h1, OperationJournal.HashArgs(Wire.OpExec, new Dictionary<string, object>(args) { ["key"] = "other" }, "return 1;"));
         }
 
         // ---------- identity ----------
@@ -176,10 +176,10 @@ namespace Bimbridge.Tests
         }
 
         [Theory]
-        [InlineData("parcial")]
-        [InlineData("desconocido")]
+        [InlineData("partial")]
+        [InlineData("unknown")]
         [InlineData("error")]
-        [InlineData("cancelado")]
+        [InlineData("cancelled")]
         public void PartialOrUnknown_RequiresExplicitReconcile_AndKeepsAttempts(string status)
         {
             var path = Tmp();
@@ -212,7 +212,7 @@ namespace Bimbridge.Tests
             var j = Journal(path);
             j.Begin("k1", "d", Wire.OpExec, "h", null, "s");
             j.Complete("k1", "d", Status.Ok, null);
-            File.AppendAllText(path, "{\"ev\":\"inicio\",\"clave\":\"k2\",\"do"); // power cut in the middle of a line
+            File.AppendAllText(path, "{\"ev\":\"start\",\"key\":\"k2\",\"do"); // power cut in the middle of a line
             var j2 = Journal(path);
             Assert.Equal(OperationJournal.BeginKind.Completed, j2.Begin("k1", "d", Wire.OpExec, "h", null, "s").Kind);
             Assert.Equal(OperationJournal.BeginKind.New, j2.Begin("k3", "d", Wire.OpExec, "h", null, "s").Kind);
@@ -230,7 +230,7 @@ namespace Bimbridge.Tests
             var blocker = Path.Combine(dir, "i_am_a_file");
             File.WriteAllText(blocker, "x");
             // The journal folder is a file: it is neither created nor written.
-            Assert.Throws<JournalUnavailableException>(() => new OperationJournal(Path.Combine(blocker, "operaciones.jsonl")));
+            Assert.Throws<JournalUnavailableException>(() => new OperationJournal(Path.Combine(blocker, "operations.jsonl")));
         }
 
         [Fact]
@@ -251,7 +251,7 @@ namespace Bimbridge.Tests
         public void PersistedSince_IsPerGeneration()
         {
             var t = new TaskRecord { Id = "t" };
-            t.NotePersist(new PersistEvidence { Kind = "guardado", When = "2026-10-20T10:00:00.000Z", Generation = "g1", Seq = 5 });
+            t.NotePersist(new PersistEvidence { Kind = "saved", When = "2026-10-20T10:00:00.000Z", Generation = "g1", Seq = 5 });
             Assert.True(t.PersistedSince("g1", "2026-10-20T09:59:00.000Z"));
             Assert.False(t.PersistedSince("g1", "2026-10-20T10:01:00.000Z"));
             Assert.False(t.PersistedSince("g2", "2026-10-20T09:00:00.000Z"));

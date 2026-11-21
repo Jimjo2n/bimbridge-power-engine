@@ -189,7 +189,7 @@ def lighting_plan(seed=7, n_d=40, n_s=20, n_g=12, rot=0, near_dupes=2):
             ln, wd = 4 * 12 / SCALE * PT_PER_IN, (8 / 12) * 12 / SCALE * PT_PER_IN
             c.rect(sx - ln / 2, sy - wd / 2, ln, wd, fill=False)
         c.text(sx + 6, sy + 4, code, 6)
-        truth.append({"codigo": code, "modelo_ft": [x, y], "lamina_pt": [round(sx, 3), round(sy, 3)], "simbolo": kind})
+        truth.append({"code": code, "model_ft": [x, y], "sheet_pt": [round(sx, 3), round(sy, 3)], "symbol": kind})
 
     for _ in range(n_d):
         add("D", "circle")
@@ -201,10 +201,10 @@ def lighting_plan(seed=7, n_d=40, n_s=20, n_g=12, rot=0, near_dupes=2):
     dupes = []
     for k in range(near_dupes):
         t = truth[k]
-        x, y = t["modelo_ft"][0] + 0.125, t["modelo_ft"][1]
+        x, y = t["model_ft"][0] + 0.125, t["model_ft"][1]
         sx, sy = model_to_sheet_pt(x, y, rot)
         c.circle(sx, sy, 4.0)
-        dupes.append({"codigo": t["codigo"], "modelo_ft": [x, y], "lamina_pt": [round(sx, 3), round(sy, 3)], "casi_duplicado_de": k})
+        dupes.append({"code": t["code"], "model_ft": [x, y], "sheet_pt": [round(sx, 3), round(sy, 3)], "near_duplicate_of": k})
     # legend
     lx, ly = W - 4.5 * PT_PER_IN, H - 2.0 * PT_PER_IN
     c.text(lx, ly + 14, "LIGHTING LEGEND", 10)
@@ -226,11 +226,11 @@ def lighting_plan(seed=7, n_d=40, n_s=20, n_g=12, rot=0, near_dupes=2):
     for r, row in enumerate(rows):
         for k, cell in enumerate(row):
             c.text(tx + cols[k] + 3, ty - (r + 1) * rh + 4, cell, 7)
-    anchors = [{"eje": "A1", "modelo_ft": [0, 0]}, {"eje": "F1", "modelo_ft": [150, 0]}, {"eje": "A5", "modelo_ft": [0, 100]}, {"eje": "F5", "modelo_ft": [150, 100]}]
+    anchors = [{"axis": "A1", "model_ft": [0, 0]}, {"axis": "F1", "model_ft": [150, 0]}, {"axis": "A5", "model_ft": [0, 100]}, {"axis": "F5", "model_ft": [150, 100]}]
     for a in anchors:
-        a["lamina_pt"] = [round(v, 3) for v in model_to_sheet_pt(a["modelo_ft"][0], a["modelo_ft"][1], rot)]
-    return c.content(), {"luminarias": truth, "casi_duplicados": dupes, "anclas": anchors,
-                         "escala": SCALE, "rotacion_modelo_deg": rot, "lamina_in": [SHEET_W_IN, SHEET_H_IN]}
+        a["sheet_pt"] = [round(v, 3) for v in model_to_sheet_pt(a["model_ft"][0], a["model_ft"][1], rot)]
+    return c.content(), {"fixtures": truth, "near_duplicates": dupes, "anchors": anchors,
+                         "scale": SCALE, "model_rotation_deg": rot, "sheet_in": [SHEET_W_IN, SHEET_H_IN]}
 
 
 def docx(path):
@@ -270,12 +270,12 @@ def build(out):
     # same plan with /Rotate 90 (the sheet appears rotated): extraction must return coordinates in visible space
     pdf = Pdf(); pdf.page(W, H, content, rotate=90); pdf.write(os.path.join(out, "plan_rotado.pdf"))
     rot = json.loads(json.dumps(truth))  # /Rotate 90: visible (x', y') = (y, W - x)
-    for key in ("luminarias", "casi_duplicados", "anclas"):
+    for key in ("fixtures", "near_duplicates", "anchors"):
         for e in rot[key]:
-            x, y = e["lamina_pt"]
-            e["lamina_pt"] = [round(y, 3), round(W - x, 3)]
-    rot["lamina_in"] = [truth["lamina_in"][1], truth["lamina_in"][0]]
-    rot["rotacion_pagina_deg"] = 90
+            x, y = e["sheet_pt"]
+            e["sheet_pt"] = [round(y, 3), round(W - x, 3)]
+    rot["sheet_in"] = [truth["sheet_in"][1], truth["sheet_in"][0]]
+    rot["page_rotation_deg"] = 90
     truths["plan_rotado.pdf"] = rot
     # model rotated 30° on the sheet: registration must recover the rotation
     content30, truth30 = lighting_plan(seed=11, rot=30.0)

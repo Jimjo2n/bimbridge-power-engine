@@ -11,7 +11,7 @@ namespace Bimbridge.AgentHost
     /// Crash injection for recovery tests. Format (variable BIMBRIDGE_AH_FAULT or <see cref="Configure"/>):
     /// <c>point[@op][#n][:k]</c> — crashes at point <c>point</c>, only for operation <c>op</c> (if given), the n-th time it is passed
     /// (the 1st by default); <c>k</c> is an argument of the point (e.g. after how many elements inside a transaction).
-    /// Mode (BIMBRIDGE_AH_FAULT_MODE): "matar" (default: the process kills itself with SIGKILL, with no finally blocks or flushes) or "excepcion".
+    /// Mode (BIMBRIDGE_AH_FAULT_MODE): "kill" (default: the process kills itself with SIGKILL, with no finally blocks or flushes) or "exception".
     /// Before killing it writes a line to BIMBRIDGE_AH_FAULT_MARK (if set) so the test knows where it crashed.
     /// Points: backend.mitad_tx, backend.tras_commit, runner.tras_ejecutar, runner.en_verificacion, runner.tras_verificar,
     /// runner.en_checkpoint, runner.entre_operaciones.
@@ -61,7 +61,7 @@ namespace Bimbridge.AgentHost
 
         public Faults Configure(string spec, string mode = null, string mark = null)
         {
-            _point = null; _op = null; _nth = 1; _hits = 0; Arg = -1; _mode = mode ?? "matar"; _mark = mark;
+            _point = null; _op = null; _nth = 1; _hits = 0; Arg = -1; _mode = mode ?? "kill"; _mark = mark;
             if (string.IsNullOrWhiteSpace(spec)) return this;
             var s = spec.Trim();
             var colon = s.LastIndexOf(':');
@@ -106,7 +106,7 @@ namespace Bimbridge.AgentHost
                 }
                 catch (IOException) { }
             }
-            if (_mode == "excepcion") throw new CrashException("simulated crash at " + where);
+            if (_mode == "exception") throw new CrashException("simulated crash at " + where);
             Process.GetCurrentProcess().Kill();
             // Kill is asynchronous on some systems: do not keep running anything.
             System.Threading.Thread.Sleep(System.Threading.Timeout.Infinite);

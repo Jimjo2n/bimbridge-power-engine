@@ -1,94 +1,94 @@
 {
- "esquema": "bimbridge.campana080/1",
+ "schema": "bimbridge.campaign080/1",
  "item": "N8-05",
- "titulo": "Sheet creation and composition",
- "estado_inicial": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW.",
+ "title": "Sheet creation and composition",
+ "initial_status": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW.",
  "variables": {
-  "vista_lamina": "id of a view that is not on any sheet (e.g. BB-N8-04 DRAFTING)"
+  "sheet_view": "id of a view that is not on any sheet (e.g. BB-N8-04 DRAFTING)"
  },
- "pasos": [
+ "steps": [
   {
-   "nombre": "sheet and view",
+   "name": "sheet and view",
    "op": "plan",
    "args": {
     "ops": [
      {
       "op": "sheet_create",
-      "numero": "BB-N8-05",
-      "nombre": "BIMBRIDGE CAMPAIGN"
+      "number": "BB-N8-05",
+      "name": "BIMBRIDGE CAMPAIGN"
      },
      {
       "op": "sheet_place",
-      "hoja": "@1",
-      "vista": "${vista_lamina}"
+      "sheet": "@1",
+      "view": "${sheet_view}"
      }
     ],
     "summary": "campaign 0.8.0"
    },
-   "guardar": {
+   "save": {
     "plan": "plan_id"
    }
   },
   {
-   "nombre": "apply",
+   "name": "apply",
    "op": "commit",
    "args": {
     "plan_id": "${plan}"
    },
-   "escritura": true
+   "write": true
   },
   {
-   "nombre": "sheet set (print set)",
+   "name": "sheet set (print set)",
    "op": "plan",
    "args": {
     "ops": [
      {
       "op": "sheet_set",
-      "nombre": "BB-N8-05 SET",
-      "hojas": [
+      "name": "BB-N8-05 SET",
+      "sheets": [
        "BB-N8-05"
       ]
      }
     ],
     "summary": "campaign 0.8.0"
    },
-   "guardar": {
+   "save": {
     "plan": "plan_id"
    }
   },
   {
-   "nombre": "save set",
+   "name": "save set",
    "op": "commit",
    "args": {
     "plan_id": "${plan}"
    },
-   "escritura": true
+   "write": true
   },
   {
-   "nombre": "repeated set without replace is rejected",
+   "name": "repeated set without replace is rejected",
    "op": "plan",
    "args": {
     "ops": [
      {
       "op": "sheet_set",
-      "nombre": "BB-N8-05 SET",
-      "hojas": [
+      "name": "BB-N8-05 SET",
+      "sheets": [
        "BB-N8-05"
       ]
      }
     ]
    },
-   "esperar": "invalido",
-   "depende_del_modelo": true
+   "wait": "invalid",
+   "depends_on_model": true
   },
   {
-   "nombre": "the sheet exists",
+   "name": "the sheet exists",
    "op": "catalog",
    "args": {
-    "que": "laminas",
-    "buscar": "BB-N8-05"
+    "kind": "sheets",
+    "search": "BB-N8-05"
    },
-   "contiene": [
+   "contains": [
     "BB-N8-05"
    ]
   }

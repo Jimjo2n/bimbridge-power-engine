@@ -24,7 +24,7 @@ namespace Bimbridge.Tests
         {
             ms.Sort();
             double P(double q) => ms[Math.Min(ms.Count - 1, (int)Math.Ceiling(q * ms.Count) - 1)];
-            return new Dictionary<string, object> { ["n"] = (long)ms.Count, ["media_ms"] = Math.Round(ms.Average(), 4), ["p50_ms"] = Math.Round(P(0.5), 4), ["p95_ms"] = Math.Round(P(0.95), 4), ["max_ms"] = Math.Round(ms.Max(), 4) };
+            return new Dictionary<string, object> { ["n"] = (long)ms.Count, ["mean_ms_value"] = Math.Round(ms.Average(), 4), ["p50_ms"] = Math.Round(P(0.5), 4), ["p95_ms"] = Math.Round(P(0.95), 4), ["max_ms"] = Math.Round(ms.Max(), 4) };
         }
 
         private static List<double> Time(int n, Action a)
@@ -42,24 +42,24 @@ namespace Bimbridge.Tests
 
             var audit = new AuditLog(Path.Combine(root, "aud", "a.jsonl"));
             for (var i = 0; i < 20; i++) audit.Append("w", "warmup", "ok");
-            res["auditoria_append"] = Stats(Time(500, () => audit.Append("s", "exec_codigo", "ok", new Dictionary<string, object> { ["sha256"] = new string('a', 64) })));
-            res["auditoria_intencion_mas_resultado"] = Stats(Time(300, () => { var id = audit.Intent("s", "tarea_lote", "t"); audit.Outcome("s", "tarea_lote", id, "resultado"); }));
+            res["audit_append"] = Stats(Time(500, () => audit.Append("s", "exec_code", "ok", new Dictionary<string, object> { ["sha256"] = new string('a', 64) })));
+            res["audit_intent_plus_result"] = Stats(Time(300, () => { var id = audit.Intent("s", "task_batch", "t"); audit.Outcome("s", "task_batch", id, "result"); }));
             var big = Path.Combine(root, "aud", "a.jsonl");
-            res["auditoria_bytes_por_registro"] = new FileInfo(big).Length / AuditLog.Verify(big).Lines;
-            res["auditoria_verify_completo"] = Stats(Time(5, () => AuditLog.Verify(big)));
+            res["audit_bytes_per_record"] = new FileInfo(big).Length / AuditLog.Verify(big).Lines;
+            res["audit_verify_full"] = Stats(Time(5, () => AuditLog.Verify(big)));
 
-            var store = new TaskStore(Path.Combine(root, "tareas"));
+            var store = new TaskStore(Path.Combine(root, "tasks"));
             Assert.True(store.TryLease("t", "A", "i", TimeSpan.FromHours(1), DateTime.UtcNow, out var l));
-            res["lease_validar"] = Stats(Time(1000, () => store.ValidateOwnership("t", "A", l.Fencing, DateTime.UtcNow)));
-            res["lease_renovar"] = Stats(Time(300, () => store.RenewLease("t", "A", l.Fencing, TimeSpan.FromHours(1), DateTime.UtcNow)));
+            res["lease_validate"] = Stats(Time(1000, () => store.ValidateOwnership("t", "A", l.Fencing, DateTime.UtcNow)));
+            res["lease_renew"] = Stats(Time(300, () => store.RenewLease("t", "A", l.Fencing, TimeSpan.FromHours(1), DateTime.UtcNow)));
 
             var g = new GrantStore(Path.Combine(root, "aut"));
             for (var i = 0; i < 10; i++) g.Approve("t" + i, "doc", null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "p", DateTime.UtcNow);
-            res["concesion_comprobar_10"] = Stats(Time(300, () => g.Check("t5", "doc", null, Capability.Modify, DateTime.UtcNow)));
+            res["lease_check_10"] = Stats(Time(300, () => g.Check("t5", "doc", null, Capability.Modify, DateTime.UtcNow)));
 
             var outp = Environment.GetEnvironmentVariable("BIMBRIDGE_MEASURE_OUT");
             if (!string.IsNullOrEmpty(outp)) File.WriteAllText(Path.Combine(outp, "medicion_sobrecostes.json"), Json.Write(res));
-            Assert.True((double)((Dictionary<string, object>)res["lease_validar"])["p95_ms"] < 50);
+            Assert.True((double)((Dictionary<string, object>)res["lease_validate"])["p95_ms"] < 50);
         }
 
         /// <summary>
@@ -102,16 +102,16 @@ namespace Bimbridge.Tests
 
             var res = new Dictionary<string, object>
             {
-                ["scripts_unicos"] = (long)n,
-                ["bytes_imagen_media"] = (long)images.Average(x => x.Length),
-                ["compilar_2026"] = Stats(compileMs.Skip(5).ToList()),
-                ["no_coleccionable_bytes_retenidos"] = retainedNonCollectible,
-                ["no_coleccionable_ensamblados_nuevos"] = (long)(asmAfter - asmBefore),
-                ["coleccionable_descargado"] = !wr.IsAlive,
-                ["coleccionable_bytes_retenidos_tras_descargar"] = retainedCollectible,
-                ["memoria_privada_delta_no_coleccionable_bytes"] = ws1 - ws0,
+                ["unique_scripts"] = (long)n,
+                ["mean_image_bytes"] = (long)images.Average(x => x.Length),
+                ["compile_2026"] = Stats(compileMs.Skip(5).ToList()),
+                ["noncollectible_bytes_retained"] = retainedNonCollectible,
+                ["noncollectible_new_assemblies"] = (long)(asmAfter - asmBefore),
+                ["collectible_unloaded"] = !wr.IsAlive,
+                ["collectible_bytes_retained_after_unload"] = retainedCollectible,
+                ["private_memory_delta_noncollectible_bytes"] = ws1 - ws0,
                 ["memoria_privada_delta_coleccionable_tras_descargar_bytes"] = ws2 - ws1,
-                ["nota"] = "GC.GetTotalMemory does not count assembly metadata (native memory); the process private memory does, but it is noisy",
+                ["note"] = "GC.GetTotalMemory does not count assembly metadata (native memory); the process private memory does, but it is noisy",
             };
             var outp = Environment.GetEnvironmentVariable("BIMBRIDGE_MEASURE_OUT");
             if (!string.IsNullOrEmpty(outp)) File.WriteAllText(Path.Combine(outp, "medicion_roslyn_memoria.json"), Json.Write(res));
@@ -166,7 +166,7 @@ namespace Bimbridge.Tests
             await RunOnce(false); await RunOnce(true); // warm up
             var off = new List<double>(); var on = new List<double>();
             for (var i = 0; i < 7; i++) { off.Add(await RunOnce(false)); on.Add(await RunOnce(true)); }
-            var res = new Dictionary<string, object> { ["unidades"] = 1000L, ["protecciones_apagadas"] = Stats(off), ["protecciones_0_6_1"] = Stats(on) };
+            var res = new Dictionary<string, object> { ["units"] = 1000L, ["protections_off"] = Stats(off), ["protections_0_6_1"] = Stats(on) };
             var outp = Environment.GetEnvironmentVariable("BIMBRIDGE_MEASURE_OUT");
             if (!string.IsNullOrEmpty(outp)) File.WriteAllText(Path.Combine(outp, "medicion_motor_1000.json"), Json.Write(res));
         }

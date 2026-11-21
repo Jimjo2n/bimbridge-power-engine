@@ -187,7 +187,7 @@ namespace Bimbridge.Addin.Ui
             foreach (var c in selected)
             {
                 Runtime.Plans.Finish(c.Plan, PlanStatus.Discarded, "discarded by the user");
-                Runtime.Journal?.Log(VersionRegistry.HumanAuthor, "descartar", PlanStatus.Discarded, 0, new Dictionary<string, object> { ["plan"] = c.Plan.Id });
+                Runtime.Journal?.Log(VersionRegistry.HumanAuthor, "discard", PlanStatus.Discarded, 0, new Dictionary<string, object> { ["plan"] = c.Plan.Id });
                 c.ShowResult(PlanStatus.Discarded, "Discarded. The model was not touched.");
             }
             Runtime.MarkDirty();
@@ -421,17 +421,17 @@ namespace Bimbridge.Addin.Ui
                     case "loc": return "Position";
                     case "rot": return "Rotation";
                     case "head": return "Tag head";
-                    case "exists": case "nuevo": return "";
+                    case "exists": case "new": return "";
                     case "tag": return "Tag";
-                    case "rango": return "View range";
-                    case "plantilla": return "Template";
-                    case "escala": return "Scale";
-                    case "detalle": return "Detail level";
-                    case "recorte": return "Crop";
-                    case "caja_seccion": return "Section box";
+                    case "range": return "View range";
+                    case "template": return "Template";
+                    case "scale": return "Scale";
+                    case "detail": return "Detail level";
+                    case "crop": return "Crop";
+                    case "section_box": return "Section box";
                 }
                 if (key.StartsWith("oculto@", StringComparison.Ordinal)) return "Hidden in view";
-                if (key.StartsWith("graficos@", StringComparison.Ordinal)) return "Graphics in view";
+                if (key.StartsWith("graphics@", StringComparison.Ordinal)) return "Graphics in view";
                 if (key.StartsWith("cat_oculta:", StringComparison.Ordinal)) return "Hidden category: " + key.Substring(11);
                 if (key.StartsWith("cat_graficos:", StringComparison.Ordinal)) return "Graphics of " + key.Substring(13);
                 return key;

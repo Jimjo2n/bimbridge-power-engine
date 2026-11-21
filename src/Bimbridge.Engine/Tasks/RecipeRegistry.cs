@@ -30,7 +30,7 @@ namespace Bimbridge.Engine.Tasks
 
         public RecipeRegistry(params string[] folders) { _folders = folders.Where(f => !string.IsNullOrEmpty(f)).ToArray(); }
 
-        public static string UserFolder => Home.Sub("recetas");
+        public static string UserFolder => Home.Sub("recipes");
 
         private static readonly Regex VersionRx = new Regex(@"Version\s*=>\s*""([^""]*)""", RegexOptions.Compiled);
         private static readonly Regex DescRx = new Regex(@"Description\s*=>\s*""([^""]*)""", RegexOptions.Compiled);
@@ -68,7 +68,7 @@ namespace Bimbridge.Engine.Tasks
             var code = File.ReadAllText(path);
             return new Entry
             {
-                Name = name, Path = path, Origin = folder == UserFolder ? "usuario" : "instalada",
+                Name = name, Path = path, Origin = folder == UserFolder ? "user" : "installed",
                 Version = VersionRx.Match(code) is var m && m.Success ? m.Groups[1].Value : "1",
                 Description = DescRx.Match(code) is var d && d.Success ? d.Groups[1].Value : "",
                 Hash = Home.Sha256Hex(code),

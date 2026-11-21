@@ -20,14 +20,14 @@ namespace Bimbridge.AgentHost
             var doc = Program.Opt(a, "--doc");
             if (string.IsNullOrWhiteSpace(doc)) { Console.Error.WriteLine("missing --doc"); return 2; }
             var store = new PlanStore(PlanStore.DefaultQueueRoot);
-            if (a[1] == "estado") { store.LoadPersisted(doc); Console.WriteLine(Json.Write(store.CheckWritable(doc).ToJson())); return 0; }
-            if (a[1] != "resolver") { Console.Error.WriteLine("plan-store estado|resolver"); return 2; }
+            if (a[1] == "status") { store.LoadPersisted(doc); Console.WriteLine(Json.Write(store.CheckWritable(doc).ToJson())); return 0; }
+            if (a[1] != "resolve") { Console.Error.WriteLine("plan-store status|resolve"); return 2; }
 
             var author = Program.Opt(a, "--autor");
             var reason = Program.Opt(a, "--motivo");
             if (Array.IndexOf(a, "--confirmo-revision-humana") < 0 || string.IsNullOrWhiteSpace(author) || string.IsNullOrWhiteSpace(reason))
             {
-                Console.Error.WriteLine("resolver requires --autor, --motivo and --confirmo-revision-humana: a person must have reviewed the model");
+                Console.Error.WriteLine("resolve requires --autor, --motivo and --confirmo-revision-humana: a person must have reviewed the model");
                 return 2;
             }
             if (Process.GetProcessesByName("Revit").Length > 0) { Console.Error.WriteLine("Revit is open: close it before resolving. Nothing was changed."); return 3; }

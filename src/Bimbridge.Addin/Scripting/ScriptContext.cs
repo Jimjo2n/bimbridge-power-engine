@@ -44,9 +44,9 @@ namespace Bimbridge.Addin.Scripting
         /// <summary>UIDocument of the target only if it is the active one; otherwise null.</summary>
         public UIDocument UiDoc { get; }
         public IDictionary<string, object> Args { get; }
-        /// <summary>"consulta" (everything is rolled back at the end) or "ejecutar".</summary>
+        /// <summary>"query" (everything is rolled back at the end) or "run".</summary>
         public string Mode { get; }
-        /// <summary>"auto", "grupo" or "ninguna" (the script opens its own transactions).</summary>
+        /// <summary>"auto", "group" or "none" (the script opens its own transactions).</summary>
         public string Tx { get; }
         public CancellationToken Cancel { get; }
 
@@ -88,7 +88,7 @@ namespace Bimbridge.Addin.Scripting
         /// <summary>Declares a traceable exception (something deliberately left unresolved, with its reason and evidence).</summary>
         public void Exception(string reason, object detail = null)
         {
-            var d = new Dictionary<string, object> { ["motivo"] = reason, ["detalle"] = detail == null ? null : ResultSerializer.ToJson(detail, Doc, out _) };
+            var d = new Dictionary<string, object> { ["reason"] = reason, ["detail"] = detail == null ? null : ResultSerializer.ToJson(detail, Doc, out _) };
             if (Sink != null) Sink.Exceptions.Add(d); else Log("exception: " + reason);
         }
 
@@ -101,13 +101,13 @@ namespace Bimbridge.Addin.Scripting
         /// </summary>
         public string Artifact(string name, string content)
         {
-            var safe = new string((name ?? "artefacto.txt").Select(c => char.IsLetterOrDigit(c) || c == '.' || c == '_' || c == '-' ? c : '_').ToArray());
-            var dir = Sink?.ArtifactsDir ?? Home.Sub("resultados");
+            var safe = new string((name ?? "artifact.txt").Select(c => char.IsLetterOrDigit(c) || c == '.' || c == '_' || c == '-' ? c : '_').ToArray());
+            var dir = Sink?.ArtifactsDir ?? Home.Sub("results");
             System.IO.Directory.CreateDirectory(dir);
             var path = System.IO.Path.Combine(dir, safe);
             System.IO.File.WriteAllText(path, content ?? "");
             var sha = Home.FileSha256(path);
-            var a = new Dictionary<string, object> { ["ruta"] = path, ["sha256"] = sha, ["bytes"] = new System.IO.FileInfo(path).Length, ["tipo"] = System.IO.Path.GetExtension(path).TrimStart('.') };
+            var a = new Dictionary<string, object> { ["path"] = path, ["sha256"] = sha, ["bytes"] = new System.IO.FileInfo(path).Length, ["type"] = System.IO.Path.GetExtension(path).TrimStart('.') };
             Sink?.Artifacts.Add(a);
             return path;
         }

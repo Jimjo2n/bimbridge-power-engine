@@ -7,8 +7,8 @@ namespace Bimbridge.AgentHost
     public static class BuildInfo
     {
         public static readonly string Informational =
-            typeof(BuildInfo).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "desconocida";
+            typeof(BuildInfo).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
         public static string Version => Informational.Split('+')[0];
-        public static string Commit => Informational.Contains("+") ? Informational.Substring(Informational.IndexOf('+') + 1) : "sin_commit";
+        public static string Commit => Informational.Contains("+") ? Informational.Substring(Informational.IndexOf('+') + 1) : "no_commit";
     }
 }

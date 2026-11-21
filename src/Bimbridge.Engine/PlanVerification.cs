@@ -10,19 +10,19 @@ namespace Bimbridge.Engine
     /// </summary>
     public static class PlanVerification
     {
-        public const string Met = "cumplidas";
-        public const string Differences = "con_diferencias";
-        public const string NotVerified = "sin_verificar";
+        public const string Met = "met";
+        public const string Differences = "with_differences";
+        public const string NotVerified = "unverified";
 
         public static string Postconditions(IDictionary<string, object> verification)
         {
             if (verification == null) return NotVerified;
-            if (verification.ContainsKey("distintos")) return Differences;
-            if (verification.TryGetValue("verificacion_creacion", out var vc) && vc is Dictionary<string, object> c)
+            if (verification.ContainsKey("different_items")) return Differences;
+            if (verification.TryGetValue("creation_verification", out var vc) && vc is Dictionary<string, object> c)
             {
-                var checkedN = Arg.GetLong(c, "revisados") ?? 0;
-                var okN = Arg.GetLong(c, "como_se_pidio") ?? 0;
-                if (okN != checkedN || c.ContainsKey("problemas")) return Differences;
+                var checkedN = Arg.GetLong(c, "reviewed") ?? 0;
+                var okN = Arg.GetLong(c, "as_requested") ?? 0;
+                if (okN != checkedN || c.ContainsKey("problems")) return Differences;
             }
             return Met;
         }

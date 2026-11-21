@@ -12,7 +12,7 @@ namespace Bimbridge.Addin.Revit
     /// Per-document version registry (section 5.3). Subscribes ONCE per Revit session
     /// to cheap events, instead of 10 events per call like pyRevit (D2).
     /// Attributes each change: transactions with prefix "BIMBRIDGE" → the session that was writing;
-    /// any other (operator by hand, Undo, another add-in) → "usuario".
+    /// any other (operator by hand, Undo, another add-in) → "user".
     /// </summary>
     public sealed class DocumentTracker
     {
@@ -25,7 +25,7 @@ namespace Bimbridge.Addin.Revit
         public volatile string CurrentWriter;
 
         /// <summary>Prefix of temporary changes that undo themselves (capture with highlighting): they do not count as model changes.</summary>
-        public const string TemporaryPrefix = TransactionPrefix + " temporal";
+        public const string TemporaryPrefix = TransactionPrefix + " temporary";
 
         private int _suspended;
 

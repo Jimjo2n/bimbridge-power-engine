@@ -139,13 +139,13 @@ namespace Bimbridge.Addin.Ui
             var state = UpdateService.OnlineState;
             var r = UpdateService.Online;
             string text;
-            if (!UpdateService.OnlineEnabled) text = "Disabled in this computer's configuration (actualizacion_online=no).";
+            if (!UpdateService.OnlineEnabled) text = "Disabled in this computer's configuration (online_update=no).";
             else if (state == null) text = "Checks the latest version published at github.com/" + UpdateService.Repo + ". It only connects when you press the button; no GitHub account needed.";
             else if (state == "error") text = "Could not check: " + UpdateService.OnlineError;
-            else if (state == "sin_releases") text = "The repository does not have any installable published version yet." + (UpdateService.OnlineError != null ? "\n" + UpdateService.OnlineError : "");
-            else if (state == "nueva") text = "Published version: " + r.Tag + (r.Commit != null ? " (commit " + r.Commit.Substring(0, 7) + ")" : "") + (r.Prerelease ? " · prerelease" : "") + ". It is newer than the one you are using.";
-            else if (state == "mismo_version_otro_commit") text = "The published version " + r.Tag + " has the same number as yours but a different commit (" + r.Commit.Substring(0, 7) + "; you are using " + (UpdateService.RunningCommit ?? "?") + "). You can install it if you want exactly the published one.";
-            else if (state == "anterior") text = "The latest published version (" + r.Tag + ") is older than the one you are using. There is nothing to update.";
+            else if (state == "no_releases") text = "The repository does not have any installable published version yet." + (UpdateService.OnlineError != null ? "\n" + UpdateService.OnlineError : "");
+            else if (state == "new") text = "Published version: " + r.Tag + (r.Commit != null ? " (commit " + r.Commit.Substring(0, 7) + ")" : "") + (r.Prerelease ? " · prerelease" : "") + ". It is newer than the one you are using.";
+            else if (state == "same_version_other_commit") text = "The published version " + r.Tag + " has the same number as yours but a different commit (" + r.Commit.Substring(0, 7) + "; you are using " + (UpdateService.RunningCommit ?? "?") + "). You can install it if you want exactly the published one.";
+            else if (state == "previous") text = "The latest published version (" + r.Tag + ") is older than the one you are using. There is nothing to update.";
             else text = "You are using the latest published version (" + r.Tag + (r.Commit != null ? ", commit " + r.Commit.Substring(0, 7) : "") + ").";
             var t = Theme.Label(text, 12.5, false, state == "error" ? Theme.Darken(Theme.Red, 0.8) : Theme.Muted);
             t.Margin = new Thickness(0, 0, 0, 10);
@@ -157,11 +157,11 @@ namespace Bimbridge.Addin.Ui
                 check.Margin = new Thickness(0, 0, 8, 0);
                 check.Click += async (s, e) => await CheckOnline();
                 row.Children.Add(check);
-                if (r != null && (state == "nueva" || state == "mismo_version_otro_commit") && !UpdateService.RestartPending)
+                if (r != null && (state == "new" || state == "same_version_other_commit") && !UpdateService.RestartPending)
                 {
                     var get = Theme.Button("Download and install " + r.Tag, Theme.Kind.Primary);
                     get.Margin = new Thickness(0);
-                    var sameVersion = state == "mismo_version_otro_commit";
+                    var sameVersion = state == "same_version_other_commit";
                     get.Click += async (s, e) => await DownloadAndInstall(r, sameVersion);
                     row.Children.Add(get);
                 }

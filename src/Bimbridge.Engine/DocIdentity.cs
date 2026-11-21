@@ -32,7 +32,7 @@ namespace Bimbridge.Engine
 
         public static DocIdentity File(string path, string print, string generation) => new DocIdentity
         {
-            Kind = "archivo",
+            Kind = "file",
             Key = "archivo:" + NormalizePath(path),
             Print = string.IsNullOrEmpty(print) ? null : print,
             Generation = generation,
@@ -40,7 +40,7 @@ namespace Bimbridge.Engine
 
         public static DocIdentity Unsaved(string instanceId, int sequence, string generation) => new DocIdentity
         {
-            Kind = "nuevo",
+            Kind = "new",
             Key = "nuevo:" + instanceId + "#" + sequence.ToString(CultureInfo.InvariantCulture),
             Print = null,
             Generation = generation,

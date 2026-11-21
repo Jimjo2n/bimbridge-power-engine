@@ -1,7 +1,7 @@
 {
   "revit": 2025,
-  "paquete_referencia": "2025.4.60",
-  "metodo": "System.Reflection.Metadata sobre ensamblados de referencia; sin cargar ni ejecutar Revit",
+  "reference_package": "2025.4.60",
+  "method": "System.Reflection.Metadata sobre ensamblados de referencia; sin cargar ni ejecutar Revit",
   "postable_command": [
     "RoofByFace",
     "Soffit",
@@ -1806,7 +1806,7 @@
     "SystemsAnalysisReport",
     "Internal"
   ],
-  "superficies": {
+  "surfaces": {
     "Autodesk.Revit.DB.Analysis.EnergyAnalysisDetailModel": true,
     "Autodesk.Revit.DB.Analysis.SpatialFieldManager": true,
     "Autodesk.Revit.DB.Architecture.Railing::Create": true,

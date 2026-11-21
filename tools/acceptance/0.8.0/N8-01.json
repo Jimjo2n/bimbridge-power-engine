@@ -1,27 +1,27 @@
 {
- "esquema": "bimbridge.campana080/1",
+ "schema": "bimbridge.campaign080/1",
  "item": "N8-01",
- "titulo": "Correct document identity",
- "estado_inicial": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW.",
+ "title": "Correct document identity",
+ "initial_status": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW.",
  "variables": {
-  "ruta_json": "path of the .rvt as it appears in JSON (double backslashes)"
+  "json_path": "path of the .rvt as it appears in JSON (double backslashes)"
  },
- "pasos": [
+ "steps": [
   {
-   "nombre": "context",
+   "name": "context",
    "op": "context",
    "args": {},
-   "contiene": [
-    "${ruta_json}"
+   "contains": [
+    "${json_path}"
    ]
   },
   {
-   "nombre": "open documents",
+   "name": "open documents",
    "op": "docs",
    "args": {}
   },
   {
-   "nombre": "nonexistent target is rejected",
+   "name": "nonexistent target is rejected",
    "op": "query",
    "args": {
     "doc": "d999",
@@ -30,11 +30,11 @@
     ],
     "count": true
    },
-   "doc_explicito": true,
-   "esperar": "destino_no_disponible"
+   "explicit_doc": true,
+   "wait": "target_unavailable"
   },
   {
-   "nombre": "read in the pinned document",
+   "name": "read in the pinned document",
    "op": "query",
    "args": {
     "cat": [

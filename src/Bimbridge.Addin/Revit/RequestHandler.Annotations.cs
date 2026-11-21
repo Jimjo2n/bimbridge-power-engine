@@ -32,13 +32,13 @@ namespace Bimbridge.Addin.Revit
                     {
                         var original = doc.GetElement(Ids.ToId(id));
                         var data = AnnotationRepair.Inspect(original);
-                        data["estado"] = "referencias_disponibles";
+                        data["status"] = "available_references";
                         rows.Add(data);
                     }
                     catch (QueryException ex)
                     {
                         differences = true;
-                        rows.Add(new Dictionary<string, object> { ["id"] = id, ["estado"] = "no_evaluable", ["motivo"] = ex.Message });
+                        rows.Add(new Dictionary<string, object> { ["id"] = id, ["status"] = "not_evaluable", ["reason"] = ex.Message });
                     }
                 }
                 rev = _tracker.For(doc)?.Rev ?? 0;
@@ -47,7 +47,7 @@ namespace Bimbridge.Addin.Revit
             if (!work.Ok) return FromWork(request.Id, work);
             if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
             return new Response { Id = request.Id, Rev = rev, State = differences ? Status.CompletedWithDifferences : Status.Ok,
-                Data = new Dictionary<string, object> { ["anotaciones"] = rows } };
+                Data = new Dictionary<string, object> { ["annotations"] = rows } };
         }
     }
 }

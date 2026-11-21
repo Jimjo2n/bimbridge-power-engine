@@ -21,9 +21,9 @@ namespace Bimbridge.Tests
 
         private static TaskRecord Draft(string id, int n, string state) => new TaskRecord
         {
-            Id = id, Objective = "prueba", RecipeName = "fake", RecipeVersion = "1", RecipeHash = "h", ContentHash = "c-" + n, State = state,
+            Id = id, Objective = "test", RecipeName = "fake", RecipeVersion = "1", RecipeHash = "h", ContentHash = "c-" + n, State = state,
             Args = new Dictionary<string, object> { ["n"] = (long)n },
-            Docs = new List<TaskDoc> { new TaskDoc { Key = "archivo:c:\\practica.rvt", Title = "practica", Generation = "inst#1" } },
+            Docs = new List<TaskDoc> { new TaskDoc { Key = "archivo:c:\\practica.rvt", Title = "practice", Generation = "inst#1" } },
             Policy = new Dictionary<string, object>(),
         };
 
@@ -38,21 +38,21 @@ namespace Bimbridge.Tests
         {
             var root = TempRoot();
             var store = new TaskStore(root);
-            store.Create(Draft("ajena", 5, TaskState.Interrupted), "// fake");
-            Assert.True(store.TryLease("ajena", "inst:B", "B", TimeSpan.FromHours(1), DateTime.UtcNow, out _));
-            var file = Path.Combine(store.Dir("ajena"), "tarea.json");
+            store.Create(Draft("foreign", 5, TaskState.Interrupted), "// fake");
+            Assert.True(store.TryLease("foreign", "inst:B", "B", TimeSpan.FromHours(1), DateTime.UtcNow, out _));
+            var file = Path.Combine(store.Dir("foreign"), "task.json");
             var before = File.ReadAllText(file);
             var mgr = new TaskManager(new TaskStore(root), "A", t => new FakeBackend(new FakeModel())) { Authority = new AllowAll() };
 
-            var t1 = mgr.Cancel("ajena", out var busy);
+            var t1 = mgr.Cancel("foreign", out var busy);
             Assert.NotNull(busy);
             Assert.Contains("another Revit", busy);
             Assert.Equal(TaskState.Interrupted, t1.State);
-            Assert.Contains("another Revit", mgr.Note("ajena", "nota", "prueba"));
-            Assert.Contains("another Revit", mgr.Reconcile("ajena", null, true, "comprobado", "prueba"));
-            Assert.Contains("another Revit", mgr.Archive("ajena"));
+            Assert.Contains("another Revit", mgr.Note("foreign", "note", "test"));
+            Assert.Contains("another Revit", mgr.Reconcile("foreign", null, true, "checked", "test"));
+            Assert.Contains("another Revit", mgr.Archive("foreign"));
 
-            Assert.True(store.Exists("ajena"));
+            Assert.True(store.Exists("foreign"));
             Assert.Equal(before, File.ReadAllText(file));
         }
 
@@ -63,7 +63,7 @@ namespace Bimbridge.Tests
             var root = TempRoot();
             var store = new TaskStore(root);
             var thief = new TaskStore(root);
-            var t = Draft("robada", 200, TaskState.Queued);
+            var t = Draft("stolen", 200, TaskState.Queued);
             store.Create(t, "// fake");
             var m = new FakeModel { MsPerUnit = 50 };
             var stolen = false;
@@ -72,7 +72,7 @@ namespace Bimbridge.Tests
             {
                 if (v != 3) return;
                 // After expiry (now+2h) another owner takes it: new fencing token.
-                Assert.True(thief.TryLease("robada", "inst:B", "B", TimeSpan.FromHours(3), DateTime.UtcNow.AddHours(2), out var l));
+                Assert.True(thief.TryLease("stolen", "inst:B", "B", TimeSpan.FromHours(3), DateTime.UtcNow.AddHours(2), out var l));
                 Assert.True(l.Fencing >= 2);
                 stolen = true;
             };
@@ -84,9 +84,9 @@ namespace Bimbridge.Tests
                 if (stolen && !marked && !Monitor.IsEntered(m.Lock))
                 {
                     marked = true;
-                    var other = thief.Load("robada");
+                    var other = thief.Load("stolen");
                     other.ConfirmSeq = 424242;
-                    other.Decisions.Add(new Dictionary<string, object> { ["t"] = "x", ["texto"] = "marcador-B", ["quien"] = "B" });
+                    other.Decisions.Add(new Dictionary<string, object> { ["t"] = "x", ["text"] = "marcador-B", ["who"] = "B" });
                     thief.Save(other);
                 }
                 return DateTime.UtcNow;
@@ -97,10 +97,10 @@ namespace Bimbridge.Tests
             Assert.True(marked);
             Assert.Equal(TaskState.Interrupted, runner.Task_.State);
             Assert.Contains("lease lost",runner.Task_.Reason);
-            var onDisk = store.Load("robada");
+            var onDisk = store.Load("stolen");
             Assert.Equal(424242, onDisk.ConfirmSeq);
-            Assert.Contains(onDisk.Decisions, d => (d["texto"] as string) == "marcador-B");
-            var lease = store.ReadLease("robada");
+            Assert.Contains(onDisk.Decisions, d => (d["text"] as string) == "marcador-B");
+            var lease = store.ReadLease("stolen");
             Assert.Equal("inst:B", lease.Owner);
             Assert.False(lease.Released);
         }
@@ -123,7 +123,7 @@ namespace Bimbridge.Tests
             var last = leaseAtSave.Last();
             Assert.NotNull(last);
             Assert.Equal("inst:A", last.Owner);
-            Assert.False(last.Released, "the last tarea.json was written after releasing the lease");
+            Assert.False(last.Released, "the last task.json was written after releasing the lease");
             Assert.True(store.ReadLease("normal").Released);
             Assert.Equal(TaskState.Applied, store.Load("normal").State);
         }

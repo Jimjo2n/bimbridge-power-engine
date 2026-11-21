@@ -69,10 +69,11 @@ namespace Bimbridge.Engine
             lock (_lock) WithFileLock(() => { Resync(fullCheck: true); return true; });
         }
 
-        public static string DefaultPath => Path.Combine(Home.Root, "auditoria", "auditoria.jsonl");
+        public static string DefaultPath => Home.Resolve(Path.Combine(Home.Root, "audit", "audit.jsonl"));
 
         private string LockPath => _path + ".lock";
-        public static string HeadPath(string path) => path + ".cabeza";
+        public static string HeadPath(string path) =>
+            File.Exists(path + ".head") || !File.Exists(path + LegacyAliases.AuditHeadSuffix) ? path + ".head" : path + LegacyAliases.AuditHeadSuffix;
 
         /// <summary>Records an authority event. Returns its seq.</summary>
         public long Append(string author, string op, string status, Dictionary<string, object> extra = null)
@@ -121,7 +122,7 @@ namespace Bimbridge.Engine
                     if (done.HasValue) return done.Value;
                 }
                 var waited = sw.ElapsedTicks;
-                Crash("antes_bloqueo");
+                Crash("before_lock");
                 var fs = TryOpenLock();
                 if (fs != null)
                 {
@@ -145,11 +146,11 @@ namespace Bimbridge.Engine
                         // A simulated crash sends nothing: the process "died". The next leader will reconcile.
                         if (!crashed)
                         {
-                            Crash("antes_confirmar");
+                            Crash("before_commit");
                             for (var k = 0; k < after.Count; k++)
                             {
                                 after[k]();
-                                if (k == 0 && after.Count > 1) Crash("tras_confirmar_parcial");
+                                if (k == 0 && after.Count > 1) Crash("after_partial_commit");
                             }
                         }
                     }
@@ -205,7 +206,7 @@ namespace Bimbridge.Engine
             var name = DateTime.UtcNow.Ticks.ToString("D19", CultureInfo.InvariantCulture) + "-" + me.Id;
             var json = Json.Write(new Dictionary<string, object>
             {
-                ["id"] = me.Id, ["autor"] = me.Author, ["op"] = me.Op, ["estado"] = me.State, ["pid"] = me.Pid, ["t"] = me.T, ["extra"] = me.Extra,
+                ["id"] = me.Id, ["author"] = me.Author, ["op"] = me.Op, ["status"] = me.State, ["pid"] = me.Pid, ["t"] = me.T, ["extra"] = me.Extra,
             });
             try
             {
@@ -248,7 +249,7 @@ namespace Bimbridge.Engine
         /// <summary>With the lock held: claims the pending entries, writes them with a single fsync and confirms to each follower.</summary>
         private long Lead(AuditItem me, string pendName, List<Action> after)
         {
-            Crash("inicio_lider");
+            Crash("leader_start");
             if (pendName != null) { var early = Collect(me); if (early.HasValue) return early.Value; }
             var tp = System.Diagnostics.Stopwatch.StartNew();
             Resync(fullCheck: false);
@@ -274,7 +275,7 @@ namespace Bimbridge.Engine
                     var claimed = Path.Combine(PendDir, Path.GetFileNameWithoutExtension(f) + ".reclamada");
                     try { File.Move(f, claimed); }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { continue; }   // its writer withdrew it
-                    try { o = Json.ParseObject(File.ReadAllText(claimed)); }
+                    try { o = LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(claimed))); }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is FormatException)
                     {
                         // Unreadable: not written. The claim stays for reconciliation and the writer receives a definitive error.
@@ -284,7 +285,7 @@ namespace Bimbridge.Engine
                     }
                     var it = new AuditItem
                     {
-                        Id = Arg.GetString(o, "id"), Author = Arg.GetString(o, "autor"), Op = Arg.GetString(o, "op"), State = Arg.GetString(o, "estado"),
+                        Id = Arg.GetString(o, "id"), Author = Arg.GetString(o, "author"), Op = Arg.GetString(o, "op"), State = Arg.GetString(o, "status"),
                         Pid = Arg.GetLong(o, "pid") ?? 0, T = o.TryGetValue("t", out var tv) ? tv : Home.Now(),
                         Extra = o.TryGetValue("extra", out var ev) ? ev as Dictionary<string, object> : null,
                     };
@@ -295,7 +296,7 @@ namespace Bimbridge.Engine
                 }
                 if ((DateTime.UtcNow - _lastClean).TotalSeconds > 30) { _lastClean = DateTime.UtcNow; CleanStaleReplies(); }
             }
-            Crash("tras_reclamo");
+            Crash("after_claim");
             AuditProfile.Phase(1, tp.ElapsedTicks); tp.Restart();
             // Another leader already claimed my entry: its reply is sent right after releasing the lock, so we wait (bounded) instead of failing.
             // What I claimed from others is always written: a claimed entry is never lost.
@@ -350,12 +351,12 @@ namespace Bimbridge.Engine
             var inQuarantine = new HashSet<string>(StringComparer.Ordinal);
             foreach (var q in Quarantined) foreach (var kv in FindCids(q, byId.Keys)) inQuarantine.Add(kv.Key);
             // Seal and evidence BEFORE confirming anything.
-            WriteLine("sistema", "recuperacion_reclamos", "reclamos_de_lider_caido", new Dictionary<string, object>
+            WriteLine("system", "claims_recovery", "dead_leader_claims", new Dictionary<string, object>
             {
-                ["confirmados"] = byId.Keys.Where(found.ContainsKey).Cast<object>().ToList(),
-                ["no_escritos"] = byId.Keys.Where(k => !found.ContainsKey(k) && !inQuarantine.Contains(k)).Cast<object>().ToList(),
-                ["en_cadena_apartada"] = byId.Keys.Where(inQuarantine.Contains).Cast<object>().ToList(),
-                ["motivo"] = "a leader released the lock without finishing (crash), leaving claimed entries",
+                ["committed"] = byId.Keys.Where(found.ContainsKey).Cast<object>().ToList(),
+                ["not_written"] = byId.Keys.Where(k => !found.ContainsKey(k) && !inQuarantine.Contains(k)).Cast<object>().ToList(),
+                ["in_set_aside_chain"] = byId.Keys.Where(inQuarantine.Contains).Cast<object>().ToList(),
+                ["reason"] = "a leader released the lock without finishing (crash), leaving claimed entries",
             });
             long? mine = null;
             string mineError = null;
@@ -392,7 +393,7 @@ namespace Bimbridge.Engine
             {
                 if (raw.IndexOf("\"cid\":", StringComparison.Ordinal) < 0) continue;
                 Dictionary<string, object> o;
-                try { o = Json.ParseObject(raw); } catch (FormatException) { continue; }
+                try { o = LegacyAliases.NormalizeRecord(Json.ParseObject(raw)); } catch (FormatException) { continue; }
                 var cid = Arg.GetString(o, "cid");
                 if (cid != null && want.Contains(cid)) res[cid] = Arg.GetLong(o, "seq") ?? 0;
             }
@@ -425,9 +426,9 @@ namespace Bimbridge.Engine
         {
             var id = Guid.NewGuid().ToString("N").Substring(0, 16);
             var e = extra != null ? new Dictionary<string, object>(extra) : new Dictionary<string, object>();
-            e["intencion"] = id;
-            e["objetivo"] = target;
-            Append(author, op, "intencion", e);
+            e["intent"] = id;
+            e["target"] = target;
+            Append(author, op, "intent", e);
             return id;
         }
 
@@ -435,8 +436,8 @@ namespace Bimbridge.Engine
         public void Outcome(string author, string op, string intentId, string status, Dictionary<string, object> extra = null)
         {
             var e = extra != null ? new Dictionary<string, object>(extra) : new Dictionary<string, object>();
-            e["intencion"] = intentId;
-            e["fase"] = "resultado";
+            e["intent"] = intentId;
+            e["phase"] = "result";
             Append(author, op, status, e);
         }
 
@@ -448,34 +449,34 @@ namespace Bimbridge.Engine
             string intent = null;
             foreach (var raw in ReadLinesShared(path))
             {
-                if (raw.IndexOf("\"intento_id\"", StringComparison.Ordinal) < 0 && (intent == null || raw.IndexOf(intent, StringComparison.Ordinal) < 0))
+                if (raw.IndexOf("\"attempt_id\"", StringComparison.Ordinal) < 0 && (intent == null || raw.IndexOf(intent, StringComparison.Ordinal) < 0))
                     continue;
                 Dictionary<string, object> entry;
-                try { entry = Json.ParseObject(raw); }
+                try { entry = LegacyAliases.NormalizeRecord(Json.ParseObject(raw)); }
                 catch (FormatException) { continue; }
                 var op = Arg.GetString(entry, "op");
-                if (op != "commit" && op != "aplicar_cola") continue;
-                var candidate = Arg.GetString(entry, "intencion");
+                if (op != "commit" && op != "apply_queue") continue;
+                var candidate = Arg.GetString(entry, "intent");
                 if (candidate == null) continue;
-                var state = Arg.GetString(entry, "estado");
-                if (state == "intencion" && Arg.GetString(entry, "intento_id") == attempt &&
-                    Arg.GetString(entry, "objetivo") == doc && Arg.GetString(entry, "huella_doc") == docPrint &&
-                    ((Arg.GetString(entry, "sesion_intento") ?? Arg.GetString(entry, "autor")) == session ||
-                        (!string.IsNullOrEmpty(agent) && Arg.GetString(entry, "agente") == agent)))
+                var state = Arg.GetString(entry, "status");
+                if (state == "intent" && Arg.GetString(entry, "attempt_id") == attempt &&
+                    Arg.GetString(entry, "target") == doc && Arg.GetString(entry, "doc_fingerprint") == docPrint &&
+                    ((Arg.GetString(entry, "attempt_session") ?? Arg.GetString(entry, "author")) == session ||
+                        (!string.IsNullOrEmpty(agent) && Arg.GetString(entry, "agent") == agent)))
                 {
                     var planId = Arg.GetString(entry, "plan_id");
                     if (result != null && Arg.GetString(result, "plan_id") != planId) return null;
                     intent = candidate;
                     result = new Dictionary<string, object>
                     {
-                        ["intento_id"] = attempt, ["estado"] = Status.Unknown, ["doc"] = doc, ["huella_doc"] = docPrint,
-                        ["plan_id"] = planId, ["inicio"] = Arg.GetString(entry, "t"),
+                        ["attempt_id"] = attempt, ["status"] = Status.Unknown, ["doc"] = doc, ["doc_fingerprint"] = docPrint,
+                        ["plan_id"] = planId, ["start"] = Arg.GetString(entry, "t"),
                     };
                 }
-                else if (candidate == intent && Arg.GetString(entry, "fase") == "resultado")
+                else if (candidate == intent && Arg.GetString(entry, "phase") == "result")
                 {
-                    result["estado"] = Arg.GetString(entry, "estado_recibo") ?? state ?? Status.Unknown;
-                    result["fin"] = Arg.GetString(entry, "t");
+                    result["status"] = Arg.GetString(entry, "receipt_status") ?? state ?? Status.Unknown;
+                    result["end"] = Arg.GetString(entry, "t");
                     result["rev"] = Arg.GetLong(entry, "rev");
                 }
             }
@@ -490,20 +491,20 @@ namespace Bimbridge.Engine
             foreach (var raw in ReadLinesShared(path))
             {
                 Dictionary<string, object> o;
-                try { o = Json.ParseObject(raw); } catch (FormatException) { continue; }
-                if (Arg.GetString(o, "op") == "cuarentena" && o.TryGetValue("intenciones_pendientes", out var ip) && ip is List<object> carried)
+                try { o = LegacyAliases.NormalizeRecord(Json.ParseObject(raw)); } catch (FormatException) { continue; }
+                if (Arg.GetString(o, "op") == "quarantine" && o.TryGetValue("pending_intents", out var ip) && ip is List<object> carried)
                 {
                     // rc3: what was pending in a set-aside chain stays pending (it is not hidden by quarantining the chain).
                     foreach (var c in carried.OfType<Dictionary<string, object>>())
                     {
-                        var cid = Arg.GetString(c, "intencion");
-                        if (cid != null) { c["desde_cuarentena"] = Arg.GetString(o, "apartado"); open[cid] = c; }
+                        var cid = Arg.GetString(c, "intent");
+                        if (cid != null) { c["from_quarantine"] = Arg.GetString(o, "set_aside"); open[cid] = c; }
                     }
                     continue;
                 }
-                var id = Arg.GetString(o, "intencion");
+                var id = Arg.GetString(o, "intent");
                 if (id == null) continue;
-                if (Arg.GetString(o, "estado") == "intencion") open[id] = o;
+                if (Arg.GetString(o, "status") == "intent") open[id] = o;
                 else open.Remove(id);
             }
             return open.Values.ToList();
@@ -534,15 +535,15 @@ namespace Bimbridge.Engine
                     ["seq"] = seq,
                     ["t"] = it.T ?? Home.Now(),
                     ["pid"] = it.Pid,
-                    ["autor"] = it.Author,
+                    ["author"] = it.Author,
                     ["op"] = it.Op,
-                    ["estado"] = it.State,
+                    ["status"] = it.State,
                     ["prev"] = prev,
                 };
                 if (it.Extra != null) foreach (var kv in it.Extra) if (!e.ContainsKey(kv.Key)) e[kv.Key] = kv.Value;
                 if (it.Cid != null) e["cid"] = it.Cid;
                 // AUD-01: batch marker so verification can tell a complete unconfirmed batch from a truncated tail.
-                if (items.Count > 1) e["lote"] = index.ToString(CultureInfo.InvariantCulture) + "/" + items.Count.ToString(CultureInfo.InvariantCulture);
+                if (items.Count > 1) e["batch"] = index.ToString(CultureInfo.InvariantCulture) + "/" + items.Count.ToString(CultureInfo.InvariantCulture);
                 var line = Json.Write(e);
                 lastLineStart = buf.Length;
                 var b = Encoding.UTF8.GetBytes(line + "\n");
@@ -553,32 +554,32 @@ namespace Bimbridge.Engine
             try
             {
                 foreach (var it in items) FaultBeforeWrite?.Invoke(it.Op);
-                Crash("antes_escribir");
+                Crash("before_write");
                 var bytes = buf.ToArray();
                 long offset, length;
                 using (var fs = new FileStream(_path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.WriteThrough))
                 {
                     offset = fs.Position;
                     var tw = System.Diagnostics.Stopwatch.StartNew();
-                    if (CrashPoint != null && CrashPoint("durante_escritura"))
+                    if (CrashPoint != null && CrashPoint("during_write"))
                     {
                         // Tests only: write cut in half (leaves complete lines and a fragment, like a real crash).
                         fs.Write(bytes, 0, bytes.Length / 2);
                         fs.Flush(true);
-                        throw new AuditCrashException("durante_escritura");
+                        throw new AuditCrashException("during_write");
                     }
                     fs.Write(bytes, 0, bytes.Length);
-                    Crash("tras_escribir_antes_fsync");
+                    Crash("after_write_before_fsync");
                     var tf = System.Diagnostics.Stopwatch.StartNew();
                     fs.Flush(true);
                     AuditProfile.Write(tw.ElapsedTicks - tf.ElapsedTicks, tf.ElapsedTicks);
                     length = fs.Length;
                 }
-                Crash("tras_fsync_antes_cabeza");
+                Crash("after_fsync_before_head");
                 var th = System.Diagnostics.Stopwatch.StartNew();
-                Home.WriteAtomic(HeadPath(_path), Json.Write(new Dictionary<string, object> { ["seq"] = seq, ["ultimo"] = prev, ["longitud"] = length }));
+                Home.WriteAtomic(HeadPath(_path), Json.Write(new Dictionary<string, object> { ["seq"] = seq, ["last"] = prev, ["length"] = length }));
                 AuditProfile.Head(th.ElapsedTicks);
-                Crash("tras_cabeza");
+                Crash("after_head");
                 _knownLength = length;
                 _lastOffset = offset + lastLineStart;
                 _knownWrite = File.GetLastWriteTimeUtc(_path);
@@ -633,10 +634,10 @@ namespace Bimbridge.Engine
                 // AUD-01: batch persisted but not confirmed (crash between the fsync and the head). It is an intact chain: it is sealed with a record
                 // documenting it, instead of declaring it corrupt.
                 if (v.HeadLag > 1)
-                    WriteLine("sistema", "recuperacion_cabeza", "lote_no_confirmado_sellado", new Dictionary<string, object>
+                    WriteLine("system", "head_recovery", "sealed_uncommitted_batch", new Dictionary<string, object>
                     {
-                        ["registros"] = v.HeadLag, ["desde_seq"] = v.Lines - v.HeadLag + 1, ["hasta_seq"] = v.Lines,
-                        ["motivo"] = "crash between the batch fsync and the head update; no writer received confirmation",
+                        ["records"] = v.HeadLag, ["from_seq"] = v.Lines - v.HeadLag + 1, ["to_seq"] = v.Lines,
+                        ["reason"] = "crash between the batch fsync and the head update; no writer received confirmation",
                     });
                 return;
             }
@@ -668,15 +669,15 @@ namespace Bimbridge.Engine
         private void Quarantine(List<string> errors)
         {
             List<object> pending;
-            try { pending = PendingIntents(_path).Select(d => (object)new Dictionary<string, object> { ["intencion"] = Arg.GetString(d, "intencion"), ["op"] = Arg.GetString(d, "op"), ["objetivo"] = Arg.GetString(d, "objetivo"), ["autor"] = Arg.GetString(d, "autor"), ["t"] = Arg.GetString(d, "t") }).ToList(); }
+            try { pending = PendingIntents(_path).Select(d => (object)new Dictionary<string, object> { ["intent"] = Arg.GetString(d, "intent"), ["op"] = Arg.GetString(d, "op"), ["target"] = Arg.GetString(d, "target"), ["author"] = Arg.GetString(d, "author"), ["t"] = Arg.GetString(d, "t") }).ToList(); }
             catch (Exception) { pending = new List<object>(); }
-            var dest = _path + ".cuarentena-" + DateTime.UtcNow.ToString("yyyyMMddTHHmmssfff", CultureInfo.InvariantCulture) + "-" + Guid.NewGuid().ToString("N").Substring(0, 6);
+            var dest = _path + ".quarantine-" + DateTime.UtcNow.ToString("yyyyMMddTHHmmssfff", CultureInfo.InvariantCulture) + "-" + Guid.NewGuid().ToString("N").Substring(0, 6);
             string sha;
             try
             {
                 sha = Home.FileSha256(_path);
                 File.Move(_path, dest);
-                if (File.Exists(HeadPath(_path))) File.Move(HeadPath(_path), dest + ".cabeza");
+                if (File.Exists(HeadPath(_path))) File.Move(HeadPath(_path), dest + ".head");
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
@@ -684,10 +685,10 @@ namespace Bimbridge.Engine
             }
             Quarantined.Add(dest);
             _prev = ""; _seq = 0; _knownLength = 0; _lastOffset = -1;
-            WriteLine("sistema", "cuarentena", "cadena_nueva", new Dictionary<string, object>
+            WriteLine("system", "quarantine", "new_chain", new Dictionary<string, object>
             {
-                ["apartado"] = Path.GetFileName(dest), ["sha256_apartado"] = sha, ["errores"] = errors.Take(10).Cast<object>().ToList(),
-                ["intenciones_pendientes"] = pending,
+                ["set_aside"] = Path.GetFileName(dest), ["set_aside_sha256"] = sha, ["errors"] = errors.Take(10).Cast<object>().ToList(),
+                ["pending_intents"] = pending,
             });
         }
 
@@ -739,7 +740,7 @@ namespace Bimbridge.Engine
             n++;
             batchPos = null;
             Dictionary<string, object> o;
-            try { o = Json.ParseObject(raw); }
+            try { o = LegacyAliases.NormalizeRecord(Json.ParseObject(raw)); }   // the hash below is over the stored bytes (raw), never re-serialized
             catch (FormatException) { errors.Add("line " + n + " unreadable"); prev = Home.Sha256Hex(raw); return; }
             var p = Arg.GetString(o, "prev") ?? "";
             if (p != prev) errors.Add("line " + n + ": broken chain (prev does not match)");
@@ -747,7 +748,7 @@ namespace Bimbridge.Engine
             try { seq = Convert.ToInt64(o.TryGetValue("seq", out var s) ? s : 0L, CultureInfo.InvariantCulture); }
             catch (Exception) { seq = -1; }
             if (seq != n) errors.Add("line " + n + ": seq " + seq + " out of order");
-            batchPos = Arg.GetString(o, "lote");
+            batchPos = Arg.GetString(o, "batch");
             prev = Home.Sha256Hex(raw);
         }
 
@@ -764,7 +765,7 @@ namespace Bimbridge.Engine
         /// <summary>
         /// AUD-01: compares the tail with the head. The head can never be ahead or point to another hash. It may lag behind only in the
         /// state left by a crash between a batch fsync and the head update: either ONE individual record, or ONE
-        /// COMPLETE batch (all its lines with the "lote" marker i/n, i = 1..n in order, n = lag). Those lines are persisted but NOT confirmed
+        /// COMPLETE batch (all its lines with the "batch" marker i/n, i = 1..n in order, n = lag). Those lines are persisted but NOT confirmed
         /// (nobody received their seq), and the next write seals them. Returns the tolerated lag (0 if the head is up to date).
         /// </summary>
         private static long CheckHead(string path, List<string> hashes, List<string> batchPositions, List<string> errors)
@@ -772,11 +773,11 @@ namespace Bimbridge.Engine
             var hp = HeadPath(path);
             if (!File.Exists(hp)) return 0; // chains older than rc3
             Dictionary<string, object> h;
-            try { h = Json.ParseObject(File.ReadAllText(hp)); }
+            try { h = LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(hp))); }
             catch (Exception) { errors.Add("head unreadable"); return 0; }
             long seq;
             try { seq = Convert.ToInt64(h.TryGetValue("seq", out var s) ? s : 0L, CultureInfo.InvariantCulture); } catch (Exception) { seq = -1; }
-            var last = Arg.GetString(h, "ultimo") ?? "";
+            var last = Arg.GetString(h, "last") ?? "";
             if (seq < 0) { errors.Add("head unreadable"); return 0; }
             if (seq > hashes.Count) { errors.Add("records missing at the end (the head says " + seq + ", there are " + hashes.Count + ")"); return 0; }
             if (seq >= 1 && hashes[(int)seq - 1] != last) { errors.Add("record " + seq + " does not match the head (edited)"); return 0; }
@@ -832,7 +833,7 @@ namespace Bimbridge.Engine
         /// AUD-01: conservative repair of a tail left by a crash. It only acts if EVERYTHING before is a valid chain and what is left over
         /// is beyond the head (persisted but never confirmed): a final fragment without a newline and/or the lines of an incomplete
         /// batch. What is set aside is kept intact in "&lt;auditoria&gt;.fragmento-…" (evidence), the file is cut at the last valid
-        /// boundary, the head is rewritten and a "recuperacion_cola" record documenting it is appended. It never cuts confirmed records
+        /// boundary, the head is rewritten and a "queue_recovery" record documenting it is appended. It never cuts confirmed records
         /// (≤ head); an edit, a deletion or a broken chain still go to quarantine.
         /// </summary>
         private bool TryRepairTail(out string note)
@@ -871,9 +872,9 @@ namespace Bimbridge.Engine
             if (File.Exists(hp))
             {
                 Dictionary<string, object> h;
-                try { h = Json.ParseObject(File.ReadAllText(hp)); } catch (Exception) { return false; }
+                try { h = LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(hp))); } catch (Exception) { return false; }
                 try { headSeq = Convert.ToInt64(h.TryGetValue("seq", out var s) ? s : 0L, CultureInfo.InvariantCulture); } catch (Exception) { return false; }
-                var last = Arg.GetString(h, "ultimo") ?? "";
+                var last = Arg.GetString(h, "last") ?? "";
                 if (headSeq < 0 || headSeq > keep) return false;       // confirmed records would be lost: quarantine
                 if (headSeq >= 1 && hashes[(int)headSeq - 1] != last) return false;
             }
@@ -890,19 +891,19 @@ namespace Bimbridge.Engine
                     fw.Write(dropped, 0, dropped.Length);
                     fw.Flush(true);
                 }
-                Crash("reparacion_tras_fragmento_tmp");
+                Crash("repair_after_tmp_fragment");
                 var back = File.ReadAllBytes(tmp);
                 if (back.Length != dropped.Length || !back.SequenceEqual(dropped)) { File.Delete(tmp); return false; }
                 File.Move(tmp, dest);
-                Crash("reparacion_antes_truncar");
+                Crash("repair_before_truncate");
                 using (var fs = new FileStream(_path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.WriteThrough))
                 {
                     fs.SetLength(keepBytes);
                     fs.Flush(true);
                 }
-                Crash("reparacion_tras_truncar");
+                Crash("repair_after_truncate");
                 var lastHash = keep == 0 ? "" : hashes[keep - 1];
-                Home.WriteAtomic(hp, Json.Write(new Dictionary<string, object> { ["seq"] = (long)keep, ["ultimo"] = lastHash, ["longitud"] = keepBytes }));
+                Home.WriteAtomic(hp, Json.Write(new Dictionary<string, object> { ["seq"] = (long)keep, ["last"] = lastHash, ["length"] = keepBytes }));
                 _prev = lastHash; _seq = keep; _knownLength = keepBytes;
                 _lastOffset = keep == 0 ? -1 : (keep == 1 ? 0 : ends[keep - 2]);
                 _knownWrite = File.GetLastWriteTimeUtc(_path);
@@ -910,10 +911,10 @@ namespace Bimbridge.Engine
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return false; }
             Repaired.Add(dest);
             note = "incomplete tail set aside: " + (hashes.Count - keep) + " lines of an unfinished batch and " + (all.Length - completeLen) + " bytes without a newline";
-            WriteLine("sistema", "recuperacion_cola", "cola_incompleta_apartada", new Dictionary<string, object>
+            WriteLine("system", "queue_recovery", "incomplete_tail_set_aside", new Dictionary<string, object>
             {
-                ["apartado"] = Path.GetFileName(dest), ["sha256_apartado"] = Home.FileSha256(dest), ["bytes"] = (long)dropped.Length,
-                ["lineas_descartadas"] = (long)(hashes.Count - keep), ["motivo"] = "write interrupted beyond the head (never confirmed)",
+                ["set_aside"] = Path.GetFileName(dest), ["set_aside_sha256"] = Home.FileSha256(dest), ["bytes"] = (long)dropped.Length,
+                ["discarded_lines"] = (long)(hashes.Count - keep), ["reason"] = "write interrupted beyond the head (never confirmed)",
             });
             return true;
         }
@@ -987,7 +988,7 @@ namespace Bimbridge.Engine
     /// </summary>
     public static class AuditGate
     {
-        public const string Incomplete = "auditoria_incompleta";
+        public const string Incomplete = "incomplete_audit";
 
         public static T Apply<T>(AuditLog audit, string author, string op, string target, Dictionary<string, object> extra,
             Func<T> apply, Func<T, string> status, Func<string, T> refused, Func<T, string, T> incomplete)
@@ -998,7 +999,7 @@ namespace Bimbridge.Engine
                 if (audit == null) throw new JournalUnavailableException("audit not initialized", null);
                 intent = audit.Intent(author, op, target, extra);
             }
-            catch (JournalUnavailableException ex) { return refused("auditoria_no_disponible: nothing was modified (" + ex.Message + ")"); }
+            catch (JournalUnavailableException ex) { return refused("audit_unavailable: nothing was modified (" + ex.Message + ")"); }
             var result = apply();
             try { audit.Outcome(author, op, intent, status(result), extra); }
             catch (JournalUnavailableException ex)

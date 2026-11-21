@@ -60,8 +60,8 @@ namespace Bimbridge.Setup
 
         /// <summary>A backup made before the rename: its unit keys point at the former add-in folder, so applying it would restore nothing.</summary>
         public static bool IsLegacyBackup(Dictionary<string, object> manifest) =>
-            manifest.TryGetValue("archivos", out var f) && f is Dictionary<string, object> files &&
-            files.Keys.Any(k => k.Contains("/" + LegacyFolder));
+            new[] { "files", "archivos" }.Any(key => manifest.TryGetValue(key, out var f) && f is Dictionary<string, object> files &&
+                                                   files.Keys.Any(k => k.Contains("/" + LegacyFolder)));
 
         /// <summary>
         /// Phase 1, before SetupCore.Install: moves data and configuration, renames the Codex section, the grant key header and
@@ -93,7 +93,8 @@ namespace Bimbridge.Setup
             }
             found |= RewritePaths(p, p.ConfigFile);
             found |= RewritePaths(p, p.InstallRecord);
-            found |= RewriteGrantKey(Path.Combine(p.Home, "autorizaciones", "clave.bin"), log);
+            found |= MigrateDataNames(p.Home, log);
+            found |= RewriteGrantKey(Path.Combine(p.Home, "authorizations", "key.bin"), log);
             found |= MigrateCodex(p, log);
             found |= RewriteScripts(p, log);
             return found;
@@ -154,6 +155,85 @@ namespace Bimbridge.Setup
         }
 
         // ---------------- folders ----------------
+
+        /// <summary>
+        /// Data folder and file names up to 0.9.3 (Spanish) → current (English), relative to the data folder; '*' is any one name.
+        /// Parents come before children, so the inner patterns use the English parent names. File contents are never touched
+        /// (hash-chained logs and signed grants are verified over their stored bytes).
+        /// </summary>
+        public static readonly (string Legacy, string English)[] DataRenames =
+        {
+            ("tareas", "tasks"), ("tareas_documentos", "tasks_documents"), ("cola", "queue"), ("recetas", "recipes"), ("auditoria", "audit"),
+            ("respaldos", "backups"), ("actualizaciones", "updates"), ("capturas", "captures"), ("exportes", "exports"), ("resultados", "results"),
+            ("operaciones", "operations"), ("autorizaciones", "authorizations"), ("metricas", "metrics"), ("historial", "history"),
+            ("flujos", "workflows"), ("familias", "families"), ("interfaz.json", "ui.json"), ("referencias_confiables.txt", "trusted_references.txt"),
+            ("diagnostico.json", "diagnostics.json"), ("retener.on", "hold.on"), ("pausado.on", "paused.on"),
+            ("tasks/_archivo", "_archive"),
+            ("tasks/*/tarea.json", "task.json"), ("tasks/*/receta.cs", "recipe.cs"), ("tasks/*/unidades.jsonl", "units.jsonl"),
+            ("tasks/_archive/*/tarea.json", "task.json"), ("tasks/_archive/*/receta.cs", "recipe.cs"), ("tasks/_archive/*/unidades.jsonl", "units.jsonl"),
+            ("queue/*/cuarentena", "quarantine"),
+            ("audit/auditoria.jsonl", "audit.jsonl"), ("audit/auditoria.jsonl.cabeza", "audit.jsonl.head"), ("audit/auditoria.jsonl.pend", "audit.jsonl.pend"),
+            ("backups/*/respaldo.json", "backup.json"), ("backups/*/archivos", "files"),
+            ("updates/preparadas", "staged"), ("updates/pendiente.json", "pending.json"), ("updates/resultado.json", "result.json"), ("updates/ultima.txt", "last.txt"),
+            ("operations/operaciones.jsonl", "operations.jsonl"), ("history/operaciones.jsonl", "operations.jsonl"),
+            ("authorizations/clave.bin", "key.bin"), ("authorizations/solicitudes", "requests"),
+            ("families/indice.json", "index.json"), ("scripts/historial", "history"),
+        };
+
+        /// <summary>
+        /// Renames data written by 0.9.3 and earlier to the English layout. A folder whose English name already exists is merged into it
+        /// without overwriting; a file whose English name exists is left in place (and logged). Idempotent. Returns true if anything moved.
+        /// </summary>
+        public static bool MigrateDataNames(string home, Action<string> log)
+        {
+            log = log ?? (_ => { });
+            if (!Directory.Exists(home)) return false;
+            var moved = 0;
+            foreach (var (legacy, english) in DataRenames)
+                foreach (var src in Expand(home, legacy.Split('/')))
+                {
+                    var dst = Path.Combine(Path.GetDirectoryName(src), english);
+                    if (File.Exists(src))
+                    {
+                        if (File.Exists(dst) || Directory.Exists(dst)) { log("Kept " + src + ": " + dst + " already exists"); continue; }
+                        try { File.Move(src, dst); moved++; }
+                        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { log("Could not rename " + src + ": " + ex.Message); }
+                    }
+                    else if (Directory.Exists(src))
+                    {
+                        if (!Directory.Exists(dst) && !File.Exists(dst))
+                        {
+                            try { Directory.Move(src, dst); moved++; continue; }
+                            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                        }
+                        Merge(src, dst, _ => false, _ => false, log, ref moved);
+                    }
+                }
+            var metrics = Path.Combine(home, "metrics");
+            if (Directory.Exists(metrics))
+                foreach (var f in Directory.GetFiles(metrics, "puente-*.jsonl"))
+                {
+                    var dst = Path.Combine(metrics, "bridge-" + Path.GetFileName(f).Substring("puente-".Length));
+                    if (File.Exists(dst)) continue;
+                    try { File.Move(f, dst); moved++; } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+            if (moved > 0) log("Data folder names updated to the current layout in " + home);
+            return moved > 0;
+        }
+
+        private static IEnumerable<string> Expand(string dir, string[] parts, int i = 0)
+        {
+            var last = i == parts.Length - 1;
+            var names = parts[i] == "*"
+                ? (Directory.Exists(dir) ? Directory.GetDirectories(dir).Select(Path.GetFileName).ToArray() : new string[0])
+                : new[] { parts[i] };
+            foreach (var n in names)
+            {
+                var path = Path.Combine(dir, n);
+                if (last) { if (File.Exists(path) || Directory.Exists(path)) yield return path; }
+                else if (Directory.Exists(path)) foreach (var x in Expand(path, parts, i + 1)) yield return x;
+            }
+        }
 
         private static Func<string, bool> DropFromHome(string root) => path =>
         {
@@ -272,13 +352,14 @@ namespace Bimbridge.Setup
         }
 
         /// <summary>
-        /// Saved scripts and recipes (recetas\, scripts\) that name the old namespaces or the old (Spanish) scripting API stop compiling.
-        /// Paused tasks keep their own copy (tareas\*\receta.cs) bound to a hash and are not touched: finish or cancel them before updating.
+        /// Saved scripts and recipes (recipes\, scripts\; the legacy folder names too if they were not renamed) that name the old namespaces or
+        /// the old (Spanish) scripting API stop compiling. Paused tasks keep their own copy (tasks\*\recipe.cs) bound to a hash and are not
+        /// touched: finish or cancel them before updating.
         /// </summary>
         public static bool RewriteScripts(SetupPaths p, Action<string> log)
         {
             var found = false;
-            foreach (var dir in new[] { "recetas", "scripts" }.Select(d => Path.Combine(p.Home, d)).Where(Directory.Exists))
+            foreach (var dir in new[] { "recipes", "recetas", "scripts" }.Select(d => Path.Combine(p.Home, d)).Where(Directory.Exists))
                 foreach (var f in Directory.GetFiles(dir, "*.cs", SearchOption.AllDirectories))
                 {
                     try

@@ -27,7 +27,7 @@ namespace Bimbridge.Engine.Qc
             public bool? InsideCrop;
             /// <summary>Template that controls the view (name) or null.</summary>
             public string Template;
-            /// <summary>"planta" | "rcp" | other (no range).</summary>
+            /// <summary>"floorplan" | "rcp" | other (no range).</summary>
             public string PlanKind;
             /// <summary>Absolute elevations (mm) of the range that applies at that point (the plan region's if the element falls in one).</summary>
             public double? Cut, Bottom, Top, Depth;
@@ -48,15 +48,15 @@ namespace Bimbridge.Engine.Qc
         {
             var r = new List<Reason>();
             var via = f.Template != null ? " (controlled by template " + f.Template + ")" : "";
-            if (f.ElementHidden) r.Add(new Reason { Code = "oculto_en_vista", Detail = "hidden element by element in this view", Certain = true });
-            if (f.CategoryHidden) r.Add(new Reason { Code = "categoria_oculta", Detail = "category turned off in Visibility/Graphics" + via, Certain = true });
-            foreach (var name in f.HidingFilters ?? new List<string>()) r.Add(new Reason { Code = "filtro", Detail = name + " hides it" + via, Certain = true });
-            if (f.WorksetHidden) r.Add(new Reason { Code = "workset_oculto", Detail = "its workset is not visible in this view" + via, Certain = true });
-            if (f.PhaseHidden == true) r.Add(new Reason { Code = "fase", Detail = "its phase falls outside the view's phase filter", Certain = true });
-            if (f.DesignOptionHidden == true) r.Add(new Reason { Code = "opcion_de_diseno", Detail = "belongs to a design option the view does not show", Certain = true });
-            if (f.CropActive && f.InsideCrop == false) r.Add(new Reason { Code = "fuera_de_recorte", Detail = "falls outside the crop region", Certain = true });
+            if (f.ElementHidden) r.Add(new Reason { Code = "hidden_in_view", Detail = "hidden element by element in this view", Certain = true });
+            if (f.CategoryHidden) r.Add(new Reason { Code = "hidden_category", Detail = "category turned off in Visibility/Graphics" + via, Certain = true });
+            foreach (var name in f.HidingFilters ?? new List<string>()) r.Add(new Reason { Code = "filter", Detail = name + " hides it" + via, Certain = true });
+            if (f.WorksetHidden) r.Add(new Reason { Code = "hidden_workset", Detail = "its workset is not visible in this view" + via, Certain = true });
+            if (f.PhaseHidden == true) r.Add(new Reason { Code = "phase", Detail = "its phase falls outside the view's phase filter", Certain = true });
+            if (f.DesignOptionHidden == true) r.Add(new Reason { Code = "design_option", Detail = "belongs to a design option the view does not show", Certain = true });
+            if (f.CropActive && f.InsideCrop == false) r.Add(new Reason { Code = "outside_crop", Detail = "falls outside the crop region", Certain = true });
 
-            if ((f.PlanKind == "planta" || f.PlanKind == "rcp") && f.ZMin.HasValue && f.ZMax.HasValue && f.Cut.HasValue)
+            if ((f.PlanKind == "floorplan" || f.PlanKind == "rcp") && f.ZMin.HasValue && f.ZMax.HasValue && f.Cut.HasValue)
             {
                 var src = f.RangeSource ?? "view range";
                 var cut = f.Cut.Value;
@@ -64,15 +64,15 @@ namespace Bimbridge.Engine.Qc
                 {
                     // RCP: looks up from the cut plane to "top".
                     var top = f.Top ?? double.MaxValue;
-                    if (f.ZMax < cut) r.Add(new Reason { Code = "rango_de_vista", Detail = "the body (" + F(f.ZMin) + "–" + F(f.ZMax) + " mm) is below the cut " + F(cut) + " of the " + src, Certain = true });
-                    else if (f.ZMin > top) r.Add(new Reason { Code = "rango_de_vista", Detail = "the body starts at " + F(f.ZMin) + " mm, above top " + F(top) + " of the " + src, Certain = true });
+                    if (f.ZMax < cut) r.Add(new Reason { Code = "view_range_of", Detail = "the body (" + F(f.ZMin) + "–" + F(f.ZMax) + " mm) is below the cut " + F(cut) + " of the " + src, Certain = true });
+                    else if (f.ZMin > top) r.Add(new Reason { Code = "view_range_of", Detail = "the body starts at " + F(f.ZMin) + " mm, above top " + F(top) + " of the " + src, Certain = true });
                 }
                 else
                 {
                     var depth = f.Depth ?? f.Bottom ?? double.MinValue;
-                    if (f.ZMax < depth) r.Add(new Reason { Code = "rango_de_vista", Detail = "the body ends at " + F(f.ZMax) + " mm, below the depth " + F(depth) + " of the " + src, Certain = true });
+                    if (f.ZMax < depth) r.Add(new Reason { Code = "view_range_of", Detail = "the body ends at " + F(f.ZMax) + " mm, below the depth " + F(depth) + " of the " + src, Certain = true });
                     else if (f.ZMin > cut)
-                        r.Add(new Reason { Code = "rango_de_vista", Detail = "the body is entirely above the cut " + F(cut) + " of the " + src + "; in floor plan, fixtures above the cut are not drawn (unless their category rules say otherwise)", Certain = false });
+                        r.Add(new Reason { Code = "view_range_of", Detail = "the body is entirely above the cut " + F(cut) + " of the " + src + "; in floor plan, fixtures above the cut are not drawn (unless their category rules say otherwise)", Certain = false });
                 }
             }
             notCheckable = new List<string>

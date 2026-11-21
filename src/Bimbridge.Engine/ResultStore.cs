@@ -21,7 +21,7 @@ namespace Bimbridge.Engine
         public const int KeepDays = 7;
         public const string JsonFragmentFormat = "json_fragmentos: concatenate the lines with no separator";
 
-        public static string Folder => Home.Sub("resultados");
+        public static string Folder => Home.Sub("results");
 
         /// <summary>Saves the text and returns its handle (r + short date + sequence; distinct prefix per process).</summary>
         public static string Save(string text, string origin = "a")
@@ -63,9 +63,9 @@ namespace Bimbridge.Engine
             var id = Save(FragmentJson(json), "b");
             var summary = new Dictionary<string, object>
             {
-                ["res"] = id, ["formato_res"] = JsonFragmentFormat, ["lectura"] = "res " + id + " desde=0 n=2",
+                ["res"] = id, ["result_format"] = JsonFragmentFormat, ["read"] = "res " + id + " from=0 n=2",
             };
-            foreach (var key in new[] { "codigo", "estado" })
+            foreach (var key in new[] { "code", "status" })
                 if (result.TryGetValue(key, out var value)) summary[key] = value;
             return Json.Write(summary);
         }
@@ -118,7 +118,7 @@ namespace Bimbridge.Engine
                 sb.Append(l).Append('\n');
                 shown++;
             }
-            sb.Append("… (" + shown + " of " + lines.Length + " lines; rest with: res " + id + " desde=" + shown + ")");
+            sb.Append("… (" + shown + " of " + lines.Length + " lines; rest with: res " + id + " from=" + shown + ")");
             return sb.ToString();
         }
     }

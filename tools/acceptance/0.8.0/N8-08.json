@@ -1,68 +1,68 @@
 {
- "esquema": "bimbridge.campana080/1",
+ "schema": "bimbridge.campaign080/1",
  "item": "N8-08",
- "titulo": "Authorization and rejection",
- "estado_inicial": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW. config.json: \"permisos\": [\"leer\",\"modificar_proyecto\",\"interfaz\"]; restart Revit after changing it.",
+ "title": "Authorization and rejection",
+ "initial_status": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW. config.json: \"permissions\": [\"read\",\"modify_project\",\"ui\"]; restart Revit after changing it.",
  "variables": {
   "ids": "3–30 ids",
   "rfa": "path of the RFA from N8-06"
  },
- "pasos": [
+ "steps": [
   {
-   "nombre": "dynamic code denied",
+   "name": "dynamic code denied",
    "op": "exec",
    "args": {
-    "modo": "ejecutar",
-    "codigo": "return 1;"
+    "mode": "run",
+    "code": "return 1;"
    },
-   "escritura": true,
-   "esperar": "rechazado",
-   "contiene": [
-    "codigo_dinamico"
+   "write": true,
+   "wait": "rejected",
+   "contains": [
+    "dynamic_code"
    ]
   },
   {
-   "nombre": "sync denied",
+   "name": "sync denied",
    "op": "doc",
    "args": {
-    "accion": "sync"
+    "action": "sync"
    },
-   "escritura": true,
-   "esperar": "rechazado",
-   "contiene": [
-    "sincronizar"
+   "write": true,
+   "wait": "rejected",
+   "contains": [
+    "sync"
    ]
   },
   {
-   "nombre": "export denied",
+   "name": "export denied",
    "op": "doc",
    "args": {
-    "accion": "pdf",
-    "hojas": [
+    "action": "pdf",
+    "sheets": [
      "BB-N8-05"
     ]
    },
-   "escritura": true,
-   "esperar": "rechazado",
-   "contiene": [
-    "exportar"
+   "write": true,
+   "wait": "rejected",
+   "contains": [
+    "export"
    ]
   },
   {
-   "nombre": "load file denied",
+   "name": "load file denied",
    "op": "fam",
    "args": {
-    "accion": "cargar_archivo",
-    "ruta": "${rfa}"
+    "action": "load_file",
+    "path": "${rfa}"
    },
-   "escritura": true,
-   "esperar": "rechazado",
-   "contiene": [
-    "cargar_archivo"
+   "write": true,
+   "wait": "rejected",
+   "contains": [
+    "load_file"
    ]
   },
   {
-   "nombre": "modify project allowed",
+   "name": "modify project allowed",
    "op": "plan",
    "args": {
     "ops": [
@@ -75,17 +75,17 @@
     ],
     "summary": "campaign 0.8.0"
    },
-   "guardar": {
+   "save": {
     "plan": "plan_id"
    }
   },
   {
-   "nombre": "apply allowed",
+   "name": "apply allowed",
    "op": "commit",
    "args": {
     "plan_id": "${plan}"
    },
-   "escritura": true
+   "write": true
   }
  ]
 }

@@ -141,7 +141,7 @@ namespace Bimbridge.Engine.Coverage
             if (!q.Relevance && !string.IsNullOrWhiteSpace(q.Text))
                 foreach (var t in Tokens(q.Text).Distinct())
                 {
-                    // prefix: "circ" finds "circuito"; bounded to the keys of the word index (not the catalog).
+                    // prefix: "circ" finds "circuit"; bounded to the keys of the word index (not the catalog).
                     // Binary search for the first token >= t in the sorted keys, scanning only while they share the prefix.
                     var lo = Array.BinarySearch(_tokenKeys, t, StringComparer.Ordinal);
                     if (lo < 0) lo = ~lo;
@@ -163,13 +163,13 @@ namespace Bimbridge.Engine.Coverage
 
         private static readonly string[][] VdcAliases =
         {
-            new[] { "luminaria", "luminarias", "fixture", "fixtures", "lighting" },
-            new[] { "vinculo", "vinculos", "link", "links", "linked" },
-            new[] { "choque", "choques", "clash", "clashes", "interferencia", "interference" },
-            new[] { "tuberia", "tuberias", "pipe", "pipes", "piping" },
-            new[] { "lamina", "laminas", "sheet", "sheets" },
-            new[] { "etiqueta", "etiquetas", "tag", "tags" },
-            new[] { "cota", "cotas", "dimension", "dimensions" },
+            new[] { "fixture", "fixtures", "fixture", "fixtures", "lighting" },
+            new[] { "link", "links", "link", "links", "linked" },
+            new[] { "clash", "clashes", "clash", "clashes", "interference", "interference" },
+            new[] { "pipe", "pipes", "pipe", "pipes", "piping" },
+            new[] { "sheet", "sheets", "sheet", "sheets" },
+            new[] { "tag", "tags_list", "tag", "tags" },
+            new[] { "dimension", "dimensions", "dimension", "dimensions" },
         };
 
         private IEnumerable<int> Rank(IEnumerable<int> ids, string text)
@@ -199,18 +199,18 @@ namespace Bimbridge.Engine.Coverage
 
         /// <summary>Compact row for discovery (the minimum to decide; the full contract is separate).</summary>
         public static List<object> Row(CapabilityEntry c) => new List<object> { c.Id, c.Name, c.Status.ToString(), c.Strategy ?? "none" };
-        public static readonly List<object> RowColumns = new List<object> { "id", "capacidad", "estado", "estrategia" };
+        public static readonly List<object> RowColumns = new List<object> { "id", "capability", "status", "strategy" };
 
         /// <summary>Full contract (on demand only).</summary>
         public static Dictionary<string, object> Contract(CapabilityEntry c) => new Dictionary<string, object>
         {
-            ["id"] = c.Id, ["dominio"] = c.Domain, ["subdominio"] = c.Subdomain, ["nombre"] = c.Name, ["nombre_en"] = c.NameEn, ["operacion"] = c.Operation,
-            ["resultado_esperado"] = c.Expected, ["categorias"] = (c.Categories ?? new string[0]).Cast<object>().ToList(), ["documento"] = c.DocumentKind,
-            ["estrategia"] = c.Strategy, ["ejecutor"] = ExecutorOf(c), ["api"] = (c.ApiSurfaces ?? new string[0]).Cast<object>().ToList(),
-            ["versiones"] = c.MinVersion + "–" + c.MaxVersion, ["estado"] = c.Status.ToString(), ["implementacion"] = (c.Implementation ?? new string[0]).Cast<object>().ToList(),
-            ["pruebas"] = (c.Tests ?? new string[0]).Cast<object>().ToList(), ["verificador"] = c.Verifier, ["idempotencia"] = c.Idempotency, ["recuperacion"] = c.Recovery,
-            ["limitaciones"] = c.Limitations, ["comandos_cinta"] = (c.PostableCommands ?? new string[0]).Cast<object>().ToList(), ["prioridad"] = c.Priority,
-            ["verificacion_nativa"] = c.Status == CoverageStatus.NATIVE_VERIFIED ? "si" : "pendiente",
+            ["id"] = c.Id, ["domain"] = c.Domain, ["subdomain"] = c.Subdomain, ["name"] = c.Name, ["name_en"] = c.NameEn, ["operation"] = c.Operation,
+            ["expected_result"] = c.Expected, ["categories"] = (c.Categories ?? new string[0]).Cast<object>().ToList(), ["document"] = c.DocumentKind,
+            ["strategy"] = c.Strategy, ["executor"] = ExecutorOf(c), ["api"] = (c.ApiSurfaces ?? new string[0]).Cast<object>().ToList(),
+            ["versions"] = c.MinVersion + "–" + c.MaxVersion, ["status"] = c.Status.ToString(), ["implementation"] = (c.Implementation ?? new string[0]).Cast<object>().ToList(),
+            ["tests_list"] = (c.Tests ?? new string[0]).Cast<object>().ToList(), ["verifier_name"] = c.Verifier, ["idempotency"] = c.Idempotency, ["recovery"] = c.Recovery,
+            ["limitations"] = c.Limitations, ["ribbon_commands"] = (c.PostableCommands ?? new string[0]).Cast<object>().ToList(), ["priority"] = c.Priority,
+            ["native_verification"] = c.Status == CoverageStatus.NATIVE_VERIFIED ? "yes" : "pending",
         };
 
         /// <summary>Official executor of the directive (Capability → Executor) derived from the strategy.</summary>

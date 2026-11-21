@@ -140,16 +140,16 @@ namespace Bimbridge.Setup
         }
 
         /// <summary>
-        /// "nueva": the release is a higher version. "mismo_version_otro_commit": same version, different commit from the running one (can be
-        /// installed on request). "al_dia": same version and same commit (or unknown commit). "anterior": the release is older.
+        /// "new": the release is a higher version. "same_version_other_commit": same version, different commit from the running one (can be
+        /// installed on request). "up_to_date": same version and same commit (or unknown commit). "previous": the release is older.
         /// </summary>
         public static string Compare(Version running, string runningCommit, OnlineRelease r)
         {
             var run = Updates.Normalize(running) ?? new Version(0, 0, 0);
-            if (r.Version > run) return "nueva";
-            if (r.Version < run) return "anterior";
-            if (r.Commit != null && !string.IsNullOrEmpty(runningCommit) && !r.Commit.StartsWith(runningCommit.Trim().ToLowerInvariant(), StringComparison.Ordinal)) return "mismo_version_otro_commit";
-            return "al_dia";
+            if (r.Version > run) return "new";
+            if (r.Version < run) return "previous";
+            if (r.Commit != null && !string.IsNullOrEmpty(runningCommit) && !r.Commit.StartsWith(runningCommit.Trim().ToLowerInvariant(), StringComparison.Ordinal)) return "same_version_other_commit";
+            return "up_to_date";
         }
 
         /// <summary>Commit an assembly was built from, taken from its informational version "X.Y.Z+abcdef0" (null if it has none).</summary>

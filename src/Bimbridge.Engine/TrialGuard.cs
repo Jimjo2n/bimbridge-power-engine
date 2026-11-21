@@ -10,7 +10,7 @@ namespace Bimbridge.Engine
     /// </summary>
     public static class TrialGuard
     {
-        public const string Code = "documento_con_cambios_sin_guardar";
+        public const string Code = "document_with_unsaved_changes";
 
         /// <summary>null = a trial is allowed; text = reason for the upfront refusal (nothing has been modified).</summary>
         public static string Refuse(bool isModified, string route) =>
@@ -29,10 +29,10 @@ namespace Bimbridge.Engine
         public static string TrialStatus(bool functionalOk, bool restorationOk) =>
             !restorationOk ? Protocol.Status.Unknown : functionalOk ? PlanStatus.Trialed : PlanStatus.RolledBack;
 
-        public const string CorrectReverted = "ensayo_correcto_revertido";
-        public const string FunctionalFailureReverted = "fallo_funcional_revertido";
-        public const string RollbackFailed = "rollback_fallido";
-        public const string UnknownNeedsReconciliation = "desconocido_requiere_reconciliacion";
+        public const string CorrectReverted = "trial_ok_reverted";
+        public const string FunctionalFailureReverted = "functional_failure_reverted";
+        public const string RollbackFailed = "rollback_failed";
+        public const string UnknownNeedsReconciliation = "unknown_requires_reconcile";
 
         /// <summary>The four trial results. Only the first is success, and it requires a confirmed rollback and a clean re-read.</summary>
         public static string Classify(bool functionalOk, bool rollbackConfirmed, bool restorationOk) =>

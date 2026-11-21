@@ -127,7 +127,7 @@ namespace Bimbridge.Tests
             var key = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "c3");
             st.Begin("copy_monitor_fixtures", key, Corr("doc-A"), out _);
             Assert.Throws<InvalidOperationException>(() => st.Begin("copy_monitor_fixtures", key, Corr("doc-B"), out _));
-            Assert.Throws<InvalidOperationException>(() => st.Begin("otro_flujo", key, Corr("doc-A"), out _));
+            Assert.Throws<InvalidOperationException>(() => st.Begin("other_workflow", key, Corr("doc-A"), out _));
             Assert.NotEqual(key, WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-B", "link-1", "c3"));
             Assert.Throws<ArgumentException>(() => st.Load("../fuera"));
         }
@@ -328,8 +328,8 @@ namespace Bimbridge.Tests
             Assert.Contains(CopyMonitorFlow.Load(Store(), key, Expect(fewer, maps: maps), true).Differences, x => x.Contains("+0 −1 modified 0"));
 
             // Without a preflight there is nothing to verify; an old attempt without expectations is not accepted.
-            Assert.Null(CopyMonitorFlow.Load(Store(), WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "nada"), Expect(), true));
-            var legacy = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "viejo");
+            Assert.Null(CopyMonitorFlow.Load(Store(), WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "nothing"), Expect(), true));
+            var legacy = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "old");
             Store().SaveBaselineOnce(legacy, "doc-A", "link-1", new long[] { 1 }, out _);
             Assert.Throws<InvalidDataException>(() => CopyMonitorFlow.Load(Store(), legacy, Expect(), true));
         }
@@ -364,7 +364,7 @@ namespace Bimbridge.Tests
             var ui = NativeCapabilities.Describe(NativeCapabilities.CopyMonitorFixtures, year, new ClientEnvironment { UiExecutorAvailable = true, UiExecutorName = "x" });
             Assert.Equal(SupportLevel.experimental, ui.LevelOf(ExecMode.ui_assisted));
             Assert.Equal(ExecMode.ui_assisted, ui.Recommended);
-            Assert.Equal("bimbridge.native_capability/1", ui.ToJson()["esquema"]);
+            Assert.Equal("bimbridge.native_capability/1", ui.ToJson()["schema"]);
         }
 
         [Fact]
@@ -412,21 +412,21 @@ namespace Bimbridge.Tests
         {
             var healthyBridgeHiddenTools = new ConnectionObservations { BridgeInstalled = true, HelloOk = true, ToolsListed = 6, ToolsVisibleToAgent = 0, Instances = new List<RevitInstance>() };
             var r = ConnectionDiagnostics.Report(healthyBridgeHiddenTools, "0.9.1+abc");
-            Assert.Equal("herramientas_no_expuestas_al_agente", r["veredicto"]);
+            Assert.Equal("tools_not_exposed_to_agent", r["verdict"]);
             Assert.Equal("0.9.1+abc", r["build"]);
 
             var noClient = new ConnectionObservations { BridgeInstalled = true };
             noClient.ClientRegistrations["claude"] = false;
-            Assert.Equal("cliente_sin_registro", ConnectionDiagnostics.Report(noClient, "b")["veredicto"]);
+            Assert.Equal("client_unregistered", ConnectionDiagnostics.Report(noClient, "b")["verdict"]);
 
             var noRevit = new ConnectionObservations { BridgeInstalled = true, HelloOk = true, ToolsListed = 6, ToolsVisibleToAgent = 6, Instances = new List<RevitInstance>() };
-            Assert.Equal("revit_no_conectado", ConnectionDiagnostics.Report(noRevit, "b")["veredicto"]);
+            Assert.Equal("revit_not_connected", ConnectionDiagnostics.Report(noRevit, "b")["verdict"]);
 
             var t = DateTime.UtcNow;
             var two = new ConnectionObservations { BridgeInstalled = true, HelloOk = true, ToolsListed = 6, Instances = new List<RevitInstance> { Inst(1, "2024", t), Inst(2, "2026", t) } };
             var rep = ConnectionDiagnostics.Report(two, "b");
-            Assert.Equal("varias_instancias", rep["veredicto"]);
-            Assert.Contains(((List<object>)rep["hallazgos"]).Cast<Dictionary<string, object>>(), f => (string)f["codigo"] == "sin_ejecutor_ui");
+            Assert.Equal("multiple_instances", rep["verdict"]);
+            Assert.Contains(((List<object>)rep["findings"]).Cast<Dictionary<string, object>>(), f => (string)f["code"] == "no_ui_executor");
         }
 
         // ------------------------------------------------------------------ #24 Copy/Monitor verifier (synthetic fixtures)
@@ -463,9 +463,9 @@ namespace Bimbridge.Tests
             foreach (var tf in new[] { LinkTransform.Identity, new LinkTransform { Dx = 100, Dy = -20, Dz = 0.5, RotationDeg = 30 } })
             {
                 var r = CopyMonitorVerifier.Verify(src, new List<HostFixture>(), PerfectCopy(src, tf, 77), tf, null, 77);
-                Assert.Equal("verificado", r["resultado"]);
-                Assert.Equal(88L, ((Dictionary<string, object>)r["correctos"])["n"]);
-                Assert.Equal("inferred", r["nivel_prueba_correspondencia"]);
+                Assert.Equal("verified", r["result"]);
+                Assert.Equal(88L, ((Dictionary<string, object>)r["correct"])["n"]);
+                Assert.Equal("inferred", r["correspondence_test_level"]);
             }
         }
 
@@ -477,16 +477,16 @@ namespace Bimbridge.Tests
             var mirror = new LinkTransform { Dx = 10, Dy = 5, BasisX = new[] { -1.0, 0, 0 }, BasisY = new[] { 0.0, 1, 0 }, BasisZ = new[] { 0.0, 0, 1 } };
             Assert.True(mirror.Mirrored);
             var r = CopyMonitorVerifier.Verify(src, null, PerfectCopy(src, mirror, 77), mirror, null, 77);
-            Assert.Equal("verificado", r["resultado"]);
-            Assert.Equal(true, r["vinculo_reflejado"]);
+            Assert.Equal("verified", r["result"]);
+            Assert.Equal(true, r["mirrored_link"]);
             // Copied as if there were no reflection: wrong positions.
             var naive = PerfectCopy(src, new LinkTransform { Dx = 10, Dy = 5 }, 77);
-            Assert.Equal("fallido", CopyMonitorVerifier.Verify(src, null, naive, mirror, null, 77)["resultado"]);
+            Assert.Equal("failed", CopyMonitorVerifier.Verify(src, null, naive, mirror, null, 77)["result"]);
 
             var tilted = new LinkTransform { BasisX = new[] { 1.0, 0, 0 }, BasisY = new[] { 0.0, Math.Cos(0.3), Math.Sin(0.3) }, BasisZ = new[] { 0.0, -Math.Sin(0.3), Math.Cos(0.3) } };
-            Assert.Equal("no_verificable", CopyMonitorVerifier.Verify(src, null, new List<HostFixture>(), tilted, null, 77)["resultado"]);
+            Assert.Equal("not_verifiable", CopyMonitorVerifier.Verify(src, null, new List<HostFixture>(), tilted, null, 77)["result"]);
             var scaled = new LinkTransform { BasisX = new[] { 2.0, 0, 0 }, BasisY = new[] { 0.0, 1, 0 }, BasisZ = new[] { 0.0, 0, 1 } };
-            Assert.Contains("scale", (string)CopyMonitorVerifier.Verify(src, null, new List<HostFixture>(), scaled, null, 77)["motivo"]);
+            Assert.Contains("scale", (string)CopyMonitorVerifier.Verify(src, null, new List<HostFixture>(), scaled, null, 77)["reason"]);
         }
 
         [Fact]
@@ -495,10 +495,10 @@ namespace Bimbridge.Tests
             var src = Synthetic88();
             var host = PerfectCopy(src, LinkTransform.Identity, 77);
             host[0].Monitoring = false;
-            var d = (Dictionary<string, object>)CopyMonitorVerifier.Verify(src, null, host, null, null, 77)["dimensiones"];
-            Assert.Equal(88L, d["consistencia_geometrica"]);
-            Assert.Equal(87L, d["supervision_al_vinculo"]);
-            Assert.StartsWith("no_demostrada", (string)d["correspondencia_individual_origen"]);
+            var d = (Dictionary<string, object>)CopyMonitorVerifier.Verify(src, null, host, null, null, 77)["dimensions_list"];
+            Assert.Equal(88L, d["geometric_consistency"]);
+            Assert.Equal(87L, d["link_supervision"]);
+            Assert.StartsWith("not_demonstrated", (string)d["individual_origin_correspondence"]);
         }
 
         [Fact]
@@ -508,8 +508,8 @@ namespace Bimbridge.Tests
             var host = PerfectCopy(src, LinkTransform.Identity, 77);
             foreach (var h in host) { h.Monitoring = false; h.MonitoredLinkInstances.Clear(); }
             var r = CopyMonitorVerifier.Verify(src, null, host, null, null, 77);
-            Assert.Equal("fallido", r["resultado"]);
-            Assert.Equal(88L, ((Dictionary<string, object>)r["sin_supervision"])["n"]);
+            Assert.Equal("failed", r["result"]);
+            Assert.Equal(88L, ((Dictionary<string, object>)r["unsupervised"])["n"]);
         }
 
         [Fact]
@@ -528,14 +528,14 @@ namespace Bimbridge.Tests
             host.Add(existing);                                                  // already there before: does not count
             var r = CopyMonitorVerifier.Verify(src, new List<HostFixture> { existing }, host, null, null, 77);
             long N(string b) => (long)((Dictionary<string, object>)r[b])["n"];
-            Assert.Equal("fallido", r["resultado"]);
-            Assert.Equal(1L, N("ausentes"));
-            Assert.Equal(1L, N("tipo_incorrecto"));
-            Assert.Equal(1L, N("sin_supervision"));
-            Assert.Equal(2L, N("mal_colocados"));
-            Assert.Equal(1L, N("duplicados"));
-            Assert.Equal(0L, N("inesperados"));
-            Assert.Equal(83L, N("correctos"));
+            Assert.Equal("failed", r["result"]);
+            Assert.Equal(1L, N("missing"));
+            Assert.Equal(1L, N("wrong_type"));
+            Assert.Equal(1L, N("unsupervised"));
+            Assert.Equal(2L, N("misplaced"));
+            Assert.Equal(1L, N("duplicates"));
+            Assert.Equal(0L, N("unexpected"));
+            Assert.Equal(83L, N("correct"));
         }
 
         [Fact]
@@ -546,14 +546,14 @@ namespace Bimbridge.Tests
             var kept = src.Where(s => !(s.Family == "Ducha")).ToList();
             var host = PerfectCopy(kept, LinkTransform.Identity, 77, s => s.Family == "WC" && s.Type == "B" ? "WC: A" : null);
             var r = CopyMonitorVerifier.Verify(src, null, host, null, maps, 77);
-            Assert.Equal("verificado", r["resultado"]);
-            Assert.Equal(82L, r["esperados"]);
-            Assert.Equal(6L, ((Dictionary<string, object>)r["excluidos"])["n"]);
+            Assert.Equal("verified", r["result"]);
+            Assert.Equal(82L, r["expected_items"]);
+            Assert.Equal(6L, ((Dictionary<string, object>)r["excluded_items"])["n"]);
 
             // Without applying the mapping (copied the original type): wrong type on the 2 WC B.
             var unmapped = PerfectCopy(kept, LinkTransform.Identity, 77);
             var r2 = CopyMonitorVerifier.Verify(src, null, unmapped, null, maps, 77);
-            Assert.Equal(2L, ((Dictionary<string, object>)r2["tipo_incorrecto"])["n"]);
+            Assert.Equal(2L, ((Dictionary<string, object>)r2["wrong_type"])["n"]);
         }
     }
 }

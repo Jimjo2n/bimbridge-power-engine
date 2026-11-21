@@ -45,7 +45,7 @@ namespace Bimbridge.Addin.Revit
                         Authority = Ui.Runtime.Grants != null ? (ITaskAuthority)new GrantAuthority(Ui.Runtime.Grants) : DenyWritesAuthority.Instance,
                         Audit = Ui.Runtime.Audit,
                     };
-                    _tracker.Saved += (doc, saveAs) => OnPersisted(doc, saveAs ? "guardar_como" : "guardado");
+                    _tracker.Saved += (doc, saveAs) => OnPersisted(doc, saveAs ? "save_as" : "saved");
                     _tracker.Synced += doc => OnPersisted(doc, "sync");
                 }
                 catch (Exception ex) { _tasksError = ex.GetType().Name + ": " + ex.Message; }
@@ -123,89 +123,89 @@ namespace Bimbridge.Addin.Revit
             var verb = OpSemantics.TaskVerb(a);
             var id = Arg.GetString(a, "id") ?? Arg.GetString(a, Wire.TaskArg);
             var who = session.ClientName ?? session.Id;
-            if (verb == "recetas") return Recipes(request);
-            if (verb == "lista") return TaskList(request);
-            if (verb == "iniciar") return await StartTask(session, request, ct).ConfigureAwait(false);
-            if (string.IsNullOrWhiteSpace(id)) return Response.Fail(request.Id, Status.Invalid, "missing the task id= (tarea lista shows the ones on this machine)");
+            if (verb == "recipes") return Recipes(request);
+            if (verb == "list") return TaskList(request);
+            if (verb == "start") return await StartTask(session, request, ct).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(id)) return Response.Fail(request.Id, Status.Invalid, "missing the task id= (task list shows the ones on this machine)");
             switch (verb)
             {
-                case "estado":
-                case "resumen":
+                case "status":
+                case "summary":
                 {
                     var t = _taskMgr.Get(id, out _);
                     if (t == null) return Response.Fail(request.Id, Status.Invalid, "task does not exist: " + id);
-                    return TaskResponse(request, t, verb == "resumen");
+                    return TaskResponse(request, t, verb == "summary");
                 }
-                case "esperar":
+                case "wait":
                 {
-                    var since = Arg.GetLong(a, "desde") ?? -1;
+                    var since = Arg.GetLong(a, "from") ?? -1;
                     var max = Math.Max(1, Math.Min(120, Arg.GetLong(a, "max") ?? 30));
                     var t = await _taskMgr.WaitAsync(id, since, TimeSpan.FromSeconds(max), ct).ConfigureAwait(false);
                     if (t == null) return Response.Fail(request.Id, Status.Invalid, "task does not exist: " + id);
                     return TaskResponse(request, t, false);
                 }
-                case "cancelar":
+                case "cancel":
                 {
                     var t = _taskMgr.Cancel(id, out var busy);
                     if (t == null) return Response.Fail(request.Id, Status.Invalid, "task does not exist: " + id);
                     if (busy != null) return Response.Fail(request.Id, Status.DocumentBusy, busy);
                     return TaskResponse(request, t, false);
                 }
-                case "reanudar":
+                case "resume":
                 {
                     if (!_config.AllowsExec(true)) return Response.Fail(request.Id, Status.Rejected, "this Revit does not allow running recipes (runner/levels in the MCP configuration)");
                     var r = _taskMgr.Resume(id, who, PolicyFrom(a, onlyGiven: true));
                     if (r.Error != null) return Response.Fail(request.Id, r.ErrorStatus ?? Status.Error, r.Error);
                     var t = await WaitBriefly(r.Task, a, ct).ConfigureAwait(false);
-                    return TaskResponse(request, t, false, r.AlreadyRunning ? new Dictionary<string, object> { ["ya_en_curso"] = true } : null);
+                    return TaskResponse(request, t, false, r.AlreadyRunning ? new Dictionary<string, object> { ["already_running"] = true } : null);
                 }
-                case "reconciliar":
+                case "reconcile":
                 {
                     var dec = (Arg.GetString(a, "decision") ?? "").Trim().ToLowerInvariant();
                     bool applied;
-                    if (dec == "aplicada" || dec == "aplicado" || dec == "si") applied = true;
-                    else if (dec == "no_aplicada" || dec == "no_aplicado" || dec == "no") applied = false;
-                    else return Response.Fail(request.Id, Status.Invalid, "reconciliar needs decision=aplicada (already in the model: not repeated) or decision=no_aplicada (it will run on resume)");
-                    var err = _taskMgr.Reconcile(id, Arg.GetStringList(a, "claves"), applied, Arg.GetString(a, "nota"), who);
+                    if (dec == "applied" || dec == "applied" || dec == "yes") applied = true;
+                    else if (dec == "not_applied" || dec == "not_applied" || dec == "no") applied = false;
+                    else return Response.Fail(request.Id, Status.Invalid, "reconcile needs decision=applied (already in the model: not repeated) or decision=not_applied (it will run on resume)");
+                    var err = _taskMgr.Reconcile(id, Arg.GetStringList(a, "keys"), applied, Arg.GetString(a, "note"), who);
                     if (err != null) return Response.Fail(request.Id, BusyOrInvalid(id), err);
                     return TaskResponse(request, _taskMgr.Get(id, out _), false);
                 }
-                case "anotar":
+                case "note":
                 {
-                    var text = Arg.GetString(a, "texto");
-                    if (string.IsNullOrWhiteSpace(text)) return Response.Fail(request.Id, Status.Invalid, "anotar needs texto=");
+                    var text = Arg.GetString(a, "text");
+                    if (string.IsNullOrWhiteSpace(text)) return Response.Fail(request.Id, Status.Invalid, "note needs text=");
                     var err = _taskMgr.Note(id, text, who);
                     if (err != null) return Response.Fail(request.Id, BusyOrInvalid(id), err);
                     return TaskResponse(request, _taskMgr.Get(id, out _), false);
                 }
-                case "unidades":
+                case "units":
                 {
-                    var rows = _taskMgr.UnitRows(id, Arg.GetString(a, "estado"), (int)(Arg.GetLong(a, "desde") ?? 0), (int)(Arg.GetLong(a, "n") ?? 50), out var total);
+                    var rows = _taskMgr.UnitRows(id, Arg.GetString(a, "status"), (int)(Arg.GetLong(a, "from") ?? 0), (int)(Arg.GetLong(a, "n") ?? 50), out var total);
                     return new Response
                     {
                         Id = request.Id,
                         Data = new Dictionary<string, object>
                         {
-                            ["cols"] = new List<object> { "clave", "estado", "intentos", "ms", "error", "creados" },
+                            ["cols"] = new List<object> { "key", "status", "attempts", "ms", "error", "created" },
                             ["rows"] = rows.Cast<object>().ToList(), ["total"] = (long)total,
                         },
                     };
                 }
-                case "olvidar":
+                case "forget":
                 {
                     var err = _taskMgr.Archive(id);
                     if (err != null) return Response.Fail(request.Id, BusyOrInvalid(id), err);
-                    return new Response { Id = request.Id, Data = new Dictionary<string, object> { ["tarea"] = id, ["archivada"] = true } };
+                    return new Response { Id = request.Id, Data = new Dictionary<string, object> { ["task"] = id, ["archived"] = true } };
                 }
                 default:
-                    return Response.Fail(request.Id, Status.Invalid, "tarea: iniciar, estado, resumen, esperar, cancelar, reanudar, reconciliar, anotar, lista, unidades, recetas or olvidar");
+                    return Response.Fail(request.Id, Status.Invalid, "task: start, status, summary, wait, cancel, resume, reconcile, note, list, units, recipes or forget");
             }
         }
 
         /// <summary>Short wait after start/resume (espera_s, default 10 s): small tasks come back already finished in ONE call.</summary>
         private async Task<TaskRecord> WaitBriefly(TaskRecord t, IDictionary<string, object> a, CancellationToken ct)
         {
-            var wait = Math.Max(0, Math.Min(120, Arg.GetLong(a, "espera_s") ?? 10));
+            var wait = Math.Max(0, Math.Min(120, Arg.GetLong(a, "wait_s") ?? 10));
             var until = DateTime.UtcNow.AddSeconds(wait);
             var cur = t;
             while (DateTime.UtcNow < until && _taskMgr.IsRunning(t.Id))
@@ -216,7 +216,7 @@ namespace Bimbridge.Addin.Revit
             return _taskMgr.Get(t.Id, out _) ?? cur;
         }
 
-        private static readonly string[] PolicyKeys = { "guardar_cada", "al_final", "en_error", "lote_max", "avisos", "tx" };
+        private static readonly string[] PolicyKeys = { "save_every", "at_end", "on_error", "batch_max", "warnings", "tx" };
 
         private static Dictionary<string, object> PolicyFrom(IDictionary<string, object> a, bool onlyGiven)
         {
@@ -239,15 +239,15 @@ namespace Bimbridge.Addin.Revit
             // Recipe: registered by name (receta=), .cs file, saved script (nombre=) or inline code.
             string code, source, recipeName, recipeVersion = null, recipeHash;
             var installedRecipe = false;
-            var reg = Arg.GetString(a, "receta");
+            var reg = Arg.GetString(a, "recipe");
             if (reg != null)
             {
                 var e = _recipes.Find(reg);
                 if (e == null)
-                    return Response.Fail(request.Id, Status.Invalid, "there is no recipe '" + reg + "' (tarea recetas lists the available ones; user recipes go in " + RecipeRegistry.UserFolder + ")");
+                    return Response.Fail(request.Id, Status.Invalid, "there is no recipe '" + reg + "' (task recipes lists the available ones; user recipes go in " + RecipeRegistry.UserFolder + ")");
                 code = File.ReadAllText(e.Path);
                 source = e.Origin + ":" + e.Path;
-                installedRecipe = e.Origin == "instalada";
+                installedRecipe = e.Origin == "installed";
                 recipeName = e.Name;
                 recipeVersion = e.Version;
             }
@@ -257,8 +257,8 @@ namespace Bimbridge.Addin.Revit
                 var blockedTask = DynamicCodePolicy.Decide(Ui.Runtime.BlockDynamicCode);
                 if (blockedTask != null) return Response.Fail(request.Id, Status.Rejected, blockedTask);
                 code = ResolveCode(a, out source, out var codeError);
-                if (code == null) return Response.Fail(request.Id, Status.Invalid, codeError ?? "missing the recipe: receta=name, archivo=path.cs, nombre= of a saved script or codigo=");
-                recipeName = Arg.GetString(a, "nombre") ?? (Arg.GetString(a, "archivo") is string f ? Path.GetFileNameWithoutExtension(f) : "codigo");
+                if (code == null) return Response.Fail(request.Id, Status.Invalid, codeError ?? "missing the recipe: recipe=name, file=path.cs, name= of a saved script or code=");
+                recipeName = Arg.GetString(a, "name") ?? (Arg.GetString(a, "file") is string f ? Path.GetFileNameWithoutExtension(f) : "code");
             }
             recipeHash = Home.Sha256Hex(code);
 
@@ -276,7 +276,7 @@ namespace Bimbridge.Addin.Revit
             }, ct).ConfigureAwait(false);
             if (compiled.Item1 == null) return Response.Fail(request.Id, Status.Invalid, compiled.Item2);
             // R03: what the agent asks for (capacidades=) is only NOTED as requested. What is never granted is rejected right away.
-            var requested = Arg.GetStringList(a, "capacidades").Where(c => Capability.Grantable.Contains(c)).ToList();
+            var requested = Arg.GetStringList(a, "capabilities").Where(c => Capability.Grantable.Contains(c)).ToList();
             var denied = CapabilityPolicy.Denied(ExecutionProfile.RestrictedAutonomous, compiled.Item1.Capabilities, Capability.Grantable);
             if (denied.Count > 0) return Response.Fail(request.Id, Status.Rejected, CapabilityPolicy.Explain(denied));
             var writes = true;
@@ -300,18 +300,18 @@ namespace Bimbridge.Addin.Revit
             // autonomous code (read-only too) requires a person to approve THAT task (which pins the recipe's SHA-256).
             if (!installedRecipe) requires.Add(Capability.ExternalRecipe);
             requires = requires.Distinct().ToList();
-            policy["requiere"] = requires.Cast<object>().ToList();
-            if (requested.Count > 0) policy["solicitadas"] = requested.Cast<object>().ToList();
+            policy["requires"] = requires.Cast<object>().ToList();
+            if (requested.Count > 0) policy["requested"] = requested.Cast<object>().ToList();
             var content = OpSemantics.Canonical(new Dictionary<string, object>
             {
-                ["receta"] = recipeHash, ["args"] = userArgs, ["doc"] = target.Key, ["huella_doc"] = target.Print ?? "", ["refs"] = refs.Cast<object>().ToList(),
-                ["requiere"] = requires.Cast<object>().ToList(),
+                ["recipe"] = recipeHash, ["args"] = userArgs, ["doc"] = target.Key, ["doc_fingerprint"] = target.Print ?? "", ["refs"] = refs.Cast<object>().ToList(),
+                ["requires"] = requires.Cast<object>().ToList(),
             });
             var draft = new TaskRecord
             {
                 Id = TaskStore.SafeId(Arg.GetString(a, "id") ?? Arg.GetString(a, Wire.TaskArg) ?? TaskStore.NewId(DateTime.UtcNow)),
-                Objective = Arg.GetString(a, "objetivo"),
-                Scope = Arg.GetString(a, "alcance"),
+                Objective = Arg.GetString(a, "target"),
+                Scope = Arg.GetString(a, "scope"),
                 RecipeName = recipeName,
                 RecipeVersion = recipeVersion ?? "1",
                 RecipeHash = recipeHash,
@@ -326,11 +326,11 @@ namespace Bimbridge.Addin.Revit
             var t = await WaitBriefly(r.Task, a, ct).ConfigureAwait(false);
             var extra = new Dictionary<string, object>
             {
-                ["receta"] = recipeName + " v" + draft.RecipeVersion, ["huella"] = draft.ContentHash,
-                ["compilar_ms"] = compiled.Item1.FromCache ? 0L : compiled.Item1.CompileMs,
+                ["recipe"] = recipeName + " v" + draft.RecipeVersion, ["fingerprint"] = draft.ContentHash,
+                ["compile_ms"] = compiled.Item1.FromCache ? 0L : compiled.Item1.CompileMs,
             };
-            if (!r.Created) extra["ya_existia"] = true;
-            if (r.AlreadyRunning) extra["ya_en_curso"] = true;
+            if (!r.Created) extra["already_existed"] = true;
+            if (r.AlreadyRunning) extra["already_running"] = true;
             // What still needs authorization is left as a REQUEST for a person («Authorize» button in Revit). The agent cannot approve it.
             var need = requires.Concat(requested).Distinct().ToList();
             if (Ui.Runtime.Grants != null && need.Count > 0)
@@ -340,10 +340,10 @@ namespace Bimbridge.Addin.Revit
                 {
                     Ui.Runtime.Grants.Request(draft.Id, target.Key, target.Print, target.Title, missing, session.ClientName ?? session.Id, draft.Objective, DateTime.UtcNow);
                     Ui.Runtime.MarkDirty();
-                    extra["autorizacion"] = new Dictionary<string, object>
+                    extra["authorization"] = new Dictionary<string, object>
                     {
-                        ["pendiente"] = missing.Cast<object>().ToList(),
-                        ["como"] = "a person must press «Authorize» on the BIMBRIDGE tab in Revit; then: tarea reanudar " + draft.Id,
+                        ["pending"] = missing.Cast<object>().ToList(),
+                        ["as"] = "a person must press «Authorize» on the BIMBRIDGE tab in Revit; then: task resume " + draft.Id,
                     };
                 }
             }
@@ -358,8 +358,8 @@ namespace Bimbridge.Addin.Revit
                 Id = request.Id,
                 Data = new Dictionary<string, object>
                 {
-                    ["cols"] = new List<object> { "nombre", "version", "origen", "descripcion", "sha" }, ["rows"] = rows,
-                    ["carpeta_usuario"] = RecipeRegistry.UserFolder,
+                    ["cols"] = new List<object> { "name", "version", "origin", "description", "sha" }, ["rows"] = rows,
+                    ["user_folder"] = RecipeRegistry.UserFolder,
                 },
             };
         }
@@ -373,7 +373,7 @@ namespace Bimbridge.Addin.Revit
                 Id = request.Id,
                 Data = new Dictionary<string, object>
                 {
-                    ["cols"] = new List<object> { "id", "estado", "receta", "doc", "unidades", "confirmadas", "actualizada" }, ["rows"] = rows,
+                    ["cols"] = new List<object> { "id", "status", "recipe", "doc", "units", "committed_items", "updated" }, ["rows"] = rows,
                 },
             };
         }
@@ -385,7 +385,7 @@ namespace Bimbridge.Addin.Revit
         {
             private readonly System.Reflection.MethodInfo _run;
             public RunAsRecipe(System.Reflection.MethodInfo run) { _run = run; }
-            public override IEnumerable<Unit> Units(ScriptContext ctx) { yield return new Unit("unica"); }
+            public override IEnumerable<Unit> Units(ScriptContext ctx) { yield return new Unit("unique"); }
             public override object Run(ScriptContext ctx, Unit u)
             {
                 try { return _run.Invoke(null, new object[] { ctx }); }
@@ -423,7 +423,7 @@ namespace Bimbridge.Addin.Revit
             {
                 _h = h;
                 _t = t;
-                _owner = "tarea:" + t.Id;
+                _owner = "tarea:" + t.Id;   // document lease owner identity shared with 0.9.3 processes and stored leases: kept verbatim
                 _sink = new ScriptContext.TaskSink { TaskId = t.Id, ArtifactsDir = h._taskMgr.Store.ArtifactsDir(t.Id) };
                 // rc3: recipe boundary. Authority = the engine's last safe point (leases + grants); with no engine running, nothing.
                 _gate = new RecipeGate(() => _t.Preflight != null ? _t.Preflight() : "the task is not running", WriteCounter);
@@ -466,9 +466,9 @@ namespace Bimbridge.Addin.Revit
                 TxPolicy tx = TxPolicy.PerUnit;
                 why = Guard(app, RecipeGate.Phase.Constructor, () => tx = r.Transaction);
                 if (why != null) return why;
-                var req = _t.Policy.TryGetValue("requiere", out var rq) && rq is List<object> rl ? rl.Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)).ToList() : null;
+                var req = _t.Policy.TryGetValue("requires", out var rq) && rq is List<object> rl ? rl.Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)).ToList() : null;
                 if (tx != TxPolicy.ReadOnly && req != null && !req.Contains(Capability.Modify))
-                    return "the recipe declares Transaction=" + tx + " but the task was authorized as read-only: it is not run (restart the task to request revit_modificar)";
+                    return "the recipe declares Transaction=" + tx + " but the task was authorized as read-only: it is not run (restart the task to request revit_modify)";
                 _recipe = r;
                 return null;
             }
@@ -496,7 +496,7 @@ namespace Bimbridge.Addin.Revit
                     return BackendResult<bool>.Fail("file " + key + " now contains ANOTHER model (fingerprint " + info.Print + " ≠ " + _t.MainDoc.Print + "): the task does not continue on a different document");
                 if (!_locked)
                 {
-                    if (!_h.Locks.TryAcquire(new[] { key }, _owner, "tarea", _t.Id, out var blocking))
+                    if (!_h.Locks.TryAcquire(new[] { key }, _owner, "task", _t.Id, out var blocking))
                         return BackendResult<bool>.Waiting("the document is held by " + blocking.Describe(), "wait for it to finish");
                     _locked = true;
                 }
@@ -529,7 +529,7 @@ namespace Bimbridge.Addin.Revit
 
             private ScriptContext Ctx(UIApplication app, Document doc, CancellationToken ct)
             {
-                var ctx = new ScriptContext(app, doc, _t.Args, OpSemantics.ModeRun, "tarea", ct, _sets, DocRegistry.Instance.IdOf(doc)) { Sink = _sink };
+                var ctx = new ScriptContext(app, doc, _t.Args, OpSemantics.ModeRun, "task", ct, _sets, DocRegistry.Instance.IdOf(doc)) { Sink = _sink };
                 return ctx;
             }
 
@@ -558,8 +558,8 @@ namespace Bimbridge.Addin.Revit
                 get
                 {
                     var p = (_t.PolicyString("tx") ?? "").ToLowerInvariant();
-                    if (p == "ninguna") return TxPolicy.None;
-                    if (p == "lectura") return TxPolicy.ReadOnly;
+                    if (p == "none") return TxPolicy.None;
+                    if (p == "read") return TxPolicy.ReadOnly;
                     return _recipe?.Transaction ?? TxPolicy.PerUnit;
                 }
             }
@@ -574,7 +574,7 @@ namespace Bimbridge.Addin.Revit
                     var r = await OnRevit((app, watch, budget) =>
                     {
                         var doc = FindDoc(app);
-                        if (doc == null) { fail = "cerrado"; return true; }
+                        if (doc == null) { fail = "closed"; return true; }
                         var ctx = Ctx(app, doc, ct);
                         var reg = _h._tracker.For(doc);
                         try
@@ -610,7 +610,7 @@ namespace Bimbridge.Addin.Revit
                         return true;
                     }, ct).ConfigureAwait(false);
                     if (!r.Ok) return FromWork<bool>(r);
-                    if (fail == "cerrado") return BackendResult<bool>.Waiting("the document is not open", "open it; the task continues on its own");
+                    if (fail == "closed") return BackendResult<bool>.Waiting("the document is not open", "open it; the task continues on its own");
                     if (fail != null) return BackendResult<bool>.Fail(fail);
                 }
                 return BackendResult<bool>.Ok(true);
@@ -685,14 +685,14 @@ namespace Bimbridge.Addin.Revit
                 var rev0 = reg?.Rev ?? 0;
                 bool Changed() => (reg?.Rev ?? 0) != rev0;
                 var policy = TxPolicy;
-                var failures = new FailureLog { DeleteWarnings = !string.Equals(_t.PolicyString("avisos"), "dejar", StringComparison.OrdinalIgnoreCase) };
+                var failures = new FailureLog { DeleteWarnings = !string.Equals(_t.PolicyString("warnings"), "leave", StringComparison.OrdinalIgnoreCase) };
                 Transaction t = null;
                 _sink.Clear();
                 try
                 {
                     if (policy == TxPolicy.PerUnit)
                     {
-                        t = new Transaction(doc, DocumentTracker.TransactionPrefix + " tarea " + _t.Id + " " + Clip(u.Key, 60));
+                        t = new Transaction(doc, DocumentTracker.TransactionPrefix + " task " + _t.Id + " " + Clip(u.Key, 60));
                         FailureLog.Attach(t, failures);
                         var ts = t.Start();
                         if (ts != TransactionStatus.Started) { wait = "Revit does not allow opening a transaction now (" + ts + ")"; return null; }
@@ -778,8 +778,8 @@ namespace Bimbridge.Addin.Revit
             public async Task<BackendResult<UnitOutcome>> RunBarrierAsync(TaskRecord task, UnitRef barrier, CancellationToken ct)
             {
                 var verb = (barrier.Barrier ?? "").ToLowerInvariant();
-                if (verb != "guardar" && verb != "sync" && verb != "sincronizar" && verb != "pdf")
-                    return BackendResult<UnitOutcome>.Ok(UnitOutcome.Of(barrier.Key, UnitState.RolledBack, "unknown barrier '" + barrier.Barrier + "' (guardar, sync or pdf)"));
+                if (verb != "save" && verb != "sync" && verb != "sync" && verb != "pdf")
+                    return BackendResult<UnitOutcome>.Ok(UnitOutcome.Of(barrier.Key, UnitState.RolledBack, "unknown barrier '" + barrier.Barrier + "' (save, sync or pdf)"));
                 if (!_h._config.AllowsDocOps)
                     return BackendResult<UnitOutcome>.Ok(UnitOutcome.Of(barrier.Key, UnitState.RolledBack, "the MCP configuration does not allow save/sync/export in this Revit"));
                 var sw = Stopwatch.StartNew();
@@ -797,8 +797,8 @@ namespace Bimbridge.Addin.Revit
                     {
                         switch (verb)
                         {
-                            case "guardar": data = DocOps.Save(app, doc, bargs, pend, diffs); break;
-                            case "sync": case "sincronizar": data = DocOps.Sync(doc, bargs, diffs, _h._tracker); break;
+                            case "save": data = DocOps.Save(app, doc, bargs, pend, diffs); break;
+                            case "sync":  data = DocOps.Sync(doc, bargs, diffs, _h._tracker); break;
                             case "pdf": data = DocOps.Pdf(doc, bargs, _sets, DocRegistry.Instance.IdOf(doc), pend, diffs); break;
                         }
                         try { path = doc.IsModelInCloud ? ModelPathUtils.ConvertModelPathToUserVisiblePath(doc.GetCloudModelPath()) : doc.PathName; } catch (Exception) { path = doc.PathName; }
@@ -815,32 +815,32 @@ namespace Bimbridge.Addin.Revit
                 List<object> files = null;
                 if (pend.Files.Count > 0)
                 {
-                    var expected = data != null && data.TryGetValue("n_hojas", out var nh) && nh is long l ? (int)l : 0;
+                    var expected = data != null && data.TryGetValue("n_sheets", out var nh) && nh is long l ? (int)l : 0;
                     files = await Task.Run(() => DocOps.VerifyFiles(pend, expected, diffs), ct).ConfigureAwait(false);
-                    data["archivos"] = files;
+                    data["files"] = files;
                 }
                 o.State = UnitState.Committed;
                 o.Result = data;
                 o.Ms = sw.ElapsedMilliseconds;
-                foreach (var d in diffs) o.Exceptions.Add(new Dictionary<string, object> { ["motivo"] = "barrier " + verb + ": " + d });
+                foreach (var d in diffs) o.Exceptions.Add(new Dictionary<string, object> { ["reason"] = "barrier " + verb + ": " + d });
                 var first = files?.OfType<Dictionary<string, object>>().FirstOrDefault();
                 if (verb == "pdf")
                 {
                     foreach (var f in files?.OfType<Dictionary<string, object>>() ?? Enumerable.Empty<Dictionary<string, object>>())
                         o.Artifacts.Add(new Dictionary<string, object>
                         {
-                            ["ruta"] = f.TryGetValue("archivo", out var p) ? p : null, ["sha256"] = f.TryGetValue("sha256", out var s) ? s : null,
-                            ["bytes"] = f.TryGetValue("bytes", out var b) ? b : null, ["paginas"] = f.TryGetValue("paginas", out var pg) ? pg : null, ["tipo"] = "pdf",
+                            ["path"] = f.TryGetValue("file", out var p) ? p : null, ["sha256"] = f.TryGetValue("sha256", out var s) ? s : null,
+                            ["bytes"] = f.TryGetValue("bytes", out var b) ? b : null, ["pages"] = f.TryGetValue("pages", out var pg) ? pg : null, ["type"] = "pdf",
                         });
                 }
                 else
                 {
                     o.Persist = new PersistEvidence
                     {
-                        Kind = verb == "guardar" ? "guardar" : "sync", When = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
-                        File = (first != null && first.TryGetValue("archivo", out var fp) ? fp as string : null) ?? path,
+                        Kind = verb == "save" ? "save" : "sync", When = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
+                        File = (first != null && first.TryGetValue("file", out var fp) ? fp as string : null) ?? path,
                         Bytes = first != null && first.TryGetValue("bytes", out var fb) && fb is long lb ? lb : 0,
-                        Mtime = first != null && first.TryGetValue("escrito_utc", out var fm) ? fm as string : null,
+                        Mtime = first != null && first.TryGetValue("written_utc", out var fm) ? fm as string : null,
                         Sha = first != null && first.TryGetValue("sha256", out var fs) ? fs as string : null,
                     };
                 }
@@ -937,18 +937,18 @@ namespace Bimbridge.Addin.Revit
                             // P0: with unsaved changes the temporary group is not opened (Revit will reject any attempt to modify).
                             if (Engine.TrialGuard.MayOpenTemporaryGroup(doc.IsModified))
                             {
-                                g = new TransactionGroup(doc, DocumentTracker.TemporaryPrefix + " qc tarea");
+                                g = new TransactionGroup(doc, DocumentTracker.TemporaryPrefix + " qc task");
                                 g.Start();
                             }
                             object value = null;
                             var pg = EnsureInstance(app) ?? Guard(app, RecipeGate.Phase.Postcondition, () => value = _recipe.Postcondition(ctx));
                             if (pg != null) throw new InvalidOperationException(pg);
                             var json = value == null ? null : ResultSerializer.ToJson(value, doc, out _, out _);
-                            result = json as Dictionary<string, object> ?? (json == null ? new Dictionary<string, object>() : new Dictionary<string, object> { ["resultado"] = json });
+                            result = json as Dictionary<string, object> ?? (json == null ? new Dictionary<string, object>() : new Dictionary<string, object> { ["result"] = json });
                         }
                         catch (Exception ex)
                         {
-                            result = new Dictionary<string, object> { ["desviaciones"] = new List<object> { "the postcondition failed: " + Describe(ex) } };
+                            result = new Dictionary<string, object> { ["deviations"] = new List<object> { "the postcondition failed: " + Describe(ex) } };
                         }
                         finally
                         {

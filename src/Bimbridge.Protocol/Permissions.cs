@@ -6,14 +6,14 @@ using System.Linq;
 namespace Bimbridge.Protocol
 {
     /// <summary>
-    /// 0.8.0: permissions split by operation class. Each request belongs to ONE class; if config.json has "permisos", only
+    /// 0.8.0: permissions split by operation class. Each request belongs to ONE class; if config.json has "permissions", only
     /// the listed classes pass (on top of the usual R/P/W/D levels, which still apply). Publish has no operation:
     /// it is always denied. UI operations (show/cap) are their own class because they change what the user sees.
     /// </summary>
     public static class Permissions
     {
-        public const string Read = "leer", ModifyProject = "modificar_proyecto", ModifyFamily = "modificar_familia", LoadFile = "cargar_archivo",
-            Save = "guardar", Sync = "sincronizar", Export = "exportar", Publish = "publicar", DynamicCode = "codigo_dinamico", Ui = "interfaz";
+        public const string Read = "read", ModifyProject = "modify_project", ModifyFamily = "modify_family", LoadFile = "load_file",
+            Save = "save", Sync = "sync", Export = "export", Publish = "publish", DynamicCode = "dynamic_code", Ui = "ui";
 
         public static readonly string[] All = { Read, ModifyProject, ModifyFamily, LoadFile, Save, Sync, Export, Publish, DynamicCode, Ui };
 
@@ -27,13 +27,13 @@ namespace Bimbridge.Protocol
                     return kind == OpSemantics.Kind.Read ? Read : DynamicCode;   // rolled-back query = read; trial/run = dynamic code
                 case Wire.OpFam:
                     var f = OpSemantics.FamVerb(args);
-                    if (f == "cargar_archivo") return LoadFile;
-                    if (f == "cargar") return ModifyProject;                    // loads an already open RFA into the project
+                    if (f == "load_file") return LoadFile;
+                    if (f == "load") return ModifyProject;                    // loads an already open RFA into the project
                     return kind == OpSemantics.Kind.Read ? Read : ModifyFamily;
                 case Wire.OpDoc:
-                    switch ((Arg.GetString(args, "accion") ?? "").Trim().ToLowerInvariant())
+                    switch ((Arg.GetString(args, "action") ?? "").Trim().ToLowerInvariant())
                     {
-                        case "sync": case "sincronizar": return Sync;
+                        case "sync":  return Sync;
                         case "pdf": return Export;
                         default: return Save;                                    // guardar, guardar_como, cerrar (cerrar may save)
                     }
@@ -74,7 +74,7 @@ namespace Bimbridge.Protocol
         /// <summary>null if allowed; otherwise the reason for the AI.</summary>
         public static string Deny(string permission, HashSet<string> effective) =>
             effective.Contains(permission) ? null
-            : permission == Publish ? "publicar is not supported in BIMBRIDGE"
-            : "permission '" + permission + "' not granted in config.json (permisos: " + string.Join(", ", effective.OrderBy(x => x, StringComparer.Ordinal)) + "). Ask the user for it; do not try another way.";
+            : permission == Publish ? "publish is not supported in BIMBRIDGE"
+            : "permission '" + permission + "' not granted in config.json (permissions: " + string.Join(", ", effective.OrderBy(x => x, StringComparer.Ordinal)) + "). Ask the user for it; do not try another way.";
     }
 }

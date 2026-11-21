@@ -128,16 +128,16 @@ namespace Bimbridge.Tests
             Assert.False(r.Passed);
             bool Has(string code, string reference = null, long? id = null) =>
                 r.Findings.Any(f => f.Code == code && (reference == null || f.Ref == reference) && (id == null || f.Id == id || (f.Detail ?? "").Contains("#" + id)));
-            Assert.True(Has("faltante", "U102/P2"));
-            Assert.True(Has("sobrante", id: 9001));
-            Assert.True(Has("casi_duplicado", id: 9002));
-            Assert.True(Has("ambiguo", "U101/L1")); // two candidates at 0 and 20 mm: proximity does not prove which one
-            Assert.True(Has("altura", "U101/L2"));
-            Assert.True(Has("tipo", "U102/L1"));
-            Assert.True(Has("sin_etiqueta", "C1"));
-            Assert.True(Has("etiqueta_duplicada", "U102/L2"));
-            Assert.True(Has("grupo", "U101/P1"));
-            Assert.True(Has("orientacion", "U102/P1"));
+            Assert.True(Has("missing", "U102/P2"));
+            Assert.True(Has("leftover", id: 9001));
+            Assert.True(Has("near_duplicate", id: 9002));
+            Assert.True(Has("ambiguous", "U101/L1")); // two candidates at 0 and 20 mm: proximity does not prove which one
+            Assert.True(Has("height", "U101/L2"));
+            Assert.True(Has("type", "U102/L1"));
+            Assert.True(Has("no_tag", "C1"));
+            Assert.True(Has("duplicate_tag", "U102/L2"));
+            Assert.True(Has("group", "U101/P1"));
+            Assert.True(Has("orientation", "U102/P1"));
             // Nothing deviated counts as correct
             Assert.Equal(exp.Count - 1 - 1 - 6, r.Approved); // -missing -ambiguous -6 with deviation (only U101/P2 stays correct)
             Assert.Equal(6, r.WithDeviation);
@@ -195,14 +195,14 @@ namespace Bimbridge.Tests
         [Fact]
         public void UnconfirmedSourceFields_AreReportedSeparately()
         {
-            var json = Json.ParseObject("{\"tolerancias\":{\"xy\":100,\"z\":20},\"elementos\":[{\"ref\":\"R1\",\"x\":0,\"y\":0,\"nivel\":\"L1\",\"tipo\":\"F: T\",\"no_confirmado\":[\"altura\"],\"fuente\":\"E-1 p2 r3 sha:ab12\"}]}");
+            var json = Json.ParseObject("{\"tolerances\":{\"xy\":100,\"z\":20},\"elements\":[{\"ref\":\"R1\",\"x\":0,\"y\":0,\"level\":\"L1\",\"type\":\"F: T\",\"not_committed\":[\"height\"],\"source\":\"E-1 p2 r3 sha:ab12\"}]}");
             var exp = ManifestQc.Parse(json, out var o);
             Assert.Equal(100, o.TolXY);
             var r = ManifestQc.Run(exp, new List<ManifestQc.Actual> { new ManifestQc.Actual { Id = 5, X = 0, Y = 0, Level = "L1", Family = "F", Type = "T" } }, o);
             Assert.Equal(1, r.Approved);
             Assert.Equal(1, r.Unconfirmed);
-            Assert.Contains(r.Findings, f => f.Code == "no_confirmado" && f.Detail.Contains("E-1 p2 r3"));
-            Assert.Throws<ArgumentException>(() => ManifestQc.Parse(Json.ParseObject("{\"elementos\":[{\"ref\":\"a\",\"x\":0,\"y\":0},{\"ref\":\"a\",\"x\":1,\"y\":1}]}"), out _));
+            Assert.Contains(r.Findings, f => f.Code == "not_committed" && f.Detail.Contains("E-1 p2 r3"));
+            Assert.Throws<ArgumentException>(() => ManifestQc.Parse(Json.ParseObject("{\"elements\":[{\"ref\":\"a\",\"x\":0,\"y\":0},{\"ref\":\"a\",\"x\":1,\"y\":1}]}"), out _));
         }
 
         [Theory]
@@ -224,8 +224,8 @@ namespace Bimbridge.Tests
                 PlanKind = "rcp", Cut = 5000, Top = 9000, ZMin = 2600, ZMax = 2700, RangeSource = "plan region 17861903",
             };
             var reasons = VisibilityQc.Explain(f, out var notCheckable);
-            Assert.Contains(reasons, x => x.Code == "filtro" && x.Detail.Contains("10-PRECONSTRUCTION"));
-            Assert.Contains(reasons, x => x.Code == "rango_de_vista" && x.Detail.Contains("plan region") && x.Certain);
+            Assert.Contains(reasons, x => x.Code == "filter" && x.Detail.Contains("10-PRECONSTRUCTION"));
+            Assert.Contains(reasons, x => x.Code == "view_range_of" && x.Detail.Contains("plan region") && x.Certain);
             Assert.Contains(notCheckable, s => s.Contains("the family's own visibility"));
         }
 

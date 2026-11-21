@@ -14,9 +14,9 @@ namespace Bimbridge.Engine.Workflow
     /// </summary>
     public static class SourceKinds
     {
-        public const string User = "instruccion_usuario", Transcript = "transcripcion", Demonstration = "demostracion", Plan = "plano",
-            Pdf = "pdf", Table = "tabla", Markup = "markup", Revision = "revision", ProfessionalDecision = "decision_profesional",
-            Inference = "inferencia_agente", Model = "modelo", ExecutionPlan = "plan_ejecucion";
+        public const string User = "user_instruction", Transcript = "transcription", Demonstration = "demonstration", Plan = "plan",
+            Pdf = "pdf", Table = "schedule", Markup = "markup", Revision = "revision", ProfessionalDecision = "professional_decision",
+            Inference = "agent_inference", Model = "model", ExecutionPlan = "execution_plan";
 
         public static readonly string[] All = { User, Transcript, Demonstration, Plan, Pdf, Table, Markup, Revision, ProfessionalDecision, Inference, Model, ExecutionPlan };
 
@@ -45,7 +45,7 @@ namespace Bimbridge.Engine.Workflow
     public static class Confidence
     {
         public const string Observed = "OBSERVED", Inferred = "INFERRED", Unknown = "UNKNOWN";
-        public const string Verified = "COMPROBADO", Reported = "REPORTADO", Pending = "PENDIENTE", Blocked = "BLOQUEADO";
+        public const string Verified = "VERIFIED", Reported = "REPORTED", Pending = "PENDING", Blocked = "BLOCKED";
         public static bool IsConfidence(string s) => s == Observed || s == Inferred || s == Unknown;
         public static bool IsEvidence(string s) => s == Verified || s == Reported || s == Pending || s == Blocked;
     }
@@ -63,16 +63,16 @@ namespace Bimbridge.Engine.Workflow
 
         public Dictionary<string, object> ToJson()
         {
-            var d = new Dictionary<string, object> { ["id"] = Id, ["tipo"] = Kind, ["revision"] = Revision, ["ubicacion"] = Locator };
+            var d = new Dictionary<string, object> { ["id"] = Id, ["type"] = Kind, ["revision"] = Revision, ["location"] = Locator };
             if (Sha256 != null) d["sha256"] = Sha256;
-            if (DerivedFrom.Count > 0) d["derivada_de"] = DerivedFrom.Cast<object>().ToList();
+            if (DerivedFrom.Count > 0) d["derived_from"] = DerivedFrom.Cast<object>().ToList();
             return d;
         }
 
         public static SourceRef FromJson(Dictionary<string, object> d) => d == null ? null : new SourceRef
         {
-            Id = Arg.GetString(d, "id"), Kind = Arg.GetString(d, "tipo"), Revision = Arg.GetString(d, "revision"), Locator = Arg.GetString(d, "ubicacion"),
-            Sha256 = Arg.GetString(d, "sha256"), DerivedFrom = Arg.GetStringList(d, "derivada_de") ?? new List<string>(),
+            Id = Arg.GetString(d, "id"), Kind = Arg.GetString(d, "type"), Revision = Arg.GetString(d, "revision"), Locator = Arg.GetString(d, "location"),
+            Sha256 = Arg.GetString(d, "sha256"), DerivedFrom = Arg.GetStringList(d, "derived_from") ?? new List<string>(),
         };
 
         /// <summary>Identities of this source for comparing lineages: its id and its content.</summary>
@@ -94,8 +94,8 @@ namespace Bimbridge.Engine.Workflow
     {
         public string Id;
         public SourceRef Source;
-        public string Scope;          // scope: "nivel=L03", "vista=…", "*"
-        public string Key;            // what is regulated: "altura_montaje", "workset", "codigo"…
+        public string Scope;          // scope: "level=L03", "view=…", "*"
+        public string Key;            // what is regulated: "mounting_height", "workset", "code"…
         public string Value;          // required value (text); null = the source does not set it (not invented)
         public int Authority = -1;    // -1 = that of its source kind
         public string Confidence = Workflow.Confidence.Observed;
@@ -110,13 +110,13 @@ namespace Bimbridge.Engine.Workflow
         {
             var d = new Dictionary<string, object>
             {
-                ["id"] = Id, ["fuente"] = Source?.ToJson(), ["alcance"] = Scope, ["clave"] = Key, ["valor"] = Value,
-                ["autoridad"] = (long)EffectiveAuthority, ["confianza"] = Confidence,
+                ["id"] = Id, ["source"] = Source?.ToJson(), ["scope"] = Scope, ["key"] = Key, ["value"] = Value,
+                ["authority"] = (long)EffectiveAuthority, ["confidence"] = Confidence,
             };
-            if (Acceptance != null) d["aceptacion"] = Acceptance;
-            if (Elements.Count > 0) d["elementos"] = Elements.Cast<object>().ToList();
-            if (Supersedes.Count > 0) d["reemplaza"] = Supersedes.Cast<object>().ToList();
-            if (Note != null) d["nota"] = Note;
+            if (Acceptance != null) d["acceptance"] = Acceptance;
+            if (Elements.Count > 0) d["elements"] = Elements.Cast<object>().ToList();
+            if (Supersedes.Count > 0) d["replaces"] = Supersedes.Cast<object>().ToList();
+            if (Note != null) d["note"] = Note;
             return d;
         }
 
@@ -124,13 +124,13 @@ namespace Bimbridge.Engine.Workflow
         {
             var r = new Requirement
             {
-                Id = Arg.GetString(d, "id"), Source = SourceRef.FromJson(d.TryGetValue("fuente", out var f) ? f as Dictionary<string, object> : null),
-                Scope = Arg.GetString(d, "alcance") ?? "*", Key = Arg.GetString(d, "clave"), Value = Arg.GetString(d, "valor"),
-                Confidence = Arg.GetString(d, "confianza") ?? Workflow.Confidence.Observed, Acceptance = Arg.GetString(d, "aceptacion"), Note = Arg.GetString(d, "nota"),
+                Id = Arg.GetString(d, "id"), Source = SourceRef.FromJson(d.TryGetValue("source", out var f) ? f as Dictionary<string, object> : null),
+                Scope = Arg.GetString(d, "scope") ?? "*", Key = Arg.GetString(d, "key"), Value = Arg.GetString(d, "value"),
+                Confidence = Arg.GetString(d, "confidence") ?? Workflow.Confidence.Observed, Acceptance = Arg.GetString(d, "acceptance"), Note = Arg.GetString(d, "note"),
             };
-            var a = Arg.GetLong(d, "autoridad"); if (a.HasValue) r.Authority = (int)a.Value;
-            if (d.TryGetValue("elementos", out var e) && e is List<object> el) r.Elements = el.Select(x => Convert.ToInt64(x, CultureInfo.InvariantCulture)).ToList();
-            if (d.TryGetValue("reemplaza", out var s) && s is List<object> sl) r.Supersedes = sl.Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)).ToList();
+            var a = Arg.GetLong(d, "authority"); if (a.HasValue) r.Authority = (int)a.Value;
+            if (d.TryGetValue("elements", out var e) && e is List<object> el) r.Elements = el.Select(x => Convert.ToInt64(x, CultureInfo.InvariantCulture)).ToList();
+            if (d.TryGetValue("replaces", out var s) && s is List<object> sl) r.Supersedes = sl.Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)).ToList();
             return r;
         }
     }
@@ -142,8 +142,8 @@ namespace Bimbridge.Engine.Workflow
         public string Reason;
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["alcance"] = Scope, ["clave"] = Key, ["motivo"] = Reason,
-            ["candidatos"] = Candidates.Select(c => (object)new Dictionary<string, object> { ["id"] = c.Id, ["valor"] = c.Value, ["fuente"] = c.Source?.Id, ["autoridad"] = (long)c.EffectiveAuthority }).ToList(),
+            ["scope"] = Scope, ["key"] = Key, ["reason"] = Reason,
+            ["candidates"] = Candidates.Select(c => (object)new Dictionary<string, object> { ["id"] = c.Id, ["value"] = c.Value, ["source"] = c.Source?.Id, ["authority"] = (long)c.EffectiveAuthority }).ToList(),
         };
     }
 

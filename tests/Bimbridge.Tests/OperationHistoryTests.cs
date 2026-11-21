@@ -17,7 +17,7 @@ namespace Bimbridge.Tests
     /// </summary>
     public class OperationHistoryTests
     {
-        private static string NewPath() => Path.Combine(Path.GetTempPath(), "bb_hist_" + Guid.NewGuid().ToString("N"), "operaciones.jsonl");
+        private static string NewPath() => Path.Combine(Path.GetTempPath(), "bb_hist_" + Guid.NewGuid().ToString("N"), "operations.jsonl");
         private static readonly OperationHistory.Scope All = new OperationHistory.Scope { SeeAll = true };
         private static OperationHistory.Scope Me(string session, string agent = null) => new OperationHistory.Scope { SessionId = session, AgentId = agent };
 
@@ -44,9 +44,9 @@ namespace Bimbridge.Tests
             var (commits, n) = h.Query(All, null, "commit", null, null, null);
             Assert.Equal(2, n);
             Assert.Equal(c.Id, commits[0].JobId);                           // most recent first
-            Assert.Equal("reconciliar_antes", commits[0].Retry);           // uncertain: never retry blindly
-            Assert.Equal("reintentable", commits[1].Retry);                // conflict: nothing was applied
-            Assert.Equal("reconciliar_antes", h.Query(All, Status.Cancelled, null, null, null, null).Page[0].Retry);
+            Assert.Equal("reconcile_first", commits[0].Retry);           // uncertain: never retry blindly
+            Assert.Equal("retryable", commits[1].Retry);                // conflict: nothing was applied
+            Assert.Equal("reconcile_first", h.Query(All, Status.Cancelled, null, null, null, null).Page[0].Retry);
             Assert.Equal(2, h.Query(All, null, null, "S2", null, null).Total);
             Assert.Equal(1, h.Query(All, null, null, null, null, "dropped").Total);
 
@@ -64,9 +64,9 @@ namespace Bimbridge.Tests
         public void WithDifferences_RequiresReview_NotSuccessWithoutPendingActions()
         {
             // AUD-14
-            Assert.Equal("revisar_diferencias", OperationHistory.RetryAdvice(Status.CompletedWithDifferences));
-            Assert.Equal("no_necesario", OperationHistory.RetryAdvice(Status.Ok));
-            Assert.Equal("reconciliar_antes", OperationHistory.RetryAdvice("un_estado_nuevo_desconocido"));
+            Assert.Equal("review_differences", OperationHistory.RetryAdvice(Status.CompletedWithDifferences));
+            Assert.Equal("not_needed", OperationHistory.RetryAdvice(Status.Ok));
+            Assert.Equal("reconcile_first", OperationHistory.RetryAdvice("an_unknown_new_status"));
         }
 
         [Fact]
@@ -86,7 +86,7 @@ namespace Bimbridge.Tests
             Assert.All(ana.Page, r => Assert.Equal("A-ana", r.Agent));
             // Filters do not widen the scope: asking for someone else's session or text does not show it.
             Assert.Equal(0, h.Query(Me("S-ana-1", "A-ana"), null, null, "S-bob-1", null, null).Total);
-            Assert.Equal(0, h.Query(Me("S-ana-1", "A-ana"), null, null, null, null, "secreto").Total);
+            Assert.Equal(0, h.Query(Me("S-ana-1", "A-ana"), null, null, null, null, "secret").Total);
             Assert.Equal(1, h.Query(Me("S-bob-1", "A-bob"), null, null, null, null, null).Total);
             // An anonymous session only sees its own session; another anonymous session does not see the first (null is not a shared identity).
             Assert.Equal(1, h.Query(Me("S-anon-1"), null, null, null, null, null).Total);
@@ -96,7 +96,7 @@ namespace Bimbridge.Tests
             Assert.Throws<ArgumentNullException>(() => h.Query(null, null, null, null, null, null));
             // Asking for "all" without user authorization is rejected (not granted just for asking, nor silently downgraded).
             Assert.Null(OperationHistory.ScopeFor("S-ana-1", "A-ana", wantAll: true, sharedAuthorized: false, out var refusal));
-            Assert.Contains("historial_compartido", refusal);
+            Assert.Contains("shared_history", refusal);
             Assert.False(new EngineConfig().SharedHistory);                 // not authorized by default
             Assert.Equal(2, h.Query(OperationHistory.ScopeFor("S-ana-1", "A-ana", false, false, out _), null, null, null, null, null).Total);
             Assert.Equal(2, h.Query(OperationHistory.ScopeFor("S-ana-1", "A-ana", false, true, out _), null, null, null, null, null).Total);   // authorized but not requested: own entries
@@ -168,7 +168,7 @@ namespace Bimbridge.Tests
             {
                 await release.Task;
                 // Like DocOp: result with the list of differences, without passing a status.
-                jobs.Complete(job, new Dictionary<string, object> { ["archivo"] = "x.pdf", ["diferencias"] = new List<object> { "the PDF has 3 pages and 4 sheets were requested" } });
+                jobs.Complete(job, new Dictionary<string, object> { ["file"] = "x.pdf", ["differences"] = new List<object> { "the PDF has 3 pages and 4 sheets were requested" } });
             });
             Assert.Equal(Status.InProgress, job.State);                    // what the client saw at first
             Assert.Equal(0, h.Count);
@@ -178,15 +178,15 @@ namespace Bimbridge.Tests
             Assert.Equal(Status.CompletedWithDifferences, jobs.Get(job.Id).State);  // later query of the job_id
             var rec = h.Query(All, null, null, null, null, null).Page.Single();
             Assert.Equal(Status.CompletedWithDifferences, rec.State);               // history
-            Assert.Equal("revisar_diferencias", rec.Retry);                // requires review, not "no_necesario"
+            Assert.Equal("review_differences", rec.Retry);                // requires review, not "not_needed"
             Assert.Equal(0, h.Query(All, Status.Ok, null, null, null, null).Total);
 
             // An explicit "ok" does not mask differences; other explicit statuses are respected; without differences it is still ok.
-            var a = jobs.Create("S1", "doc ifc"); jobs.Complete(a, new Dictionary<string, object> { ["diferencias"] = new List<object> { "x" } }, Status.Ok);
+            var a = jobs.Create("S1", "doc ifc"); jobs.Complete(a, new Dictionary<string, object> { ["differences"] = new List<object> { "x" } }, Status.Ok);
             Assert.Equal(Status.CompletedWithDifferences, a.State);
-            var b = jobs.Create("S1", "exec"); jobs.Complete(b, new Dictionary<string, object> { ["diferencias"] = new List<object> { "x" } }, "parcial");
-            Assert.Equal("parcial", b.State);
-            var c = jobs.Create("S1", "doc pdf"); jobs.Complete(c, new Dictionary<string, object> { ["diferencias"] = new List<object>() });
+            var b = jobs.Create("S1", "exec"); jobs.Complete(b, new Dictionary<string, object> { ["differences"] = new List<object> { "x" } }, "partial");
+            Assert.Equal("partial", b.State);
+            var c = jobs.Create("S1", "doc pdf"); jobs.Complete(c, new Dictionary<string, object> { ["differences"] = new List<object>() });
             Assert.Equal(Status.Ok, c.State);
         }
 

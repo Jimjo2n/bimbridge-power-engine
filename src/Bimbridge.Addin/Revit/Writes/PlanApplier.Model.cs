@@ -16,7 +16,7 @@ namespace Bimbridge.Addin.Revit.Writes
     /// 0.9.1 (Blocks C/D/E): creation and verification of the typed modeling operations.
     /// Guards at apply time (what was resolved while planning still exists and the name is still free), creation with Revit's public API,
     /// and verification of what was created: each element is read back and compared with the request (elevation, ends, level, size, circuit
-    /// members and panel, schedule fields, bounded room). A difference is reported in "verificacion_creacion".
+    /// members and panel, schedule fields, bounded room). A difference is reported in "creation_verification".
     /// </summary>
     internal sealed partial class PlanApplier
     {
@@ -41,9 +41,9 @@ namespace Bimbridge.Addin.Revit.Writes
         {
             if (!ModelKinds.Contains(op)) return null;
             bool Exists(string k) => !t.ContainsKey(k) || _doc.GetElement(Ids.ToId(WriteKit.L(t, k))) != null;
-            foreach (var k in new[] { "nivel", "nivel_superior", "wtype", "stype", "sys", "ctype", "panel", "vft_planta", "vft_rcp" })
+            foreach (var k in new[] { "level", "top_level", "wtype", "stype", "sys", "ctype", "panel", "vft_plan", "vft_rcp" })
                 if (!Exists(k)) return "\u0000" + k + " no longer exists";
-            var name = WriteKit.S(t, "nombre");
+            var name = WriteKit.S(t, "name");
             switch (op)
             {
                 case "conduit_route":
@@ -99,10 +99,10 @@ namespace Bimbridge.Addin.Revit.Writes
                 case "level_create":
                 {
                     var lvl = Level.Create(_doc, WriteKit.D(t, "elev"));
-                    var name = WriteKit.S(t, "nombre");
+                    var name = WriteKit.S(t, "name");
                     if (name != null) lvl.Name = name;
                     var made = new List<ElementId> { Track(opIndex, op, lvl.Id, t) };
-                    foreach (var k in new[] { "vft_planta", "vft_rcp" })
+                    foreach (var k in new[] { "vft_plan", "vft_rcp" })
                         if (t.ContainsKey(k)) made.Add(ViewPlan.Create(_doc, Ids.ToId(WriteKit.L(t, k)), lvl.Id).Id);
                     return made;
                 }
@@ -110,20 +110,20 @@ namespace Bimbridge.Addin.Revit.Writes
                 {
                     var p = PtList(t, "pts", 0);
                     var g = Grid.Create(_doc, Line.CreateBound(p[0], p[1]));
-                    var name = WriteKit.S(t, "nombre");
+                    var name = WriteKit.S(t, "name");
                     if (name != null) g.Name = name;
                     return new[] { Track(opIndex, op, g.Id, t) };
                 }
                 case "wall_create":
                 {
-                    var lvl = (Level)_doc.GetElement(Ids.ToId(WriteKit.L(t, "nivel")));
+                    var lvl = (Level)_doc.GetElement(Ids.ToId(WriteKit.L(t, "level")));
                     var p = PtList(t, "pts", lvl.Elevation);
                     var w = Wall.Create(_doc, Line.CreateBound(p[0], p[1]), Ids.ToId(WriteKit.L(t, "wtype")), lvl.Id,
-                                        WriteKit.D(t, "altura"), WriteKit.D(t, "desfase", 0), false, WriteKit.B(t, "estructural"));
-                    if (t.ContainsKey("nivel_superior"))
+                                        WriteKit.D(t, "height"), WriteKit.D(t, "offset", 0), false, WriteKit.B(t, "structural"));
+                    if (t.ContainsKey("top_level"))
                     {
                         var hp = w.get_Parameter(BuiltInParameter.WALL_HEIGHT_TYPE);
-                        if (hp == null || hp.IsReadOnly || !hp.Set(Ids.ToId(WriteKit.L(t, "nivel_superior"))))
+                        if (hp == null || hp.IsReadOnly || !hp.Set(Ids.ToId(WriteKit.L(t, "top_level"))))
                             throw new InvalidOperationException("could not constrain the wall to the top level");
                     }
                     return new[] { Track(opIndex, op, w.Id, t) };
@@ -131,13 +131,13 @@ namespace Bimbridge.Addin.Revit.Writes
                 case "floor_create":
                 case "ceiling_create":
                 {
-                    var lvl = (Level)_doc.GetElement(Ids.ToId(WriteKit.L(t, "nivel")));
+                    var lvl = (Level)_doc.GetElement(Ids.ToId(WriteKit.L(t, "level")));
                     var loops = new List<CurveLoop> { Loop(PtList(t, "pts", lvl.Elevation)) };
                     Element e;
                     BuiltInParameter offP;
                     if (op == "floor_create")
                     {
-                        e = Floor.Create(_doc, loops, Ids.ToId(WriteKit.L(t, "stype")), lvl.Id, WriteKit.B(t, "estructural"), null, 0.0);
+                        e = Floor.Create(_doc, loops, Ids.ToId(WriteKit.L(t, "stype")), lvl.Id, WriteKit.B(t, "structural"), null, 0.0);
                         offP = BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM;
                     }
                     else
@@ -145,7 +145,7 @@ namespace Bimbridge.Addin.Revit.Writes
                         e = Ceiling.Create(_doc, loops, Ids.ToId(WriteKit.L(t, "stype")), lvl.Id);
                         offP = BuiltInParameter.CEILING_HEIGHTABOVELEVEL_PARAM;
                     }
-                    var off = WriteKit.D(t, "desfase", 0);
+                    var off = WriteKit.D(t, "offset", 0);
                     var pp = e.get_Parameter(offP);
                     if (pp != null && !pp.IsReadOnly && Math.Abs(pp.AsDouble() - off) > Tol && !pp.Set(off))
                         throw new InvalidOperationException("could not set the height above the level");
@@ -153,11 +153,11 @@ namespace Bimbridge.Addin.Revit.Writes
                 }
                 case "room_create":
                 {
-                    var lvl = (Level)_doc.GetElement(Ids.ToId(WriteKit.L(t, "nivel")));
+                    var lvl = (Level)_doc.GetElement(Ids.ToId(WriteKit.L(t, "level")));
                     var room = _doc.Create.NewRoom(lvl, new UV(WriteKit.D(t, "x"), WriteKit.D(t, "y")))
                                ?? throw new InvalidOperationException("Revit did not create the room");
-                    var name = WriteKit.S(t, "nombre"); if (name != null) room.Name = name;
-                    var number = WriteKit.S(t, "numero"); if (number != null) room.Number = number;
+                    var name = WriteKit.S(t, "name"); if (name != null) room.Name = name;
+                    var number = WriteKit.S(t, "number"); if (number != null) room.Number = number;
                     return new[] { Track(opIndex, op, room.Id, t) };
                 }
                 case "conduit_create":
@@ -171,8 +171,8 @@ namespace Bimbridge.Addin.Revit.Writes
                 {
                     var a = Xyz(t, "a"); var b = Xyz(t, "b");
                     MEPCurve m = op == "duct_create"
-                        ? (MEPCurve)Duct.Create(_doc, Ids.ToId(WriteKit.L(t, "sys")), Ids.ToId(WriteKit.L(t, "ctype")), Ids.ToId(WriteKit.L(t, "nivel")), a, b)
-                        : Pipe.Create(_doc, Ids.ToId(WriteKit.L(t, "sys")), Ids.ToId(WriteKit.L(t, "ctype")), Ids.ToId(WriteKit.L(t, "nivel")), a, b);
+                        ? (MEPCurve)Duct.Create(_doc, Ids.ToId(WriteKit.L(t, "sys")), Ids.ToId(WriteKit.L(t, "ctype")), Ids.ToId(WriteKit.L(t, "level")), a, b)
+                        : Pipe.Create(_doc, Ids.ToId(WriteKit.L(t, "sys")), Ids.ToId(WriteKit.L(t, "ctype")), Ids.ToId(WriteKit.L(t, "level")), a, b);
                     foreach (var (k, bip) in SizeParams(op))
                     {
                         if (!t.ContainsKey(k)) continue;
@@ -196,11 +196,11 @@ namespace Bimbridge.Addin.Revit.Writes
                 case "schedule_create":
                 {
                     var vs = ViewSchedule.CreateSchedule(_doc, Ids.ToId(WriteKit.L(t, "cat")));
-                    var name = WriteKit.S(t, "nombre"); if (name != null) vs.Name = name;
+                    var name = WriteKit.S(t, "name"); if (name != null) vs.Name = name;
                     var def = vs.Definition;
                     var available = def.GetSchedulableFields().ToList();
                     var missing = new List<string>();
-                    foreach (var f in ((List<object>)t["campos"]).Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)))
+                    foreach (var f in ((List<object>)t["fields"]).Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)))
                     {
                         var sf = available.FirstOrDefault(x => string.Equals(x.GetName(_doc), f, StringComparison.OrdinalIgnoreCase));
                         if (sf == null) { missing.Add(f); continue; }
@@ -217,9 +217,9 @@ namespace Bimbridge.Addin.Revit.Writes
 
         private Conduit CreateConduit(Dictionary<string, object> t, XYZ a, XYZ b)
         {
-            var m = Conduit.Create(_doc, Ids.ToId(WriteKit.L(t, "ctype")), a, b, Ids.ToId(WriteKit.L(t, "nivel")));
+            var m = Conduit.Create(_doc, Ids.ToId(WriteKit.L(t, "ctype")), a, b, Ids.ToId(WriteKit.L(t, "level")));
             var diameter = m.get_Parameter(BuiltInParameter.RBS_CONDUIT_DIAMETER_PARAM);
-            if (diameter == null || diameter.IsReadOnly || !diameter.Set(WriteKit.D(t, "diametro")))
+            if (diameter == null || diameter.IsReadOnly || !diameter.Set(WriteKit.D(t, "diameter")))
                 throw new InvalidOperationException("could not set the conduit diameter");
             SetConduitWorkset(m, t);
             return m;
@@ -241,9 +241,9 @@ namespace Bimbridge.Addin.Revit.Writes
             var points = RoutePoints(target);
             var scopeError = VerifyRouteScope(target);
             if (scopeError != null) throw new InvalidOperationException(scopeError);
-            if (target.ContainsKey("reemplazar_ids"))
+            if (target.ContainsKey("replace_ids"))
             {
-                var replacement = WriteKit.Longs(target, "reemplazar_ids").Select(Ids.ToId).ToList();
+                var replacement = WriteKit.Longs(target, "replace_ids").Select(Ids.ToId).ToList();
                 var removed = _doc.Delete(replacement);
                 if (!new HashSet<ElementId>(removed).SetEquals(replacement))
                     throw new InvalidOperationException("Revit tried to delete elements outside the scope; the replacement is rolled back");
@@ -275,22 +275,22 @@ namespace Bimbridge.Addin.Revit.Writes
         }
 
         private static List<XYZ> RoutePoints(Dictionary<string, object> t) =>
-            OpCatalog.Points(t["puntos"], "conduit_route puntos", 3, 100).Select(p => new XYZ(p[0], p[1], p[2])).ToList();
+            OpCatalog.Points(t["points"], "conduit_route points", 3, 100).Select(p => new XYZ(p[0], p[1], p[2])).ToList();
 
         private static List<object> RouteTerminals(Dictionary<string, object> target) =>
-            target.TryGetValue("extremos", out var ends) ? (List<object>)ends : new List<object> { null, null };
+            target.TryGetValue("ends", out var ends) ? (List<object>)ends : new List<object> { null, null };
 
         private string VerifyRouteScope(Dictionary<string, object> target)
         {
-            if (!target.ContainsKey("extremos")) return null;
+            if (!target.ContainsKey("ends")) return null;
             try
             {
                 var points = RoutePoints(target);
-                var replacing = target.ContainsKey("reemplazar_ids");
+                var replacing = target.ContainsKey("replace_ids");
                 if (replacing)
                 {
-                    var current = ConduitRouteScope.Capture(_doc, WriteKit.Longs(target, "reemplazar_ids").ToList(), points[0], points.Last());
-                    if (!Equals(current["huella"], target["huella_original"])) return "the original run changed after planning";
+                    var current = ConduitRouteScope.Capture(_doc, WriteKit.Longs(target, "replace_ids").ToList(), points[0], points.Last());
+                    if (!Equals(current["fingerprint"], target["original_fingerprint"])) return "the original run changed after planning";
                 }
                 var terminals = RouteTerminals(target);
                 if (terminals[0] is Dictionary<string, object> first)
@@ -346,9 +346,9 @@ namespace Bimbridge.Addin.Revit.Writes
                 {
                     var s = live[i];
                     var size = s.get_Parameter(BuiltInParameter.RBS_CONDUIT_DIAMETER_PARAM);
-                    if (size == null || ModelOps.Differs(size.AsDouble(), WriteKit.D(target, "diametro"), Tol) ||
+                    if (size == null || ModelOps.Differs(size.AsDouble(), WriteKit.D(target, "diameter"), Tol) ||
                         Ids.ToLong(s.GetTypeId()) != WriteKit.L(target, "ctype") ||
-                        Ids.ToLong(s.ReferenceLevel?.Id) != WriteKit.L(target, "nivel") ||
+                        Ids.ToLong(s.ReferenceLevel?.Id) != WriteKit.L(target, "level") ||
                         (target.ContainsKey("ws") && s.WorksetId.IntegerValue != WriteKit.L(target, "ws")))
                         return "Run: the type, level, diameter or workset does not match";
                     if (!((s.Location as LocationCurve)?.Curve is Line line) ||
@@ -372,8 +372,8 @@ namespace Bimbridge.Addin.Revit.Writes
         }
 
         private static IEnumerable<(string, BuiltInParameter)> SizeParams(string op) => op == "duct_create"
-            ? new[] { ("diametro", BuiltInParameter.RBS_CURVE_DIAMETER_PARAM), ("ancho", BuiltInParameter.RBS_CURVE_WIDTH_PARAM), ("alto", BuiltInParameter.RBS_CURVE_HEIGHT_PARAM) }
-            : new[] { ("diametro", op == "conduit_create" ? BuiltInParameter.RBS_CONDUIT_DIAMETER_PARAM : BuiltInParameter.RBS_PIPE_DIAMETER_PARAM) };
+            ? new[] { ("diameter", BuiltInParameter.RBS_CURVE_DIAMETER_PARAM), ("width", BuiltInParameter.RBS_CURVE_WIDTH_PARAM), ("height", BuiltInParameter.RBS_CURVE_HEIGHT_PARAM) }
+            : new[] { ("diameter", op == "conduit_create" ? BuiltInParameter.RBS_CONDUIT_DIAMETER_PARAM : BuiltInParameter.RBS_PIPE_DIAMETER_PARAM) };
 
         private static bool Near(XYZ a, XYZ b) => a != null && b != null && a.DistanceTo(b) < Tol;
 
@@ -392,7 +392,7 @@ namespace Bimbridge.Addin.Revit.Writes
                 {
                     var l = (Level)e;
                     if (ModelOps.Differs(l.Elevation, WriteKit.D(t, "elev"), Tol)) return "elevation " + l.Elevation + " ft, requested " + WriteKit.D(t, "elev");
-                    var n = WriteKit.S(t, "nombre");
+                    var n = WriteKit.S(t, "name");
                     return n != null && l.Name != n ? "name '" + l.Name + "'" : null;
                 }
                 case "grid_create":
@@ -405,27 +405,27 @@ namespace Bimbridge.Addin.Revit.Writes
                 case "wall_create":
                 {
                     var w = (Wall)e;
-                    if (w.LevelId != Ids.ToId(WriteKit.L(t, "nivel"))) return "different level";
+                    if (w.LevelId != Ids.ToId(WriteKit.L(t, "level"))) return "different level";
                     var p = PtList(t, "pts", 0);
                     var lc = (w.Location as LocationCurve)?.Curve;
                     if (lc == null) return "no location line";
                     var flat = Line.CreateBound(new XYZ(lc.GetEndPoint(0).X, lc.GetEndPoint(0).Y, 0), new XYZ(lc.GetEndPoint(1).X, lc.GetEndPoint(1).Y, 0));
                     if (!SameLine(flat, p[0], p[1])) return "the ends do not match";
-                    if (t.ContainsKey("nivel_superior"))
-                        return w.get_Parameter(BuiltInParameter.WALL_HEIGHT_TYPE)?.AsElementId() == Ids.ToId(WriteKit.L(t, "nivel_superior")) ? null : "it was not constrained to the top level";
+                    if (t.ContainsKey("top_level"))
+                        return w.get_Parameter(BuiltInParameter.WALL_HEIGHT_TYPE)?.AsElementId() == Ids.ToId(WriteKit.L(t, "top_level")) ? null : "it was not constrained to the top level";
                     var hp = w.get_Parameter(BuiltInParameter.WALL_USER_HEIGHT_PARAM);
                     if (hp == null || !hp.HasValue) return "could not read the height (parameter missing)";
                     var h = hp.AsDouble();
-                    return ModelOps.Differs(h, WriteKit.D(t, "altura"), Tol) ? "height " + h + " ft" : null;
+                    return ModelOps.Differs(h, WriteKit.D(t, "height"), Tol) ? "height " + h + " ft" : null;
                 }
                 case "floor_create":
                 case "ceiling_create":
                 {
-                    if (e.LevelId != Ids.ToId(WriteKit.L(t, "nivel"))) return "different level";
+                    if (e.LevelId != Ids.ToId(WriteKit.L(t, "level"))) return "different level";
                     var bip = m.Kind == "floor_create" ? BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM : BuiltInParameter.CEILING_HEIGHTABOVELEVEL_PARAM;
                     var op = e.get_Parameter(bip);
                     if (op == null || !op.HasValue) return "could not read the height above the level (parameter missing)";
-                    if (ModelOps.Differs(op.AsDouble(), WriteKit.D(t, "desfase", 0), Tol)) return "height above the level " + op.AsDouble() + " ft";
+                    if (ModelOps.Differs(op.AsDouble(), WriteKit.D(t, "offset", 0), Tol)) return "height above the level " + op.AsDouble() + " ft";
                     var ap = e.get_Parameter(BuiltInParameter.HOST_AREA_COMPUTED);
                     if (ap == null || !ap.HasValue) return "could not read the area (parameter missing)";
                     var area = ap.AsDouble();
@@ -444,7 +444,7 @@ namespace Bimbridge.Addin.Revit.Writes
                     var lc = ((e.Location as LocationCurve)?.Curve);
                     if (!SameLine(lc, Xyz(t, "a"), Xyz(t, "b"))) return "the ends do not match";
                     if (m.Kind == "conduit_create" && (Ids.ToLong(e.GetTypeId()) != WriteKit.L(t, "ctype") ||
-                        Ids.ToLong(((Conduit)e).ReferenceLevel?.Id) != WriteKit.L(t, "nivel") ||
+                        Ids.ToLong(((Conduit)e).ReferenceLevel?.Id) != WriteKit.L(t, "level") ||
                         (t.ContainsKey("ws") && e.WorksetId.IntegerValue != WriteKit.L(t, "ws"))))
                         return "the conduit type, level or workset does not match";
                     foreach (var (k, bip) in SizeParams(m.Kind))
@@ -469,7 +469,7 @@ namespace Bimbridge.Addin.Revit.Writes
                 case "schedule_create":
                 {
                     var vs = (ViewSchedule)e;
-                    var want = ((List<object>)t["campos"]).Count;
+                    var want = ((List<object>)t["fields"]).Count;
                     var got = vs.Definition.GetFieldCount();
                     return got == want ? null : "fields " + got + ", requested " + want;
                 }
@@ -489,8 +489,8 @@ namespace Bimbridge.Addin.Revit.Writes
                 if (why == null) { ok++; continue; }
                 if (problems.Count < 10) problems.Add("@" + m.Op.ToString(CultureInfo.InvariantCulture) + " " + m.Kind + " " + Ids.ToLong(m.Id) + ": " + why);
             }
-            var d = new Dictionary<string, object> { ["revisados"] = (long)_made.Count, ["como_se_pidio"] = (long)ok };
-            if (problems.Count > 0) d["problemas"] = problems;
+            var d = new Dictionary<string, object> { ["reviewed"] = (long)_made.Count, ["as_requested"] = (long)ok };
+            if (problems.Count > 0) d["problems"] = problems;
             return d;
         }
     }

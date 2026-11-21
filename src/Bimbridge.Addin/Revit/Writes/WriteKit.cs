@@ -188,7 +188,7 @@ namespace Bimbridge.Addin.Revit.Writes
                     if (v is string s2)
                     {
                         var t = s2.Trim().ToLowerInvariant();
-                        if (IsYesNo(p) && (t == "si" || t == "sí" || t == "yes" || t == "true" || t == "1")) { value = 1L; return true; }
+                        if (IsYesNo(p) && (t == "yes" || t == "yes" || t == "yes" || t == "true" || t == "1")) { value = 1L; return true; }
                         if (IsYesNo(p) && (t == "no" || t == "false" || t == "0")) { value = 0L; return true; }
                         if (long.TryParse(t, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n)) { value = n; return true; }
                     }
@@ -206,7 +206,7 @@ namespace Bimbridge.Addin.Revit.Writes
                         return true;
                     }
                     var name = v == null ? "" : Convert.ToString(v, CultureInfo.InvariantCulture).Trim();
-                    if (name.Length == 0 || name.Equals("ninguno", StringComparison.OrdinalIgnoreCase) || name.Equals("ninguna", StringComparison.OrdinalIgnoreCase) || name.Equals("none", StringComparison.OrdinalIgnoreCase))
+                    if (name.Length == 0 || name.Equals("none", StringComparison.OrdinalIgnoreCase) || name.Equals("none", StringComparison.OrdinalIgnoreCase) || name.Equals("none", StringComparison.OrdinalIgnoreCase))
                     {
                         value = -1L; show = "none"; return true;
                     }
@@ -332,10 +332,10 @@ namespace Bimbridge.Addin.Revit.Writes
             var parts = new List<string>();
             var col = Hex(o.ProjectionLineColor);
             if (col.Length > 0) parts.Add("color=" + col);
-            if (o.Halftone) parts.Add("medio_tono");
-            if (o.Transparency > 0) parts.Add("transparencia=" + o.Transparency);
-            if (o.ProjectionLineWeight > 0) parts.Add("grosor=" + o.ProjectionLineWeight);
-            return parts.Count == 0 ? "sin cambios" : string.Join(" ", parts);
+            if (o.Halftone) parts.Add("halftone");
+            if (o.Transparency > 0) parts.Add("transparency=" + o.Transparency);
+            if (o.ProjectionLineWeight > 0) parts.Add("line_weight=" + o.ProjectionLineWeight);
+            return parts.Count == 0 ? "unchanged" : string.Join(" ", parts);
         }
 
         public static Category CategoryByName(Document doc, string name)
@@ -470,11 +470,11 @@ namespace Bimbridge.Addin.Revit.Writes
         {
             switch (kind)
             {
-                case "plano": return ViewType.FloorPlan;
+                case "plan": return ViewType.FloorPlan;
                 case "rcp": return ViewType.CeilingPlan;
-                case "seccion": return ViewType.Section;
+                case "section": return ViewType.Section;
                 case "3d": return ViewType.ThreeD;
-                case "dibujo": return ViewType.DraftingView;
+                case "drafting": return ViewType.DraftingView;
                 default: return null;
             }
         }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-//! C interface (FFI) of the Rust Geometry Engine. Return codes: 0 OK, 1 INVALIDO, 2 CANCELADO, 3 ERROR_MOTOR (caught panic).
+//! C interface (FFI) of the Rust Geometry Engine. Return codes: 0 OK, 1 INVALID, 2 CANCELLED, 3 ERROR_MOTOR (caught panic).
 //! The caller (C#) allocates the output buffers; the only memory Rust returns (segment pairs) is freed with
 //! `pe_free_i32`. No panic crosses the FFI boundary.
 

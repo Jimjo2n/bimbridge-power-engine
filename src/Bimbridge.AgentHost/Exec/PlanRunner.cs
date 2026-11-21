@@ -17,7 +17,7 @@ namespace Bimbridge.AgentHost
         public int CheckpointEvery = 64;
         /// <summary>Open for inspection only (no lease, writes nothing).</summary>
         public bool InspectOnly;
-        /// <summary>alpha3: writes against a real backend. null = blocked (alpha1). "ensayo" or "persistente": chosen by the OPERATOR
+        /// <summary>alpha3: writes against a real backend. null = blocked (alpha1). "trial" or "persistent": chosen by the OPERATOR
         /// when launching the AgentHost (never by the plan) and must match the backend mode.</summary>
         public string RealWrites;
     }
@@ -34,14 +34,14 @@ namespace Bimbridge.AgentHost
         public static ValidatedPlan Read(string dir, List<Diagnostic> diags)
         {
             var path = PathIn(dir);
-            if (!File.Exists(path)) { diags.Add(Diagnostic.Error("plan_ausente", path)); return null; }
+            if (!File.Exists(path)) { diags.Add(Diagnostic.Error("plan_missing", path)); return null; }
             Dictionary<string, object> o;
             try { o = Json.ParseObject(File.ReadAllText(path)); }
-            catch (Exception ex) when (ex is FormatException || ex is IOException) { diags.Add(Diagnostic.Error("plan_ilegible", ex.Message)); return null; }
-            if (!(o.TryGetValue("plan", out var p) && p is Dictionary<string, object> pd)) { diags.Add(Diagnostic.Error("plan_ilegible", "no plan field")); return null; }
+            catch (Exception ex) when (ex is FormatException || ex is IOException) { diags.Add(Diagnostic.Error("plan_unreadable", ex.Message)); return null; }
+            if (!(o.TryGetValue("plan", out var p) && p is Dictionary<string, object> pd)) { diags.Add(Diagnostic.Error("plan_unreadable", "no plan field")); return null; }
             var errs = IrValidator.Validate(PlanDraft.FromJson(pd), out var vp);
-            if (errs.Count > 0) { diags.Add(Diagnostic.Error("plan_guardado_invalido", string.Join("; ", errs.Take(5)))); return null; }
-            if (Arg.GetString(o, "hash") != vp.Hash) { diags.Add(Diagnostic.Error("plan_alterado", "saved hash " + Arg.GetString(o, "hash") + " ≠ content " + vp.Hash)); return null; }
+            if (errs.Count > 0) { diags.Add(Diagnostic.Error("saved_plan_invalid", string.Join("; ", errs.Take(5)))); return null; }
+            if (Arg.GetString(o, "hash") != vp.Hash) { diags.Add(Diagnostic.Error("plan_tampered", "saved hash " + Arg.GetString(o, "hash") + " ≠ content " + vp.Hash)); return null; }
             return vp;
         }
     }
@@ -89,18 +89,18 @@ namespace Bimbridge.AgentHost
             if (draft != null)
             {
                 var errs = IrValidator.Validate(draft, out given);
-                if (errs.Count > 0) { foreach (var e in errs) diags.Add(Diagnostic.Error("plan_invalido", e)); return null; }
+                if (errs.Count > 0) { foreach (var e in errs) diags.Add(Diagnostic.Error("plan_invalid", e)); return null; }
             }
             if (File.Exists(PlanFile.PathIn(dir)))
             {
                 var saved = PlanFile.Read(dir, diags);
                 if (saved == null) return null;
-                if (given != null && given.Hash != saved.Hash) { diags.Add(Diagnostic.Error("plan_distinto", "the folder belongs to plan " + saved.Hash + "; the one received is " + given.Hash)); return null; }
+                if (given != null && given.Hash != saved.Hash) { diags.Add(Diagnostic.Error("plan_different", "the folder belongs to plan " + saved.Hash + "; the one received is " + given.Hash)); return null; }
                 r.Plan = saved;
             }
             else
             {
-                if (given == null) { diags.Add(Diagnostic.Error("plan_ausente", "no plan.json and no plan received")); return null; }
+                if (given == null) { diags.Add(Diagnostic.Error("plan_missing", "no plan.json and no plan received")); return null; }
                 if (!opt.InspectOnly) PlanFile.Write(dir, given);
                 r.Plan = given;
             }
@@ -111,14 +111,14 @@ namespace Bimbridge.AgentHost
                 if (backend.DocKey != r.Plan.DocKey || backend.DocPrint != r.Plan.DocPrint)
                 { diags.Add(Diagnostic.Error(ErrorClass.DifferentDocument, "the plan is for " + r.Plan.DocKey + " [" + r.Plan.DocPrint + "]; the backend has " + backend.DocKey + " [" + backend.DocPrint + "]")); return null; }
                 if (backend.TouchesRealModel && r.Plan.Ops.Any(o => o.Writes) && (opt.RealWrites == null || opt.RealWrites != backend.WriteMode))
-                { diags.Add(Diagnostic.Error("escrituras_no_permitidas", "the plan writes to a real model and the operator did not authorize that mode (authorized: " + (opt.RealWrites ?? "none") + ", backend: " + backend.WriteMode + ")")); return null; }
+                { diags.Add(Diagnostic.Error("writes_not_allowed", "the plan writes to a real model and the operator did not authorize that mode (authorized: " + (opt.RealWrites ?? "none") + ", backend: " + backend.WriteMode + ")")); return null; }
             }
 
             // 3. ownership
             if (!opt.InspectOnly)
             {
                 try { r._lease = PlanLease.TryAcquire(dir, opt.LeaseTtl, out var h); r.Holder = h; }
-                catch (TaskStore.LeaseStoreException ex) { diags.Add(Diagnostic.Error("lease_no_fiable", ex.Message)); return null; }
+                catch (TaskStore.LeaseStoreException ex) { diags.Add(Diagnostic.Error("lease_unreliable", ex.Message)); return null; }
                 if (r._lease == null) diags.Add(Diagnostic.Warn(ErrorClass.PlanInUse, "owner " + r.Holder?.Owner + " (fencing " + r.Holder?.Fencing + ", expires " + r.Holder?.Expires + "); inspection only"));
             }
 
@@ -129,7 +129,7 @@ namespace Bimbridge.AgentHost
             if (r.IsOwner)
             {
                 if (r._lease.Fencing <= r.State.Fencing)
-                { diags.Add(Diagnostic.Error("lease_reiniciado", "lease fencing " + r._lease.Fencing + " ≤ journal fencing " + r.State.Fencing + "; the lease store was lost or altered")); r._lease.Release(); return null; }
+                { diags.Add(Diagnostic.Error("lease_restarted", "lease fencing " + r._lease.Fencing + " ≤ journal fencing " + r.State.Fencing + "; the lease store was lost or altered")); r._lease.Release(); return null; }
                 r.State.RecordOwner(r._lease.Fencing, r._lease.Owner);
             }
             return r;
@@ -142,14 +142,14 @@ namespace Bimbridge.AgentHost
             if (!IsOwner) throw new InvalidOperationException(ErrorClass.PlanInUse + ": this process does not own the plan");
         }
 
-        public void Pause() { RequireOwner(); if (State.PlanState == PlanRunState.Active) { State.PlanAction("pausar"); State.Checkpoint(); } }
-        public void Resume() { RequireOwner(); if (State.PlanState == PlanRunState.Paused) { State.PlanAction("reanudar"); State.Checkpoint(); } }
+        public void Pause() { RequireOwner(); if (State.PlanState == PlanRunState.Active) { State.PlanAction("pause"); State.Checkpoint(); } }
+        public void Resume() { RequireOwner(); if (State.PlanState == PlanRunState.Paused) { State.PlanAction("resume"); State.Checkpoint(); } }
 
         /// <summary>Cancels: operations not yet started become cancelada; those left half done are resolved (recovery) on the next run.</summary>
         public void Cancel()
         {
             RequireOwner();
-            if (State.PlanState != PlanRunState.Cancelled) State.PlanAction("cancelar");
+            if (State.PlanState != PlanRunState.Cancelled) State.PlanAction("cancel");
             foreach (var id in Plan.Order)
                 if (State.Ops[id].State == OpState.Validated) State.Transition(id, OpState.Cancelled, error: ErrorClass.Cancellation, note: "plan cancelled");
             State.Checkpoint();
@@ -162,7 +162,7 @@ namespace Bimbridge.AgentHost
         public string Run(CancellationToken ct = default)
         {
             RequireOwner();
-            if (State.PlanState == PlanRunState.Paused) return Compact.Summary(Plan, State) + " · pausado";
+            if (State.PlanState == PlanRunState.Paused) return Compact.Summary(Plan, State) + " · paused";
             var cancelled = State.PlanState == PlanRunState.Cancelled;
             try
             {
@@ -228,7 +228,7 @@ namespace Bimbridge.AgentHost
                 if ((pc.Min != null && pre.Targets < pc.Min) || (pc.Max != null && pre.Targets > pc.Max))
                 { State.Transition(id, OpState.Failed, error: ErrorClass.Precondition, note: "targets = " + pre.Targets + " outside " + pc + "; nothing was written"); return true; }
             if (op.Writes && pre.Targets == 0 && !op.AllowEmpty)
-            { State.Transition(id, OpState.Failed, error: ErrorClass.NoTargets, note: "the scope selects no elements; nothing was written (permitir_vacio=false)"); return true; }
+            { State.Transition(id, OpState.Failed, error: ErrorClass.NoTargets, note: "the scope selects no elements; nothing was written (allow_empty=false)"); return true; }
 
             _lease.Check();
             var attempt = State.Ops[id].Attempt + 1;
@@ -238,7 +238,7 @@ namespace Bimbridge.AgentHost
             catch (UncertainEffectException ex)
             {
                 // unknown whether it was committed: never retry blindly; observe the model right now
-                State.Note(id, "efecto_incierto", new Dictionary<string, object> { ["detalle"] = ex.Message });
+                State.Note(id, "uncertain_effect", new Dictionary<string, object> { ["detail"] = ex.Message });
                 Recover(op);
                 return true;
             }
@@ -260,14 +260,14 @@ namespace Bimbridge.AgentHost
             var id = op.Id;
             var rec = State.Ops[id];
             var obs = _b.Observe(op, Ctx(rec.Attempt));
-            State.Note(id, "recuperacion", new Dictionary<string, object> { ["efecto"] = JournalTokens.Of(obs.Effect), ["transacciones"] = obs.Transactions, ["detalle"] = obs.Detail });
+            State.Note(id, "recovery", new Dictionary<string, object> { ["effect"] = JournalTokens.Of(obs.Effect), ["transactions_list"] = obs.Transactions, ["detail"] = obs.Detail });
             switch (obs.Effect)
             {
                 case Effect.NotObserved:
                     State.Transition(id, OpState.Validated, note: "recovery: effect not observed (" + obs.Detail + "); will run without duplicating");
                     return;
                 case Effect.NoTargets:
-                    if (op.AllowEmpty) State.Transition(id, OpState.Executed, result: new Dictionary<string, object> { ["elementos"] = 0L, ["cambiados"] = 0L, ["vacio"] = true, ["recuperada"] = true });
+                    if (op.AllowEmpty) State.Transition(id, OpState.Executed, result: new Dictionary<string, object> { ["elements"] = 0L, ["changed"] = 0L, ["empty_value"] = true, ["recovered"] = true });
                     else State.Transition(id, OpState.Failed, error: ErrorClass.NoTargets, note: "recovery: no effect and the scope selects no elements");
                     return;
                 case Effect.Partial:
@@ -286,19 +286,19 @@ namespace Bimbridge.AgentHost
                     if (post.State == PostState.NotEvaluable || op.Expected.Count > 0)
                     {
                         State.Transition(id, OpState.NeedsVerification, error: ErrorClass.InsufficientEvidence, evidence: evid,
-                            note: "recovery: " + obs.Detail + "; postconditions " + JournalTokens.Of(post.State) + (op.Expected.Count > 0 ? "; resultado_esperado (" + string.Join(",", op.Expected.Keys) + ") not checkable" : "") + "; not repeated");
+                            note: "recovery: " + obs.Detail + "; postconditions " + JournalTokens.Of(post.State) + (op.Expected.Count > 0 ? "; expected_result (" + string.Join(",", op.Expected.Keys) + ") not checkable" : "") + "; not repeated");
                         return;
                     }
                     // no expected result: verification is state-only; the result makes explicit that there is no run data
-                    State.Transition(id, OpState.Executed, result: new Dictionary<string, object> { ["recuperada"] = true, ["sin_datos_de_ejecucion"] = true }, note: "recovery: " + obs.Detail);
+                    State.Transition(id, OpState.Executed, result: new Dictionary<string, object> { ["recovered"] = true, ["no_execution_data"] = true }, note: "recovery: " + obs.Detail);
                     return;
             }
         }
 
         private static Dictionary<string, object> Evidence(PostcheckResult post)
         {
-            var e = new Dictionary<string, object>(post.Evidence, StringComparer.Ordinal) { ["postcondiciones"] = JournalTokens.Of(post.State) };
-            if (post.Detail != null) e["detalle"] = post.Detail;
+            var e = new Dictionary<string, object>(post.Evidence, StringComparer.Ordinal) { ["postconditions"] = JournalTokens.Of(post.State) };
+            if (post.Detail != null) e["detail"] = post.Detail;
             return e;
         }
 
@@ -309,7 +309,7 @@ namespace Bimbridge.AgentHost
             _faults.Hit("runner.en_verificacion", id);
             var post = _b.CheckPostconditions(op, Ctx(rec.Attempt));
             var evid = Evidence(post);
-            var trial = rec.Result != null && rec.Result.TryGetValue("ensayo", out var tv) && tv is bool tb && tb;
+            var trial = rec.Result != null && rec.Result.TryGetValue("trial", out var tv) && tv is bool tb && tb;
             if (trial)
             {
                 // trial: the postcondition is "applied and verified temporarily, and the model returned to its initial state".
@@ -326,10 +326,10 @@ namespace Bimbridge.AgentHost
                 if (rec.Result == null || !rec.Result.TryGetValue(kv.Key, out got))
                 { State.Transition(id, OpState.NeedsVerification, error: ErrorClass.InsufficientEvidence, evidence: evid, note: "the result does not contain '" + kv.Key + "'; not certified"); return; }
                 if (!Values.Same(kv.Value, got))
-                { evid["esperado"] = kv.Key; State.Transition(id, OpState.Failed, error: ErrorClass.Verification, evidence: evid, note: kv.Key + ": expected " + Values.Show(kv.Value) + ", got " + Values.Show(got)); return; }
+                { evid["expected"] = kv.Key; State.Transition(id, OpState.Failed, error: ErrorClass.Verification, evidence: evid, note: kv.Key + ": expected " + Values.Show(kv.Value) + ", got " + Values.Show(got)); return; }
                 checkedKeys.Add(kv.Key);
             }
-            evid["esperado_comprobado"] = checkedKeys;
+            evid["expected_checked"] = checkedKeys;
             _faults.Hit("runner.tras_verificar", id);
             State.Transition(id, OpState.Verified, evidence: evid);
         }

@@ -9,14 +9,14 @@ namespace Bimbridge.Engine
     /// <summary>
     /// Dynamic C# execution (exec), since the consolidated review: ENABLED by default for local agents that can already use
     /// BIMBRIDGE (pipe with the Windows user's ACL + config.json levels). A single user control blocks it:
-    /// "Block C# code injection" = config.json "bloquear_inyeccion_csharp": true. Persists across restarts.
-    /// Replaces the 4-hour "Trusted code" and the SHA-256 authorization (codigo_autorizado).
+    /// "Block C# code injection" = config.json "block_csharp_injection": true. Persists across restarts.
+    /// Replaces the 4-hour "Trusted code" and the SHA-256 authorization (authorized_code).
     /// It is not a sandbox: the code runs in the Revit process with the user's permissions; its effects outside the document are not rolled back.
     /// </summary>
     public static class DynamicCodePolicy
     {
-        public const string ConfigKey = "bloquear_inyeccion_csharp";
-        public const string BlockedCode = "inyeccion_csharp_bloqueada";
+        public const string ConfigKey = "block_csharp_injection";
+        public const string BlockedCode = "csharp_injection_blocked";
 
         /// <summary>null = may run; text = refusal (nothing was compiled or run).</summary>
         public static string Decide(bool blocked) =>
@@ -31,7 +31,7 @@ namespace Bimbridge.Engine
             try
             {
                 if (!File.Exists(path)) return false;
-                var o = Json.ParseObject(File.ReadAllText(path));
+                var o = LegacyAliases.NormalizeConfig(Json.ParseObject(File.ReadAllText(path)));
                 return Arg.GetBool(o, ConfigKey) ?? false;
             }
             catch (Exception) { return true; }

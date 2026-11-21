@@ -42,7 +42,7 @@ namespace Bimbridge.Addin.Ui
                 td0.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Cancel the staged update");
                 td0.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Choose another ZIP (replaces the staged one)");
                 var a = td0.Show();
-                if (a == TaskDialogResult.CommandLink1) { ZipUpdate.CancelPending(paths.UpdatesDir); Log("cancelada", pending.Version, null); return Result.Succeeded; }
+                if (a == TaskDialogResult.CommandLink1) { ZipUpdate.CancelPending(paths.UpdatesDir); Log("cancelled", pending.Version, null); return Result.Succeeded; }
                 if (a != TaskDialogResult.CommandLink2) return Result.Cancelled;
             }
 
@@ -57,7 +57,7 @@ namespace Bimbridge.Addin.Ui
             var insp = ZipUpdate.Inspect(dlg.FileName, info?.ProductVersion ?? Updates.Format(UpdateService.Running), info?.Versions, keys, policy: Policy);
             if (!insp.Ok)
             {
-                Log("rechazado_" + insp.State, insp.Version, insp);
+                Log("rejected_" + insp.State, insp.Version, insp);
                 TaskDialog.Show("BIMBRIDGE · Package rejected", insp.Message + (insp.Details.Count > 0 ? "\n\n" + string.Join("\n", insp.Details.Take(10)) : "") + "\n\nNothing was installed.");
                 return Result.Failed;
             }
@@ -93,14 +93,14 @@ namespace Bimbridge.Addin.Ui
             {
                 var who = Environment.UserName + " (Revit dialog)";
                 var p = ZipUpdate.Stage(insp, paths.UpdatesDir, who, unsignedOk, policy: Policy);
-                Process.Start(new ProcessStartInfo(p.Installer, "/aplicar-pendiente") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = paths.UpdatesDir });
-                Log("preparada", p.Version, insp);
+                Process.Start(new ProcessStartInfo(p.Installer, "/apply-pending") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = paths.UpdatesDir });
+                Log("prepared", p.Version, insp);
                 TaskDialog.Show("BIMBRIDGE", "Update to " + p.Version + " staged and verified.\n\nIt will be installed when you close Revit (all Revit windows). Until then " + insp.Installed + " stays in use. The result will appear when you reopen Revit.");
                 return Result.Succeeded;
             }
             catch (Exception ex)
             {
-                Log("error_preparar", insp.Version, insp);
+                Log("prepare_error", insp.Version, insp);
                 TaskDialog.Show("BIMBRIDGE", "Could not stage: " + ex.Message + "\n\nNothing was installed.");
                 return Result.Failed;
             }
@@ -109,15 +109,15 @@ namespace Bimbridge.Addin.Ui
         /// <summary>At startup: if the external process left a new result, it is recorded and reported once.</summary>
         internal static string TakeResult()
         {
-            var f = Path.Combine(UpdateService.Paths.UpdatesDir, ZipUpdate.ResultFile);
+            var f = LegacyAliases.ResolveExisting(UpdateService.Paths.UpdatesDir, Path.Combine(UpdateService.Paths.UpdatesDir, ZipUpdate.ResultFile));
             try
             {
                 if (!File.Exists(f)) return null;
                 var o = Bimbridge.Protocol.Json.ParseObject(File.ReadAllText(f));
                 File.Move(f, f + "." + DateTime.UtcNow.ToString("yyyyMMddHHmmss") + ".visto");
-                var status = Convert.ToString(o.TryGetValue("estado", out var e) ? e : null);
-                Runtime.Audit?.Append(VersionRegistry.HumanAuthor, "actualizar_zip_resultado", status, new Dictionary<string, object> { ["version"] = o.TryGetValue("version", out var v) ? v : null });
-                return "Update from ZIP: " + status + ". " + (o.TryGetValue("mensaje", out var m) ? m : "");
+                var status = Convert.ToString(o.TryGetValue("status", out var e) ? e : null);
+                Runtime.Audit?.Append(VersionRegistry.HumanAuthor, "update_zip_result", status, new Dictionary<string, object> { ["version"] = o.TryGetValue("version", out var v) ? v : null });
+                return "Update from ZIP: " + status + ". " + (o.TryGetValue("message", out var m) ? m : "");
             }
             catch (Exception) { return null; }
         }
@@ -126,9 +126,9 @@ namespace Bimbridge.Addin.Ui
         {
             try
             {
-                Runtime.Audit?.Append(VersionRegistry.HumanAuthor, "actualizar_zip", status, new Dictionary<string, object>
+                Runtime.Audit?.Append(VersionRegistry.HumanAuthor, "update_zip", status, new Dictionary<string, object>
                 {
-                    ["version"] = version, ["zip_sha256"] = insp?.ZipSha256, ["firmado"] = insp?.Signed, ["clave"] = insp?.KeyId, ["mensaje"] = insp?.Message,
+                    ["version"] = version, ["zip_sha256"] = insp?.ZipSha256, ["signed"] = insp?.Signed, ["key"] = insp?.KeyId, ["message"] = insp?.Message,
                 });
                 Runtime.Log("Update from ZIP: " + status + " " + version);
             }

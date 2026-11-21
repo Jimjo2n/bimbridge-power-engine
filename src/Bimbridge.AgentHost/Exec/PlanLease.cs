@@ -10,7 +10,7 @@ namespace Bimbridge.AgentHost
     /// <summary>
     /// Exclusive ownership of a plan run (AH-04). Not a new mechanism: it reuses the fenced lease of
     /// <see cref="TaskStore"/> (0.6.x, the same one the add-in tasks use; file lock + fencing that increases on each acquisition).
-    /// The fencing token is written to the journal ("dueno" lines and every transition) and presented to the model in every transaction: a
+    /// The fencing token is written to the journal ("owner" lines and every transition) and presented to the model in every transaction: a
     /// zombie process whose lease expired and was taken by another is rejected in all three places.
     /// </summary>
     public sealed class PlanLease : IDisposable

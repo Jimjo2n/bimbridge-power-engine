@@ -1,23 +1,23 @@
 {
- "esquema": "bimbridge.campana080/1",
+ "schema": "bimbridge.campaign080/1",
  "item": "N8-12",
- "titulo": "Deliverable preparation and verification",
- "estado_inicial": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW. After N8-05. config allows export (RPW without a 'permisos' list).",
+ "title": "Deliverable preparation and verification",
+ "initial_status": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW. After N8-05. config allows export (RPW without a 'permisos' list).",
  "variables": {
-  "carpeta_pdf": "local test folder (JSON-escaped)"
+  "pdf_folder": "local test folder (JSON-escaped)"
  },
- "pasos": [
+ "steps": [
   {
-   "nombre": "export the set to PDF",
+   "name": "export the set to PDF",
    "op": "doc",
    "args": {
-    "accion": "pdf",
-    "conjunto": "BB-N8-05 SET",
-    "carpeta": "${carpeta_pdf}",
-    "combinar": true
+    "action": "pdf",
+    "sheet_set": "BB-N8-05 SET",
+    "folder": "${pdf_folder}",
+    "combine": true
    },
-   "escritura": true,
-   "contiene": [
+   "write": true,
+   "contains": [
     ".pdf"
    ]
   }

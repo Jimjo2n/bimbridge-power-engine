@@ -33,11 +33,11 @@ namespace Bimbridge.Engine.Tasks
         public static class Phase
         {
             public const string Constructor = "constructor";
-            public const string Prepare = "preparar";
-            public const string Enumerate = "enumerar";
-            public const string Run = "ejecutar";
-            public const string Verify = "verificar";
-            public const string Postcondition = "postcondicion";
+            public const string Prepare = "prepare";
+            public const string Enumerate = "enumerate";
+            public const string Run = "run";
+            public const string Verify = "verify";
+            public const string Postcondition = "postcondition";
         }
 
         /// <summary>Runs <paramref name="body"/> only if the authority allows it. Returns null or the reason for the refusal/failure.
@@ -45,14 +45,14 @@ namespace Bimbridge.Engine.Tasks
         public string Run(string phase, Action body)
         {
             var why = _authorize();
-            if (why != null) return "autorizacion_requerida (" + phase + "): " + why + ". The recipe was not run.";
+            if (why != null) return "authorization_required (" + phase + "): " + why + ". The recipe was not run.";
             var before = _writeCounter();
             body();
             if (IsReadPhase(phase))
             {
                 var after = _writeCounter();
                 if (after != before)
-                    return "escritura_en_fase_de_lectura: the recipe modified the model during '" + phase + "' (only Run may write, inside the engine's transaction). The task stops.";
+                    return "write_in_read_phase: the recipe modified the model during '" + phase + "' (only Run may write, inside the engine's transaction). The task stops.";
             }
             return null;
         }

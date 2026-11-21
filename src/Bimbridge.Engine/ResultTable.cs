@@ -80,7 +80,7 @@ namespace Bimbridge.Engine
                     ["total"] = _total, ["cols"] = new List<object>(_spec.GroupBy) { "n" },
                     ["groups"] = order.Take(maxGroups).Select(key => (object)_groups[key]).ToList(),
                 };
-                if (order.Count > maxGroups) result["aviso"] = "more than " + maxGroups + " groups; showing the first ones";
+                if (order.Count > maxGroups) result["warning"] = "more than " + maxGroups + " groups; showing the first ones";
                 return result;
             }
         }
@@ -104,7 +104,7 @@ namespace Bimbridge.Engine
                 });
                 using (var sha = SHA256.Create())
                     result["sha256"] = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(payload))).Replace("-", "").ToLowerInvariant();
-                result["formato_digest"] = "query-rows-v1";
+                result["digest_format"] = "query-rows-v1";
                 return result;
             }
 
@@ -139,8 +139,8 @@ namespace Bimbridge.Engine
             }
             result["cols"] = new List<object>(q.Fields);
             result["rows"] = outRows;
-            if (q.Millimeters) result["unidades"] = "mm";
-            if (trimmed > 0) result["aviso_texto"] = trimmed + " texts truncated to " + QuerySpec.MaxTextLength + " characters; use full=true to see them in full";
+            if (q.Millimeters) result["units"] = "mm";
+            if (trimmed > 0) result["text_warning"] = trimmed + " texts truncated to " + QuerySpec.MaxTextLength + " characters; use full=true to see them in full";
             if (pages > 1)
             {
                 result["page"] = (long)page;

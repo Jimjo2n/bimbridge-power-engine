@@ -17,15 +17,15 @@ namespace Bimbridge.Tests
             Assert.Equal(Permissions.Read, Permissions.Of(Wire.OpPlan, A(), false));
             Assert.Equal(Permissions.ModifyProject, Permissions.Of(Wire.OpCommit, A(), false));
             Assert.Equal(Permissions.ModifyFamily, Permissions.Of(Wire.OpCommit, A(), true));
-            Assert.Equal(Permissions.Read, Permissions.Of(Wire.OpExec, A(("modo", "consulta")), false));
-            Assert.Equal(Permissions.DynamicCode, Permissions.Of(Wire.OpExec, A(("modo", "ejecutar")), false));
-            Assert.Equal(Permissions.DynamicCode, Permissions.Of(Wire.OpExec, A(("modo", "ensayo")), false));
-            Assert.Equal(Permissions.Read, Permissions.Of(Wire.OpFam, A(("accion", "buscar")), false));
-            Assert.Equal(Permissions.LoadFile, Permissions.Of(Wire.OpFam, A(("accion", "cargar_archivo")), false));
-            Assert.Equal(Permissions.ModifyFamily, Permissions.Of(Wire.OpFam, A(("accion", "conector")), true));
-            Assert.Equal(Permissions.Save, Permissions.Of(Wire.OpDoc, A(("accion", "guardar")), false));
-            Assert.Equal(Permissions.Sync, Permissions.Of(Wire.OpDoc, A(("accion", "sync")), false));
-            Assert.Equal(Permissions.Export, Permissions.Of(Wire.OpDoc, A(("accion", "pdf")), false));
+            Assert.Equal(Permissions.Read, Permissions.Of(Wire.OpExec, A(("mode", "query")), false));
+            Assert.Equal(Permissions.DynamicCode, Permissions.Of(Wire.OpExec, A(("mode", "run")), false));
+            Assert.Equal(Permissions.DynamicCode, Permissions.Of(Wire.OpExec, A(("mode", "trial")), false));
+            Assert.Equal(Permissions.Read, Permissions.Of(Wire.OpFam, A(("action", "search")), false));
+            Assert.Equal(Permissions.LoadFile, Permissions.Of(Wire.OpFam, A(("action", "load_file")), false));
+            Assert.Equal(Permissions.ModifyFamily, Permissions.Of(Wire.OpFam, A(("action", "connector")), true));
+            Assert.Equal(Permissions.Save, Permissions.Of(Wire.OpDoc, A(("action", "save")), false));
+            Assert.Equal(Permissions.Sync, Permissions.Of(Wire.OpDoc, A(("action", "sync")), false));
+            Assert.Equal(Permissions.Export, Permissions.Of(Wire.OpDoc, A(("action", "pdf")), false));
             Assert.Equal(Permissions.Ui, Permissions.Of(Wire.OpShow, A(), false));
             Assert.Equal(Permissions.Ui, Permissions.Of(Wire.OpCapture, A(), false));
         }
@@ -33,7 +33,7 @@ namespace Bimbridge.Tests
         [Fact]
         public void Explicit_List_Narrows_And_Publish_IsNeverGranted()
         {
-            var eff = Permissions.Effective(new List<string> { "leer", "modificar_proyecto", "publicar" }, "RPW");
+            var eff = Permissions.Effective(new List<string> { "read", "modify_project", "publish" }, "RPW");
             Assert.Null(Permissions.Deny(Permissions.ModifyProject, eff));
             Assert.NotNull(Permissions.Deny(Permissions.DynamicCode, eff));   // W in levels, but the explicit list does not grant it
             Assert.NotNull(Permissions.Deny(Permissions.Sync, eff));

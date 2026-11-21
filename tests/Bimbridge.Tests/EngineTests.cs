@@ -225,7 +225,7 @@ namespace Bimbridge.Tests
             var v = (string)((object[])((List<object>)r["rows"])[0])[1];
             Assert.Equal(QuerySpec.MaxTextLength, v.Length);
             Assert.EndsWith("…", v);
-            Assert.True(r.ContainsKey("aviso_texto"));
+            Assert.True(r.ContainsKey("text_warning"));
 
             r = (Dictionary<string, object>)ResultTable.Build(QuerySpec.Parse(A(("ids", "1"), ("f", "id,comments"), ("full", true))), rows, out _);
             Assert.Equal(600, ((string)((object[])((List<object>)r["rows"])[0])[1]).Length);
@@ -238,7 +238,7 @@ namespace Bimbridge.Tests
             var r = (Dictionary<string, object>)ResultTable.Build(q, Rows(), out var ids);
             // 10 ft = 3048 mm does not pass; 11 ft = 3352.8 mm does. Rows with elev ≥ 11 ft: 2 + 1 + 3 = 6.
             Assert.Equal(6L, r["total"]);
-            Assert.Equal("mm", r["unidades"]);
+            Assert.Equal("mm", r["units"]);
             Assert.Equal(3352.8, (double)((object[])((List<object>)r["rows"])[0])[1], 1);
         }
 
@@ -347,13 +347,13 @@ namespace Bimbridge.Tests
                 new LightingAudit.ViewCount { ViewId = 9, Visible = new long[] { 1 } },
             };
             var inventory = LightingAudit.CompareInventory(expected, new Engine.Qc.ManifestQc.Options(), physical, fixtures, tags, views);
-            Assert.Equal(1L, inventory["faltantes"]);
-            Assert.Equal(1L, inventory["casi_duplicados"]);
-            Assert.Equal(2L, inventory["correctos"]);
+            Assert.Equal(1L, inventory["missing"]);
+            Assert.Equal(1L, inventory["near_duplicates"]);
+            Assert.Equal(2L, inventory["correct"]);
             var counts = LightingAudit.Summarize(fixtures, tags, views, out _);
-            Assert.Equal(3L, counts["luminarias"]);
+            Assert.Equal(3L, counts["fixtures"]);
             Assert.Equal(2L, counts["tags"]);
-            Assert.Equal(0L, ((Dictionary<string, object>)counts["tags_duplicados"])["n"]);
+            Assert.Equal(0L, ((Dictionary<string, object>)counts["duplicate_tags"])["n"]);
         }
 
         [Fact]
@@ -375,15 +375,15 @@ namespace Bimbridge.Tests
             };
             var r = LightingAudit.Summarize(fx, tags, null, out var sets);
 
-            Assert.Equal(3L, r["luminarias"]);
-            Assert.Equal(1L, ((Dictionary<string, object>)r["sin_tag"])["n"]);
-            Assert.Equal(1L, ((Dictionary<string, object>)r["tags_huerfanos"])["n"]);
-            Assert.Equal(1L, ((Dictionary<string, object>)r["tags_duplicados"])["sobrantes"]);
-            Assert.Equal(false, r["cumple_regla"]);
-            Assert.Equal(new long[] { 2 }, sets["$sin_tag"]);
-            Assert.Equal(new long[] { 104 }, sets["$tags_huerfanos"]);
+            Assert.Equal(3L, r["fixtures"]);
+            Assert.Equal(1L, ((Dictionary<string, object>)r["untagged"])["n"]);
+            Assert.Equal(1L, ((Dictionary<string, object>)r["orphan_tags"])["n"]);
+            Assert.Equal(1L, ((Dictionary<string, object>)r["duplicate_tags"])["leftovers"]);
+            Assert.Equal(false, r["meets_rule"]);
+            Assert.Equal(new long[] { 2 }, sets["$untagged"]);
+            Assert.Equal(new long[] { 104 }, sets["$orphan_tags"]);
             Assert.Equal(new long[] { 101 }, sets["$tags_sobrantes"]);
-            Assert.Equal(2L, ((Dictionary<string, object>)r["por_nivel"])["LEVEL05"]);
+            Assert.Equal(2L, ((Dictionary<string, object>)r["by_level"])["LEVEL05"]);
         }
 
         [Fact]
@@ -406,10 +406,10 @@ namespace Bimbridge.Tests
                 new LightingAudit.ViewCount { ViewId = 60, Name = "LEVEL06 - NON-UNIT LIGHTING", Level = "LEVEL06", Visible = new long[] { 3 } },
             };
             var r = LightingAudit.Summarize(fx, tags, views, out _);
-            var rows = (List<object>)r["vistas"];
+            var rows = (List<object>)r["views"];
             Assert.Equal(new object[] { 50L, "LEVEL05 - NON-UNIT LIGHTING", "LEVEL05", 2L, 1L, 1L }, (object[])rows[0]);
             Assert.Equal(new object[] { 60L, "LEVEL06 - NON-UNIT LIGHTING", "LEVEL06", 1L, 1L, 0L }, (object[])rows[1]);
-            Assert.StartsWith("nivel", (string)r["vistas_metodo"]);
+            Assert.StartsWith("level", (string)r["views_method"]);
         }
 
         [Fact]
@@ -427,8 +427,8 @@ namespace Bimbridge.Tests
             };
             var r = LightingAudit.Summarize(fx, tags, null, out var sets, all, new List<string> { "level 02" });
             Assert.Equal(2L, r["tags"]);
-            Assert.Equal(new long[] { 13 }, sets["$tags_huerfanos"]);
-            Assert.Equal(0L, ((Dictionary<string, object>)r["sin_tag"])["n"]);
+            Assert.Equal(new long[] { 13 }, sets["$orphan_tags"]);
+            Assert.Equal(0L, ((Dictionary<string, object>)r["untagged"])["n"]);
         }
 
         [Fact]
@@ -437,7 +437,7 @@ namespace Bimbridge.Tests
             var fx = new List<LightingAudit.Fixture> { new LightingAudit.Fixture { Id = 1, Level = "L" } };
             var tags = new List<LightingAudit.Tag> { new LightingAudit.Tag { Id = 2, ViewId = 5, Tagged = new long[] { 1 } } };
             var r = LightingAudit.Summarize(fx, tags, null, out var sets);
-            Assert.Equal(true, r["cumple_regla"]);
+            Assert.Equal(true, r["meets_rule"]);
             Assert.Empty(sets);
         }
     }

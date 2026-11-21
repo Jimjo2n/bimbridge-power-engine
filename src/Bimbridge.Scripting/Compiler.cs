@@ -79,56 +79,56 @@ namespace Bimbridge.Scripting
         // type (full-name prefix) → capability. Member "*" = any member.
         private static readonly (string type, string member, string cap)[] Rules =
         {
-            ("System.Diagnostics.Process", "*", "proceso"),
-            ("System.Net.", "*", "red"),
-            ("System.Reflection.Assembly", "*", "reflexion"),
-            ("System.Reflection.Module", "*", "reflexion"),
-            ("System.AppDomain", "*", "reflexion"),
-            ("System.Runtime.Loader.", "*", "reflexion"),
-            ("System.Delegate", "DynamicInvoke", "reflexion"),
-            ("System.Delegate", "CreateDelegate", "reflexion"),
-            ("System.Linq.Expressions.LambdaExpression", "Compile", "reflexion"),
-            ("System.Linq.Expressions.Expression<TDelegate>", "Compile", "reflexion"),
-            ("System.Type", "GetMethod*", "reflexion"), ("System.Type", "GetProperty*", "reflexion"), ("System.Type", "GetField*", "reflexion"),
-            ("System.Type", "GetMember*", "reflexion"), ("System.Type", "GetConstructor*", "reflexion"), ("System.Type", "GetTypeFromProgID", "reflexion"),
-            ("System.Type", "GetTypeFromCLSID", "reflexion"),
-            ("System.IO.Pipes.", "*", "red"),
-            ("System.Threading.Tasks.Task", "Run", "hilos"), ("System.Threading.ThreadPool", "*", "hilos"),
-            ("System.Reflection.MethodBase", "Invoke", "reflexion"),
-            ("System.Reflection.MethodInfo", "Invoke", "reflexion"),
-            ("System.Reflection.PropertyInfo", "SetValue", "reflexion"),
-            ("System.Reflection.FieldInfo", "SetValue", "reflexion"),
-            ("System.Reflection.Emit.", "*", "reflexion"),
-            ("System.Activator", "*", "reflexion"),
-            ("System.Type", "GetType", "reflexion"),
-            ("System.Type", "InvokeMember", "reflexion"),
-            ("System.Runtime.InteropServices.Marshal", "*", "nativo"),
-            ("System.Runtime.InteropServices.NativeLibrary", "*", "nativo"),
-            ("Microsoft.Win32.Registry", "*", "registro"),
-            ("System.Environment", "Exit", "salida_proceso"),
-            ("System.Environment", "FailFast", "salida_proceso"),
-            ("System.Environment", "SetEnvironmentVariable", "entorno"),
-            ("System.IO.File", "Write*", "archivo_escritura"), ("System.IO.File", "Append*", "archivo_escritura"),
-            ("System.IO.File", "Delete", "archivo_escritura"), ("System.IO.File", "Move", "archivo_escritura"),
-            ("System.IO.File", "Copy", "archivo_escritura"), ("System.IO.File", "Replace", "archivo_escritura"),
-            ("System.IO.File", "Create*", "archivo_escritura"), ("System.IO.File", "Open*", "archivo_escritura"),
-            ("System.IO.Directory", "Delete", "archivo_escritura"), ("System.IO.Directory", "Move", "archivo_escritura"),
-            ("System.IO.FileInfo", "Delete", "archivo_escritura"), ("System.IO.FileInfo", "MoveTo", "archivo_escritura"),
-            ("System.IO.FileStream", ".ctor", "archivo_escritura"), ("System.IO.StreamWriter", ".ctor", "archivo_escritura"),
-            ("System.Threading.Thread", ".ctor", "hilos"),
-            ("Autodesk.Revit.DB.Document", "Save", "revit_guardar"), ("Autodesk.Revit.DB.Document", "SaveAs", "revit_guardar"),
+            ("System.Diagnostics.Process", "*", "process"),
+            ("System.Net.", "*", "network"),
+            ("System.Reflection.Assembly", "*", "reflection"),
+            ("System.Reflection.Module", "*", "reflection"),
+            ("System.AppDomain", "*", "reflection"),
+            ("System.Runtime.Loader.", "*", "reflection"),
+            ("System.Delegate", "DynamicInvoke", "reflection"),
+            ("System.Delegate", "CreateDelegate", "reflection"),
+            ("System.Linq.Expressions.LambdaExpression", "Compile", "reflection"),
+            ("System.Linq.Expressions.Expression<TDelegate>", "Compile", "reflection"),
+            ("System.Type", "GetMethod*", "reflection"), ("System.Type", "GetProperty*", "reflection"), ("System.Type", "GetField*", "reflection"),
+            ("System.Type", "GetMember*", "reflection"), ("System.Type", "GetConstructor*", "reflection"), ("System.Type", "GetTypeFromProgID", "reflection"),
+            ("System.Type", "GetTypeFromCLSID", "reflection"),
+            ("System.IO.Pipes.", "*", "network"),
+            ("System.Threading.Tasks.Task", "Run", "threads"), ("System.Threading.ThreadPool", "*", "threads"),
+            ("System.Reflection.MethodBase", "Invoke", "reflection"),
+            ("System.Reflection.MethodInfo", "Invoke", "reflection"),
+            ("System.Reflection.PropertyInfo", "SetValue", "reflection"),
+            ("System.Reflection.FieldInfo", "SetValue", "reflection"),
+            ("System.Reflection.Emit.", "*", "reflection"),
+            ("System.Activator", "*", "reflection"),
+            ("System.Type", "GetType", "reflection"),
+            ("System.Type", "InvokeMember", "reflection"),
+            ("System.Runtime.InteropServices.Marshal", "*", "native"),
+            ("System.Runtime.InteropServices.NativeLibrary", "*", "native"),
+            ("Microsoft.Win32.Registry", "*", "registry"),
+            ("System.Environment", "Exit", "process_output"),
+            ("System.Environment", "FailFast", "process_output"),
+            ("System.Environment", "SetEnvironmentVariable", "environment"),
+            ("System.IO.File", "Write*", "write_file"), ("System.IO.File", "Append*", "write_file"),
+            ("System.IO.File", "Delete", "write_file"), ("System.IO.File", "Move", "write_file"),
+            ("System.IO.File", "Copy", "write_file"), ("System.IO.File", "Replace", "write_file"),
+            ("System.IO.File", "Create*", "write_file"), ("System.IO.File", "Open*", "write_file"),
+            ("System.IO.Directory", "Delete", "write_file"), ("System.IO.Directory", "Move", "write_file"),
+            ("System.IO.FileInfo", "Delete", "write_file"), ("System.IO.FileInfo", "MoveTo", "write_file"),
+            ("System.IO.FileStream", ".ctor", "write_file"), ("System.IO.StreamWriter", ".ctor", "write_file"),
+            ("System.Threading.Thread", ".ctor", "threads"),
+            ("Autodesk.Revit.DB.Document", "Save", "revit_save"), ("Autodesk.Revit.DB.Document", "SaveAs", "revit_save"),
             ("Autodesk.Revit.DB.Document", "SynchronizeWithCentral", "revit_sync"),
-            ("Autodesk.Revit.DB.Document", "Export", "revit_exportar"),
-            ("Autodesk.Revit.DB.Document", "Close", "revit_cerrar"),
-            ("Autodesk.Revit.UI.UIApplication", "OpenAndActivateDocument", "revit_abrir"),
-            ("Autodesk.Revit.ApplicationServices.Application", "OpenDocumentFile", "revit_abrir"),
-            ("Autodesk.Revit.UI.UIDocument", "SaveAndClose", "revit_cerrar"),
+            ("Autodesk.Revit.DB.Document", "Export", "revit_export"),
+            ("Autodesk.Revit.DB.Document", "Close", "revit_close"),
+            ("Autodesk.Revit.UI.UIApplication", "OpenAndActivateDocument", "revit_open"),
+            ("Autodesk.Revit.ApplicationServices.Application", "OpenDocumentFile", "revit_open"),
+            ("Autodesk.Revit.UI.UIDocument", "SaveAndClose", "revit_close"),
             ("Autodesk.Revit.DB.WorksharingUtils", "*", "revit_sync"),
             // rc3: transactions belong to the engine. Standalone code that opens its own (or queues UI commands) could write
             // outside Run or outside the audit: always denied in the restricted profile.
-            ("Autodesk.Revit.DB.Transaction", "*", "revit_transaccion"), ("Autodesk.Revit.DB.SubTransaction", "*", "revit_transaccion"),
-            ("Autodesk.Revit.DB.TransactionGroup", "*", "revit_transaccion"), ("Autodesk.Revit.UI.UIApplication", "PostCommand", "revit_transaccion"),
-            ("System.Runtime.CompilerServices.ModuleInitializerAttribute", "*", "reflexion"),
+            ("Autodesk.Revit.DB.Transaction", "*", "revit_transaction"), ("Autodesk.Revit.DB.SubTransaction", "*", "revit_transaction"),
+            ("Autodesk.Revit.DB.TransactionGroup", "*", "revit_transaction"), ("Autodesk.Revit.UI.UIApplication", "PostCommand", "revit_transaction"),
+            ("System.Runtime.CompilerServices.ModuleInitializerAttribute", "*", "reflection"),
         };
 
         private static bool Match(string pattern, string value) =>
@@ -141,10 +141,10 @@ namespace Bimbridge.Scripting
             var root = tree.GetRoot();
             foreach (var node in root.DescendantNodes())
             {
-                if (node is ExternAliasDirectiveSyntax) found.Add("nativo:extern alias");
-                if (node is MethodDeclarationSyntax md && md.Modifiers.Any(m => m.IsKind(SyntaxKind.ExternKeyword))) found.Add("nativo:extern " + md.Identifier.Text);
-                if (node is UnsafeStatementSyntax) found.Add("nativo:unsafe");
-                if (node is IdentifierNameSyntax idn && idn.Identifier.Text == "dynamic" && model.GetTypeInfo(idn).Type?.TypeKind == TypeKind.Dynamic) found.Add("reflexion:dynamic");
+                if (node is ExternAliasDirectiveSyntax) found.Add("native:extern alias");
+                if (node is MethodDeclarationSyntax md && md.Modifiers.Any(m => m.IsKind(SyntaxKind.ExternKeyword))) found.Add("native:extern " + md.Identifier.Text);
+                if (node is UnsafeStatementSyntax) found.Add("native:unsafe");
+                if (node is IdentifierNameSyntax idn && idn.Identifier.Text == "dynamic" && model.GetTypeInfo(idn).Type?.TypeKind == TypeKind.Dynamic) found.Add("reflection:dynamic");
                 ISymbol sym = null;
                 if (node is InvocationExpressionSyntax || node is ObjectCreationExpressionSyntax || node is ImplicitObjectCreationExpressionSyntax || node is MemberAccessExpressionSyntax)
                     sym = model.GetSymbolInfo(node).Symbol ?? model.GetSymbolInfo(node).CandidateSymbols.FirstOrDefault();

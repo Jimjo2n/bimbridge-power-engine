@@ -37,7 +37,7 @@ namespace Bimbridge.Tests
         private static Dictionary<string, bool> Surfaces(int year)
         {
             using var j = Inventory(year);
-            return j.RootElement.GetProperty("superficies").EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetBoolean(), StringComparer.Ordinal);
+            return j.RootElement.GetProperty("surfaces").EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetBoolean(), StringComparer.Ordinal);
         }
 
         [Fact]
@@ -158,8 +158,8 @@ namespace Bimbridge.Tests
         public void Summary_CountsMatchTheCatalog()
         {
             var s = CapabilityCatalog.Summary();
-            Assert.Equal((long)CapabilityCatalog.All.Count, s["capacidades"]);
-            var byStatus = (Dictionary<string, object>)s["por_estado"];
+            Assert.Equal((long)CapabilityCatalog.All.Count, s["capabilities"]);
+            var byStatus = (Dictionary<string, object>)s["by_status"];
             Assert.Equal((long)CapabilityCatalog.All.Count, byStatus.Values.Sum(v => (long)v));
         }
     }

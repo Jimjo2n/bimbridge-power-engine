@@ -48,9 +48,9 @@ namespace Bimbridge.Engine
             var e = new Dictionary<string, object>
             {
                 ["t"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture),
-                ["autor"] = author,
+                ["author"] = author,
                 ["op"] = op,
-                ["estado"] = status,
+                ["status"] = status,
                 ["ms"] = elapsedMs,
             };
             if (extra != null) foreach (var kv in extra) e[kv.Key] = kv.Value;

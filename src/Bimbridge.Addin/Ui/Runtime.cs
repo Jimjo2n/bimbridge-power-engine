@@ -58,7 +58,7 @@ namespace Bimbridge.Addin.Ui
             }
             BlockDynamicCode = on;
             if (Config != null) Config.BlockDynamicCode = on;
-            try { Audit?.Append(VersionRegistry.HumanAuthor, "bloquear_inyeccion_csharp", on ? "bloqueado" : "permitido"); }
+            try { Audit?.Append(VersionRegistry.HumanAuthor, "block_csharp_injection", on ? "blocked" : "allowed"); }
             catch (JournalUnavailableException ex) { Log("AUDIT not written (C# block): " + ex.Message); }
             Log("C# code injection: " + (on ? "BLOCKED" : "allowed"));
             MarkDirty();
@@ -81,15 +81,15 @@ namespace Bimbridge.Addin.Ui
         }
 
         // ---- UI preferences (this user only, next to the rest of the add-in's data; never config.json) ----
-        private static string UiPrefsPath => Home.Sub("interfaz.json");
+        private static string UiPrefsPath => Home.Sub("ui.json");
 
         // Read once, before Runtime is first used (App.OnStartup fills it at startup).
         static Runtime()
         {
             try
             {
-                if (System.IO.File.Exists(UiPrefsPath) && Bimbridge.Protocol.Json.Parse(System.IO.File.ReadAllText(UiPrefsPath)) is Dictionary<string, object> d)
-                    Theme.ReduceMotionOverride = d.TryGetValue("movimiento", out var m) && "reducido".Equals(m as string, StringComparison.Ordinal);
+                if (System.IO.File.Exists(UiPrefsPath) && Bimbridge.Protocol.Json.Parse(System.IO.File.ReadAllText(UiPrefsPath)) is Dictionary<string, object> d && Bimbridge.Protocol.LegacyAliases.NormalizeRecord(d) != null)
+                    Theme.ReduceMotionOverride = d.TryGetValue("motion", out var m) && "reduced".Equals(m as string, StringComparison.Ordinal);
             }
             catch (Exception) { } // unreadable or corrupt: automatic motion (follows Windows)
         }
@@ -99,7 +99,7 @@ namespace Bimbridge.Addin.Ui
         {
             error = null;
             Theme.ReduceMotionOverride = reduced;
-            try { Home.WriteAtomic(UiPrefsPath, Bimbridge.Protocol.Json.Write(new Dictionary<string, object> { ["movimiento"] = reduced ? "reducido" : "automatico" })); }
+            try { Home.WriteAtomic(UiPrefsPath, Bimbridge.Protocol.Json.Write(new Dictionary<string, object> { ["motion"] = reduced ? "reduced" : "automatic" })); }
             catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException)
             {
                 error = ex.Message;
@@ -132,7 +132,7 @@ namespace Bimbridge.Addin.Ui
         public static void TogglePause()
         {
             var on = Pause.Toggle();
-            Journal?.Log(VersionRegistry.HumanAuthor, "pausar", on ? "si" : "no", 0);
+            Journal?.Log(VersionRegistry.HumanAuthor, "pause", on ? "yes" : "no", 0);
             Log("Pause AI: " + (on ? "YES" : "NO"));
             MarkDirty();
         }
@@ -140,7 +140,7 @@ namespace Bimbridge.Addin.Ui
         public static void ToggleHold()
         {
             var on = Hold.Toggle();
-            Journal?.Log(VersionRegistry.HumanAuthor, "retener", on ? "si" : "no", 0);
+            Journal?.Log(VersionRegistry.HumanAuthor, "hold", on ? "yes" : "no", 0);
             Log("Hold: " + (on ? "YES" : "NO"));
             MarkDirty();
         }
@@ -157,16 +157,16 @@ namespace Bimbridge.Addin.Ui
             var block0 = Plans.CheckWritable(key0);
             if (block0.Blocked) { Log("Queue: plan " + p.Id + " NOT applied: " + block0.Message); return new PlanOps.ApplyResult { Status = PlanStatus.Held, Detail = block0.Message }; }
             // R01: durable intent BEFORE touching the model (AuditGate); without it nothing is applied. Result afterwards.
-            var ex0 = new Dictionary<string, object> { ["plan"] = p.Id, ["cambios"] = (long)p.Entries.Count };
+            var ex0 = new Dictionary<string, object> { ["plan"] = p.Id, ["changes"] = (long)p.Entries.Count };
             if (p.ReceiptAttempt != null)
             {
                 ex0["plan_id"] = p.Id;
-                ex0["intento_id"] = p.ReceiptAttempt;
-                ex0["sesion_intento"] = p.ReceiptSession;
-                ex0["agente"] = p.ReceiptAgent;
-                ex0["huella_doc"] = p.ReceiptDocPrint;
+                ex0["attempt_id"] = p.ReceiptAttempt;
+                ex0["attempt_session"] = p.ReceiptSession;
+                ex0["agent"] = p.ReceiptAgent;
+                ex0["doc_fingerprint"] = p.ReceiptDocPrint;
             }
-            return AuditGate.Apply(Audit, p.SessionId, "aplicar_cola", DocumentTracker.KeyOf(doc) ?? "", ex0, () =>
+            return AuditGate.Apply(Audit, p.SessionId, "apply_queue", DocumentTracker.KeyOf(doc) ?? "", ex0, () =>
             {
                 try { Plans.BeginWrite(p); }
                 catch (Exception ex) when (ex is DocWriteBlockedException || ex is PlanStoreException)
@@ -192,10 +192,10 @@ namespace Bimbridge.Addin.Ui
                     if (owner != null) RequestHandler.SaveCreated(owner, p);
                 }
                 catch (Exception ex) { Log("Queue: could not save the created elements: " + ex.Message); }
-                ex0["detalle"] = r.Detail;
+                ex0["detail"] = r.Detail;
                 if (r.Status == PlanStatus.Applied && PlanVerification.Postconditions(p.Verification) != PlanVerification.Met)
-                    ex0["estado_recibo"] = Bimbridge.Protocol.Status.CompletedWithDifferences;
-                Journal?.Log(p.SessionId, "aplicar_cola", r.Status, sw.ElapsedMilliseconds, ex0);
+                    ex0["receipt_status"] = Bimbridge.Protocol.Status.CompletedWithDifferences;
+                Journal?.Log(p.SessionId, "apply_queue", r.Status, sw.ElapsedMilliseconds, ex0);
                 MarkDirty();
                 return r;
             }, r => r.Status, why =>

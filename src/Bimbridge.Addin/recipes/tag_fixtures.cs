@@ -8,9 +8,9 @@ public class TagFixtures : Recipe
 {
     public override string Version => "1";
     public override string Description => "One tag per fixture in a view; resumable without duplicates; saves and optionally exports PDF";
-    public override IEnumerable<string> Inputs => new[] { "vista" };
+    public override IEnumerable<string> Inputs => new[] { "view" };
 
-    private static View ViewOf(ScriptContext ctx) => ctx.E<View>(Convert.ToInt64(ctx.Args["vista"])) ?? throw new ArgumentException("the view does not exist");
+    private static View ViewOf(ScriptContext ctx) => ctx.E<View>(Convert.ToInt64(ctx.Args["view"])) ?? throw new ArgumentException("the view does not exist");
 
     private static int TagsOf(Document doc, View v, ElementId id)
     {
@@ -35,14 +35,14 @@ public class TagFixtures : Recipe
         foreach (var e in new FilteredElementCollector(ctx.Doc, v.Id).OfCategory(BuiltInCategory.OST_LightingFixtures).WhereElementIsNotElementType()
                      .OrderBy(x => x.UniqueId, StringComparer.Ordinal))
             yield return new Unit("tag:" + v.UniqueId + ":" + e.UniqueId, new Dictionary<string, object> { ["uid"] = e.UniqueId }, new[] { ctx.Long(e.Id) });
-        if (!string.Equals(Convert.ToString(ctx.Args.TryGetValue("guardar", out var g) ? g : "si"), "no", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(Convert.ToString(ctx.Args.TryGetValue("save", out var g) ? g : "yes"), "no", StringComparison.OrdinalIgnoreCase))
             yield return Unit.Save();
-        if (ctx.Args.TryGetValue("pdf_hojas", out var h) && h != null)
+        if (ctx.Args.TryGetValue("pdf_sheets", out var h) && h != null)
         {
-            var o = new Dictionary<string, object> { ["hojas"] = h };
-            if (ctx.Args.TryGetValue("pdf_carpeta", out var c)) o["carpeta"] = c;
-            if (ctx.Args.TryGetValue("pdf_nombre", out var nm)) o["nombre"] = nm;
-            o["sobrescribir"] = true;
+            var o = new Dictionary<string, object> { ["sheets"] = h };
+            if (ctx.Args.TryGetValue("pdf_folder", out var c)) o["folder"] = c;
+            if (ctx.Args.TryGetValue("pdf_name", out var nm)) o["name"] = nm;
+            o["overwrite"] = true;
             yield return Unit.Pdf("pdf", o);
         }
     }
@@ -56,11 +56,11 @@ public class TagFixtures : Recipe
         var p = (e.Location as LocationPoint)?.Point ?? (e.get_BoundingBox(v) is BoundingBoxXYZ bb ? (bb.Min + bb.Max) / 2 : null);
         if (p == null) { ctx.Exception("no insertion point", ctx.Long(e.Id)); ctx.Skip("no point"); }
         IndependentTag tag;
-        if (ctx.Args.TryGetValue("tipo_etiqueta", out var tt) && tt != null)
+        if (ctx.Args.TryGetValue("tag_type_name", out var tt) && tt != null)
             tag = IndependentTag.Create(ctx.Doc, ctx.Id(Convert.ToInt64(tt)), v.Id, new Reference(e), false, TagOrientation.Horizontal, p);
         else
             tag = IndependentTag.Create(ctx.Doc, v.Id, new Reference(e), false, TagMode.TM_ADDBY_CATEGORY, TagOrientation.Horizontal, p);
-        return new Dictionary<string, object> { ["luz"] = ctx.Long(e.Id), ["etiqueta"] = ctx.Long(tag.Id) };
+        return new Dictionary<string, object> { ["light"] = ctx.Long(e.Id), ["tag"] = ctx.Long(tag.Id) };
     }
 
     public override Verification Verify(ScriptContext ctx, Unit u)
@@ -83,6 +83,6 @@ public class TagFixtures : Recipe
         var fixtures = new FilteredElementCollector(ctx.Doc, v.Id).OfCategory(BuiltInCategory.OST_LightingFixtures).WhereElementIsNotElementType().ToElementIds();
         var untagged = fixtures.Where(i => !count.ContainsKey(i)).Select(i => (object)("untagged: " + ctx.Long(i)));
         var doubled = fixtures.Where(i => count.TryGetValue(i, out var n) && n > 1).Select(i => (object)("with " + count[i] + " tags: " + ctx.Long(i)));
-        return new Dictionary<string, object> { ["luces_en_vista"] = fixtures.Count, ["desviaciones"] = untagged.Concat(doubled).ToList() };
+        return new Dictionary<string, object> { ["lights_in_view"] = fixtures.Count, ["deviations"] = untagged.Concat(doubled).ToList() };
     }
 }

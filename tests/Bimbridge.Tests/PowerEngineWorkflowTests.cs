@@ -58,24 +58,24 @@ namespace Bimbridge.Tests
         public void TooFew_Degenerate_ScaleMismatch_Residual()
         {
             var a = Grid(0, Registration.FtPerPtAtScale(96), 0, 0);
-            Assert.Equal("anclas_insuficientes", Registration.Solve(a.Take(1).ToList()).State);
-            Assert.Equal("degenerado", Registration.Solve(new List<Anchor> { new Anchor("x", 1, 1, 0, 0), new Anchor("y", 1, 1, 5, 5) }).State);
-            Assert.Equal("degenerado", Registration.Solve(new List<Anchor> { a[0], a[1], new Anchor("m", (a[0].Px + a[1].Px) / 2, a[0].Py, 75, 0) }, new RegistrationOptions { Mode = "afin" }).State);
-            Assert.Equal("escala_incoherente", Registration.Solve(a, new RegistrationOptions { ExpectedRevitScale = 48 }).State);
-            Assert.Equal("ancla_invalida", Registration.Solve(new List<Anchor> { a[0], new Anchor("A/1", 0, 0, 1, 1) }).State);
+            Assert.Equal("insufficient_anchors", Registration.Solve(a.Take(1).ToList()).State);
+            Assert.Equal("degenerate", Registration.Solve(new List<Anchor> { new Anchor("x", 1, 1, 0, 0), new Anchor("y", 1, 1, 5, 5) }).State);
+            Assert.Equal("degenerate", Registration.Solve(new List<Anchor> { a[0], a[1], new Anchor("m", (a[0].Px + a[1].Px) / 2, a[0].Py, 75, 0) }, new RegistrationOptions { Mode = "affine" }).State);
+            Assert.Equal("inconsistent_scale", Registration.Solve(a, new RegistrationOptions { ExpectedRevitScale = 48 }).State);
+            Assert.Equal("invalid_anchor", Registration.Solve(new List<Anchor> { a[0], new Anchor("A/1", 0, 0, 1, 1) }).State);
             // with only 3 anchors, a bad one cannot be isolated: the residual stays visible
             var b = a.Take(3).ToList(); b[2] = new Anchor(b[2].Name, b[2].Px, b[2].Py, b[2].Mx + 10, b[2].My);
-            Assert.Equal("residuo_excesivo", Registration.Solve(b).State);
+            Assert.Equal("excessive_residual", Registration.Solve(b).State);
         }
 
         [Fact]
         public void Affine_HandlesNonUniformScale_AndWarns()
         {
             var a = Grid(0, Registration.FtPerPtAtScale(96), 0, 0).Select(x => new Anchor(x.Name, x.Px, x.Py * 1.05, x.Mx, x.My)).ToList();
-            var r = Registration.Solve(a, new RegistrationOptions { Mode = "afin" });
+            var r = Registration.Solve(a, new RegistrationOptions { Mode = "affine" });
             Assert.True(r.Ok, r.Reason);
             Assert.Contains(r.Warnings, w => w.Contains("different scale"));
-            Assert.Equal("residuo_excesivo", Registration.Solve(a).State);   // a similarity cannot explain a distorted drawing
+            Assert.Equal("excessive_residual", Registration.Solve(a).State);   // a similarity cannot explain a distorted drawing
         }
 
         [Fact]
@@ -119,8 +119,8 @@ namespace Bimbridge.Tests
 
         private static readonly List<TypeRule> Rules = new List<TypeRule>
         {
-            new TypeRule { Code = "D", FamilyType = "LTG_DOWNLIGHT-SURFACE - ROUND: D", Mounting = "losa", Workset = "LIGHTING - DIST" },
-            new TypeRule { Code = "G", FamilyType = "LTG_DOWNLIGHT-SURFACE - ROUND: G", Mounting = "losa", Workset = "LIGHTING-EMERGENCY - DIST" },
+            new TypeRule { Code = "D", FamilyType = "LTG_DOWNLIGHT-SURFACE - ROUND: D", Mounting = "slab", Workset = "LIGHTING - DIST" },
+            new TypeRule { Code = "G", FamilyType = "LTG_DOWNLIGHT-SURFACE - ROUND: G", Mounting = "slab", Workset = "LIGHTING-EMERGENCY - DIST" },
             new TypeRule { Code = "S", FamilyType = "LTG_STRIP LIGHT: S", ElevFt = 9.25, Workset = "LIGHTING - DIST", Directional = true },
         };
 
@@ -132,14 +132,14 @@ namespace Bimbridge.Tests
             using (var pe = new PowerEngineDispatcher(PowerEngineEnv.Options()))
             {
                 // A. interpretation
-                var grids = pe.Document("pdf_grids", new Dictionary<string, object> { ["ruta"] = F(name) }, new[] { Fx });
-                var syms = pe.Document("pdf_symbols", new Dictionary<string, object> { ["ruta"] = F(name) }, new[] { Fx });
+                var grids = pe.Document("pdf_grids", new Dictionary<string, object> { ["path"] = F(name) }, new[] { Fx });
+                var syms = pe.Document("pdf_symbols", new Dictionary<string, object> { ["path"] = F(name) }, new[] { Fx });
                 Assert.True(grids.Ok && syms.Ok, grids.Error + syms.Error);
-                var pg = (Dictionary<string, object>)((List<object>)grids.Result["paginas"])[0];
-                var page = ((List<object>)pg["intersecciones"]).Cast<Dictionary<string, object>>()
-                    .ToDictionary(x => (string)x["nombre"], x => { var p = (List<object>)x["punto_pt"]; return (Convert.ToDouble(p[0], CultureInfo.InvariantCulture), Convert.ToDouble(p[1], CultureInfo.InvariantCulture)); });
-                var sheet = (Dictionary<string, object>)((Dictionary<string, object>)((List<object>)syms.Result["paginas"])[0])["lamina"];
-                var scale = Convert.ToDouble(((Dictionary<string, object>)sheet["escala"])["factor_revit"], CultureInfo.InvariantCulture);
+                var pg = (Dictionary<string, object>)((List<object>)grids.Result["pages"])[0];
+                var page = ((List<object>)pg["intersections"]).Cast<Dictionary<string, object>>()
+                    .ToDictionary(x => (string)x["name"], x => { var p = (List<object>)x["point_pt"]; return (Convert.ToDouble(p[0], CultureInfo.InvariantCulture), Convert.ToDouble(p[1], CultureInfo.InvariantCulture)); });
+                var sheet = (Dictionary<string, object>)((Dictionary<string, object>)((List<object>)syms.Result["pages"])[0])["sheet"];
+                var scale = Convert.ToDouble(((Dictionary<string, object>)sheet["scale"])["revit_factor"], CultureInfo.InvariantCulture);
 
                 // B. registration (anchors are intersections of grids with the same name in the drawing and in the model)
                 var anchors = Registration.AnchorsByName(page, ModelGrid());
@@ -148,7 +148,7 @@ namespace Bimbridge.Tests
                 Assert.True(reg.Ok, reg.Reason);
                 var truth = Truth(name);
                 // page->model undoes the model rotation on the sheet and applies the page /Rotate (visible = content rotated -90 degrees)
-                var expRot = -Convert.ToDouble(truth["rotacion_modelo_deg"], CultureInfo.InvariantCulture) + (truth.ContainsKey("rotacion_pagina_deg") ? Convert.ToDouble(truth["rotacion_pagina_deg"], CultureInfo.InvariantCulture) : 0);
+                var expRot = -Convert.ToDouble(truth["model_rotation_deg"], CultureInfo.InvariantCulture) + (truth.ContainsKey("page_rotation_deg") ? Convert.ToDouble(truth["page_rotation_deg"], CultureInfo.InvariantCulture) : 0);
                 Assert.True(PlacementVerifier.AngleDiff(reg.RotationDeg, expRot, false) < 0.01, "giro " + reg.RotationDeg + " frente a " + expRot);
                 Assert.True(reg.RmsFt < 0.01);
 
@@ -156,22 +156,22 @@ namespace Bimbridge.Tests
                 var pdfSha = (string)syms.Result["sha256"];
                 var plan = PlacementPlanner.Plan(PlacementPlanner.FromPdfSymbols(syms.Result), reg, Rules,
                     new PlacementOptions { Level = "LEVEL 09", SourceId = name, SourceSha256 = pdfSha, SourceRevision = "CCD7" }, null, pe);
-                Assert.Equal("listo_con_ambiguedades", plan.State);
+                Assert.Equal("ready_with_ambiguities", plan.State);
                 Assert.Equal(72, plan.Place.Count);
-                Assert.Equal(2, plan.Ambiguous.Count(a => a.Reason.StartsWith("casi_duplicado", StringComparison.Ordinal)));
-                Assert.All(plan.Batches, b => Assert.True(((List<object>)((Dictionary<string, object>)b["operacion"])["puntos"]).Count <= 500));
+                Assert.Equal(2, plan.Ambiguous.Count(a => a.Reason.StartsWith("near_duplicate", StringComparison.Ordinal)));
+                Assert.All(plan.Batches, b => Assert.True(((List<object>)((Dictionary<string, object>)b["operation"])["points"]).Count <= 500));
                 Assert.Equal(72, plan.Batches.Sum(b => ((List<object>)b["items"]).Count));
-                var fixtures = ((List<object>)truth["luminarias"]).Cast<Dictionary<string, object>>().ToList();
+                var fixtures = ((List<object>)truth["fixtures"]).Cast<Dictionary<string, object>>().ToList();
                 foreach (var l in fixtures)
                 {
-                    var m = (List<object>)l["modelo_ft"];
+                    var m = (List<object>)l["model_ft"];
                     double mx = Convert.ToDouble(m[0], CultureInfo.InvariantCulture), my = Convert.ToDouble(m[1], CultureInfo.InvariantCulture);
                     var best = plan.Place.OrderBy(p => (p.X - mx) * (p.X - mx) + (p.Y - my) * (p.Y - my)).First();
-                    Assert.True(Math.Sqrt((best.X - mx) * (best.X - mx) + (best.Y - my) * (best.Y - my)) < 0.02, name + " " + l["codigo"] + " " + mx + "," + my);
-                    Assert.Equal((string)l["codigo"], best.Code);
+                    Assert.True(Math.Sqrt((best.X - mx) * (best.X - mx) + (best.Y - my) * (best.Y - my)) < 0.02, name + " " + l["code"] + " " + mx + "," + my);
+                    Assert.Equal((string)l["code"], best.Code);
                 }
                 // the strips follow the model rotation (symmetric at 180 degrees)
-                Assert.All(plan.Place.Where(p => p.Code == "S"), p => Assert.True(PlacementVerifier.AngleDiff(p.RotDeg, -Convert.ToDouble(truth["rotacion_modelo_deg"], CultureInfo.InvariantCulture), true) < 0.5, "tira " + p.RotDeg));
+                Assert.All(plan.Place.Where(p => p.Code == "S"), p => Assert.True(PlacementVerifier.AngleDiff(p.RotDeg, -Convert.ToDouble(truth["model_rotation_deg"], CultureInfo.InvariantCulture), true) < 0.5, "tira " + p.RotDeg));
 
                 // D. SIMULATED run: what place "would do", with seeded defects
                 long id = 1000;
@@ -185,23 +185,23 @@ namespace Bimbridge.Tests
                 // E. independent verification: the expected set comes from the test TRUTH (another source, another sha), not from the plan
                 var expected = fixtures.Select((l, i) =>
                 {
-                    var m = (List<object>)l["modelo_ft"];
-                    var code = (string)l["codigo"];
+                    var m = (List<object>)l["model_ft"];
+                    var code = (string)l["code"];
                     return new ExpectedFixture { Key = code + "-" + i, Code = code, FamilyType = Rules.First(r => r.Code == code).FamilyType, X = Convert.ToDouble(m[0], CultureInfo.InvariantCulture), Y = Convert.ToDouble(m[1], CultureInfo.InvariantCulture) };
                 }).ToList();
                 var truthSrc = new SourceRef { Id = "truth.json", Kind = SourceKinds.Table, Sha256 = Home.Sha256Hex(File.ReadAllText(F("truth.json"))) };
                 var built = new List<SourceRef> { new SourceRef { Id = name, Kind = SourceKinds.Pdf, Sha256 = pdfSha } };
                 var rep = PlacementVerifier.Verify(truthSrc, built, plan.Fingerprint, expected, observed, null, pe);
-                Assert.Equal("diferencias", rep["estado"]);
-                var counts = (Dictionary<string, object>)((Dictionary<string, object>)rep["resumen"])["diferencias"];
-                Assert.Equal(1L, counts["omitido"]); Assert.Equal(1L, counts["desplazado"]); Assert.Equal(1L, counts["tipo_incorrecto"]);
-                Assert.Equal(1L, counts["duplicado"]); Assert.Equal(1L, counts["adicional"]);
-                Assert.False(counts.ContainsKey("giro_incorrecto"));
+                Assert.Equal("differences", rep["status"]);
+                var counts = (Dictionary<string, object>)((Dictionary<string, object>)rep["summary"])["differences"];
+                Assert.Equal(1L, counts["skipped"]); Assert.Equal(1L, counts["displaced"]); Assert.Equal(1L, counts["wrong_type"]);
+                Assert.Equal(1L, counts["duplicate"]); Assert.Equal(1L, counts["additional"]);
+                Assert.False(counts.ContainsKey("wrong_rotation"));
 
                 // verification against the plan itself or against the same PDF is NOT independent
                 var planAsExpected = plan.Place.Select(p => new ExpectedFixture { Key = p.Id, Code = p.Code, FamilyType = p.FamilyType, X = p.X, Y = p.Y }).ToList();
-                Assert.Equal("no_independiente", PlacementVerifier.Verify(new SourceRef { Id = "plan", Kind = SourceKinds.Table, Sha256 = Home.Sha256Hex("otra") }, built, plan.Fingerprint, planAsExpected, observed)["estado"]);
-                Assert.Equal("no_independiente", PlacementVerifier.Verify(new SourceRef { Id = "copia", Kind = SourceKinds.Pdf, Sha256 = pdfSha }, built, null, expected, observed)["estado"]);
+                Assert.Equal("not_independent", PlacementVerifier.Verify(new SourceRef { Id = "plan", Kind = SourceKinds.Table, Sha256 = Home.Sha256Hex("other") }, built, plan.Fingerprint, planAsExpected, observed)["status"]);
+                Assert.Equal("not_independent", PlacementVerifier.Verify(new SourceRef { Id = "copy", Kind = SourceKinds.Pdf, Sha256 = pdfSha }, built, null, expected, observed)["status"]);
             }
         }
 
@@ -224,8 +224,8 @@ namespace Bimbridge.Tests
             Assert.Single(plan.Place);
             Assert.Single(plan.AlreadyThere);
             var why = plan.Ambiguous.Select(a => a.Reason.Split(':')[0]).OrderBy(x => x).ToList();
-            Assert.Equal(new[] { "confianza_baja", "conflicto_existente", "sin_altura", "sin_tipo" }, why);
-            Assert.Equal("sin_registro", PlacementPlanner.Plan(syms, new RegistrationResult { State = "residuo_excesivo" }, rules, new PlacementOptions { Level = "L1" }).State);
+            Assert.Equal(new[] { "existing_conflict", "low_confidence", "no_height", "no_type" }, why);
+            Assert.Equal("unregistered", PlacementPlanner.Plan(syms, new RegistrationResult { State = "excessive_residual" }, rules, new PlacementOptions { Level = "L1" }).State);
             // ids stable across runs
             Assert.Equal(plan.Place[0].Id, PlacementPlanner.Plan(syms, reg, rules, new PlacementOptions { Level = "L1", SourceSha256 = new string('a', 64) }, ex).Place[0].Id);
         }
@@ -253,7 +253,7 @@ namespace Bimbridge.Tests
             Assert.Empty(ambiguous.AlreadyThere);
             Assert.Empty(ambiguous.Batches);
             Assert.Equal(2, ambiguous.Ambiguous.Count);
-            Assert.All(ambiguous.Ambiguous, item => Assert.StartsWith("existente_compartido", item.Reason));
+            Assert.All(ambiguous.Ambiguous, item => Assert.StartsWith("shared_existing", item.Reason));
             existing.RemoveAt(0);
             var first = PlacementPlanner.Plan(symbols, registration, rules, settings, existing);
             Assert.Equal(2, first.Place.Count);

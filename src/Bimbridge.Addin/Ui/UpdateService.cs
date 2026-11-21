@@ -81,13 +81,13 @@ namespace Bimbridge.Addin.Ui
             Online = null; OnlineError = null;
             try
             {
-                if (!OnlineEnabled) { OnlineState = "error"; OnlineError = "online update is disabled in the configuration (actualizacion_online=no)"; return; }
+                if (!OnlineEnabled) { OnlineState = "error"; OnlineError = "online update is disabled in the configuration (online_update=no)"; return; }
                 var json = OnlineHttp.GetText(OnlineUpdate.ApiUrl(Repo), OnlineUpdate.MaxTextBytes);
                 var r = OnlineUpdate.Pick(json, Repo, AllowPrerelease, out var skipped);
-                if (r == null) { OnlineState = "sin_releases"; OnlineError = skipped.Count > 0 ? "discarded: " + string.Join("; ", skipped.Take(5)) : null; return; }
+                if (r == null) { OnlineState = "no_releases"; OnlineError = skipped.Count > 0 ? "discarded: " + string.Join("; ", skipped.Take(5)) : null; return; }
                 Online = r;
                 OnlineState = OnlineUpdate.Compare(Running, RunningCommit, r);
-                Runtime.Journal?.Log("usuario", "actualizar_buscar_online", OnlineState, 0, new Dictionary<string, object> { ["release"] = r.Tag, ["repo"] = Repo });
+                Runtime.Journal?.Log("user", "update_check_online", OnlineState, 0, new Dictionary<string, object> { ["release"] = r.Tag, ["repo"] = Repo });
             }
             catch (Exception ex) when (ex is OnlineUpdateException || ex is IOException)
             {
@@ -103,12 +103,12 @@ namespace Bimbridge.Addin.Ui
             try
             {
                 var c = OnlineUpdate.Download(r, Paths.CachedSetup(r.VersionText), OnlineHttp.GetText, OnlineHttp.GetFile);
-                Runtime.Journal?.Log("usuario", "actualizar_descargar_online", "ok", 0, new Dictionary<string, object> { ["release"] = r.Tag, ["repo"] = Repo, ["sha256"] = OnlineUpdate.Sha256File(c.Exe) });
+                Runtime.Journal?.Log("user", "update_download_online", "ok", 0, new Dictionary<string, object> { ["release"] = r.Tag, ["repo"] = Repo, ["sha256"] = OnlineUpdate.Sha256File(c.Exe) });
                 return (c, null);
             }
             catch (Exception ex) when (ex is OnlineUpdateException || ex is IOException || ex is UnauthorizedAccessException)
             {
-                Runtime.Journal?.Log("usuario", "actualizar_descargar_online", "error", 0, new Dictionary<string, object> { ["release"] = r.Tag, ["detalle"] = ex.Message });
+                Runtime.Journal?.Log("user", "update_download_online", "error", 0, new Dictionary<string, object> { ["release"] = r.Tag, ["detail"] = ex.Message });
                 return (null, ex.Message);
             }
         }
@@ -181,10 +181,10 @@ namespace Bimbridge.Addin.Ui
                 var exe = Paths.CachedSetup(c.VersionText);
                 if (!string.Equals(Path.GetFullPath(c.Exe), Path.GetFullPath(exe), StringComparison.OrdinalIgnoreCase))
                     File.Copy(c.Exe, exe, true);
-                var report = Path.Combine(Paths.UpdatesDir, "ultima.txt");
+                var report = Bimbridge.Protocol.LegacyAliases.ResolveExisting(Paths.UpdatesDir, Path.Combine(Paths.UpdatesDir, "last.txt"));
                 try { File.Delete(report); } catch (Exception) { }
 
-                var psi = new ProcessStartInfo(exe, "/actualizar" + (allowOlder ? " /permitir-anterior" : ""))
+                var psi = new ProcessStartInfo(exe, "/update" + (allowOlder ? " /permitir-anterior" : ""))
                 {
                     UseShellExecute = false,
                     CreateNoWindow = true,
@@ -201,8 +201,8 @@ namespace Bimbridge.Addin.Ui
                             return (false, "The installer did not finish within 3 minutes. Check " + report + ".");
                     }
                     var text = File.Exists(report) ? File.ReadAllLines(report).Skip(2).FirstOrDefault() : null;
-                    Runtime.Journal?.Log("usuario", "actualizar", p.ExitCode == 0 ? "ok" : "error", 0,
-                        new Dictionary<string, object> { ["version"] = c.VersionText, ["codigo"] = (long)p.ExitCode, ["detalle"] = text });
+                    Runtime.Journal?.Log("user", "update", p.ExitCode == 0 ? "ok" : "error", 0,
+                        new Dictionary<string, object> { ["version"] = c.VersionText, ["code"] = (long)p.ExitCode, ["detail"] = text });
                     Runtime.Log("Update to " + c.VersionText + ": exit code " + p.ExitCode + " " + text);
                     return (p.ExitCode == 0, text ?? "The installer finished with exit code " + p.ExitCode + ".");
                 }
@@ -221,7 +221,7 @@ namespace Bimbridge.Addin.Ui
         {
             try
             {
-                using (File.Open(Path.Combine(Paths.Home, "instalador.lock"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) { }
+                using (File.Open(Path.Combine(Paths.Home, "installer.lock"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) { }
                 return null;
             }
             catch (FileNotFoundException) { return null; }
@@ -230,7 +230,7 @@ namespace Bimbridge.Addin.Ui
             {
                 try
                 {
-                    var lines = File.ReadAllLines(Path.Combine(Paths.UpdatesDir, "ultima.txt"));
+                    var lines = File.ReadAllLines(Bimbridge.Protocol.LegacyAliases.ResolveExisting(Paths.UpdatesDir, Path.Combine(Paths.UpdatesDir, "last.txt")));
                     return lines.Length >= 3 && lines[0] == "6" ? lines[2] : null;
                 }
                 catch (IOException) { return null; }

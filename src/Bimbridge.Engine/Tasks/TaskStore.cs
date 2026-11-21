@@ -22,11 +22,13 @@ namespace Bimbridge.Engine.Tasks
         private readonly Dictionary<string, JsonlLog> _logs = new Dictionary<string, JsonlLog>(StringComparer.OrdinalIgnoreCase);
         private readonly object _lock = new object();
 
-        public TaskStore(string root = null) { _root = root ?? Home.Sub("tareas"); }
+        public TaskStore(string root = null) { _root = root ?? Home.Sub("tasks"); }
 
         public string Root => _root;
         public string Dir(string id) => Path.Combine(_root, SafeId(id));
-        public string ArtifactsDir(string id) => Path.Combine(Dir(id), "artefactos");
+        public string ArtifactsDir(string id) => Path.Combine(Dir(id), "artifacts");
+        /// <summary>A file of the task; a task created by 0.9.3 or earlier keeps its legacy file names until the installer migrates them.</summary>
+        private string FileOf(string id, string name) => LegacyAliases.ResolveExisting(_root, Path.Combine(Dir(id), name));
 
         public static string SafeId(string id)
         {
@@ -42,7 +44,7 @@ namespace Bimbridge.Engine.Tasks
         public static string NewId(DateTime now) =>
             "T" + now.ToString("yyMMdd-HHmmss", CultureInfo.InvariantCulture) + "-" + Guid.NewGuid().ToString("N").Substring(0, 4);
 
-        public bool Exists(string id) => File.Exists(Path.Combine(Dir(id), "tarea.json"));
+        public bool Exists(string id) => File.Exists(FileOf(id, "task.json"));
 
         public void Create(TaskRecord r, string recipeCode)
         {
@@ -50,30 +52,30 @@ namespace Bimbridge.Engine.Tasks
             if (Exists(r.Id)) throw new InvalidOperationException("task " + r.Id + " already exists");
             Directory.CreateDirectory(dir);
             Directory.CreateDirectory(ArtifactsDir(r.Id));
-            if (recipeCode != null) Home.WriteAtomic(Path.Combine(dir, "receta.cs"), recipeCode);
+            if (recipeCode != null) Home.WriteAtomic(Path.Combine(dir, "recipe.cs"), recipeCode);
             Save(r);
         }
 
-        /// <summary>Tests only: fault injection before writing tarea.json (R07).</summary>
+        /// <summary>Tests only: fault injection before writing task.json (R07).</summary>
         public Action<string> FaultBeforeSave;
 
         public void Save(TaskRecord r)
         {
             FaultBeforeSave?.Invoke(r.Id);
             r.Updated = TaskTime.Now();
-            Home.WriteAtomic(Path.Combine(Dir(r.Id), "tarea.json"), Json.Write(r.ToJson()));
+            Home.WriteAtomic(Path.Combine(Dir(r.Id), "task.json"), Json.Write(r.ToJson()));
         }
 
         public TaskRecord Load(string id)
         {
-            var p = Path.Combine(Dir(id), "tarea.json");
+            var p = FileOf(id, "task.json");
             if (!File.Exists(p)) return null;
-            return TaskRecord.FromJson(Json.ParseObject(File.ReadAllText(p)));
+            return TaskRecord.FromJson(LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(p))));
         }
 
         public string RecipeCode(string id)
         {
-            var p = Path.Combine(Dir(id), "receta.cs");
+            var p = FileOf(id, "recipe.cs");
             return File.Exists(p) ? File.ReadAllText(p) : null;
         }
 
@@ -99,7 +101,7 @@ namespace Bimbridge.Engine.Tasks
             {
                 if (!_logs.TryGetValue(id, out var l))
                 {
-                    l = new JsonlLog(Path.Combine(Dir(id), "unidades.jsonl"));
+                    l = new JsonlLog(FileOf(id, "units.jsonl"));
                     _logs[id] = l;
                 }
                 return l;
@@ -117,7 +119,7 @@ namespace Bimbridge.Engine.Tasks
         public UnitLog LoadUnits(string id)
         {
             var log = new UnitLog();
-            var path = Path.Combine(Dir(id), "unidades.jsonl");
+            var path = FileOf(id, "units.jsonl");
             if (!File.Exists(path)) return log;
             var reader = new JsonlLog(path);
             foreach (var ev in reader.ReadNew()) log.Apply(ev);
@@ -125,12 +127,12 @@ namespace Bimbridge.Engine.Tasks
             return log;
         }
 
-        /// <summary>Moves the task folder to _archivo\ (does not delete). null = fine; otherwise the reason.</summary>
+        /// <summary>Moves the task folder to _archive\ (does not delete). null = fine; otherwise the reason.</summary>
         public string Archive(string id)
         {
             try
             {
-                var dest = Path.Combine(_root, "_archivo", SafeId(id) + "-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture));
+                var dest = Path.Combine(_root, "_archive", SafeId(id) + "-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture));
                 Directory.CreateDirectory(Path.GetDirectoryName(dest));
                 Directory.Move(Dir(id), dest);
                 return null;
@@ -175,11 +177,11 @@ namespace Bimbridge.Engine.Tasks
             try
             {
                 if (!File.Exists(p)) return null;
-                var o = Json.ParseObject(File.ReadAllText(p));
+                var o = LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(p)));
                 long f = 0;
                 if (o.TryGetValue("fencing", out var fv) && fv != null) f = Convert.ToInt64(fv, CultureInfo.InvariantCulture);
-                bool rel = o.TryGetValue("liberada", out var rv) && rv is bool rb && rb;
-                return new Lease { Owner = Arg.GetString(o, "dueno"), Instance = Arg.GetString(o, "instancia"), Expires = Arg.GetString(o, "vence"), Fencing = f, Released = rel };
+                bool rel = o.TryGetValue("released", out var rv) && rv is bool rb && rb;
+                return new Lease { Owner = Arg.GetString(o, "owner"), Instance = Arg.GetString(o, "instance"), Expires = Arg.GetString(o, "expires"), Fencing = f, Released = rel };
             }
             catch (Exception ex) when (ex is IOException || ex is FormatException || ex is UnauthorizedAccessException || ex is InvalidCastException || ex is OverflowException)
             { throw new LeaseStoreException("lease.json unreadable: " + ex.Message, ex); }
@@ -190,7 +192,7 @@ namespace Bimbridge.Engine.Tasks
             try
             {
                 Home.WriteAtomic(Path.Combine(Dir(id), "lease.json"), Json.Write(new Dictionary<string, object>
-                { ["dueno"] = l.Owner, ["instancia"] = l.Instance, ["vence"] = l.Expires, ["fencing"] = l.Fencing, ["liberada"] = l.Released }));
+                { ["owner"] = l.Owner, ["instance"] = l.Instance, ["expires"] = l.Expires, ["fencing"] = l.Fencing, ["released"] = l.Released }));
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             { throw new LeaseStoreException("lease.json not writable: " + ex.Message, ex); }
@@ -319,51 +321,51 @@ namespace Bimbridge.Engine.Tasks
             var kind = Arg.GetString(ev, "ev");
             switch (kind)
             {
-                case "inicio":
-                    foreach (var k in Arg.GetStringList(ev, "claves"))
+                case "start":
+                    foreach (var k in Arg.GetStringList(ev, "keys"))
                     {
                         var u = Ensure(k);
                         u.State = UnitState.InProgress;
                         u.Attempts++;
-                        u.Generation = Arg.GetString(ev, "generacion");
+                        u.Generation = Arg.GetString(ev, "generation");
                         u.When = Arg.GetString(ev, "t");
                         u.Started = u.When;
                     }
                     break;
-                case "sin_ejecutar":
-                    foreach (var k in Arg.GetStringList(ev, "claves"))
+                case "not_run":
+                    foreach (var k in Arg.GetStringList(ev, "keys"))
                     {
                         var u = Ensure(k);
                         if (u.State == UnitState.InProgress) { u.State = UnitState.Pending; u.Attempts = Math.Max(0, u.Attempts - 1); }
                     }
                     break;
-                case "fin":
-                case "verificada":
-                case "reconciliada":
+                case "end":
+                case "verified":
+                case "reconciled":
                 {
-                    var key = Arg.GetString(ev, "clave");
+                    var key = Arg.GetString(ev, "key");
                     if (key == null) break;
                     var u = Ensure(key);
                     // R05, defense in depth: even if someone writes the event by hand, a reconciliation does not return committed units to pending.
-                    if (kind == "reconciliada" && UnitState.IsDone(u.State) && Arg.GetString(ev, "estado") == UnitState.Pending) { IllegalEvents++; break; }
-                    u.State = Arg.GetString(ev, "estado") ?? u.State;
+                    if (kind == "reconciled" && UnitState.IsDone(u.State) && Arg.GetString(ev, "status") == UnitState.Pending) { IllegalEvents++; break; }
+                    u.State = Arg.GetString(ev, "status") ?? u.State;
                     u.Error = Arg.GetString(ev, "error");
                     u.Ms = Arg.GetLong(ev, "ms") ?? u.Ms;
                     u.When = Arg.GetString(ev, "t");
                     var seq = Arg.GetLong(ev, "seq");
                     if (seq.HasValue) u.Seq = seq.Value;
-                    if (ev.TryGetValue("creados", out var cv) && cv is System.Collections.IEnumerable ce && !(cv is string))
+                    if (ev.TryGetValue("created", out var cv) && cv is System.Collections.IEnumerable ce && !(cv is string))
                         u.Created = ce.Cast<object>().Select(x => x is object[] arr ? arr : x is List<object> l ? l.ToArray() : null).Where(x => x != null).ToList();
-                    if (ev.TryGetValue("resultado", out var rv)) u.Result = rv;
-                    if (kind == "fin" && Arg.GetString(ev, "generacion") is string g) u.Generation = g;
+                    if (ev.TryGetValue("result", out var rv)) u.Result = rv;
+                    if (kind == "end" && Arg.GetString(ev, "generation") is string g) u.Generation = g;
                     break;
                 }
-                case "pendiente":
-                    foreach (var k in Arg.GetStringList(ev, "claves"))
+                case "pending":
+                    foreach (var k in Arg.GetStringList(ev, "keys"))
                     {
                         var u = Ensure(k);
                         u.State = UnitState.Pending;
-                        u.Error = Arg.GetString(ev, "motivo");
+                        u.Error = Arg.GetString(ev, "reason");
                     }
                     break;
             }

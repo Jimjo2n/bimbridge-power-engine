@@ -50,11 +50,11 @@ namespace BimBridge.PowerEngine.Workflows
             var ind = new IndependentVerifier.Input
             {
                 ExpectedSource = expectedSource, BuildSources = (buildSources ?? new List<SourceRef>()).ToList(), BuildPlanFingerprint = buildPlanFingerprint,
-                Expected = expected.Select(e => new IndependentVerifier.Item { Key = e.Key, X = e.X, Y = e.Y, Attrs = { ["tipo"] = e.FamilyType ?? "" } }).ToList(),
+                Expected = expected.Select(e => new IndependentVerifier.Item { Key = e.Key, X = e.X, Y = e.Y, Attrs = { ["type"] = e.FamilyType ?? "" } }).ToList(),
             };
             var gate = IndependentVerifier.CheckIndependence(ind, out var proof);
             if (gate.HasValue)
-                return new Dictionary<string, object> { ["estado"] = gate.Value.State, ["motivo"] = gate.Value.Reason, ["nota"] = "no QA/QC verdict is issued without an independent source" };
+                return new Dictionary<string, object> { ["status"] = gate.Value.State, ["reason"] = gate.Value.Reason, ["note"] = "no QA/QC verdict is issued without an independent source" };
 
             var diffs = new Dictionary<string, List<Dictionary<string, object>>>(StringComparer.Ordinal);
             void Add(string kind, Dictionary<string, object> d) { if (!diffs.TryGetValue(kind, out var l)) diffs[kind] = l = new List<Dictionary<string, object>>(); l.Add(d); }
@@ -68,7 +68,7 @@ namespace BimBridge.PowerEngine.Workflows
                 foreach (var sub in g.GroupBy(i => observed[i].FamilyType ?? "").Where(s => s.Count() > 1))
                 {
                     var keep = sub.OrderBy(i => observed[i].Id).First();
-                    foreach (var i in sub.Where(i => i != keep)) { dupOf.Add(i); Add("duplicado", new Dictionary<string, object> { ["id"] = observed[i].Id, ["de"] = observed[keep].Id, ["tipo"] = observed[i].FamilyType }); }
+                    foreach (var i in sub.Where(i => i != keep)) { dupOf.Add(i); Add("duplicate", new Dictionary<string, object> { ["id"] = observed[i].Id, ["de"] = observed[keep].Id, ["type"] = observed[i].FamilyType }); }
                 }
             var obsIdx = Enumerable.Range(0, observed.Count).Where(i => !dupOf.Contains(i)).ToList();
 
@@ -83,46 +83,46 @@ namespace BimBridge.PowerEngine.Workflows
             for (var i = 0; i < expected.Count; i++)
             {
                 var x = expected[i];
-                if (pair[i] < 0) { Add("omitido", new Dictionary<string, object> { ["clave"] = x.Key, ["codigo"] = x.Code, ["xy_ft"] = XY(x.X, x.Y) }); continue; }
+                if (pair[i] < 0) { Add("skipped", new Dictionary<string, object> { ["key"] = x.Key, ["code"] = x.Code, ["xy_ft"] = XY(x.X, x.Y) }); continue; }
                 var oi = obsIdx[pair[i]]; matched.Add(oi);
                 var y = observed[oi];
                 var bad = false;
                 var d = Math.Sqrt((x.X - y.X) * (x.X - y.X) + (x.Y - y.Y) * (x.Y - y.Y));
-                if (d > o.PositionTolFt) { bad = true; Add("desplazado", new Dictionary<string, object> { ["clave"] = x.Key, ["id"] = y.Id, ["distancia_ft"] = Math.Round(d, 4), ["xy_ft"] = XY(x.X, x.Y) }); }
+                if (d > o.PositionTolFt) { bad = true; Add("displaced", new Dictionary<string, object> { ["key"] = x.Key, ["id"] = y.Id, ["distance_ft"] = Math.Round(d, 4), ["xy_ft"] = XY(x.X, x.Y) }); }
                 if (x.FamilyType != null && !string.Equals(x.FamilyType, y.FamilyType, StringComparison.Ordinal))
-                { bad = true; Add("tipo_incorrecto", new Dictionary<string, object> { ["clave"] = x.Key, ["id"] = y.Id, ["esperado"] = x.FamilyType, ["observado"] = y.FamilyType }); }
+                { bad = true; Add("wrong_type", new Dictionary<string, object> { ["key"] = x.Key, ["id"] = y.Id, ["expected"] = x.FamilyType, ["observed"] = y.FamilyType }); }
                 if (x.RotDeg.HasValue)
                 {
                     var dr = AngleDiff(x.RotDeg.Value, y.RotDeg, o.RotationSymmetric180);
-                    if (dr > o.RotationTolDeg) { bad = true; Add("giro_incorrecto", new Dictionary<string, object> { ["clave"] = x.Key, ["id"] = y.Id, ["esperado"] = x.RotDeg.Value, ["observado"] = Math.Round(y.RotDeg, 3) }); }
+                    if (dr > o.RotationTolDeg) { bad = true; Add("wrong_rotation", new Dictionary<string, object> { ["key"] = x.Key, ["id"] = y.Id, ["expected"] = x.RotDeg.Value, ["observed"] = Math.Round(y.RotDeg, 3) }); }
                 }
                 if (x.ElevFt.HasValue && (!y.ElevFt.HasValue || Math.Abs(x.ElevFt.Value - y.ElevFt.Value) > o.ElevTolFt))
-                { bad = true; Add("altura_incorrecta", new Dictionary<string, object> { ["clave"] = x.Key, ["id"] = y.Id, ["esperado_ft"] = x.ElevFt.Value, ["observado_ft"] = y.ElevFt }); }
+                { bad = true; Add("wrong_height", new Dictionary<string, object> { ["key"] = x.Key, ["id"] = y.Id, ["expected_ft"] = x.ElevFt.Value, ["observed_ft"] = y.ElevFt }); }
                 if (x.Host != null && !string.Equals(x.Host, y.Host, StringComparison.OrdinalIgnoreCase))
-                { bad = true; Add("soporte_invalido", new Dictionary<string, object> { ["clave"] = x.Key, ["id"] = y.Id, ["esperado"] = x.Host, ["observado"] = y.Host }); }
-                else if (y.SupportOk == false) { bad = true; Add("soporte_invalido", new Dictionary<string, object> { ["clave"] = x.Key, ["id"] = y.Id, ["motivo"] = "no contact with the host (geo montaje)" }); }
-                if (y.Visible == false) { bad = true; Add("no_visible", new Dictionary<string, object> { ["clave"] = x.Key, ["id"] = y.Id }); }
+                { bad = true; Add("invalid_support", new Dictionary<string, object> { ["key"] = x.Key, ["id"] = y.Id, ["expected"] = x.Host, ["observed"] = y.Host }); }
+                else if (y.SupportOk == false) { bad = true; Add("invalid_support", new Dictionary<string, object> { ["key"] = x.Key, ["id"] = y.Id, ["reason"] = "no contact with the host (geo mounting)" }); }
+                if (y.Visible == false) { bad = true; Add("not_visible", new Dictionary<string, object> { ["key"] = x.Key, ["id"] = y.Id }); }
                 if (!bad) okCount++;
             }
             foreach (var oi in obsIdx.Where(i => !matched.Contains(i)))
-                Add("adicional", new Dictionary<string, object> { ["id"] = observed[oi].Id, ["tipo"] = observed[oi].FamilyType, ["xy_ft"] = XY(observed[oi].X, observed[oi].Y) });
+                Add("additional", new Dictionary<string, object> { ["id"] = observed[oi].Id, ["type"] = observed[oi].FamilyType, ["xy_ft"] = XY(observed[oi].X, observed[oi].Y) });
 
             var notChecked = new List<object>();
             if (observed.Any(y => y.Visible == null)) notChecked.Add("visibility (no view data)");
-            if (observed.Any(y => y.SupportOk == null) && expected.All(x => x.Host == null)) notChecked.Add("physical host (no geo montaje)");
+            if (observed.Any(y => y.SupportOk == null) && expected.All(x => x.Host == null)) notChecked.Add("physical host (no geo mounting)");
             if (expected.All(x => x.ElevFt == null)) notChecked.Add("elevation (not given by the source)");
             var total = diffs.Values.Sum(l => l.Count);
             return new Dictionary<string, object>
             {
-                ["estado"] = total == 0 ? "conforme" : "diferencias",
-                ["independencia"] = proof,
-                ["resumen"] = new Dictionary<string, object>
+                ["status"] = total == 0 ? "conforming" : "differences",
+                ["independence"] = proof,
+                ["summary"] = new Dictionary<string, object>
                 {
-                    ["esperados"] = (long)expected.Count, ["observados"] = (long)observed.Count, ["correctos"] = (long)okCount,
-                    ["diferencias"] = diffs.OrderBy(k => k.Key, StringComparer.Ordinal).ToDictionary(k => k.Key, k => (object)(long)k.Value.Count),
+                    ["expected_items"] = (long)expected.Count, ["observed_items"] = (long)observed.Count, ["correct"] = (long)okCount,
+                    ["differences"] = diffs.OrderBy(k => k.Key, StringComparer.Ordinal).ToDictionary(k => k.Key, k => (object)(long)k.Value.Count),
                 },
-                ["diferencias"] = diffs.OrderBy(k => k.Key, StringComparer.Ordinal).ToDictionary(k => k.Key, k => (object)k.Value.Take(o.MaxListed).Cast<object>().ToList()),
-                ["no_comprobado"] = notChecked,
+                ["differences"] = diffs.OrderBy(k => k.Key, StringComparer.Ordinal).ToDictionary(k => k.Key, k => (object)k.Value.Take(o.MaxListed).Cast<object>().ToList()),
+                ["not_checked"] = notChecked,
             };
         }
 

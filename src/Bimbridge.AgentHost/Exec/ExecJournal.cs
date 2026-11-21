@@ -12,7 +12,7 @@ namespace Bimbridge.AgentHost
 {
     /// <summary>
     /// Durable execution state of a plan (AH-03).
-    /// AUTHORITY: <c>diario.jsonl</c> (ChainLog). Every state change of an operation is a "transicion" line written and flushed to
+    /// AUTHORITY: <c>diario.jsonl</c> (ChainLog). Every state change of an operation is a "transition" line written and flushed to
     /// disk BEFORE acting on it; the state of any operation is the result of replaying the journal.
     /// DERIVED: <c>estado.json</c> (checkpoint) — compact copy so another process (the one that lost the lease, the service, an agent)
     /// can inspect progress without replaying the journal. It carries the seq and chain hash it corresponds to, and a seal. On recovery it is
@@ -23,7 +23,7 @@ namespace Bimbridge.AgentHost
     public sealed class ExecJournal
     {
         public const int SchemaVersion = 1;
-        public static readonly string[] PlanActions = { "pausar", "reanudar", "cancelar" };
+        public static readonly string[] PlanActions = { "pause", "resume", "cancel" };
 
         private readonly string _dir;
         private readonly ValidatedPlan _plan;
@@ -38,8 +38,8 @@ namespace Bimbridge.AgentHost
         public int CheckpointEvery = 64;
         private int _sinceCheckpoint;
 
-        public string JournalPath => Path.Combine(_dir, "diario.jsonl");
-        public string CheckpointPath => Path.Combine(_dir, "estado.json");
+        public string JournalPath => LegacyAliases.ResolveExisting(_dir, Path.Combine(_dir, "journal.jsonl"));
+        public string CheckpointPath => LegacyAliases.ResolveExisting(_dir, Path.Combine(_dir, "state.json"));
 
         private ExecJournal(string dir, ValidatedPlan plan, Faults faults)
         {
@@ -54,9 +54,9 @@ namespace Bimbridge.AgentHost
         public static ExecJournal Recover(string dir, ValidatedPlan plan, bool writer, Faults faults, List<Diagnostic> diags)
         {
             var j = new ExecJournal(dir, plan, faults);
-            foreach (var tmp in Directory.Exists(dir) ? Directory.GetFiles(dir, "estado.json.tmp-*") : new string[0])
+            foreach (var tmp in Directory.Exists(dir) ? Directory.GetFiles(dir, "state.json.tmp-*") : new string[0])
             {
-                diags.Add(Diagnostic.Warn("checkpoint_a_medias", Path.GetFileName(tmp) + ": interrupted write, discarded"));
+                diags.Add(Diagnostic.Warn("checkpoint_half_written", Path.GetFileName(tmp) + ": interrupted write, discarded"));
                 if (writer) try { File.Delete(tmp); } catch (IOException) { }
             }
             var cp = ReadCheckpoint(j.CheckpointPath, plan, diags);
@@ -73,24 +73,24 @@ namespace Bimbridge.AgentHost
                 var s = Arg.GetLong(r, "seq") ?? 0;
                 if (s == cpSeq) { atCp = j.Ops.ToDictionary(kv => kv.Key, kv => kv.Value.Clone(), StringComparer.Ordinal); hashAtCp = Arg.GetString(r, "h"); planStateAtCp = j.PlanState; }
                 return true;
-            }, diags, "diario");
+            }, diags, "journal");
             if (Diagnostic.AnyError(diags)) return null;
             if (count == 0)
             {
-                if (cp != null) { diags.Add(Diagnostic.Error("diario_ausente", "there is a checkpoint (seq " + Arg.GetLong(cp, "seq") + ") but the journal " + (journalExists ? "is empty" : "does not exist") + "; nothing is certified from the checkpoint")); return null; }
-                if (writer) j._log.Append(new Dictionary<string, object> { ["ev"] = "apertura", ["plan"] = plan.Hash, ["esquema"] = (long)SchemaVersion, ["t"] = Home.Now() });
+                if (cp != null) { diags.Add(Diagnostic.Error("journal_missing", "there is a checkpoint (seq " + Arg.GetLong(cp, "seq") + ") but the journal " + (journalExists ? "is empty" : "does not exist") + "; nothing is certified from the checkpoint")); return null; }
+                if (writer) j._log.Append(new Dictionary<string, object> { ["ev"] = "opening", ["plan"] = plan.Hash, ["schema"] = (long)SchemaVersion, ["t"] = Home.Now() });
                 return j;
             }
             if (cp != null)
             {
-                if (cpSeq > j.Seq) { diags.Add(Diagnostic.Error("checkpoint_adelantado", "the checkpoint says seq " + cpSeq + " and the journal ends at " + j.Seq + "; journal records are missing")); return null; }
-                if (hashAtCp != Arg.GetString(cp, "h")) { diags.Add(Diagnostic.Error("checkpoint_otra_historia", "the chain hash at seq " + cpSeq + " does not match the journal")); return null; }
-                if (atCp == null) { diags.Add(Diagnostic.Error("checkpoint_invalido", "seq " + cpSeq + " does not exist in the journal")); return null; }
+                if (cpSeq > j.Seq) { diags.Add(Diagnostic.Error("checkpoint_ahead", "the checkpoint says seq " + cpSeq + " and the journal ends at " + j.Seq + "; journal records are missing")); return null; }
+                if (hashAtCp != Arg.GetString(cp, "h")) { diags.Add(Diagnostic.Error("checkpoint_other_history", "the chain hash at seq " + cpSeq + " does not match the journal")); return null; }
+                if (atCp == null) { diags.Add(Diagnostic.Error("checkpoint_invalid", "seq " + cpSeq + " does not exist in the journal")); return null; }
                 var cpOps = cp.TryGetValue("ops", out var co) ? co as Dictionary<string, object> : null;
                 var mine = OpSemantics.Canonical(atCp.ToDictionary(kv => kv.Key, kv => (object)kv.Value.ToJson()));
-                if (cpOps == null || OpSemantics.Canonical(cpOps) != mine || Arg.GetString(cp, "plan_estado") != planStateAtCp)
-                { diags.Add(Diagnostic.Error("checkpoint_contradice_diario", "at seq " + cpSeq + " the checkpoint and the journal give different states")); return null; }
-                if (cpSeq < j.Seq) diags.Add(Diagnostic.Info("checkpoint_atrasado", "checkpoint at seq " + cpSeq + ", journal at " + j.Seq + "; using the journal"));
+                if (cpOps == null || OpSemantics.Canonical(cpOps) != mine || Arg.GetString(cp, "plan_status") != planStateAtCp)
+                { diags.Add(Diagnostic.Error("checkpoint_contradicts_journal", "at seq " + cpSeq + " the checkpoint and the journal give different states")); return null; }
+                if (cpSeq < j.Seq) diags.Add(Diagnostic.Info("checkpoint_behind", "checkpoint at seq " + cpSeq + ", journal at " + j.Seq + "; using the journal"));
             }
             return j;
         }
@@ -100,12 +100,11 @@ namespace Bimbridge.AgentHost
             if (!File.Exists(path)) return null;
             Dictionary<string, object> cp;
             try { cp = Json.ParseObject(File.ReadAllText(path)); }
-            catch (Exception ex) when (ex is FormatException || ex is IOException) { diags.Add(Diagnostic.Warn("checkpoint_ilegible", ex.Message + "; rebuilding from the journal")); return null; }
-            var seal = Arg.GetString(cp, "sello");
-            var body = new Dictionary<string, object>(cp, StringComparer.Ordinal); body.Remove("sello");
-            if (seal == null || seal != Home.Sha256Hex(OpSemantics.Canonical(body), 32)) { diags.Add(Diagnostic.Warn("checkpoint_alterado", "invalid seal; discarded and rebuilt from the journal")); return null; }
-            if (Arg.GetLong(cp, "esquema") != SchemaVersion) { diags.Add(Diagnostic.Warn("checkpoint_esquema", "schema " + Arg.GetString(cp, "esquema") + " not supported; rebuilding from the journal")); return null; }
-            if (Arg.GetString(cp, "plan") != plan.Hash) { diags.Add(Diagnostic.Error("checkpoint_de_otro_plan", Arg.GetString(cp, "plan"))); return cp; }
+            catch (Exception ex) when (ex is FormatException || ex is IOException) { diags.Add(Diagnostic.Warn("checkpoint_unreadable", ex.Message + "; rebuilding from the journal")); return null; }
+            if (!SealValid(cp)) { diags.Add(Diagnostic.Warn("checkpoint_tampered", "invalid seal; discarded and rebuilt from the journal")); return null; }
+            LegacyAliases.NormalizeRecord(cp);
+            if (Arg.GetLong(cp, "schema") != SchemaVersion) { diags.Add(Diagnostic.Warn("checkpoint_schema", "schema " + Arg.GetString(cp, "schema") + " not supported; rebuilding from the journal")); return null; }
+            if (Arg.GetString(cp, "plan") != plan.Hash) { diags.Add(Diagnostic.Error("checkpoint_other_plan", Arg.GetString(cp, "plan"))); return cp; }
             return cp;
         }
 
@@ -117,44 +116,44 @@ namespace Bimbridge.AgentHost
             string where = "seq " + seq;
             if (seq == 1)
             {
-                if (ev != "apertura") { diags.Add(Diagnostic.Error("diario_sin_apertura", where)); return false; }
-                if (Arg.GetString(r, "plan") != _plan.Hash) { diags.Add(Diagnostic.Error("diario_de_otro_plan", "plan " + Arg.GetString(r, "plan") + ", expected " + _plan.Hash)); return false; }
-                if (Arg.GetLong(r, "esquema") != SchemaVersion) { diags.Add(Diagnostic.Error("diario_esquema_no_soportado", Arg.GetString(r, "esquema"))); return false; }
+                if (ev != "opening") { diags.Add(Diagnostic.Error("journal_without_opening", where)); return false; }
+                if (Arg.GetString(r, "plan") != _plan.Hash) { diags.Add(Diagnostic.Error("journal_other_plan", "plan " + Arg.GetString(r, "plan") + ", expected " + _plan.Hash)); return false; }
+                if (Arg.GetLong(r, "schema") != SchemaVersion) { diags.Add(Diagnostic.Error("journal_schema_not_supported", Arg.GetString(r, "schema"))); return false; }
                 return true;
             }
             var f = Arg.GetLong(r, "f") ?? 0;
             switch (ev)
             {
-                case "dueno":
-                    if (f < Fencing) { diags.Add(Diagnostic.Error("fencing_regresivo", where + ": owner with fencing " + f + " < " + Fencing)); return false; }
+                case "owner":
+                    if (f < Fencing) { diags.Add(Diagnostic.Error("fencing_regression", where + ": owner with fencing " + f + " < " + Fencing)); return false; }
                     Fencing = f;
                     return true;
-                case "transicion":
+                case "transition":
                 {
-                    if (f != Fencing) { diags.Add(Diagnostic.Error("escritor_obsoleto", where + ": written with fencing " + f + " when the current owner had " + Fencing)); return false; }
+                    if (f != Fencing) { diags.Add(Diagnostic.Error("stale_writer", where + ": written with fencing " + f + " when the current owner had " + Fencing)); return false; }
                     var op = Arg.GetString(r, "op");
                     var from = Arg.GetString(r, "de");
                     var a = Arg.GetString(r, "a");
-                    if (op == null || !Ops.TryGetValue(op, out var rec)) { diags.Add(Diagnostic.Error("operacion_desconocida", where + ": " + op)); return false; }
-                    if (!OpState.IsValid(from) || !OpState.IsValid(a)) { diags.Add(Diagnostic.Error("estado_desconocido", where + ": " + from + " → " + a)); return false; }
-                    if (rec.State != from) { diags.Add(Diagnostic.Error("transicion_inconsistente", where + ": " + op + " was in " + rec.State + ", the line says " + from)); return false; }
-                    if (!OpState.IsLegal(from, a)) { diags.Add(Diagnostic.Error("transicion_ilegal", where + ": " + op + " " + from + " → " + a)); return false; }
+                    if (op == null || !Ops.TryGetValue(op, out var rec)) { diags.Add(Diagnostic.Error("unknown_operation", where + ": " + op)); return false; }
+                    if (!OpState.IsValid(from) || !OpState.IsValid(a)) { diags.Add(Diagnostic.Error("unknown_status", where + ": " + from + " → " + a)); return false; }
+                    if (rec.State != from) { diags.Add(Diagnostic.Error("inconsistent_transition", where + ": " + op + " was in " + rec.State + ", the line says " + from)); return false; }
+                    if (!OpState.IsLegal(from, a)) { diags.Add(Diagnostic.Error("illegal_transition", where + ": " + op + " " + from + " → " + a)); return false; }
                     ApplyTransition(rec, r, seq);
                     Changes.Add((seq, op, a, rec.Error));
                     return true;
                 }
                 case "plan":
                 {
-                    if (f != Fencing) { diags.Add(Diagnostic.Error("escritor_obsoleto", where)); return false; }
-                    var acc = Arg.GetString(r, "accion");
-                    if (Array.IndexOf(PlanActions, acc) < 0) { diags.Add(Diagnostic.Error("accion_desconocida", where + ": " + acc)); return false; }
-                    PlanState = acc == "pausar" ? PlanRunState.Paused : acc == "cancelar" ? PlanRunState.Cancelled : PlanRunState.Active;
+                    if (f != Fencing) { diags.Add(Diagnostic.Error("stale_writer", where)); return false; }
+                    var acc = Arg.GetString(r, "action");
+                    if (Array.IndexOf(PlanActions, acc) < 0) { diags.Add(Diagnostic.Error("unknown_action", where + ": " + acc)); return false; }
+                    PlanState = acc == "pause" ? PlanRunState.Paused : acc == "cancel" ? PlanRunState.Cancelled : PlanRunState.Active;
                     return true;
                 }
-                case "nota":
+                case "note":
                     return true;
                 default:
-                    diags.Add(Diagnostic.Error("evento_desconocido", where + ": " + ev));
+                    diags.Add(Diagnostic.Error("unknown_event", where + ": " + ev));
                     return false;
             }
         }
@@ -163,11 +162,11 @@ namespace Bimbridge.AgentHost
         {
             rec.State = Arg.GetString(r, "a");
             rec.LastSeq = seq;
-            var att = Arg.GetLong(r, "intento"); if (att != null) rec.Attempt = (int)att.Value;
+            var att = Arg.GetLong(r, "attempt"); if (att != null) rec.Attempt = (int)att.Value;
             if (r.TryGetValue("res", out var res) && res is Dictionary<string, object> rd) rec.Result = rd;
             if (r.TryGetValue("evid", out var ev) && ev is Dictionary<string, object> ed) rec.Evidence = ed;
             rec.Error = Arg.GetString(r, "err");
-            rec.Note = Arg.GetString(r, "nota");
+            rec.Note = Arg.GetString(r, "note");
         }
 
         // ---------- writing (owner only) ----------
@@ -175,7 +174,7 @@ namespace Bimbridge.AgentHost
         public void RecordOwner(long fencing, string owner)
         {
             if (fencing < Fencing) throw new InvalidOperationException("regressive fencing");
-            _log.Append(new Dictionary<string, object> { ["ev"] = "dueno", ["f"] = fencing, ["dueno"] = owner, ["t"] = Home.Now() });
+            _log.Append(new Dictionary<string, object> { ["ev"] = "owner", ["f"] = fencing, ["owner"] = owner, ["t"] = Home.Now() });
             Fencing = fencing;
         }
 
@@ -183,13 +182,13 @@ namespace Bimbridge.AgentHost
         public void Transition(string op, string to, int? attempt = null, Dictionary<string, object> result = null, Dictionary<string, object> evidence = null, string error = null, string note = null)
         {
             var rec = Ops[op];
-            if (!OpState.IsLegal(rec.State, to)) throw new InvalidOperationException("transicion_ilegal: " + op + " " + rec.State + " → " + to);
-            var line = new Dictionary<string, object> { ["ev"] = "transicion", ["f"] = Fencing, ["op"] = op, ["de"] = rec.State, ["a"] = to, ["t"] = Home.Now() };
-            if (attempt != null) line["intento"] = (long)attempt.Value;
+            if (!OpState.IsLegal(rec.State, to)) throw new InvalidOperationException("illegal_transition: " + op + " " + rec.State + " → " + to);
+            var line = new Dictionary<string, object> { ["ev"] = "transition", ["f"] = Fencing, ["op"] = op, ["de"] = rec.State, ["a"] = to, ["t"] = Home.Now() };
+            if (attempt != null) line["attempt"] = (long)attempt.Value;
             if (result != null) line["res"] = result;
             if (evidence != null) line["evid"] = evidence;
             if (error != null) line["err"] = error;
-            if (note != null) line["nota"] = note;
+            if (note != null) line["note"] = note;
             var written = _log.Append(line);
             ApplyTransition(rec, written, _log.LastSeq);
             Changes.Add((_log.LastSeq, op, to, rec.Error));
@@ -199,14 +198,14 @@ namespace Bimbridge.AgentHost
         public void PlanAction(string action)
         {
             if (Array.IndexOf(PlanActions, action) < 0) throw new ArgumentException(action);
-            _log.Append(new Dictionary<string, object> { ["ev"] = "plan", ["f"] = Fencing, ["accion"] = action, ["t"] = Home.Now() });
-            PlanState = action == "pausar" ? PlanRunState.Paused : action == "cancelar" ? PlanRunState.Cancelled : PlanRunState.Active;
+            _log.Append(new Dictionary<string, object> { ["ev"] = "plan", ["f"] = Fencing, ["action"] = action, ["t"] = Home.Now() });
+            PlanState = action == "pause" ? PlanRunState.Paused : action == "cancel" ? PlanRunState.Cancelled : PlanRunState.Active;
         }
 
         public void Note(string op, string text, Dictionary<string, object> data = null)
         {
-            var line = new Dictionary<string, object> { ["ev"] = "nota", ["f"] = Fencing, ["op"] = op, ["texto"] = text, ["t"] = Home.Now() };
-            if (data != null) line["datos"] = data;
+            var line = new Dictionary<string, object> { ["ev"] = "note", ["f"] = Fencing, ["op"] = op, ["text"] = text, ["t"] = Home.Now() };
+            if (data != null) line["data"] = data;
             _log.Append(line);
         }
 
@@ -216,14 +215,14 @@ namespace Bimbridge.AgentHost
             _sinceCheckpoint = 0;
             var body = new Dictionary<string, object>
             {
-                ["esquema"] = (long)SchemaVersion, ["plan"] = _plan.Hash, ["seq"] = _log.LastSeq, ["h"] = _log.LastHash, ["plan_estado"] = PlanState,
+                ["schema"] = (long)SchemaVersion, ["plan"] = _plan.Hash, ["seq"] = _log.LastSeq, ["h"] = _log.LastHash, ["plan_status"] = PlanState,
                 ["t"] = Home.Now(), ["ops"] = Ops.ToDictionary(kv => kv.Key, kv => (object)kv.Value.ToJson(), StringComparer.Ordinal),
             };
-            body["sello"] = Home.Sha256Hex(OpSemantics.Canonical(body), 32);
+            body["seal"] = Home.Sha256Hex(OpSemantics.Canonical(body), 32);
             var text = Json.Write(body);
             if (_faults.Armed("runner.en_checkpoint"))
             {
-                var tmp = CheckpointPath + ".tmp-caida";
+                var tmp = CheckpointPath + ".tmp-crash";
                 var bytes = Encoding.UTF8.GetBytes(text);
                 using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write)) { fs.Write(bytes, 0, bytes.Length / 2); fs.Flush(true); }
                 _faults.Hit("runner.en_checkpoint");
@@ -231,19 +230,27 @@ namespace Bimbridge.AgentHost
             Home.WriteAtomic(CheckpointPath, text);
         }
 
+        /// <summary>The seal covers the checkpoint as stored (a 0.9.3 checkpoint carries legacy key names): checked before normalizing it.</summary>
+        private static bool SealValid(Dictionary<string, object> cp)
+        {
+            var sealKey = cp.Keys.FirstOrDefault(k => LegacyAliases.Token(k) == "seal");
+            if (sealKey == null) return false;
+            var body = new Dictionary<string, object>(cp, StringComparer.Ordinal); body.Remove(sealKey);
+            return Arg.GetString(cp, sealKey) == Home.Sha256Hex(OpSemantics.Canonical(body), 32);
+        }
+
         /// <summary>Reads the checkpoint without a lease and without replaying the journal (inspection by another process). null if missing or unreliable.</summary>
         public static Dictionary<string, object> PeekCheckpoint(string dir, string planHash)
         {
             var diags = new List<Diagnostic>();
-            var path = Path.Combine(dir, "estado.json");
+            var path = LegacyAliases.ResolveExisting(dir, Path.Combine(dir, "state.json"));
             if (!File.Exists(path)) return null;
             try
             {
                 var cp = Json.ParseObject(File.ReadAllText(path));
-                var seal = Arg.GetString(cp, "sello");
-                var body = new Dictionary<string, object>(cp, StringComparer.Ordinal); body.Remove("sello");
-                if (seal != Home.Sha256Hex(OpSemantics.Canonical(body), 32) || Arg.GetString(cp, "plan") != planHash) return null;
-                return cp;
+                if (!SealValid(cp)) return null;
+                LegacyAliases.NormalizeRecord(cp);
+                return Arg.GetString(cp, "plan") != planHash ? null : cp;
             }
             catch (Exception ex) when (ex is FormatException || ex is IOException) { return null; }
         }

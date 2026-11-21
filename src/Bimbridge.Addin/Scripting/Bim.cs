@@ -44,7 +44,7 @@ namespace Bimbridge.Addin.Scripting
         {
             /// <summary>
             /// What is inside a group, with positions relative to its origin (mm, without the group rotation): lets you compare
-            /// instances of the same type even when rotated. "miembros_espejados" counts the FamilyInstances with Mirrored=true
+            /// instances of the same type even when rotated. "mirrored_members" counts the FamilyInstances with Mirrored=true
             /// (the API does not expose whether the whole group is mirrored).
             /// </summary>
             public static Dictionary<string, object> Inspect(Group g)
@@ -60,21 +60,21 @@ namespace Bimbridge.Addin.Scripting
                 {
                     var m = doc.GetElement(id);
                     if (m == null) continue;
-                    if (m is Group sub) { nested.Add(new Dictionary<string, object> { ["id"] = L(id), ["tipo"] = sub.GroupType?.Name }); continue; }
+                    if (m is Group sub) { nested.Add(new Dictionary<string, object> { ["id"] = L(id), ["type"] = sub.GroupType?.Name }); continue; }
                     if (m is FamilyInstance fi && fi.Mirrored) mirrored++;
                     var p = PointOf(m);
                     var rel = p == null ? null : inv.OfPoint(p) - o;
                     members.Add(new Dictionary<string, object>
                     {
-                        ["id"] = L(id), ["uid"] = m.UniqueId, ["cat"] = m.Category?.Name, ["tipo"] = TypeName(doc, m),
+                        ["id"] = L(id), ["uid"] = m.UniqueId, ["cat"] = m.Category?.Name, ["type"] = TypeName(doc, m),
                         ["rel_mm"] = rel == null ? null : new[] { R(rel.X), R(rel.Y), R(rel.Z) },
                     });
                 }
                 return new Dictionary<string, object>
                 {
-                    ["id"] = L(g.Id), ["tipo"] = g.GroupType?.Name, ["origen_mm"] = new[] { R(o.X), R(o.Y), R(o.Z) },
-                    ["giro"] = Math.Round(rot * 180 / Math.PI, 3), ["miembros"] = members.Count, ["anidados"] = nested,
-                    ["miembros_espejados"] = mirrored, ["detalle"] = members,
+                    ["id"] = L(g.Id), ["type"] = g.GroupType?.Name, ["origin_mm"] = new[] { R(o.X), R(o.Y), R(o.Z) },
+                    ["rotation"] = Math.Round(rot * 180 / Math.PI, 3), ["members"] = members.Count, ["nested"] = nested,
+                    ["mirrored_members"] = mirrored, ["detail"] = members,
                 };
             }
 
@@ -131,9 +131,9 @@ namespace Bimbridge.Addin.Scripting
                 var pairs = before.Keys.Intersect(after.Keys).Select(k => new object[] { k, before[k], after[k] }).ToList();
                 return new Dictionary<string, object>
                 {
-                    ["grupo"] = L(g.Id), ["anterior"] = previous, ["nuevo"] = g.GroupType?.Name, ["ok"] = g.GroupType?.Id == newType.Id,
-                    ["desplazado_mm"] = Math.Round(moved, 1), ["girado_grados"] = Math.Round(turned, 3),
-                    ["emparejados"] = pairs.Count, ["solo_antes"] = before.Keys.Except(after.Keys).ToList(), ["solo_despues"] = after.Keys.Except(before.Keys).ToList(),
+                    ["group"] = L(g.Id), ["previous"] = previous, ["new"] = g.GroupType?.Name, ["ok"] = g.GroupType?.Id == newType.Id,
+                    ["displaced_mm"] = Math.Round(moved, 1), ["rotated_degrees"] = Math.Round(turned, 3),
+                    ["paired"] = pairs.Count, ["only_before"] = before.Keys.Except(after.Keys).ToList(), ["only_after"] = after.Keys.Except(before.Keys).ToList(),
                 };
             }
 
@@ -144,7 +144,7 @@ namespace Bimbridge.Addin.Scripting
                 var sigs = inst.ToDictionary(x => L(x.Id), x => string.Join(";", x.GetMemberIds().Select(doc.GetElement).Where(m => m != null).Select(m => Signature(x, m)).OrderBy(s => s, StringComparer.Ordinal)));
                 var mode = sigs.Values.GroupBy(s => s).OrderByDescending(x => x.Count()).FirstOrDefault()?.Key;
                 var diff = sigs.Where(kv => kv.Value != mode).Select(kv => kv.Key).ToList();
-                return new Dictionary<string, object> { ["tipo"] = typeName, ["instancias"] = inst.Count, ["distintas"] = diff, ["coherente"] = diff.Count == 0 };
+                return new Dictionary<string, object> { ["type"] = typeName, ["instances"] = inst.Count, ["different"] = diff, ["coherent"] = diff.Count == 0 };
             }
         }
 
@@ -159,10 +159,10 @@ namespace Bimbridge.Addin.Scripting
                 var solids = new List<Solid>();
                 Bodies.CollectSolids(e.get_Geometry(Bodies.NewOptions()), solids, e.Document, new[] { "Light Source" });
                 if (Bodies.TryBox(solids, out var box))
-                    return new Dictionary<string, object> { ["zmin"] = R(box.Min.Z), ["zmax"] = R(box.Max.Z), ["min"] = new[] { R(box.Min.X), R(box.Min.Y) }, ["max"] = new[] { R(box.Max.X), R(box.Max.Y) }, ["fuente"] = "solidos" };
+                    return new Dictionary<string, object> { ["zmin"] = R(box.Min.Z), ["zmax"] = R(box.Max.Z), ["min"] = new[] { R(box.Min.X), R(box.Min.Y) }, ["max"] = new[] { R(box.Max.X), R(box.Max.Y) }, ["source"] = "solids" };
                 var bb = e.get_BoundingBox(null);
                 if (bb == null) return null;
-                return new Dictionary<string, object> { ["zmin"] = R(bb.Min.Z), ["zmax"] = R(bb.Max.Z), ["min"] = new[] { R(bb.Min.X), R(bb.Min.Y) }, ["max"] = new[] { R(bb.Max.X), R(bb.Max.Y) }, ["fuente"] = "box (no solids: approximate value)" };
+                return new Dictionary<string, object> { ["zmin"] = R(bb.Min.Z), ["zmax"] = R(bb.Max.Z), ["min"] = new[] { R(bb.Min.X), R(bb.Min.Y) }, ["max"] = new[] { R(bb.Max.X), R(bb.Max.Y) }, ["source"] = "box (no solids: approximate value)" };
             }
 
             /// <summary>First 3D view that is not a template and has no section box (ReferenceIntersector needs it).</summary>
@@ -171,18 +171,18 @@ namespace Bimbridge.Addin.Scripting
                     .OrderBy(v => v.IsSectionBoxActive ? 1 : 0).FirstOrDefault();
 
             /// <summary>
-            /// Finds the body's support with a ray from the body base in <paramref name="direction"/> ("arriba" | "abajo"),
+            /// Finds the body's support with a ray from the body base in <paramref name="direction"/> ("up" | "down"),
             /// also inside links. Classifies: al_ras (|clearance| ≤ tol), empotrado (the support cuts the body), separado (positive
             /// clearance: may be correct if pendant-mounted; the reviewer decides), sin_referencia (nothing within maxMm). Moves nothing.
             /// </summary>
-            public static Dictionary<string, object> Support(Element e, View3D view, string direction = "arriba", double maxMm = 3000, double tolMm = 3,
+            public static Dictionary<string, object> Support(Element e, View3D view, string direction = "up", double maxMm = 3000, double tolMm = 3,
                 IEnumerable<BuiltInCategory> categories = null)
             {
                 var doc = e.Document;
                 view = view ?? View3D(doc) ?? throw new InvalidOperationException("there is no non-template 3D view to cast rays");
                 var body = Body(e);
-                if (body == null) return new Dictionary<string, object> { ["id"] = L(e.Id), ["clase"] = "sin_cuerpo" };
-                var up = direction != "abajo";
+                if (body == null) return new Dictionary<string, object> { ["id"] = L(e.Id), ["class"] = "no_body" };
+                var up = direction != "down";
                 var cats = (categories ?? new[] { BuiltInCategory.OST_Floors, BuiltInCategory.OST_Ceilings, BuiltInCategory.OST_Roofs, BuiltInCategory.OST_StructuralFraming,
                     BuiltInCategory.OST_Stairs, BuiltInCategory.OST_Ramps, BuiltInCategory.OST_GenericModel }).ToList();
                 // The filter must also accept the link instance; the category of what is found inside the link is checked afterwards.
@@ -212,15 +212,15 @@ namespace Bimbridge.Addin.Scripting
                     else hit = host;
                     if (hit == null) continue;
                     var gap = (h.Proximity - height) * Ft;
-                    var cls = Math.Abs(gap) <= tolMm ? "al_ras" : gap < 0 ? "empotrado" : "separado";
+                    var cls = Math.Abs(gap) <= tolMm ? "flush" : gap < 0 ? "embedded" : "separated";
                     return new Dictionary<string, object>
                     {
-                        ["id"] = L(e.Id), ["clase"] = cls, ["holgura_mm"] = Math.Round(gap, 1), ["soporte"] = L(hit.Id), ["soporte_uid"] = hit.UniqueId,
-                        ["soporte_cat"] = hit.Category?.Name, ["vinculo"] = link, ["cuerpo"] = body["fuente"], ["direccion"] = up ? "arriba" : "abajo",
-                        ["regla"] = "vertical ray from the center of the body footprint; tolerance " + tolMm + " mm",
+                        ["id"] = L(e.Id), ["class"] = cls, ["clearance_mm"] = Math.Round(gap, 1), ["support"] = L(hit.Id), ["support_uid"] = hit.UniqueId,
+                        ["support_cat"] = hit.Category?.Name, ["link"] = link, ["body"] = body["source"], ["direction"] = up ? "up" : "down",
+                        ["rule"] = "vertical ray from the center of the body footprint; tolerance " + tolMm + " mm",
                     };
                 }
-                return new Dictionary<string, object> { ["id"] = L(e.Id), ["clase"] = "sin_referencia", ["direccion"] = up ? "arriba" : "abajo", ["max_mm"] = maxMm };
+                return new Dictionary<string, object> { ["id"] = L(e.Id), ["class"] = "no_reference", ["direction"] = up ? "up" : "down", ["max_mm"] = maxMm };
             }
 
             /// <summary>Revit Transform (feet) → engine Xform (mm) to use ManifestQc/transformations without Revit.</summary>
@@ -237,39 +237,39 @@ namespace Bimbridge.Addin.Scripting
         public static class Views
         {
             private static readonly PlanViewPlane[] Planes = { PlanViewPlane.TopClipPlane, PlanViewPlane.CutPlane, PlanViewPlane.BottomClipPlane, PlanViewPlane.ViewDepthPlane };
-            private static string PlaneName(PlanViewPlane p) => p == PlanViewPlane.TopClipPlane ? "superior" : p == PlanViewPlane.CutPlane ? "corte" : p == PlanViewPlane.BottomClipPlane ? "inferior" : "profundidad";
+            private static string PlaneName(PlanViewPlane p) => p == PlanViewPlane.TopClipPlane ? "top" : p == PlanViewPlane.CutPlane ? "cut" : p == PlanViewPlane.BottomClipPlane ? "bottom" : "depth";
 
-            /// <summary>View range: per plane, level + offset and absolute elevation (mm, project elevation). "ilimitado" when applicable.</summary>
+            /// <summary>View range: per plane, level + offset and absolute elevation (mm, project elevation). "unlimited" when applicable.</summary>
             public static Dictionary<string, object> Range(ViewPlan v)
             {
                 var doc = v.Document;
                 var r = v.GetViewRange();
-                var o = new Dictionary<string, object> { ["vista"] = L(v.Id), ["nombre"] = v.Name, ["tipo"] = v.ViewType.ToString() };
+                var o = new Dictionary<string, object> { ["view"] = L(v.Id), ["name"] = v.Name, ["type"] = v.ViewType.ToString() };
                 foreach (var p in Planes)
                 {
                     var lid = r.GetLevelId(p);
                     var off = r.GetOffset(p);
-                    if (lid == PlanViewRange.Unlimited) { o[PlaneName(p)] = new Dictionary<string, object> { ["nivel"] = "ilimitado" }; continue; }
+                    if (lid == PlanViewRange.Unlimited) { o[PlaneName(p)] = new Dictionary<string, object> { ["level"] = "unlimited" }; continue; }
                     var lvl = lid == PlanViewRange.LevelAbove ? null : lid == PlanViewRange.Current ? v.GenLevel : doc.GetElement(lid) as Level;
                     o[PlaneName(p)] = new Dictionary<string, object>
                     {
-                        ["nivel"] = lid == PlanViewRange.LevelAbove ? "level above" : lvl?.Name, ["desfase_mm"] = R(off),
-                        ["cota_mm"] = lvl == null ? (object)null : R(lvl.Elevation + off),
+                        ["level"] = lid == PlanViewRange.LevelAbove ? "level above" : lvl?.Name, ["offset_mm"] = R(off),
+                        ["dimension_mm"] = lvl == null ? (object)null : R(lvl.Elevation + off),
                     };
                 }
                 var tid = v.ViewTemplateId;
-                if (tid != ElementId.InvalidElementId) o["plantilla"] = doc.GetElement(tid)?.Name;
+                if (tid != ElementId.InvalidElementId) o["template"] = doc.GetElement(tid)?.Name;
                 return o;
             }
 
             /// <summary>
-            /// Changes a range plane ("superior"|"corte"|"inferior"|"profundidad") to level + offset (mm). Fails with a clear message if a
+            /// Changes a range plane ("top"|"cut"|"bottom"|"depth") to level + offset (mm). Fails with a clear message if a
             /// template controls the range. Requires a transaction.
             /// </summary>
             public static void ApplyRange(ViewPlan v, string plane, Level level, double offsetMm)
             {
                 var p = Planes.FirstOrDefault(x => PlaneName(x) == plane);
-                if (PlaneName(p) != plane) throw new ArgumentException("plane must be superior, corte, inferior or profundidad");
+                if (PlaneName(p) != plane) throw new ArgumentException("plane must be top, cut, bottom or depth");
                 var tid = v.ViewTemplateId;
                 if (tid != ElementId.InvalidElementId && v.Document.GetElement(tid) is View t
                     && !t.GetNonControlledTemplateParameterIds().Contains(new ElementId(BuiltInParameter.PLAN_VIEW_RANGE)))
@@ -284,7 +284,7 @@ namespace Bimbridge.Addin.Scripting
             public static Dictionary<string, object> CompareTemplate(View v)
             {
                 var doc = v.Document;
-                if (!(doc.GetElement(v.ViewTemplateId) is View t)) return new Dictionary<string, object> { ["vista"] = v.Name, ["plantilla"] = null };
+                if (!(doc.GetElement(v.ViewTemplateId) is View t)) return new Dictionary<string, object> { ["view"] = v.Name, ["template"] = null };
                 var all = t.GetTemplateParameterIds();
                 var free = new HashSet<ElementId>(t.GetNonControlledTemplateParameterIds());
                 string name(ElementId id)
@@ -295,9 +295,9 @@ namespace Bimbridge.Addin.Scripting
                 }
                 return new Dictionary<string, object>
                 {
-                    ["vista"] = v.Name, ["plantilla"] = t.Name,
-                    ["controla"] = all.Where(i => !free.Contains(i)).Select(name).OrderBy(s => s).ToList(),
-                    ["libres"] = all.Where(free.Contains).Select(name).OrderBy(s => s).ToList(),
+                    ["view"] = v.Name, ["template"] = t.Name,
+                    ["controls"] = all.Where(i => !free.Contains(i)).Select(name).OrderBy(s => s).ToList(),
+                    ["free_items"] = all.Where(free.Contains).Select(name).OrderBy(s => s).ToList(),
                 };
             }
 
@@ -361,10 +361,10 @@ namespace Bimbridge.Addin.Scripting
                 var regions = new List<long>();
                 if (v is ViewPlan vp)
                 {
-                    f.PlanKind = vp.ViewType == ViewType.CeilingPlan ? "rcp" : vp.ViewType == ViewType.FloorPlan || vp.ViewType == ViewType.EngineeringPlan ? "planta" : null;
+                    f.PlanKind = vp.ViewType == ViewType.CeilingPlan ? "rcp" : vp.ViewType == ViewType.FloorPlan || vp.ViewType == ViewType.EngineeringPlan ? "floorplan" : null;
                     var rg = Range(vp);
-                    double? elevation(string k) => rg.TryGetValue(k, out var x) && x is Dictionary<string, object> d && d.TryGetValue("cota_mm", out var c) && c is double cd ? cd : (double?)null;
-                    f.Top = elevation("superior"); f.Cut = elevation("corte"); f.Bottom = elevation("inferior"); f.Depth = elevation("profundidad");
+                    double? elevation(string k) => rg.TryGetValue(k, out var x) && x is Dictionary<string, object> d && d.TryGetValue("dimension_mm", out var c) && c is double cd ? cd : (double?)null;
+                    f.Top = elevation("top"); f.Cut = elevation("cut"); f.Bottom = elevation("bottom"); f.Depth = elevation("depth");
                     f.RangeSource = "view range";
                     var body = Mounting.Body(e);
                     if (body != null) { f.ZMin = (double)body["zmin"]; f.ZMax = (double)body["zmax"]; }
@@ -385,12 +385,12 @@ namespace Bimbridge.Addin.Scripting
                     }
                 }
                 var reasons = VisibilityQc.Explain(f, out var notCheckable);
-                if (regions.Count > 0) foreach (var r in reasons.Where(x => x.Code == "rango_de_vista")) r.Certain = false;
+                if (regions.Count > 0) foreach (var r in reasons.Where(x => x.Code == "view_range_of")) r.Certain = false;
                 return new Dictionary<string, object>
                 {
-                    ["vista"] = v.Name, ["id"] = L(e.Id), ["visible_segun_api"] = reasons.Count == 0,
-                    ["causas"] = reasons.Select(x => x.ToString()).ToList(), ["no_comprobable"] = notCheckable.Concat(notes).ToList(),
-                    ["cuerpo_mm"] = f.ZMin.HasValue ? new[] { f.ZMin.Value, f.ZMax.Value } : null, ["regiones_de_plano"] = regions,
+                    ["view"] = v.Name, ["id"] = L(e.Id), ["visible_per_api"] = reasons.Count == 0,
+                    ["causes"] = reasons.Select(x => x.ToString()).ToList(), ["not_checkable"] = notCheckable.Concat(notes).ToList(),
+                    ["body_mm"] = f.ZMin.HasValue ? new[] { f.ZMin.Value, f.ZMax.Value } : null, ["plan_regions"] = regions,
                 };
             }
 

@@ -43,7 +43,7 @@ namespace Bimbridge.Tests
             return Task.CompletedTask;
         }
 
-        private Task<McpClient> Connect(string clientName, string profile = "completo")
+        private Task<McpClient> Connect(string clientName, string profile = "complete")
         {
             var bridgeDll = typeof(Bimbridge.Bridge.Program).Assembly.Location;
             var transport = new StdioClientTransport(new StdioClientTransportOptions
@@ -88,10 +88,10 @@ namespace Bimbridge.Tests
                 var reconstructed = new StringBuilder();
                 for (var from = 0; ; from += 7)
                 {
-                    var part = await Call(client, "res", new Dictionary<string, object> { ["id"] = id, ["desde"] = from, ["lineas"] = 7 });
-                    Assert.Equal((long)from, part["desde"]);
-                    reconstructed.Append(((string)part["texto"]).Replace("\n", ""));
-                    if (from + 7 >= (long)part["total_lineas"]) break;
+                    var part = await Call(client, "res", new Dictionary<string, object> { ["id"] = id, ["from"] = from, ["lines"] = 7 });
+                    Assert.Equal((long)from, part["from"]);
+                    reconstructed.Append(((string)part["text"]).Replace("\n", ""));
+                    if (from + 7 >= (long)part["total_lines"]) break;
                 }
                 var original = Assert.IsType<Dictionary<string, object>>(Response.FromJson(reconstructed.ToString()).Data);
                 Assert.Equal(first["cursor"], original["cursor"]);
@@ -99,7 +99,7 @@ namespace Bimbridge.Tests
                 Assert.Equal(new object[] { 70001L, FakeRevit.WideCell }, largeRow);
 
                 var next = await Call(client, "query", new Dictionary<string, object> { ["cursor"] = first["cursor"], ["page"] = 2 });
-                Assert.Equal(first["rev_instantanea"], next["rev_instantanea"]);
+                Assert.Equal(first["snapshot_rev"], next["snapshot_rev"]);
                 Assert.Equal(2L, next["page"]);
                 var nextRow = Assert.IsType<List<object>>(Assert.Single(Assert.IsType<List<object>>(next["rows"])));
                 Assert.Equal(new object[] { 70002L, "second row" }, nextRow);
@@ -115,12 +115,12 @@ namespace Bimbridge.Tests
 
             // Full profile: 20 tools, no trace of ports, sessions or the internal queue.
             var tools = await claude.ListToolsAsync();
-            Assert.Equal(new[] { "capture", "catalog", "check", "commit", "doc_op", "docs", "exec", "fam", "geo", "get", "guide", "job", "lote", "plan", "query", "res", "revit_context", "sets", "show", "tarea" },
+            Assert.Equal(new[] { "batch", "capture", "catalog", "check", "commit", "doc_op", "docs", "exec", "fam", "geo", "get", "guide", "job", "plan", "query", "res", "revit_context", "sets", "show", "task" },
                 tools.Select(t => t.Name).OrderBy(n => n).ToArray());
             foreach (var t in tools)
             {
                 var schema = t.JsonSchema.ToString() + t.Description;
-                Assert.DoesNotContain("puerto", schema, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("port", schema, StringComparison.OrdinalIgnoreCase);
                 Assert.DoesNotContain("sesi", schema, StringComparison.OrdinalIgnoreCase);
             }
 
@@ -131,7 +131,7 @@ namespace Bimbridge.Tests
             var r2 = await t2;
 
             Assert.Equal(5L, r1["total"]);
-            Assert.Equal("$l5", r1["guardado"]);
+            Assert.Equal("$l5", r1["saved"]);
             Assert.Equal(9L, r2["total"]);
             Assert.Equal(3, ((List<object>)r2["groups"]).Count);
 
@@ -145,7 +145,7 @@ namespace Bimbridge.Tests
             var reuse = await Call(claude, "query", new Dictionary<string, object> { ["ids"] = "$l5", ["count"] = true });
             Assert.Equal(5L, reuse["total"]);
             var other = await Call(codex, "query", new Dictionary<string, object> { ["ids"] = "$l5" });
-            Assert.Equal("invalido", other["estado"]);
+            Assert.Equal("invalid", other["status"]);
         }
 
         [Fact]
@@ -161,11 +161,11 @@ namespace Bimbridge.Tests
                 ["ops"] = Json.Parse("[{\"op\":\"set_elevation\",\"ids\":\"17855000,17855001\",\"ft\":12.5}]"),
                 ["summary"] = "Raise 2 L5 fixtures",
             });
-            Assert.Equal(2L, plan["cambios"]);
+            Assert.Equal(2L, plan["changes"]);
             var pid = (string)plan["plan_id"];
             var commit = await Call(claude, "commit", new Dictionary<string, object> { ["plan_id"] = pid });
-            Assert.Equal("retenido", commit["estado"]);
-            Assert.Equal(1L, commit["posicion_en_cola"]);
+            Assert.Equal("held", commit["status"]);
+            Assert.Equal(1L, commit["queue_position"]);
             Assert.Equal(10.0, _fake.Elev(17855000));
 
             // Codex plans on the same fixture: it chains onto what is held (before = 12.5).
@@ -173,9 +173,9 @@ namespace Bimbridge.Tests
             {
                 ["ops"] = Json.Parse("[{\"op\":\"set_elevation\",\"ids\":\"17855000\",\"ft\":13}]"),
             });
-            var row = (List<object>)((List<object>)plan2["filas"])[0];
+            var row = (List<object>)((List<object>)plan2["rows"])[0];
             Assert.Equal("12'-6\" (12.5 ft)", row[3]);
-            Assert.Equal("retenido", (await Call(codex, "commit", new Dictionary<string, object> { ["plan_id"] = plan2["plan_id"] }))["estado"]);
+            Assert.Equal("held", (await Call(codex, "commit", new Dictionary<string, object> { ["plan_id"] = plan2["plan_id"] }))["status"]);
 
             // A third plan that the user invalidates by hand while it waits.
             var plan3 = await Call(claude, "plan", new Dictionary<string, object>
@@ -187,17 +187,17 @@ namespace Bimbridge.Tests
 
             // the operator presses "Apply queue".
             var result = _fake.ApplyQueue();
-            Assert.Equal(new[] { "aplicado", "aplicado", "conflicto" }, result);
+            Assert.Equal(new[] { "applied", "applied", "conflict" }, result);
             Assert.Equal(13.0, _fake.Elev(17855000));
             Assert.Equal(12.5, _fake.Elev(17855001));
             Assert.Equal(8.0, _fake.Elev(17855005));
 
             // The AI queries afterwards: it knows what happened without repeating anything.
             var job = await Call(claude, "job", new Dictionary<string, object> { ["plan_id"] = pid });
-            Assert.False(job.ContainsKey("estado"));
-            Assert.Equal("aplicado", job["estado_plan"]);
+            Assert.False(job.ContainsKey("status"));
+            Assert.Equal("applied", job["plan_status"]);
             var job3 = await Call(claude, "job", new Dictionary<string, object> { ["plan_id"] = plan3["plan_id"] });
-            Assert.Equal("conflicto", job3["estado"]);
+            Assert.Equal("conflict", job3["status"]);
 
             // With the queue off, commit applies directly.
             _fake.Hold.Set(false);
@@ -206,12 +206,12 @@ namespace Bimbridge.Tests
                 ["ops"] = Json.Parse("{\"op\":\"set_elevation\",\"ids\":\"17855002\",\"ft\":11}"),
             });
             var c4 = await Call(claude, "commit", new Dictionary<string, object> { ["plan_id"] = plan4["plan_id"] });
-            Assert.False(c4.ContainsKey("estado"));
+            Assert.False(c4.ContainsKey("status"));
             Assert.Equal(11.0, _fake.Elev(17855002));
 
             // Free-form code does not exist as an option.
             var bad = await Call(claude, "plan", new Dictionary<string, object> { ["ops"] = Json.Parse("[{\"op\":\"run_python\",\"ids\":\"1\"}]") });
-            Assert.Equal("invalido", bad["estado"]);
+            Assert.Equal("invalid", bad["status"]);
         }
 
         [Fact]
@@ -220,53 +220,53 @@ namespace Bimbridge.Tests
             await using var c = await Connect("claude-code");
 
             // guide does not touch Revit and filters by operation (less text)
-            var g = await c.CallToolAsync("guide", new Dictionary<string, object> { ["tema"] = "escritura", ["op"] = "tag" });
+            var g = await c.CallToolAsync("guide", new Dictionary<string, object> { ["topic"] = "write", ["op"] = "tag" });
             var guideText = g.Content.OfType<TextContentBlock>().First().Text;
             Assert.Contains("- tag", guideText);
             Assert.DoesNotContain("- place", guideText);
             Assert.True(guideText.Length < OpCatalog.Guide().Length / 5);
 
             // batch: several reads in one call, in order; the write is rejected without affecting the others
-            var batch = await Call(c, "lote", new Dictionary<string, object>
+            var batch = await Call(c, "batch", new Dictionary<string, object>
             {
-                ["llamadas"] = new object[]
+                ["calls"] = new object[]
                 {
                     new Dictionary<string, object> { ["tool"] = "query", ["cat"] = "LightingFixtures", ["count"] = true },
-                    new Dictionary<string, object> { ["tool"] = "catalog", ["que"] = "niveles" },
+                    new Dictionary<string, object> { ["tool"] = "catalog", ["kind"] = "levels" },
                     new Dictionary<string, object> { ["tool"] = "get", ["ids"] = "17855000", ["f"] = "*" },
                     new Dictionary<string, object> { ["tool"] = "plan", ["ops"] = "[]" },
                 },
             });
-            var res = ((List<object>)batch["resultados"]).Cast<Dictionary<string, object>>().ToList();
+            var res = ((List<object>)batch["results"]).Cast<Dictionary<string, object>>().ToList();
             Assert.Equal(new[] { "query", "catalog", "get", "plan" }, res.Select(r => (string)r["tool"]).ToArray());
             Assert.Equal(9L, res[0]["total"]);
-            Assert.Equal("niveles", res[1]["que"]);
-            Assert.Equal("params", res[2]["op_vista"]);              // get f=* goes to the read of all parameters
-            Assert.Equal(Status.Invalid, res[3]["estado"]);
+            Assert.Equal("levels", res[1]["kind"]);
+            Assert.Equal("params", res[2]["op_view"]);              // get f=* goes to the read of all parameters
+            Assert.Equal(Status.Invalid, res[3]["status"]);
 
             // a direct get f=* is also routed to params
             var all = await Call(c, "get", new Dictionary<string, object> { ["ids"] = "17855000", ["f"] = "*" });
-            Assert.Equal("params", all["op_vista"]);
+            Assert.Equal("params", all["op_view"]);
 
             // capture returns text + image
-            var cap = await c.CallToolAsync("capture", new Dictionary<string, object> { ["colorear"] = "categorias" });
+            var cap = await c.CallToolAsync("capture", new Dictionary<string, object> { ["color_by"] = "categories" });
             Assert.False(cap.IsError ?? false);
             var img = cap.Content.OfType<ImageContentBlock>().Single();
             Assert.Equal("image/png", img.MimeType);
             Assert.Equal(0x89, img.DecodedData.Span[0]);
             var capText = Json.ParseObject(cap.Content.OfType<TextContentBlock>().First().Text);
             Assert.False(capText.ContainsKey("mime"));
-            Assert.True(capText.ContainsKey("leyenda"));
+            Assert.True(capText.ContainsKey("legend"));
         }
 
         [Fact]
         public async Task CompactProfile_ThreeTools_OneLineCommands_TextOutput()
         {
-            await using var c = await Connect("claude-code", "compacto");
+            await using var c = await Connect("claude-code", "compact_profile");
             var tools = await c.ListToolsAsync();
             Assert.Equal(new[] { "act", "commit", "exec", "plan", "power", "revit" }, tools.Select(t => t.Name).OrderBy(n => n).ToArray());
             // 0.9.0: Power Engine through the same real bridge; on-demand discovery, and without authorized folders it opens no documents
-            var pw = (await c.CallToolAsync("power", new Dictionary<string, object> { ["c"] = "cap ejes\npdf info ruta=/etc/passwd" })).Content.OfType<TextContentBlock>().First().Text;
+            var pw = (await c.CallToolAsync("power", new Dictionary<string, object> { ["c"] = "cap grids\npdf info path=/etc/passwd" })).Content.OfType<TextContentBlock>().First().Text;
             Assert.Contains("pdf.grids", pw);
             Assert.Contains("no authorized document folders", pw);
 
@@ -288,49 +288,49 @@ namespace Bimbridge.Tests
             Assert.Contains("plan_id:", planText);
             var id = planText.Split('\n').First(l => l.StartsWith("plan_id:")).Substring(8).Trim();
             var commit = await c.CallToolAsync("commit", new Dictionary<string, object> { ["plan_id"] = id });
-            Assert.DoesNotContain("invalido", commit.Content.OfType<TextContentBlock>().First().Text);
+            Assert.DoesNotContain("invalid", commit.Content.OfType<TextContentBlock>().First().Text);
 
             // unknown command → actionable error
             var bad = await c.CallToolAsync("revit", new Dictionary<string, object> { ["c"] = "zzz" });
             Assert.True(bad.IsError ?? false);
 
             // capture: image + text, no file path
-            var cap = await c.CallToolAsync("revit", new Dictionary<string, object> { ["c"] = "cap colorear=categorias" });
+            var cap = await c.CallToolAsync("revit", new Dictionary<string, object> { ["c"] = "cap color_by=categories" });
             Assert.Single(cap.Content.OfType<ImageContentBlock>());
-            Assert.DoesNotContain("archivo", cap.Content.OfType<TextContentBlock>().First().Text);
+            Assert.DoesNotContain("file", cap.Content.OfType<TextContentBlock>().First().Text);
         }
 
         [Fact]
         public async Task CompactProfile_ExecAndAct_PassArgumentsAndStopAfterFailure()
         {
-            await using var c = await Connect("claude-code", "compacto");
+            await using var c = await Connect("claude-code", "compact_profile");
             var ex = await c.CallToolAsync("exec", new Dictionary<string, object>
             {
-                ["codigo"] = "return args[\"n\"];", ["modo"] = "ejecutar", ["tx"] = "ninguna", ["doc"] = "d3",
-                ["args"] = new Dictionary<string, object> { ["n"] = 6.5 }, ["clave"] = "lav-1", ["tarea"] = "sinks",
+                ["code"] = "return args[\"n\"];", ["mode"] = "run", ["tx"] = "none", ["doc"] = "d3",
+                ["args"] = new Dictionary<string, object> { ["n"] = 6.5 }, ["key"] = "lav-1", ["task"] = "sinks",
             });
             Assert.False(ex.IsError ?? false);
             string seen;
             lock (_fake.Seen) seen = _fake.Seen.Last();
             Assert.StartsWith("exec ", seen);
-            foreach (var part in new[] { "\"modo\":\"ejecutar\"", "\"tx\":\"ninguna\"", "\"doc\":\"d3\"", "\"clave\":\"lav-1\"", "\"tarea\":\"sinks\"", "\"n\":6.5" })
+            foreach (var part in new[] { "\"mode\":\"run\"", "\"tx\":\"none\"", "\"doc\":\"d3\"", "\"key\":\"lav-1\"", "\"task\":\"sinks\"", "\"n\":6.5" })
                 Assert.Contains(part, seen);
 
             // act: in order; the 2nd fails (no radius) → the 3rd (load) is not attempted.
             _fake.Seen.Clear();
             var act = await c.CallToolAsync("act", new Dictionary<string, object>
             {
-                ["c"] = "conector nombre=cold sistema=cold cara=812:3 radio=6.5mm doc=d3\nconector nombre=hot sistema=hot cara=812:5 doc=d3\ncargar en=d1 doc=d3",
+                ["c"] = "conector name=cold system=cold face=812:3 radius=6.5mm doc=d3\nconector name=hot system=hot face=812:5 doc=d3\ncargar en=d1 doc=d3",
             });
             var text = act.Content.OfType<TextContentBlock>().First().Text;
-            Assert.Contains("parcial: 1 of 3 failed", text);
-            Assert.Contains("## ERROR conector nombre=hot", text);
+            Assert.Contains("partial: 1 of 3 failed", text);
+            Assert.Contains("## ERROR conector name=hot", text);
             Assert.Contains("skipped the remaining", text);
             lock (_fake.Seen)
             {
                 Assert.Equal(2, _fake.Seen.Count);
-                Assert.Contains("\"radio\":\"6.5mm\"", _fake.Seen[0]);
-                Assert.DoesNotContain(_fake.Seen, x => x.Contains("cargar"));
+                Assert.Contains("\"radius\":\"6.5mm\"", _fake.Seen[0]);
+                Assert.DoesNotContain(_fake.Seen, x => x.Contains("load"));
             }
 
             // revit fam only reads
@@ -338,61 +338,101 @@ namespace Bimbridge.Tests
             Assert.True(famOpen.IsError ?? false);
         }
 
+        /// <summary>0.9.4: a client still speaking the 0.9.3 (Spanish) vocabulary keeps working for one version; answers are English only.
+        /// The Spanish names and values here are intentional alias test data.</summary>
+        [Fact]
+        public async Task LegacySpanishRequests_AreAccepted_AndTheReplyIsEnglish()
+        {
+            await using var c = await Connect("claude-code", "compact_profile");
+            string Last() { lock (_fake.Seen) return _fake.Seen.Last(); }
+
+            var ex = await c.CallToolAsync("exec", new Dictionary<string, object>
+            {
+                ["codigo"] = "return 1;", ["modo"] = "ejecutar", ["tx"] = "ninguna", ["clave"] = "k-es", ["tarea"] = "t-es", ["archivo"] = null,
+            });
+            Assert.False(ex.IsError ?? false);
+            var seen = Last();
+            Assert.StartsWith("exec ", seen);
+            foreach (var part in new[] { "\"code\":\"return 1;\"", "\"mode\":\"run\"", "\"tx\":\"none\"", "\"key\":\"k-es\"", "\"task\":\"t-es\"" })
+                Assert.Contains(part, seen);
+            foreach (var legacy in new[] { "codigo", "modo", "clave", "tarea", "ejecutar", "ninguna" })
+                Assert.DoesNotContain("\"" + legacy + "\"", seen);
+
+            await c.CallToolAsync("commit", new Dictionary<string, object> { ["plan_id"] = "P-es", ["clave"] = "k2", ["modo"] = "ensayo", ["reconciliar"] = "aplicado" });
+            seen = Last();
+            foreach (var part in new[] { "\"key\":\"k2\"", "\"mode\":\"trial\"", "\"reconcile\":\"applied\"" })
+                Assert.Contains(part, seen);
+
+            var rd = await c.CallToolAsync("revit", new Dictionary<string, object> { ["c"] = "tarea estado T9 desde=3" });
+            var text = rd.Content.OfType<TextContentBlock>().First().Text;
+            lock (_fake.Seen)
+                Assert.Contains(_fake.Seen, x => x.StartsWith("task ") && x.Contains("\"action\":\"status\"") && x.Contains("\"from\":3") && x.Contains("\"id\":\"T9\""));
+            foreach (var legacy in new[] { "estado:", "aviso:", "datos:", "parcial:" })
+                Assert.DoesNotContain(legacy, text);
+
+            var act = await c.CallToolAsync("act", new Dictionary<string, object> { ["c"] = "guardar como=C:\\x.rvt doc=d3" });
+            Assert.False(act.IsError ?? false);
+            seen = Last();
+            Assert.StartsWith("doc ", seen);
+            Assert.Contains("\"action\":\"save\"", seen);
+            Assert.Contains("\"as\":\"C:\\\\x.rvt\"", seen);
+        }
+
         [Fact]
         public async Task TaskAndRecoveryArguments_ReachTheHandler_InBothProfiles()
         {
-            await using var c = await Connect("codex-mcp-client", "compacto");
+            await using var c = await Connect("codex-mcp-client", "compact_profile");
             string Last() { lock (_fake.Seen) return _fake.Seen.Last(); }
 
             // exec: archivo, refs, docs and reconciliar arrive as is (H04)
             await c.CallToolAsync("exec", new Dictionary<string, object>
             {
-                ["archivo"] = @"C:\recetas\lav.cs", ["modo"] = "ejecutar", ["refs"] = @"C:\libs\A.dll, C:\libs\B.dll", ["docs"] = "d2,d3",
-                ["clave"] = "k9", ["reconciliar"] = "no_aplicado",
+                ["file"] = @"C:\recetas\lav.cs", ["mode"] = "run", ["refs"] = @"C:\libs\A.dll, C:\libs\B.dll", ["docs"] = "d2,d3",
+                ["key"] = "k9", ["reconcile"] = "not_applied",
             });
             var seen = Last();
-            foreach (var part in new[] { "\"archivo\":\"C:\\\\recetas\\\\lav.cs\"", "\"refs\":[\"C:\\\\libs\\\\A.dll\",\"C:\\\\libs\\\\B.dll\"]", "\"docs\":[\"d2\",\"d3\"]", "\"reconciliar\":\"no_aplicado\"", "\"clave\":\"k9\"" })
+            foreach (var part in new[] { "\"file\":\"C:\\\\recetas\\\\lav.cs\"", "\"refs\":[\"C:\\\\libs\\\\A.dll\",\"C:\\\\libs\\\\B.dll\"]", "\"docs\":[\"d2\",\"d3\"]", "\"reconcile\":\"not_applied\"", "\"key\":\"k9\"" })
                 Assert.Contains(part, seen);
 
             // commit: reconciliar
-            await c.CallToolAsync("commit", new Dictionary<string, object> { ["plan_id"] = "P-x", ["clave"] = "k1", ["reconciliar"] = "aplicado" });
-            Assert.Contains("\"reconciliar\":\"aplicado\"", Last());
+            await c.CallToolAsync("commit", new Dictionary<string, object> { ["plan_id"] = "P-x", ["key"] = "k1", ["reconcile"] = "applied" });
+            Assert.Contains("\"reconcile\":\"applied\"", Last());
 
             // act: a single command starts the whole task, with policy and args
             var act = await c.CallToolAsync("act", new Dictionary<string, object>
             {
-                ["c"] = "tarea iniciar receta=agrupar_unidades id=g1 objetivo=\"L5 groups\" args.nivel=LEVEL05 args.max=3 guardar_cada=200 al_final=guardar,pdf en_error=continuar",
+                ["c"] = "tarea iniciar recipe=agrupar_unidades id=g1 target=\"L5 groups\" args.nivel=LEVEL05 args.max=3 save_every=200 at_end=save,pdf on_error=continue",
             });
             Assert.False(act.IsError ?? false);
             seen = Last();
-            Assert.StartsWith("tarea ", seen);
-            foreach (var part in new[] { "\"accion\":\"iniciar\"", "\"id\":\"g1\"", "\"receta\":\"agrupar_unidades\"", "\"objetivo\":\"L5 groups\"",
-                                         "\"nivel\":\"LEVEL05\"", "\"guardar_cada\":200", "\"al_final\":\"guardar,pdf\"", "\"en_error\":\"continuar\"" })
+            Assert.StartsWith("task ", seen);   // legacy verb and argument names in, English on the wire
+            foreach (var part in new[] { "\"action\":\"start\"", "\"id\":\"g1\"", "\"recipe\":\"agrupar_unidades\"", "\"target\":\"L5 groups\"",
+                                         "\"nivel\":\"LEVEL05\"", "\"save_every\":200", "\"at_end\":\"save,pdf\"", "\"on_error\":\"continue\"" })
                 Assert.Contains(part, seen);
             Assert.DoesNotContain("args.nivel", seen);
 
             // act: args as JSON and reconcile with keys
-            await c.CallToolAsync("act", new Dictionary<string, object> { ["c"] = "tarea reconciliar g1 decision=no_aplicada claves=u1,u2" });
+            await c.CallToolAsync("act", new Dictionary<string, object> { ["c"] = "tarea reconciliar g1 decision=not_applied keys=u1,u2" });
             seen = Last();
-            Assert.Contains("\"accion\":\"reconciliar\"", seen);
-            Assert.Contains("\"decision\":\"no_aplicada\"", seen);
+            Assert.Contains("\"action\":\"reconcile\"", seen);
+            Assert.Contains("\"decision\":\"not_applied\"", seen);
 
             // revit: task reads; writes are rejected in the bridge
-            await c.CallToolAsync("revit", new Dictionary<string, object> { ["c"] = "tarea esperar g1 desde=7 max=5" });
+            await c.CallToolAsync("revit", new Dictionary<string, object> { ["c"] = "tarea esperar g1 from=7 max=5" });
             seen = Last();
-            foreach (var part in new[] { "\"accion\":\"esperar\"", "\"id\":\"g1\"", "\"desde\":7", "\"max\":5" }) Assert.Contains(part, seen);
-            var w = await c.CallToolAsync("revit", new Dictionary<string, object> { ["c"] = "tarea iniciar receta=x" });
+            foreach (var part in new[] { "\"action\":\"wait\"", "\"id\":\"g1\"", "\"from\":7", "\"max\":5" }) Assert.Contains(part, seen);
+            var w = await c.CallToolAsync("revit", new Dictionary<string, object> { ["c"] = "tarea iniciar recipe=x" });
             Assert.True(w.IsError ?? false);
 
             // full profile: tarea tool with options
             await using var f = await Connect("claude-code");
-            await f.CallToolAsync("tarea", new Dictionary<string, object>
+            await f.CallToolAsync("task", new Dictionary<string, object>
             {
-                ["accion"] = "iniciar", ["archivo"] = @"C:\r\x.cs", ["id"] = "t2",
-                ["args"] = new Dictionary<string, object> { ["nivel"] = "LEVEL06" }, ["opciones"] = "guardar_cada=50 al_final=guardar espera_s=0",
+                ["action"] = "start", ["file"] = @"C:\r\x.cs", ["id"] = "t2",
+                ["args"] = new Dictionary<string, object> { ["level"] = "LEVEL06" }, ["options"] = "save_every=50 at_end=save wait_s=0",
             });
             seen = Last();
-            foreach (var part in new[] { "\"accion\":\"iniciar\"", "\"id\":\"t2\"", "\"nivel\":\"LEVEL06\"", "\"guardar_cada\":50", "\"al_final\":\"guardar\"", "\"espera_s\":0" })
+            foreach (var part in new[] { "\"action\":\"start\"", "\"id\":\"t2\"", "\"level\":\"LEVEL06\"", "\"save_every\":50", "\"at_end\":\"save\"", "\"wait_s\":0" })
                 Assert.Contains(part, seen);
         }
 
@@ -401,8 +441,8 @@ namespace Bimbridge.Tests
         {
             await using var c = await Connect("claude-code");
             var r = await Call(c, "query", new Dictionary<string, object> { ["f"] = "id" });
-            Assert.Equal("invalido", r["estado"]);
-            Assert.Contains("cat, ids, set or view", (string)r["aviso"]);
+            Assert.Equal("invalid", r["status"]);
+            Assert.Contains("cat, ids, set or view", (string)r["warning"]);
         }
 
         [Fact]
@@ -411,7 +451,7 @@ namespace Bimbridge.Tests
             _host.Dispose(); // Revit "closed"
             await using var c = await Connect("claude-code");
             var r = await Call(c, "revit_context");
-            Assert.Equal("revit_no_disponible", r["estado"]);
+            Assert.Equal("revit_unavailable", r["status"]);
         }
 
         [Fact]
@@ -422,7 +462,7 @@ namespace Bimbridge.Tests
             await pipe.ConnectAsync(5000);
             await Frame.WriteAsync(pipe, Json.Write(new Request { Id = 1, Op = Wire.OpHello, Args = new Dictionary<string, object>
             {
-                ["protocol"] = (long)Wire.ProtocolVersion, ["client"] = "test", ["agente"] = "E2E deadline " + Guid.NewGuid().ToString("N").Substring(0, 6), ["agente_fuente"] = AgentIdentity.SourceConfig,
+                ["protocol"] = (long)Wire.ProtocolVersion, ["client"] = "test", ["agent"] = "E2E deadline " + Guid.NewGuid().ToString("N").Substring(0, 6), ["agent_source"] = AgentIdentity.SourceConfig,
             } }), CancellationToken.None);
             Assert.Equal(Status.Ok, Response.FromJson(await Frame.ReadAsync(pipe, CancellationToken.None)).State);
 
@@ -492,7 +532,7 @@ namespace Bimbridge.Tests
                 var page = (int)(Arg.GetLong(request.Args, "page") ?? 1L);
                 var data = (Dictionary<string, object>)ResultTable.Render(snapshot.Spec, snapshot.Rows, page, snapshot.Spec.PageSize);
                 data["cursor"] = cursor;
-                data["rev_instantanea"] = snapshot.Rev;
+                data["snapshot_rev"] = snapshot.Rev;
                 return new Response { Id = request.Id, Rev = snapshot.Rev, Data = data };
             }
 
@@ -503,7 +543,7 @@ namespace Bimbridge.Tests
                 switch (r.Op)
                 {
                     case Wire.OpContext:
-                        return new Response { Id = r.Id, Rev = _versions.Rev, Data = new Dictionary<string, object> { ["documento"] = "PRUEBA" } };
+                        return new Response { Id = r.Id, Rev = _versions.Rev, Data = new Dictionary<string, object> { ["document"] = "PRUEBA" } };
                     case Wire.OpCheck:
                         try { await Task.Delay(30000, ct); }
                         catch (OperationCanceledException) { SlowCancelled = true; return Response.Fail(r.Id, Status.TimedOut, "cancelled"); }
@@ -523,7 +563,7 @@ namespace Bimbridge.Tests
                         }
                         if (q.Levels.Count > 0) rows = rows.Where(x => q.Levels.Contains((string)x["lvl"]));
                         var data = (Dictionary<string, object>)ResultTable.Build(q, rows, out var matched);
-                        if (q.SaveAs != null) { s.Sets.Save(q.SaveAs, matched); data["guardado"] = q.SaveAs; }
+                        if (q.SaveAs != null) { s.Sets.Save(q.SaveAs, matched); data["saved"] = q.SaveAs; }
                         return new Response { Id = r.Id, Rev = _versions.Rev, Data = data };
                     case Wire.OpPlan:
                     {
@@ -549,7 +589,7 @@ namespace Bimbridge.Tests
                         {
                             _plans.Hold(p);
                             var d = p.Describe(0);
-                            d["posicion_en_cola"] = (long)(_plans.Held(Doc).FindIndex(x => x.Id == p.Id) + 1);
+                            d["queue_position"] = (long)(_plans.Held(Doc).FindIndex(x => x.Id == p.Id) + 1);
                             return new Response { Id = r.Id, State = Status.Held, Data = d, Warning = "queued" };
                         }
                         var st = Apply(p);
@@ -565,19 +605,19 @@ namespace Bimbridge.Tests
                     case Wire.OpCatalog:
                         return new Response { Id = r.Id, Rev = _versions.Rev, Data = new Dictionary<string, object>
                         {
-                            ["que"] = Arg.GetString(r.Args, "que") ?? "resumen", ["total"] = 2L,
-                            ["cols"] = new List<object> { "id", "nombre" }, ["rows"] = new List<object> { new List<object> { 1L, "LEVEL05" }, new List<object> { 2L, "LEVEL06" } },
+                            ["kind"] = Arg.GetString(r.Args, "kind") ?? "summary", ["total"] = 2L,
+                            ["cols"] = new List<object> { "id", "name" }, ["rows"] = new List<object> { new List<object> { 1L, "LEVEL05" }, new List<object> { 2L, "LEVEL06" } },
                         } };
                     case Wire.OpParams:
-                        return new Response { Id = r.Id, Data = new Dictionary<string, object> { ["op_vista"] = "params", ["ids"] = Arg.GetString(r.Args, "ids") } };
+                        return new Response { Id = r.Id, Data = new Dictionary<string, object> { ["op_view"] = "params", ["ids"] = Arg.GetString(r.Args, "ids") } };
                     case Wire.OpCapture:
                     {
                         var file = Path.Combine(Path.GetTempPath(), "bimbridge-cap-" + Guid.NewGuid().ToString("N") + ".png");
                         File.WriteAllBytes(file, Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="));
                         return new Response { Id = r.Id, Data = new Dictionary<string, object>
                         {
-                            ["archivo"] = file, ["mime"] = "image/png",
-                            ["leyenda"] = new Dictionary<string, object> { ["LightingFixtures"] = "orange (9)" },
+                            ["file"] = file, ["mime"] = "image/png",
+                            ["legend"] = new Dictionary<string, object> { ["LightingFixtures"] = "orange (9)" },
                         } };
                     }
                     case Wire.OpExec:
@@ -585,12 +625,12 @@ namespace Bimbridge.Tests
                     case Wire.OpTask:
                         // Echo: the bridge must deliver the arguments as is (code, mode, args as an object, key, doc).
                         lock (Seen) Seen.Add(r.Op + " " + Json.Write(r.Args));
-                        return new Response { Id = r.Id, Data = new Dictionary<string, object> { ["eco"] = r.Args } };
+                        return new Response { Id = r.Id, Data = new Dictionary<string, object> { ["echo"] = r.Args } };
                     case Wire.OpFam:
                         lock (Seen) Seen.Add(r.Op + " " + Json.Write(r.Args));
-                        if (Arg.GetString(r.Args, "accion") == "conector" && Arg.GetString(r.Args, "radio") == null && Arg.GetString(r.Args, "diametro") == null)
-                            return Response.Fail(r.Id, Status.Invalid, "to create a pipe connector give radio= or diametro= with a unit");
-                        return new Response { Id = r.Id, Data = new Dictionary<string, object> { ["eco"] = r.Args } };
+                        if (Arg.GetString(r.Args, "action") == "connector" && Arg.GetString(r.Args, "radius") == null && Arg.GetString(r.Args, "diameter") == null)
+                            return Response.Fail(r.Id, Status.Invalid, "to create a pipe connector give radius= or diameter= with a unit");
+                        return new Response { Id = r.Id, Data = new Dictionary<string, object> { ["echo"] = r.Args } };
                     default:
                         return Response.Fail(r.Id, Status.Invalid, "op " + r.Op);
                 }

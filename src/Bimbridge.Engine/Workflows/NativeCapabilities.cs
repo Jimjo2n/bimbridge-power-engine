@@ -49,10 +49,10 @@ namespace Bimbridge.Engine.Workflows
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["esquema"] = Schema, ["operacion"] = Operation, ["revit"] = (long)RevitVersion, ["recomendado"] = Recommended.ToString(),
-            ["requiere_ejecutor_ui"] = RequiresUiExecutor,
-            ["modos"] = Modes.Select(m => (object)new Dictionary<string, object> { ["modo"] = m.Mode.ToString(), ["soporte"] = m.Level.ToString(), ["motivo"] = m.Why }).ToList(),
-            ["validaciones"] = Validations.Cast<object>().ToList(), ["limitaciones"] = Limitations.Cast<object>().ToList(),
+            ["schema"] = Schema, ["operation"] = Operation, ["revit"] = (long)RevitVersion, ["recommended"] = Recommended.ToString(),
+            ["requires_ui_executor"] = RequiresUiExecutor,
+            ["modes"] = Modes.Select(m => (object)new Dictionary<string, object> { ["mode"] = m.Mode.ToString(), ["support"] = m.Level.ToString(), ["reason"] = m.Why }).ToList(),
+            ["validations"] = Validations.Cast<object>().ToList(), ["limitations"] = Limitations.Cast<object>().ToList(),
         };
     }
 

@@ -31,8 +31,8 @@ namespace Bimbridge.Tests
             if (extra != null) foreach (var kv in extra) args[kv.Key] = kv.Value;
             return new TaskRecord
             {
-                Id = id, Objective = "prueba", RecipeName = "fake", RecipeVersion = "1", RecipeHash = "h", ContentHash = "c-" + id + n,
-                Args = args, Docs = new List<TaskDoc> { new TaskDoc { Key = docKey, Title = "practica", Generation = "inst#1" } },
+                Id = id, Objective = "test", RecipeName = "fake", RecipeVersion = "1", RecipeHash = "h", ContentHash = "c-" + id + n,
+                Args = args, Docs = new List<TaskDoc> { new TaskDoc { Key = docKey, Title = "practice", Generation = "inst#1" } },
                 Policy = policy ?? new Dictionary<string, object>(),
             };
         }
@@ -45,14 +45,14 @@ namespace Bimbridge.Tests
 
         private static async Task<TaskRecord> Run(TaskManager mgr, TaskRecord draft)
         {
-            mgr.Start(draft, "// receta", "prueba");
+            mgr.Start(draft, "// receta", "test");
             await mgr.Completion(draft.Id);
             return mgr.Get(draft.Id, out _);
         }
 
         private static async Task<TaskRecord> Resume(TaskManager mgr, string id)
         {
-            var r = mgr.Resume(id, "prueba", null);
+            var r = mgr.Resume(id, "test", null);
             Assert.Null(r.Error);
             await mgr.Completion(id);
             return mgr.Get(id, out _);
@@ -66,11 +66,11 @@ namespace Bimbridge.Tests
         public async Task R01_IntentFails_NoBatchRuns_ModelUntouched()
         {
             var root = TempRoot();
-            var audit = new AuditLog(Path.Combine(root, "aud", "a.jsonl")) { FaultBeforeWrite = op => { if (op == "tarea_lote") throw new IOException("disk full (simulated)"); } };
+            var audit = new AuditLog(Path.Combine(root, "aud", "a.jsonl")) { FaultBeforeWrite = op => { if (op == "task_batch") throw new IOException("disk full (simulated)"); } };
             var m = new FakeModel();
             var t = await Run(Mgr(root, m, new AllowAll(), audit), Draft("r01a", 20));
             Assert.Equal(TaskState.Partial, t.State);
-            Assert.StartsWith("auditoria_no_disponible", t.Reason);
+            Assert.StartsWith("audit_unavailable", t.Reason);
             Assert.Equal(0, m.Visits);
             Assert.Empty(m.Live);
         }
@@ -83,12 +83,12 @@ namespace Bimbridge.Tests
             var writes = 0;
             var audit = new AuditLog(path);
             // exactly the first "result" of a batch fails: the intent is already there, the write happens, the result never arrives.
-            audit.FaultBeforeWrite = op => { if (op == "tarea_lote" && ++writes == 2) throw new IOException("disk full (simulated)"); };
+            audit.FaultBeforeWrite = op => { if (op == "task_batch" && ++writes == 2) throw new IOException("disk full (simulated)"); };
             var m = new FakeModel();
             var mgr = Mgr(root, m, new AllowAll(), audit);
             var t = await Run(mgr, Draft("r01b", 30));
             Assert.Equal(TaskState.Partial, t.State);
-            Assert.StartsWith("auditoria_no_disponible", t.Reason);
+            Assert.StartsWith("audit_unavailable", t.Reason);
             var pending = AuditLog.PendingIntents(path);
             Assert.Single(pending);
             var done = m.Live.Count;
@@ -109,12 +109,12 @@ namespace Bimbridge.Tests
             var root = TempRoot();
             var path = Path.Combine(root, "aud", "a.jsonl");
             var m = new FakeModel();
-            var t = await Run(Mgr(root, m, new AllowAll(), new AuditLog(path)), Draft("r01c", 40, new Dictionary<string, object> { ["barrera_en"] = 20L }));
+            var t = await Run(Mgr(root, m, new AllowAll(), new AuditLog(path)), Draft("r01c", 40, new Dictionary<string, object> { ["barrier_at"] = 20L }));
             Assert.Equal(TaskState.Applied, t.State);
             Assert.Empty(AuditLog.PendingIntents(path));
             var lines = File.ReadAllLines(path);
-            Assert.Contains(lines, l => l.Contains("\"tarea_barrera_pdf\"") && l.Contains("\"intencion\""));
-            Assert.True(lines.Count(l => l.Contains("\"estado\":\"intencion\"")) >= 2);
+            Assert.Contains(lines, l => l.Contains("\"task_barrier_pdf\"") && l.Contains("\"intent\""));
+            Assert.True(lines.Count(l => l.Contains("\"status\":\"intent\"")) >= 2);
             Assert.True(AuditLog.Verify(path).Ok);
         }
 
@@ -124,18 +124,18 @@ namespace Bimbridge.Tests
             var root = TempRoot();
             var audit = new AuditLog(Path.Combine(root, "a.jsonl")) { FaultBeforeWrite = _ => throw new IOException("out of space") };
             var applied = 0;
-            var r = AuditGate.Apply(audit, "s", "aplicar_cola", "doc", new Dictionary<string, object>(), () => { applied++; return "aplicado"; }, x => x, why => why, (x, why) => why);
+            var r = AuditGate.Apply(audit, "s", "apply_queue", "doc", new Dictionary<string, object>(), () => { applied++; return "applied"; }, x => x, why => why, (x, why) => why);
             Assert.Equal(0, applied);
-            Assert.StartsWith("auditoria_no_disponible", r);
-            Assert.Equal(0, AuditGate.Apply<string>(null, "s", "op", "doc", null, () => { applied++; return "x"; }, x => x, why => "rechazado", (x, why) => why) == "rechazado" ? applied : -1);
+            Assert.StartsWith("audit_unavailable", r);
+            Assert.Equal(0, AuditGate.Apply<string>(null, "s", "op", "doc", null, () => { applied++; return "x"; }, x => x, why => "rejected", (x, why) => why) == "rejected" ? applied : -1);
 
             // failing result: applied once, the intent stays pending
             var path2 = Path.Combine(root, "b.jsonl");
             var a2 = new AuditLog(path2);
             var n = 0;
             a2.FaultBeforeWrite = _ => { if (++n == 2) throw new IOException("connection dropped"); };
-            var r2 = AuditGate.Apply(a2, "s", "aplicar_cola", "doc", new Dictionary<string, object>(), () => { applied++; return "aplicado"; }, x => x, why => why, (x, why) => x + "|" + why);
-            Assert.StartsWith("aplicado|" + AuditGate.Incomplete, r2); // rc3: never returned as a normal result
+            var r2 = AuditGate.Apply(a2, "s", "apply_queue", "doc", new Dictionary<string, object>(), () => { applied++; return "applied"; }, x => x, why => why, (x, why) => x + "|" + why);
+            Assert.StartsWith("applied|" + AuditGate.Incomplete, r2); // rc3: never returned as a normal result
             Assert.Equal(1, applied);
             Assert.Single(AuditLog.PendingIntents(path2));
         }
@@ -156,8 +156,8 @@ namespace Bimbridge.Tests
             var v = AuditLog.Verify(p);
             Assert.True(v.Ok);
             Assert.Equal(1, v.Lines);
-            Assert.Contains("\"cuarentena\"", File.ReadAllText(p));
-            b.Append("s", "despues", "ok");
+            Assert.Contains("\"quarantine\"", File.ReadAllText(p));
+            b.Append("s", "after", "ok");
             Assert.True(AuditLog.Verify(p).Ok);
         }
 
@@ -177,7 +177,7 @@ namespace Bimbridge.Tests
             var v = AuditLog.Verify(p);
             Assert.True(v.Ok, string.Join("; ", v.Errors));
             Assert.Equal(3, v.Lines);                                                     // op, documented recovery, op2
-            Assert.Contains("recuperacion_cola", File.ReadAllText(p));
+            Assert.Contains("queue_recovery", File.ReadAllText(p));
         }
 
         [Fact]
@@ -217,7 +217,7 @@ namespace Bimbridge.Tests
                 Assert.Empty(Directory.GetFiles(root, "*.cuarentena-*"));
                 // No losses or duplicates: exactly 50 lines per process, seq without gaps (Verify) and unique cid where present.
                 var lines = File.ReadAllLines(p).Where(l => l.Length > 0).Select(Json.ParseObject).ToList();
-                for (var i = 0; i < 8; i++) Assert.Equal(50, lines.Count(l => Arg.GetString(l, "autor") == "proc" + i));
+                for (var i = 0; i < 8; i++) Assert.Equal(50, lines.Count(l => Arg.GetString(l, "author") == "proc" + i));
                 var cids = lines.Select(l => Arg.GetString(l, "cid")).Where(c => c != null).ToList();
                 Assert.Equal(cids.Count, cids.Distinct().Count());
                 Assert.Empty(Directory.Exists(p + ".pend") ? Directory.GetFiles(p + ".pend", "*.json") : new string[0]);
@@ -304,7 +304,7 @@ namespace Bimbridge.Tests
 
         private static (GrantStore store, GrantAuthority auth) Grants(string root)
         {
-            var g = new GrantStore(Path.Combine(root, "autorizaciones"));
+            var g = new GrantStore(Path.Combine(root, "authorizations"));
             return (g, new GrantAuthority(g));
         }
 
@@ -314,14 +314,14 @@ namespace Bimbridge.Tests
             var root = TempRoot();
             var (g, auth) = Grants(root);
             // the agent "asks for" capabilities: recorded as a request and as a requested policy, not as a permission
-            g.Request("r03a", DocKey, null, "practica", new[] { Capability.Modify }, "agente", "x", DateTime.UtcNow);
+            g.Request("r03a", DocKey, null, "practice", new[] { Capability.Modify }, "agent", "x", DateTime.UtcNow);
             var m = new FakeModel();
             var t = await Run(Mgr(root, m, auth), Draft("r03a", 10, policy: new Dictionary<string, object>
             {
-                ["solicitadas"] = new List<object> { Capability.Modify }, ["capacidades"] = new List<object> { "all" }, ["aprobado"] = true,
+                ["requested"] = new List<object> { Capability.Modify }, ["capabilities"] = new List<object> { "all" }, ["approved"] = true,
             }));
             Assert.Equal(TaskState.Interrupted, t.State);
-            Assert.StartsWith("autorizacion_requerida", t.Reason);
+            Assert.StartsWith("authorization_required", t.Reason);
             Assert.Equal(0, m.Visits);
             Assert.Single(g.PendingRequests());
         }
@@ -341,15 +341,15 @@ namespace Bimbridge.Tests
         {
             var root = TempRoot();
             var (g, auth) = Grants(root);
-            g.Approve("otra-tarea", DocKey, null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "persona", DateTime.UtcNow);
-            g.Approve("r03c", "archivo:c:\\otro.rvt", null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "persona", DateTime.UtcNow);
+            g.Approve("otra-tarea", DocKey, null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "person", DateTime.UtcNow);
+            g.Approve("r03c", "archivo:c:\\otro.rvt", null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "person", DateTime.UtcNow);
             var m = new FakeModel();
             var mgr = Mgr(root, m, auth);
             var t = await Run(mgr, Draft("r03c", 5));
             Assert.Equal(TaskState.Interrupted, t.State);
             Assert.Contains("another document", t.Reason);
             Assert.Equal(0, m.Visits);
-            g.Approve("r03c", DocKey, null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "persona", DateTime.UtcNow);
+            g.Approve("r03c", DocKey, null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "person", DateTime.UtcNow);
             t = await Resume(mgr, "r03c");
             Assert.Equal(TaskState.Applied, t.State);
             Assert.Equal(5, m.Live.Count);
@@ -360,7 +360,7 @@ namespace Bimbridge.Tests
         {
             var root = TempRoot();
             var (g, auth) = Grants(root);
-            var grant = g.Approve("r03d", DocKey, null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "persona", DateTime.UtcNow);
+            var grant = g.Approve("r03d", DocKey, null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "person", DateTime.UtcNow);
             var m = new FakeModel { MsPerUnit = 50 };
             var countAtRevoke = -1;
             m.OnVisit = v => { if (v == 2) { g.Revoke(grant.Id, DateTime.UtcNow); countAtRevoke = m.Live.Count; } };
@@ -378,7 +378,7 @@ namespace Bimbridge.Tests
         {
             var root = TempRoot();
             var (g, auth) = Grants(root);
-            g.Approve("r03e", DocKey, null, new[] { Capability.Modify }, TimeSpan.FromMilliseconds(1), "persona", DateTime.UtcNow.AddMinutes(-5));
+            g.Approve("r03e", DocKey, null, new[] { Capability.Modify }, TimeSpan.FromMilliseconds(1), "person", DateTime.UtcNow.AddMinutes(-5));
             var m = new FakeModel();
             var t = await Run(Mgr(root, m, auth), Draft("r03e", 5));
             Assert.Equal(TaskState.Interrupted, t.State);
@@ -391,14 +391,14 @@ namespace Bimbridge.Tests
         {
             var root = TempRoot();
             var (g, _) = Grants(root);
-            var ok = g.Approve("t", DocKey, null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "persona", DateTime.UtcNow);
+            var ok = g.Approve("t", DocKey, null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "person", DateTime.UtcNow);
             var f = Path.Combine(g.Dir, "c_" + ok.Id + ".json");
-            File.WriteAllText(f, File.ReadAllText(f).Replace("\"revit_modificar\"", "\"revit_sync\""));
+            File.WriteAllText(f, File.ReadAllText(f).Replace("\"revit_modify\"", "\"revit_sync\""));
             Assert.NotNull(g.Check("t", DocKey, null, Capability.Sync, DateTime.UtcNow));
             Assert.NotNull(g.Check("t", DocKey, null, Capability.Modify, DateTime.UtcNow)); // tampered -> ignored entirely
-            File.WriteAllText(Path.Combine(g.Dir, "c_falsa.json"), "{\"id\":\"falsa\",\"tarea\":\"t\",\"doc\":\"" + DocKey.Replace("\\", "\\\\") + "\",\"capacidades\":[\"revit_modificar\"],\"vence\":\"2099-01-01T00:00:00Z\",\"firma\":\"00\"}");
+            File.WriteAllText(Path.Combine(g.Dir, "c_falsa.json"), "{\"id\":\"falsa\",\"task\":\"t\",\"doc\":\"" + DocKey.Replace("\\", "\\\\") + "\",\"capabilities\":[\"revit_modify\"],\"expires\":\"2099-01-01T00:00:00Z\",\"signature\":\"00\"}");
             Assert.NotNull(g.Check("t", DocKey, null, Capability.Modify, DateTime.UtcNow));
-            Assert.Throws<ArgumentException>(() => g.Approve("t", DocKey, null, new[] { "proceso" }, TimeSpan.FromHours(1), "x", DateTime.UtcNow));
+            Assert.Throws<ArgumentException>(() => g.Approve("t", DocKey, null, new[] { "process" }, TimeSpan.FromHours(1), "x", DateTime.UtcNow));
         }
 
         [Fact]
@@ -406,9 +406,9 @@ namespace Bimbridge.Tests
         {
             var root = TempRoot();
             var (g, auth) = Grants(root);
-            g.Approve("r03g", DocKey, null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "persona", DateTime.UtcNow); // without revit_exportar
+            g.Approve("r03g", DocKey, null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "person", DateTime.UtcNow); // without revit_exportar
             var m = new FakeModel();
-            var t = await Run(Mgr(root, m, auth), Draft("r03g", 10, new Dictionary<string, object> { ["barrera_en"] = 5L }));
+            var t = await Run(Mgr(root, m, auth), Draft("r03g", 10, new Dictionary<string, object> { ["barrier_at"] = 5L }));
             Assert.Equal(TaskState.Interrupted, t.State);
             Assert.Contains(Capability.Export, t.Reason);
             Assert.Equal(0, m.Barriers);
@@ -419,7 +419,7 @@ namespace Bimbridge.Tests
         public async Task R03_ReadOnlyTask_RunsWithoutGrant_UnderDefaultDeny()
         {
             var m = new FakeModel();
-            var t = await Run(Mgr(TempRoot(), m, DenyWritesAuthority.Instance), Draft("ro", 5, policy: new Dictionary<string, object> { ["requiere"] = new List<object>() }));
+            var t = await Run(Mgr(TempRoot(), m, DenyWritesAuthority.Instance), Draft("ro", 5, policy: new Dictionary<string, object> { ["requires"] = new List<object>() }));
             Assert.Equal(TaskState.Applied, t.State);
         }
 
@@ -428,12 +428,12 @@ namespace Bimbridge.Tests
         [Fact]
         public void R04_ExecBoundary_WritesNeedTrustedSession_QueriesAreRestricted()
         {
-            Assert.StartsWith("codigo_confiable_requerido", CapabilityPolicy.ExecDecision(true, false, new string[0], out var p1));
+            Assert.StartsWith("trusted_code_required", CapabilityPolicy.ExecDecision(true, false, new string[0], out var p1));
             Assert.Equal(ExecutionProfile.RestrictedAutonomous, p1);
             Assert.Null(CapabilityPolicy.ExecDecision(false, false, new string[0], out _));
-            Assert.NotNull(CapabilityPolicy.ExecDecision(false, false, new[] { "proceso:System.Diagnostics.Process.Start" }, out _));
-            Assert.NotNull(CapabilityPolicy.ExecDecision(false, false, new[] { "archivo_escritura:System.IO.File.WriteAllText" }, out _));
-            Assert.Null(CapabilityPolicy.ExecDecision(true, true, new[] { "proceso:System.Diagnostics.Process.Start" }, out var p2));
+            Assert.NotNull(CapabilityPolicy.ExecDecision(false, false, new[] { "process:System.Diagnostics.Process.Start" }, out _));
+            Assert.NotNull(CapabilityPolicy.ExecDecision(false, false, new[] { "write_file:System.IO.File.WriteAllText" }, out _));
+            Assert.Null(CapabilityPolicy.ExecDecision(true, true, new[] { "process:System.Diagnostics.Process.Start" }, out var p2));
             Assert.Equal(ExecutionProfile.TrustedInteractive, p2);
         }
 
@@ -487,11 +487,11 @@ namespace Bimbridge.Tests
             var m = new FakeModel();
             var mgr = Mgr(root, m, auth);
             // what the add-in writes in the policy for read-only inline codigo=
-            var t = await Run(mgr, Draft("r04x", 5, policy: new Dictionary<string, object> { ["requiere"] = new List<object> { Capability.ExternalRecipe } }));
+            var t = await Run(mgr, Draft("r04x", 5, policy: new Dictionary<string, object> { ["requires"] = new List<object> { Capability.ExternalRecipe } }));
             Assert.Equal(TaskState.Interrupted, t.State);
             Assert.Contains(Capability.ExternalRecipe, t.Reason);
             Assert.Equal(0, m.Visits);
-            g.Approve("r04x", DocKey, null, new[] { Capability.ExternalRecipe }, TimeSpan.FromHours(1), "persona", DateTime.UtcNow);
+            g.Approve("r04x", DocKey, null, new[] { Capability.ExternalRecipe }, TimeSpan.FromHours(1), "person", DateTime.UtcNow);
             t = await Resume(mgr, "r04x");
             Assert.Equal(TaskState.Applied, t.State);
         }
@@ -512,9 +512,9 @@ namespace Bimbridge.Tests
             Assert.Equal(UnitState.Unknown, units.Get("u0003").State);
             Assert.Equal(UnitState.Committed, units.Get("u0001").State);
 
-            var err = mgr.Reconcile("r05a", new List<string> { "u0001" }, applied: false, note: "quiero repetirla", who: "agente");
-            Assert.StartsWith("transicion_ilegal", err);
-            Assert.StartsWith("evidencia_requerida", mgr.Reconcile("r05a", new List<string> { "u0003" }, applied: true, note: " ", who: "agente"));
+            var err = mgr.Reconcile("r05a", new List<string> { "u0001" }, applied: false, note: "quiero repetirla", who: "agent");
+            Assert.StartsWith("illegal_transition", err);
+            Assert.StartsWith("evidence_required", mgr.Reconcile("r05a", new List<string> { "u0003" }, applied: true, note: " ", who: "agent"));
             mgr.Get("r05a", out units);
             Assert.Equal(UnitState.Committed, units.Get("u0001").State);
         }
@@ -524,7 +524,7 @@ namespace Bimbridge.Tests
         {
             var root = TempRoot();
             var (g, auth) = Grants(root);
-            g.Approve("r05b", DocKey, null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "persona", DateTime.UtcNow);
+            g.Approve("r05b", DocKey, null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "person", DateTime.UtcNow);
             var m = new FakeModel { CrashAfterCommitAt = "u0002" };
             m.Unverifiable.Add("u0002");
             var mgr = Mgr(root, m, auth);
@@ -532,10 +532,10 @@ namespace Bimbridge.Tests
             mgr = Mgr(root, m, auth);
             var t = await Resume(mgr, "r05b");
             Assert.True(t.State == TaskState.Interrupted && t.Reason.Contains("could not be verified"), t.State + ": " + t.Reason);
-            Assert.StartsWith("autorizacion_requerida", mgr.Reconcile("r05b", null, applied: false, note: "not in the model (query id 123)", who: "agente"));
-            g.Approve("r05b", DocKey, null, new[] { Capability.ReconcileNotApplied }, TimeSpan.FromHours(1), "persona", DateTime.UtcNow);
+            Assert.StartsWith("authorization_required", mgr.Reconcile("r05b", null, applied: false, note: "not in the model (query id 123)", who: "agent"));
+            g.Approve("r05b", DocKey, null, new[] { Capability.ReconcileNotApplied }, TimeSpan.FromHours(1), "person", DateTime.UtcNow);
             m.Live.Remove("u0002"); // the person checked that it was not left
-            Assert.Null(mgr.Reconcile("r05b", null, applied: false, note: "not in the model (query id 123)", who: "agente"));
+            Assert.Null(mgr.Reconcile("r05b", null, applied: false, note: "not in the model (query id 123)", who: "agent"));
             m.Unverifiable.Clear();
             t = await Resume(mgr, "r05b");
             Assert.Equal(TaskState.Applied, t.State);
@@ -551,8 +551,8 @@ namespace Bimbridge.Tests
             var mgr = Mgr(root, m, new AllowAll());
             var t = await Run(mgr, Draft("r05c", 3));
             Assert.Equal(TaskState.Applied, t.State);
-            Assert.StartsWith("transicion_ilegal", mgr.Reconcile("r05c", new List<string> { "u0001" }, applied: false, note: "x", who: "agente"));
-            var lines = File.ReadAllLines(Path.Combine(root, "r05c", "unidades.jsonl")).Length;
+            Assert.StartsWith("illegal_transition", mgr.Reconcile("r05c", new List<string> { "u0001" }, applied: false, note: "x", who: "agent"));
+            var lines = File.ReadAllLines(Path.Combine(root, "r05c", "units.jsonl")).Length;
             Assert.True(lines >= 4);
         }
 
@@ -560,9 +560,9 @@ namespace Bimbridge.Tests
         public void R05_HandWrittenIllegalEvent_IsIgnoredOnReplay()
         {
             var log = new UnitLog();
-            log.Apply(new Dictionary<string, object> { ["ev"] = "inicio", ["claves"] = new List<object> { "a" } });
-            log.Apply(new Dictionary<string, object> { ["ev"] = "fin", ["clave"] = "a", ["estado"] = UnitState.Committed, ["seq"] = 1L });
-            log.Apply(new Dictionary<string, object> { ["ev"] = "reconciliada", ["clave"] = "a", ["estado"] = UnitState.Pending });
+            log.Apply(new Dictionary<string, object> { ["ev"] = "start", ["keys"] = new List<object> { "a" } });
+            log.Apply(new Dictionary<string, object> { ["ev"] = "end", ["key"] = "a", ["status"] = UnitState.Committed, ["seq"] = 1L });
+            log.Apply(new Dictionary<string, object> { ["ev"] = "reconciled", ["key"] = "a", ["status"] = UnitState.Pending });
             Assert.Equal(UnitState.Committed, log.Get("a").State);
             Assert.Equal(1, log.IllegalEvents);
         }
@@ -576,7 +576,7 @@ namespace Bimbridge.Tests
             var m = new FakeModel { MsPerUnit = 20 };
             var second = (TaskRecord)null;
             var mgrB = Mgr(root, new FakeModel(), new AllowAll(), instance: "B");
-            m.OnVisit = v => { if (v == 2 && second == null) { mgrB.Start(Draft("r06b", 3), "// r", "otro"); second = mgrB.Completion("r06b").ContinueWith(_ => mgrB.Get("r06b", out var __)).Result; } };
+            m.OnVisit = v => { if (v == 2 && second == null) { mgrB.Start(Draft("r06b", 3), "// r", "other"); second = mgrB.Completion("r06b").ContinueWith(_ => mgrB.Get("r06b", out var __)).Result; } };
             var mgrA = Mgr(root, m, new AllowAll(), instance: "A");
             var a = await Run(mgrA, Draft("r06a", 100));
             Assert.Equal(TaskState.Applied, a.State);
@@ -610,9 +610,9 @@ namespace Bimbridge.Tests
                 if (v == 2) Assert.True(thief.TryLease("r06c", "OTRA", "B", TimeSpan.FromHours(3), DateTime.UtcNow.AddHours(2), out _));
             };
             var t = await Run(Mgr(root, m, new AllowAll()), Draft("r06c", 200));
-            // The task belongs to B (valid lease): the old runner does not write its "interrumpida" over B's tarea.json.
+            // The task belongs to B (valid lease): the old runner does not write its "interrupted" over B's tarea.json.
             Assert.Equal(TaskState.Running, t.State);
-            Assert.Contains("lease_perdido", m.PreflightRefusals);
+            Assert.Contains("lease_lost", m.PreflightRefusals);
             var afterSteal = m.Live.Count;
             Assert.True(afterSteal > 0 && afterSteal < 200);
             Assert.Equal(0, m.Duplicates);

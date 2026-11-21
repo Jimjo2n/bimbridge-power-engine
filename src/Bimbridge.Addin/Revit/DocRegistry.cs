@@ -56,7 +56,7 @@ namespace Bimbridge.Addin.Revit
             InstanceId = p.Id.ToString(CultureInfo.InvariantCulture) + "." + p.StartTime.ToUniversalTime().ToString("HHmmss", CultureInfo.InvariantCulture);
         }
 
-        public static string KindOf(Document doc) => doc == null ? null : doc.IsFamilyDocument ? "familia" : "proyecto";
+        public static string KindOf(Document doc) => doc == null ? null : doc.IsFamilyDocument ? "family" : "project";
 
         /// <summary>Document handle (created if new). Revit thread only.</summary>
         public string IdOf(Document doc)

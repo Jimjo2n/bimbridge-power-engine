@@ -458,17 +458,17 @@ namespace Bimbridge.Addin.Revit.Geo
             var meshes = layers.SelectMany(l => l.Items).Where(i => i.Body?.Mesh != null).Select(i => i.Body.Mesh).ToList();
             return new Dictionary<string, object>
             {
-                ["capas"] = (long)layers.Count,
-                ["elementos"] = (long)layers.Sum(l => l.Items.Count),
-                ["mallas"] = (long)(meshes.Count + _hostBodies.Count),
-                ["triangulos"] = meshes.Sum(m => (long)m.Triangles) + HostTriangles,
+                ["layers"] = (long)layers.Count,
+                ["elements"] = (long)layers.Sum(l => l.Items.Count),
+                ["meshes"] = (long)(meshes.Count + _hostBodies.Count),
+                ["triangles"] = meshes.Sum(m => (long)m.Triangles) + HostTriangles,
                 ["mb"] = Math.Round((meshes.Sum(m => m.Bytes) + HostTriangles * 110) / 1048576.0, 1),
-                ["ms_mallas"] = MeshMs,
-                ["ms_cajas"] = layers.Sum(l => l.BuildMs),
-                ["fallos_geometria"] = (long)MeshFailures,
-                ["reutilizadas"] = (long)HostReused,
+                ["meshes_ms"] = MeshMs,
+                ["boxes_ms"] = layers.Sum(l => l.BuildMs),
+                ["geometry_failures"] = (long)MeshFailures,
+                ["reused_items"] = (long)HostReused,
                 ["simd"] = TriMesh.SimdAvailable && TriMesh.SimdEnabled,
-                ["detalle"] = layers.OrderBy(l => l.Source.Name).ThenBy(l => l.CategoryName)
+                ["detail"] = layers.OrderBy(l => l.Source.Name).ThenBy(l => l.CategoryName)
                     .Select(l => (object)((l.Source.IsHost ? "host" : l.Source.Short) + " · " + l.CategoryName + ": " + l.Items.Count + (l.Complete ? "" : " (incomplete)"))).ToList(),
             };
         }

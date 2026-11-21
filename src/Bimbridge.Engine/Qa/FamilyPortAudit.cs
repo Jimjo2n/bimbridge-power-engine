@@ -18,8 +18,8 @@ namespace Bimbridge.Engine.Qa
             }
             if (expected.Count != observed.Count)
                 yield return "the project shows " + observed.Count + " connectors and the RFA has " + expected.Count;
-            var byKey = observed.OfType<Dictionary<string, object>>().ToLookup(p => Arg.GetString(p, "clave"), StringComparer.OrdinalIgnoreCase);
-            foreach (var group in expected.GroupBy(p => Arg.GetString(p, "clave"), StringComparer.OrdinalIgnoreCase))
+            var byKey = observed.OfType<Dictionary<string, object>>().ToLookup(p => Arg.GetString(p, "key"), StringComparer.OrdinalIgnoreCase);
+            foreach (var group in expected.GroupBy(p => Arg.GetString(p, "key"), StringComparer.OrdinalIgnoreCase))
             {
                 var key = group.Key;
                 if (string.IsNullOrWhiteSpace(key)) continue;
@@ -35,7 +35,7 @@ namespace Bimbridge.Engine.Qa
                 }
                 var source = group.Single();
                 var port = byKey[key].Single();
-                foreach (var field in new[] { "dominio", "sistema", "flujo", "forma" })
+                foreach (var field in new[] { "domain", "system", "workflow", "shape" })
                 {
                     var wanted = Arg.GetString(source, field);
                     if (wanted != null && wanted != "UndefinedSystemClassification" &&
@@ -51,8 +51,8 @@ namespace Bimbridge.Engine.Qa
 
         private static double? ReadRadius(Dictionary<string, object> port)
         {
-            var radius = GeoSummary.Num(port, "radio_mm");
-            return radius > 0 ? radius : GeoSummary.Num(port, "diametro_mm") / 2;
+            var radius = GeoSummary.Num(port, "radius_mm");
+            return radius > 0 ? radius : GeoSummary.Num(port, "diameter_mm") / 2;
         }
     }
 }

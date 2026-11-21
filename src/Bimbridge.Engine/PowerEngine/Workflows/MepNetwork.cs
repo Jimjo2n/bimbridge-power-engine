@@ -63,8 +63,8 @@ namespace BimBridge.PowerEngine.Workflows
             for (var i = 0; i < n; i++)
                 foreach (var (end, conn) in new[] { (0, segs[i].ConnA), (1, segs[i].ConnB) })
                 {
-                    if (conn == null) { openEnds.Add(new Dictionary<string, object> { ["tramo"] = ids[i], ["extremo"] = end == 0 ? "A" : "B" }); continue; }
-                    if (!index.TryGetValue(conn, out var j)) { unknownConn.Add(new Dictionary<string, object> { ["tramo"] = ids[i], ["conectado_a"] = conn }); continue; }  // fitting/equipment outside the set
+                    if (conn == null) { openEnds.Add(new Dictionary<string, object> { ["segment"] = ids[i], ["end"] = end == 0 ? "A" : "B" }); continue; }
+                    if (!index.TryGetValue(conn, out var j)) { unknownConn.Add(new Dictionary<string, object> { ["segment"] = ids[i], ["connected_to"] = conn }); continue; }  // fitting/equipment outside the set
                     // which end of j? the one closest to this end
                     var ex = Pt(segs[i], end);
                     var ja = Dist(ex, Pt(segs[j], 0)); var jb = Dist(ex, Pt(segs[j], 1));
@@ -84,15 +84,15 @@ namespace BimBridge.PowerEngine.Workflows
                 var a = Math.Min(k, cont[k]); var b = Math.Max(k, cont[k]);
                 if (a / 2 == b / 2) continue;
                 if (physComp.Component[a] != physComp.Component[b])
-                    touchNoConn.Add(new Dictionary<string, object> { ["tramos"] = new List<object> { ids[a / 2], ids[b / 2] }, ["nota"] = "coincident ends without a linked connector" });
+                    touchNoConn.Add(new Dictionary<string, object> { ["segments"] = new List<object> { ids[a / 2], ids[b / 2] }, ["note"] = "coincident ends without a linked connector" });
             }
             foreach (var (a, b) in physPairs)
             {
                 var d = Dist(Pt(segs[a / 2], a % 2), Pt(segs[b / 2], b % 2));
-                if (d > contactTolFt) connGap.Add(new Dictionary<string, object> { ["tramos"] = new List<object> { ids[a / 2], ids[b / 2] }, ["hueco_ft"] = Math.Round(d, 5) });
+                if (d > contactTolFt) connGap.Add(new Dictionary<string, object> { ["segments"] = new List<object> { ids[a / 2], ids[b / 2] }, ["gap_ft"] = Math.Round(d, 5) });
                 var sa = segs[a / 2]; var sb = segs[b / 2];
-                if (Math.Abs(sa.DiameterFt - sb.DiameterFt) > 1e-6) mismatch.Add(new Dictionary<string, object> { ["tramos"] = new List<object> { sa.Id, sb.Id }, ["motivo"] = "diameter " + In(sa.DiameterFt) + " ≠ " + In(sb.DiameterFt) });
-                if (!string.Equals(sa.System, sb.System, StringComparison.Ordinal)) mismatch.Add(new Dictionary<string, object> { ["tramos"] = new List<object> { sa.Id, sb.Id }, ["motivo"] = "system " + sa.System + " ≠ " + sb.System });
+                if (Math.Abs(sa.DiameterFt - sb.DiameterFt) > 1e-6) mismatch.Add(new Dictionary<string, object> { ["segments"] = new List<object> { sa.Id, sb.Id }, ["reason"] = "diameter " + In(sa.DiameterFt) + " ≠ " + In(sb.DiameterFt) });
+                if (!string.Equals(sa.System, sb.System, StringComparison.Ordinal)) mismatch.Add(new Dictionary<string, object> { ["segments"] = new List<object> { sa.Id, sb.Id }, ["reason"] = "system " + sa.System + " ≠ " + sb.System });
             }
 
             // layer 1: proximity (free ends within proximityTol of another end, with no continuity or connection)
@@ -110,28 +110,28 @@ namespace BimBridge.PowerEngine.Workflows
                     var members = grp.Select(q => free[q]).ToList();
                     if (members.Select(k => k / 2).Distinct().Count() < 2) continue;
                     var d = Dist(Pt(segs[members[0] / 2], members[0] % 2), Pt(segs[members[1] / 2], members[1] % 2));
-                    near.Add(new Dictionary<string, object> { ["tramos"] = members.Select(k => (object)ids[k / 2]).Distinct().ToList(), ["distancia_ft"] = Math.Round(d, 4), ["nota"] = "proximity is not connection: check whether a fitting is missing" });
+                    near.Add(new Dictionary<string, object> { ["segments"] = members.Select(k => (object)ids[k / 2]).Distinct().ToList(), ["distance_ft"] = Math.Round(d, 4), ["note"] = "proximity is not connection: check whether a fitting is missing" });
                 }
             }
 
             int Count(int[] c) => c.Distinct().Count();
             return new Dictionary<string, object>
             {
-                ["tramos"] = (long)n,
-                ["capas"] = new Dictionary<string, object>
+                ["segments"] = (long)n,
+                ["layers"] = new Dictionary<string, object>
                 {
-                    ["proximidad"] = new Dictionary<string, object> { ["tolerancia_ft"] = proximityTolFt, ["pares"] = (long)near.Count },
-                    ["continuidad"] = new Dictionary<string, object> { ["tolerancia_ft"] = contactTolFt, ["componentes"] = (long)Count(contComp.Component) },
-                    ["conexion_fisica"] = new Dictionary<string, object> { ["componentes"] = (long)Count(physComp.Component), ["extremos_abiertos"] = (long)openEnds.Count },
+                    ["proximity"] = new Dictionary<string, object> { ["tolerance_ft"] = proximityTolFt, ["pairs"] = (long)near.Count },
+                    ["continuity"] = new Dictionary<string, object> { ["tolerance_ft"] = contactTolFt, ["components"] = (long)Count(contComp.Component) },
+                    ["physical_connection"] = new Dictionary<string, object> { ["components"] = (long)Count(physComp.Component), ["open_ends"] = (long)openEnds.Count },
                 },
-                ["toca_sin_conectar"] = touchNoConn.Take(maxListed).ToList(),
-                ["conectado_con_hueco"] = connGap.Take(maxListed).ToList(),
-                ["incompatibles"] = mismatch.Take(maxListed).ToList(),
-                ["cerca_sin_conectar"] = near.Take(maxListed).ToList(),
-                ["extremos_abiertos"] = openEnds.Take(maxListed).ToList(),
-                ["conectado_fuera_del_conjunto"] = unknownConn.Take(maxListed).ToList(),
-                ["veredicto"] = touchNoConn.Count + connGap.Count + mismatch.Count == 0 ? "sin_discrepancias_entre_capas" : "discrepancias",
-                ["nota"] = "Only the physical connection layer proves electrical/mechanical continuity; the others are geometry.",
+                ["touches_unconnected"] = touchNoConn.Take(maxListed).ToList(),
+                ["connected_with_gap"] = connGap.Take(maxListed).ToList(),
+                ["incompatible_items"] = mismatch.Take(maxListed).ToList(),
+                ["near_unconnected"] = near.Take(maxListed).ToList(),
+                ["open_ends"] = openEnds.Take(maxListed).ToList(),
+                ["connected_outside_set"] = unknownConn.Take(maxListed).ToList(),
+                ["verdict"] = touchNoConn.Count + connGap.Count + mismatch.Count == 0 ? "no_layer_discrepancies" : "discrepancies",
+                ["note"] = "Only the physical connection layer proves electrical/mechanical continuity; the others are geometry.",
             };
         }
 

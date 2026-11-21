@@ -72,9 +72,9 @@ namespace Bimbridge.AgentHost
                     // continuation: following lines that are neither a marker nor a requirement belong to this requirement
                     while (i + 1 < lines.Length && lines[i + 1].Trim().Length > 0 && !Req.IsMatch(lines[i + 1].Trim()) && !Page.IsMatch(lines[i + 1].Trim()) && !Section.IsMatch(lines[i + 1].Trim()) && !lines[i + 1].TrimStart().StartsWith("#", StringComparison.Ordinal))
                         t += " " + lines[++i].Trim();
-                    if (!seen.Add(id)) { doc.Diagnostics.Add(Diagnostic.Error("requisito_duplicado", id + " (line " + (i + 1) + ")")); continue; }
-                    if (page == 0) doc.Diagnostics.Add(Diagnostic.Warn("requisito_sin_pagina", id));
-                    if (t.Length == 0) { doc.Diagnostics.Add(Diagnostic.Warn("requisito_vacio", id)); continue; }
+                    if (!seen.Add(id)) { doc.Diagnostics.Add(Diagnostic.Error("duplicate_requirement", id + " (line " + (i + 1) + ")")); continue; }
+                    if (page == 0) doc.Diagnostics.Add(Diagnostic.Warn("requirement_without_page", id));
+                    if (t.Length == 0) { doc.Diagnostics.Add(Diagnostic.Warn("empty_requirement", id)); continue; }
                     doc.Requirements.Add(new RawRequirement { DocSha = doc.Sha256, ReqId = id, Section = section, Original = t, Page = page, Line = i + 1 });
                 }
             }
@@ -85,26 +85,26 @@ namespace Bimbridge.AgentHost
     public sealed class NormalizedRequirement
     {
         public RawRequirement Raw;
-        public string Kind = "no_interpretable";     // fijar_parametro | verificacion | no_interpretable
+        public string Kind = "not_interpretable";     // set_parameter | verification | not_interpretable
         public string Category, Level, Parameter, Unit, Recipe;
         public object Value;
         public double? Tolerance;
-        public string Confidence = "baja";           // alta | media | baja
+        public string Confidence = "low";           // high | medium | low
         public List<string> Ambiguities = new List<string>();
         public List<string> Suspicious = new List<string>();
         public List<string> DependsOnReqs = new List<string>();
         public List<string> Unresolved = new List<string>();
         public string Verification;
-        public bool Executable => Confidence == "alta" && Ambiguities.Count == 0 && Suspicious.Count == 0 && Unresolved.Count == 0 && Kind != "no_interpretable";
+        public bool Executable => Confidence == "high" && Ambiguities.Count == 0 && Suspicious.Count == 0 && Unresolved.Count == 0 && Kind != "not_interpretable";
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["requisito"] = Raw.ReqId, ["pagina"] = (long)Raw.Page, ["seccion"] = Raw.Section, ["original"] = Raw.Original, ["tipo"] = Kind,
-            ["categoria"] = Category, ["nivel"] = Level, ["parametro"] = Parameter, ["valor"] = Value, ["unidades"] = Unit,
-            ["tolerancia"] = Tolerance, ["receta"] = Recipe, ["confianza"] = Confidence,
-            ["ambiguedades"] = Ambiguities.Cast<object>().ToList(), ["sospechoso"] = Suspicious.Cast<object>().ToList(),
-            ["depende_de"] = DependsOnReqs.Cast<object>().ToList(), ["sin_resolver"] = Unresolved.Cast<object>().ToList(),
-            ["verificacion"] = Verification, ["ejecutable"] = Executable,
+            ["requirement"] = Raw.ReqId, ["page"] = (long)Raw.Page, ["section"] = Raw.Section, ["original"] = Raw.Original, ["type"] = Kind,
+            ["category"] = Category, ["level"] = Level, ["parameter"] = Parameter, ["value"] = Value, ["units"] = Unit,
+            ["tolerance"] = Tolerance, ["recipe"] = Recipe, ["confidence"] = Confidence,
+            ["ambiguities"] = Ambiguities.Cast<object>().ToList(), ["suspicious"] = Suspicious.Cast<object>().ToList(),
+            ["depends_on"] = DependsOnReqs.Cast<object>().ToList(), ["unresolved"] = Unresolved.Cast<object>().ToList(),
+            ["verification"] = Verification, ["executable"] = Executable,
         };
     }
 
@@ -123,7 +123,7 @@ namespace Bimbridge.AgentHost
             @"^(?:set|fijar|establecer)\s+(?:the\s+|el\s+)?(?:parameter\s+|par[aá]metro\s+)?""(?<p>[^""]+)""\s+(?:to|a|en|=)\s+(?<v>""[^""]*""|-?\d+(?:\.\d+)?)\s*(?<u>mm|m|ft|in)?\s+" +
             @"(?:for|para|en)\s+(?:all|every|todas?\s+las|todos?\s+los)\s+(?<c>[\p{L}\s]+?)" +
             @"(?:\s+(?:on|in|en|del?)\s+(?:the\s+|el\s+)?(?:level|nivel)?\s*(?<l>[A-Za-z]*\s*\d+))?" +
-            @"(?:\s*\(\s*(?:tolerance|tolerancia)\s*(?:±|\+/-)\s*(?<t>\d+(?:\.\d+)?)\s*(?<tu>mm|m|ft|in)\s*\))?\s*\.?\s*$", O);
+            @"(?:\s*\(\s*(?:tolerance|tolerancia)\s*(?:±|\+/-)\s*(?<t>\d+(?:\.\d+)?)\s*(?<tunit>mm|m|ft|in)\s*\))?\s*\.?\s*$", O);
         private static readonly Regex Verify = new Regex(
             @"^(?:verify|check|verificar|comprobar)\s+(?:that\s+|que\s+)?(?:the\s+|el\s+)?(?<what>qc manifest|manifiesto qc|manifiesto de qc|mounting supports|montaje de soportes|soportes de montaje)" +
             @"(?:\s+(?:on|in|en|del?)\s+(?:the\s+|el\s+)?(?:level|nivel)?\s*(?<l>[A-Za-z]*\s*\d+))?\s*\.?\s*$", O);
@@ -146,7 +146,7 @@ namespace Bimbridge.AgentHost
             {
                 var n = new NormalizedRequirement { Raw = raw };
                 var t = raw.Original;
-                foreach (Match m in Injection.Matches(t)) n.Suspicious.Add("contenido_sospechoso: «" + m.Value + "» (the document cannot give orders to the system)");
+                foreach (Match m in Injection.Matches(t)) n.Suspicious.Add("suspicious_content: «" + m.Value + "» (the document cannot give orders to the system)");
                 foreach (Match m in After.Matches(t))
                 {
                     var r = m.Groups["r"].Value;
@@ -154,42 +154,42 @@ namespace Bimbridge.AgentHost
                     if (!ids.Contains(r)) n.Unresolved.Add("dependencia_no_resuelta: " + r + " does not exist in the document");
                 }
                 t = After.Replace(t, "").Trim().TrimEnd('.', ' ').Trim();
-                foreach (Match m in Hedge.Matches(t)) n.Ambiguities.Add("lenguaje_ambiguo: «" + m.Value + "»");
+                foreach (Match m in Hedge.Matches(t)) n.Ambiguities.Add("ambiguous_language: «" + m.Value + "»");
                 Match s;
                 if ((s = Set.Match(t)).Success)
                 {
-                    n.Kind = "fijar_parametro";
+                    n.Kind = "set_parameter";
                     n.Parameter = s.Groups["p"].Value;
                     var v = s.Groups["v"].Value;
-                    if (v.StartsWith("\"", StringComparison.Ordinal)) { n.Value = v.Trim('"'); n.Unit = s.Groups["u"].Success ? s.Groups["u"].Value : "texto"; }
+                    if (v.StartsWith("\"", StringComparison.Ordinal)) { n.Value = v.Trim('"'); n.Unit = s.Groups["u"].Success ? s.Groups["u"].Value : "text"; }
                     else
                     {
                         n.Value = v.Contains(".") ? (object)double.Parse(v, CultureInfo.InvariantCulture) : long.Parse(v, CultureInfo.InvariantCulture);
                         if (s.Groups["u"].Success) n.Unit = s.Groups["u"].Value.ToLowerInvariant();
-                        else n.Ambiguities.Add("unidades_no_explicitas: numeric value " + v + " without a unit");
+                        else n.Ambiguities.Add("implicit_units: numeric value " + v + " without a unit");
                     }
                     var cat = Regex.Replace(s.Groups["c"].Value.Trim(), @"\s+", " ");
-                    if (Categories.TryGetValue(cat, out var ost)) n.Category = ost; else n.Ambiguities.Add("categoria_desconocida: «" + cat + "»");
+                    if (Categories.TryGetValue(cat, out var ost)) n.Category = ost; else n.Ambiguities.Add("unknown_category: «" + cat + "»");
                     n.Level = NormalizeLevel(s.Groups["l"].Value);
                     if (s.Groups["t"].Success)
                     {
-                        if (n.Unit != null && string.Equals(s.Groups["tu"].Value, n.Unit, StringComparison.OrdinalIgnoreCase)) n.Tolerance = double.Parse(s.Groups["t"].Value, CultureInfo.InvariantCulture);
-                        else n.Ambiguities.Add("tolerancia_en_otra_unidad");
+                        if (n.Unit != null && string.Equals(s.Groups["tunit"].Value, n.Unit, StringComparison.OrdinalIgnoreCase)) n.Tolerance = double.Parse(s.Groups["t"].Value, CultureInfo.InvariantCulture);
+                        else n.Ambiguities.Add("tolerance_in_other_unit");
                     }
-                    n.Verification = "postcondition: all targets with " + n.Parameter + " = " + Values.Show(n.Value) + (n.Unit != null && n.Unit != "texto" ? " " + n.Unit : "");
-                    n.Confidence = n.Level == null ? "media" : "alta";
-                    if (n.Level == null) n.Ambiguities.Add("alcance_sin_nivel: would affect the whole category on all levels");
+                    n.Verification = "postcondition: all targets with " + n.Parameter + " = " + Values.Show(n.Value) + (n.Unit != null && n.Unit != "text" ? " " + n.Unit : "");
+                    n.Confidence = n.Level == null ? "medium" : "high";
+                    if (n.Level == null) n.Ambiguities.Add("scope_without_level: would affect the whole category on all levels");
                 }
                 else if ((s = Verify.Match(t)).Success)
                 {
-                    n.Kind = "verificacion";
+                    n.Kind = "verification";
                     var what = s.Groups["what"].Value.ToLowerInvariant();
-                    n.Recipe = what.Contains("manifest") || what.Contains("manifiesto") ? "qc_manifiesto" : "montaje_soportes";
+                    n.Recipe = what.Contains("manifest") || what.Contains("manifiesto") ? "qc_manifest" : "mount_supports";
                     n.Level = NormalizeLevel(s.Groups["l"].Value);
                     n.Verification = "postcondition: deviations = 0 (" + n.Recipe + ")";
-                    n.Confidence = "alta";
+                    n.Confidence = "high";
                 }
-                else n.Ambiguities.Add("no_interpretable: does not match any supported form; kept for review");
+                else n.Ambiguities.Add("not_interpretable: does not match any supported form; kept for review");
                 res.Add(n);
             }
             // dependencies on non-executable requirements also stay unresolved (nothing runs whose prerequisite will not run)
@@ -216,7 +216,7 @@ namespace Bimbridge.AgentHost
 
     public static class PlanBuilder
     {
-        public static BuildResult Build(SourceDocument doc, List<NormalizedRequirement> reqs, string docKey, string docPrint, string lengthUnit = "mm", string coordinates = "interno_revit")
+        public static BuildResult Build(SourceDocument doc, List<NormalizedRequirement> reqs, string docKey, string docPrint, string lengthUnit = "mm", string coordinates = "revit_internal")
         {
             var res = new BuildResult();
             var plan = new PlanDraft { Objective = "Requirements from " + (doc.Title ?? doc.Name), DocKey = docKey, DocPrint = docPrint, LengthUnit = lengthUnit, Coordinates = coordinates };
@@ -227,18 +227,18 @@ namespace Bimbridge.AgentHost
             {
                 if (!r.Executable) { res.Review.Add(r); continue; }
                 var op = new OpDraft { Source = new SourceRef { SourceId = "doc-1", Page = r.Raw.Page > 0 ? r.Raw.Page : (long?)null, Section = r.Raw.Section, Requirement = r.Raw.ReqId, Quote = r.Raw.Original.Length > 200 ? r.Raw.Original.Substring(0, 199) + "…" : r.Raw.Original } };
-                if (r.Kind == "fijar_parametro")
+                if (r.Kind == "set_parameter")
                 {
-                    op.Operation = "fijar_parametro";
-                    op.Scope["categoria"] = r.Category; op.Scope["nivel"] = r.Level;
-                    op.Params["parametro"] = r.Parameter; op.Params["valor"] = r.Value; op.Params["unidades"] = r.Unit;
-                    if (r.Tolerance != null) op.Params["tolerancia"] = r.Tolerance.Value;
+                    op.Operation = "set_parameter";
+                    op.Scope["category"] = r.Category; op.Scope["level"] = r.Level;
+                    op.Params["parameter"] = r.Parameter; op.Params["value"] = r.Value; op.Params["units"] = r.Unit;
+                    if (r.Tolerance != null) op.Params["tolerance"] = r.Tolerance.Value;
                 }
                 else
                 {
-                    op.Operation = "verificar_qc";
-                    op.Params["receta"] = r.Recipe;
-                    if (r.Level != null) op.Scope["nivel"] = r.Level;
+                    op.Operation = "verify_qc";
+                    op.Params["recipe"] = r.Recipe;
+                    if (r.Level != null) op.Scope["level"] = r.Level;
                 }
                 var sk = IrIds.SemanticKey(op.Scope, op.Operation, op.Params);
                 if (semantic.TryGetValue(sk, out var first)) { r.Ambiguities.Add("duplicado_de: " + first); res.Review.Add(r); continue; }
@@ -264,7 +264,7 @@ namespace Bimbridge.AgentHost
             {
                 if (!documents.TryGetValue(s.Name, out var b)) { errs.Add("fuente_no_disponible: " + s.Name); continue; }
                 var sha = RequirementExtractor.Sha256Hex(b);
-                if (sha != s.Sha256) errs.Add("fuente_alterada: " + s.Name + " sha256 " + sha.Substring(0, 12) + "… ≠ " + s.Sha256.Substring(0, 12) + "…");
+                if (sha != s.Sha256) errs.Add("source_tampered: " + s.Name + " sha256 " + sha.Substring(0, 12) + "… ≠ " + s.Sha256.Substring(0, 12) + "…");
             }
             return errs;
         }
@@ -304,7 +304,7 @@ namespace Bimbridge.AgentHost
                 File.WriteAllText(outp, Json.Write(b.Plan.ToJson()));
                 File.WriteAllText(Path.ChangeExtension(outp, ".revision.json"), Json.Write(new Dictionary<string, object>
                 {
-                    ["documento"] = doc.Name, ["sha256"] = doc.Sha256, ["requisitos"] = reqs.Select(r => (object)r.ToJson()).ToList(),
+                    ["document"] = doc.Name, ["sha256"] = doc.Sha256, ["requirements"] = reqs.Select(r => (object)r.ToJson()).ToList(),
                 }));
             }
             return errs.Count == 0 && b.Errors.Count == 0 ? 0 : 1;

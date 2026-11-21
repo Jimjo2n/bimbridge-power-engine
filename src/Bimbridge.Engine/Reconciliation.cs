@@ -10,7 +10,7 @@ namespace Bimbridge.Engine
     /// <summary>Write state of a document. Any doubt (evidence, damaged file, disk error) leaves it blocked.</summary>
     public sealed class DocWriteBlock
     {
-        public const string Code = "documento_bloqueado_reconciliacion";
+        public const string Code = "document_locked_reconciliation";
         public string DocKey;
         public List<string> Plans = new List<string>();
         public List<string> CorruptFiles = new List<string>();
@@ -22,16 +22,16 @@ namespace Bimbridge.Engine
             (Plans.Count > 0 ? " (" + string.Join(", ", Plans) + ")" : "") +
             (CorruptFiles.Count > 0 ? "; damaged evidence files: " + string.Join(", ", CorruptFiles) : "") +
             (Errors.Count > 0 ? "; could not read the evidence: " + string.Join("; ", Errors) : "") +
-            ". Use job op=reconciliar plan_id=… to check it against the model; do not repeat the operation.";
+            ". Use job op=reconcile plan_id=… to check it against the model; do not repeat the operation.";
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            // The code only appears when blocked: a "documento_bloqueado" with bloqueado=no confuses the reader.
-            ["codigo"] = Blocked ? Code : null,
-            ["bloqueado"] = Blocked,
-            ["planes"] = Plans.Cast<object>().ToList(),
-            ["archivos_danados"] = CorruptFiles.Cast<object>().ToList(),
-            ["errores"] = Errors.Cast<object>().ToList(),
+            // The code only appears when blocked: a "document_locked" with bloqueado=no confuses the reader.
+            ["code"] = Blocked ? Code : null,
+            ["blocked"] = Blocked,
+            ["plans"] = Plans.Cast<object>().ToList(),
+            ["damaged_files"] = CorruptFiles.Cast<object>().ToList(),
+            ["errors"] = Errors.Cast<object>().ToList(),
         };
     }
 
@@ -50,10 +50,10 @@ namespace Bimbridge.Engine
     /// <summary>Result of comparing a plan's evidence with the current model. Never guesses: what cannot be checked does not release.</summary>
     public sealed class ReconcileCheck
     {
-        public const string Reverted = "revertido_verificado";
-        public const string Applied = "aplicado_verificado";
-        public const string NotVerifiable = "no_verificable";
-        public const string ManualHuman = "manual_humano";
+        public const string Reverted = "reverted_verified";
+        public const string Applied = "applied_verified";
+        public const string NotVerifiable = "not_verifiable";
+        public const string ManualHuman = "human_manual";
 
         public string Verdict = NotVerifiable;
         public int Checked;
@@ -63,9 +63,9 @@ namespace Bimbridge.Engine
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["veredicto"] = Verdict,
-            ["comprobados"] = (long)Checked,
-            ["motivos"] = Reasons.Take(20).Cast<object>().ToList(),
+            ["verdict"] = Verdict,
+            ["checked"] = (long)Checked,
+            ["reasons"] = Reasons.Take(20).Cast<object>().ToList(),
         };
     }
 
@@ -78,7 +78,7 @@ namespace Bimbridge.Engine
             var result = new ReconcileCheck();
             var entries = plan.Entries.Where(Comparable).ToList();
             var created = plan.Created.Distinct().ToList();
-            var deleted = EvidenceIds(plan, "ids_borrados");
+            var deleted = EvidenceIds(plan, "deleted_ids");
             var plannedCreations = plan.Entries.Count(e => e.IsCreation);
             var templates = plan.Entries.Count(e => e.Ref > 0);
 
@@ -130,7 +130,7 @@ namespace Bimbridge.Engine
         }
 
         private static bool Comparable(PlanEntry e) =>
-            e.Ref == 0 && e.Id != 0 && e.Key != "nuevo" && !(e.Key != null && e.Key.Contains("@@"));
+            e.Ref == 0 && e.Id != 0 && e.Key != "new" && !(e.Key != null && e.Key.Contains("@@"));
 
         private static HashSet<long> EvidenceIds(Plan plan, string key)
         {

@@ -21,15 +21,15 @@ namespace Bimbridge.AgentHost.Bench
         {
             var list = calls.ToList();
             long L(Dictionary<string, object> c, string k) => c.TryGetValue(k, out var v) ? Convert.ToInt64(v, CultureInfo.InvariantCulture) : 0;
-            var req = list.Sum(c => L(c, "bytes_peticion"));
-            var resp = list.Sum(c => L(c, "bytes_respuesta"));
+            var req = list.Sum(c => L(c, "request_bytes"));
+            var resp = list.Sum(c => L(c, "response_bytes"));
             return new Dictionary<string, object>
             {
-                ["llamadas_cable"] = (long)list.Count,
-                ["por_operacion"] = list.GroupBy(c => Convert.ToString(c["op"], CultureInfo.InvariantCulture)).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => (object)(long)g.Count()),
-                ["bytes_peticion"] = req, ["bytes_respuesta"] = resp,
+                ["wire_calls"] = (long)list.Count,
+                ["per_operation"] = list.GroupBy(c => Convert.ToString(c["op"], CultureInfo.InvariantCulture)).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => (object)(long)g.Count()),
+                ["request_bytes"] = req, ["response_bytes"] = resp,
                 ["ms_total"] = list.Sum(c => L(c, "ms")),
-                ["tokens_estimados_cable"] = TokenEstimate.FromChars(req + resp),
+                ["wire_estimated_tokens"] = TokenEstimate.FromChars(req + resp),
             };
         }
 
@@ -40,7 +40,7 @@ namespace Bimbridge.AgentHost.Bench
             public string[] Items = new string[0];
             public Dictionary<string, object> ToJson() => new Dictionary<string, object>
             {
-                ["id"] = Id, ["nombre"] = Name, ["escenario"] = Scenario, ["metricas"] = Metrics, ["arnes"] = Harness, ["estado"] = State, ["bloqueo"] = Blocker, ["items"] = Items.Cast<object>().ToList(),
+                ["id"] = Id, ["name"] = Name, ["scenario"] = Scenario, ["metrics"] = Metrics, ["harness"] = Harness, ["status"] = State, ["lock"] = Blocker, ["items"] = Items.Cast<object>().ToList(),
             };
         }
 
@@ -58,7 +58,7 @@ namespace Bimbridge.AgentHost.Bench
                 Harness = "campaign items N8-02 (views and templates) and N8-11 (visibility) on a disposable copy; pyRevit counterpart: equivalent read+change script", Items = new[] { "N8-02", "N8-11" }, Blocker = Blocked },
             new Def { Id = "B2", Name = "Lighting and support", Scenario = "hundreds of lights, similar symbols, near duplicates, ramps, offset ≠ physical height",
                 Metrics = "precision/recall of matching and mounting, false positives/negatives against test ground truth",
-                Harness = "verificar_independiente + geo montaje on a copy; seeded test ground truth (omissions and extras); items N8-07 and N8-10", Items = new[] { "N8-07", "N8-10" }, Blocker = Blocked },
+                Harness = "verify_independent + geo mounting on a copy; seeded test ground truth (omissions and extras); items N8-07 and N8-10", Items = new[] { "N8-07", "N8-10" }, Blocker = Blocked },
             new Def { Id = "B3", Name = "Groups and annotation", Scenario = "11 unit sheets, variants, more than one panel, non-uniform level jump",
                 Metrics = "type/floor plan coverage, correct members, zero invalid references, legibility at scale",
                 Harness = "PARTIALLY PREPARED: group reading exists; the per type/floor plan coverage recipe is 0.9.0", Blocker = Blocked },
@@ -76,7 +76,7 @@ namespace Bimbridge.AgentHost.Bench
                 Harness = "NRT-03/05/06/07 (simulated in tests; NRT-03/05/06 native in rc1 14ec21d; NRT-07 without a native run); items N8-09 and N8-13", Items = new[] { "N8-09", "N8-13" }, Blocker = Blocked },
             new Def { Id = "B8", Name = "Family compatibility", Scenario = "installation/manifest, open family, connectors, reload in 2022–2026",
                 Metrics = "result per version×operation combination, verifiable rollback and reload",
-                Harness = "fam info/caras/conector/cargar_archivo + campaign N8-06 (external families) and N8-13c (ZIP installation) per version", Items = new[] { "N8-06", "N8-13" }, Blocker = Blocked },
+                Harness = "fam info/faces/connector/load_file + campaign N8-06 (external families) and N8-13c (ZIP installation) per version", Items = new[] { "N8-06", "N8-13" }, Blocker = Blocked },
         };
     }
 }

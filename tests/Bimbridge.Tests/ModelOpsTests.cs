@@ -19,16 +19,16 @@ namespace Bimbridge.Tests
         {
             Dictionary<string, object> Route() => Json.ParseObject(OpCatalog.ByKind["conduit_route"].Example);
             var replace = Route();
-            replace["reemplazar_ids"] = new List<object> { 1L, 2L, 3L };
+            replace["replace_ids"] = new List<object> { 1L, 2L, 3L };
             Assert.Equal("conduit_route", OpSpec.Parse(replace).Kind);
-            var port = new Dictionary<string, object> { ["id"] = 900L, ["conector"] = 2L };
-            replace["terminal_inicio"] = port;
+            var port = new Dictionary<string, object> { ["id"] = 900L, ["connector"] = 2L };
+            replace["start_terminal"] = port;
             Assert.Throws<QueryException>(() => OpSpec.Parse(replace));
-            replace.Remove("terminal_inicio");
-            replace["reemplazar_ids"] = new List<object> { 1L, 1L };
+            replace.Remove("start_terminal");
+            replace["replace_ids"] = new List<object> { 1L, 1L };
             Assert.Throws<QueryException>(() => OpSpec.Parse(replace));
             var create = Route();
-            create["terminal_inicio"] = port;
+            create["start_terminal"] = port;
             Assert.Equal("conduit_route", OpSpec.Parse(create).Kind);
         }
 
@@ -67,58 +67,58 @@ namespace Bimbridge.Tests
             Rejected("{\"op\":\"level_create\"}", "elev is missing");
             Rejected("{\"op\":\"level_create\",\"elev\":\"abc\"}", "elev");
             Rejected("{\"op\":\"level_create\",\"elev\":20000}", "out of range");
-            Rejected("{\"op\":\"level_create\",\"elev\":12,\"nombre\":\"L:2\"}", "does not accept the character ':'");
-            Rejected("{\"op\":\"level_create\",\"elev\":12,\"nombre\":\"  \"}", "cannot be empty");
+            Rejected("{\"op\":\"level_create\",\"elev\":12,\"name\":\"L:2\"}", "does not accept the character ':'");
+            Rejected("{\"op\":\"level_create\",\"elev\":12,\"name\":\"  \"}", "cannot be empty");
             Rejected("{\"op\":\"level_create\",\"elev\":12,\"ids\":\"123\"}", "do not use ids");
-            Rejected("{\"op\":\"grid_create\",\"puntos\":[[0,0],[0,0]]}", "Revit does not accept curves that short");
-            Rejected("{\"op\":\"grid_create\",\"puntos\":[[0,0],[0,10],[5,5]]}", "maximum 2");
-            Rejected("{\"op\":\"grid_create\",\"puntos\":[[0,0],[0,10]],\"nombre\":\"A{1}\"}", "does not accept");
+            Rejected("{\"op\":\"grid_create\",\"points\":[[0,0],[0,0]]}", "Revit does not accept curves that short");
+            Rejected("{\"op\":\"grid_create\",\"points\":[[0,0],[0,10],[5,5]]}", "maximum 2");
+            Rejected("{\"op\":\"grid_create\",\"points\":[[0,0],[0,10]],\"name\":\"A{1}\"}", "does not accept");
         }
 
         [Fact]
         public void Walls_ValidateSegmentsHeightAndConstraints()
         {
-            Plan("{\"op\":\"wall_create\",\"puntos\":[[0,0],[30,0],[30,20],[0,20]],\"cerrado\":true,\"nivel\":\"L1\",\"altura\":\"3000 mm\"}");
-            Rejected("{\"op\":\"wall_create\",\"puntos\":[[0,0],[10,0],[5,0]],\"nivel\":\"L1\"}", "overlap");
-            Rejected("{\"op\":\"wall_create\",\"puntos\":[[0,0],[10,0]],\"nivel\":\"L1\",\"altura\":0}", "altura");
-            Rejected("{\"op\":\"wall_create\",\"puntos\":[[0,0],[10,0]],\"nivel\":\"L1\",\"altura\":-3}", "altura");
-            Rejected("{\"op\":\"wall_create\",\"puntos\":[[0,0],[10,0]],\"nivel\":\"L1\",\"altura\":10,\"nivel_superior\":\"L2\"}", "not both");
-            Rejected("{\"op\":\"wall_create\",\"puntos\":[[0,0],[10,0]]}", "nivel is missing");
-            Rejected("{\"op\":\"wall_create\",\"puntos\":[[0,0],[10,0]],\"nivel\":\"L1\",\"color\":\"rojo\"}", "unknown color");
+            Plan("{\"op\":\"wall_create\",\"points\":[[0,0],[30,0],[30,20],[0,20]],\"closed\":true,\"level\":\"L1\",\"height\":\"3000 mm\"}");
+            Rejected("{\"op\":\"wall_create\",\"points\":[[0,0],[10,0],[5,0]],\"level\":\"L1\"}", "overlap");
+            Rejected("{\"op\":\"wall_create\",\"points\":[[0,0],[10,0]],\"level\":\"L1\",\"height\":0}", "height");
+            Rejected("{\"op\":\"wall_create\",\"points\":[[0,0],[10,0]],\"level\":\"L1\",\"height\":-3}", "height");
+            Rejected("{\"op\":\"wall_create\",\"points\":[[0,0],[10,0]],\"level\":\"L1\",\"height\":10,\"top_level\":\"L2\"}", "not both");
+            Rejected("{\"op\":\"wall_create\",\"points\":[[0,0],[10,0]]}", "level is missing");
+            Rejected("{\"op\":\"wall_create\",\"points\":[[0,0],[10,0]],\"level\":\"L1\",\"color\":\"red\"}", "unknown color");
         }
 
         [Fact]
         public void FloorsAndCeilings_RequireAValidClosedLoop()
         {
-            Plan("{\"op\":\"floor_create\",\"puntos\":[[0,0],[30,0],[30,20],[0,20]],\"nivel\":\"L1\",\"desfase\":\"-2 in\"}");
-            Plan("{\"op\":\"ceiling_create\",\"puntos\":[[0,0],[30,0],[30,20],[0,20]],\"nivel\":\"L1\",\"altura\":\"2700 mm\"}");
-            Rejected("{\"op\":\"floor_create\",\"puntos\":[[0,0],[10,0]],\"nivel\":\"L1\"}", "at least 3");
-            Rejected("{\"op\":\"floor_create\",\"puntos\":[[0,0],[10,0],[20,0]],\"nivel\":\"L1\"}", "overlap");
-            Rejected("{\"op\":\"floor_create\",\"puntos\":[[0,0],[10,10],[10,0],[0,20]],\"nivel\":\"L1\"}", "crosses");
-            Rejected("{\"op\":\"ceiling_create\",\"puntos\":[[0,0],[30,0],[30,20],[0,20]],\"nivel\":\"L1\",\"altura\":0}", "altura");
-            Rejected("{\"op\":\"ceiling_create\",\"puntos\":[[0,0],[30,0],[30,20],[0,20]],\"nivel\":\"L1\",\"desfase\":1}", "unknown desfase");
+            Plan("{\"op\":\"floor_create\",\"points\":[[0,0],[30,0],[30,20],[0,20]],\"level\":\"L1\",\"offset\":\"-2 in\"}");
+            Plan("{\"op\":\"ceiling_create\",\"points\":[[0,0],[30,0],[30,20],[0,20]],\"level\":\"L1\",\"height\":\"2700 mm\"}");
+            Rejected("{\"op\":\"floor_create\",\"points\":[[0,0],[10,0]],\"level\":\"L1\"}", "at least 3");
+            Rejected("{\"op\":\"floor_create\",\"points\":[[0,0],[10,0],[20,0]],\"level\":\"L1\"}", "overlap");
+            Rejected("{\"op\":\"floor_create\",\"points\":[[0,0],[10,10],[10,0],[0,20]],\"level\":\"L1\"}", "crosses");
+            Rejected("{\"op\":\"ceiling_create\",\"points\":[[0,0],[30,0],[30,20],[0,20]],\"level\":\"L1\",\"height\":0}", "height");
+            Rejected("{\"op\":\"ceiling_create\",\"points\":[[0,0],[30,0],[30,20],[0,20]],\"level\":\"L1\",\"offset\":1}", "unknown offset");
         }
 
         [Fact]
         public void Rooms_RequireA2DPointAndNonEmptyTexts()
         {
-            Plan("{\"op\":\"room_create\",\"nivel\":\"L1\",\"punto\":[15,10],\"numero\":101}");
-            Rejected("{\"op\":\"room_create\",\"nivel\":\"L1\",\"punto\":[15,10,3]}", "[x,y]");
-            Rejected("{\"op\":\"room_create\",\"nivel\":\"L1\",\"punto\":[15,10],\"nombre\":\" \"}", "cannot be empty");
+            Plan("{\"op\":\"room_create\",\"level\":\"L1\",\"point\":[15,10],\"number\":101}");
+            Rejected("{\"op\":\"room_create\",\"level\":\"L1\",\"point\":[15,10,3]}", "[x,y]");
+            Rejected("{\"op\":\"room_create\",\"level\":\"L1\",\"point\":[15,10],\"name\":\" \"}", "cannot be empty");
         }
 
         [Fact]
         public void DuctsAndPipes_ValidateEndpointsSystemAndSize()
         {
-            Plan("{\"op\":\"duct_create\",\"inicio\":[0,0,9],\"fin\":[20,0,9],\"nivel\":\"L1\",\"sistema\":\"Supply Air\",\"diametro\":\"10 in\"}");
-            Plan("{\"op\":\"pipe_create\",\"inicio\":[0,0,9],\"fin\":[0,0,1],\"nivel\":\"L1\",\"sistema\":\"Sanitary\",\"diametro\":\"4 in\"}");
-            Rejected("{\"op\":\"duct_create\",\"inicio\":[0,0],\"fin\":[20,0,9],\"nivel\":\"L1\",\"sistema\":\"S\"}", "[x,y,z]");
-            Rejected("{\"op\":\"duct_create\",\"inicio\":[1,1,9],\"fin\":[1,1,9],\"nivel\":\"L1\",\"sistema\":\"S\"}", "coincide");
-            Rejected("{\"op\":\"duct_create\",\"inicio\":[0,0,9],\"fin\":[20,0,9],\"nivel\":\"L1\",\"sistema\":\"S\",\"ancho\":\"12 in\"}", "together");
-            Rejected("{\"op\":\"duct_create\",\"inicio\":[0,0,9],\"fin\":[20,0,9],\"nivel\":\"L1\",\"sistema\":\"S\",\"ancho\":1,\"alto\":1,\"diametro\":1}", "not both");
-            Rejected("{\"op\":\"pipe_create\",\"inicio\":[0,0,9],\"fin\":[20,0,9],\"nivel\":\"L1\",\"sistema\":\"S\",\"diametro\":0}", "diametro");
-            Rejected("{\"op\":\"pipe_create\",\"inicio\":[0,0,9],\"fin\":[20,0,9],\"nivel\":\"L1\",\"sistema\":\"S\",\"ancho\":1}", "unknown ancho");
-            Rejected("{\"op\":\"pipe_create\",\"inicio\":[0,0,9],\"fin\":[20,0,9],\"nivel\":\"L1\"}", "sistema is missing");
+            Plan("{\"op\":\"duct_create\",\"start\":[0,0,9],\"end\":[20,0,9],\"level\":\"L1\",\"system\":\"Supply Air\",\"diameter\":\"10 in\"}");
+            Plan("{\"op\":\"pipe_create\",\"start\":[0,0,9],\"end\":[0,0,1],\"level\":\"L1\",\"system\":\"Sanitary\",\"diameter\":\"4 in\"}");
+            Rejected("{\"op\":\"duct_create\",\"start\":[0,0],\"end\":[20,0,9],\"level\":\"L1\",\"system\":\"S\"}", "[x,y,z]");
+            Rejected("{\"op\":\"duct_create\",\"start\":[1,1,9],\"end\":[1,1,9],\"level\":\"L1\",\"system\":\"S\"}", "coincide");
+            Rejected("{\"op\":\"duct_create\",\"start\":[0,0,9],\"end\":[20,0,9],\"level\":\"L1\",\"system\":\"S\",\"width\":\"12 in\"}", "together");
+            Rejected("{\"op\":\"duct_create\",\"start\":[0,0,9],\"end\":[20,0,9],\"level\":\"L1\",\"system\":\"S\",\"width\":1,\"height\":1,\"diameter\":1}", "not both");
+            Rejected("{\"op\":\"pipe_create\",\"start\":[0,0,9],\"end\":[20,0,9],\"level\":\"L1\",\"system\":\"S\",\"diameter\":0}", "diameter");
+            Rejected("{\"op\":\"pipe_create\",\"start\":[0,0,9],\"end\":[20,0,9],\"level\":\"L1\",\"system\":\"S\",\"width\":1}", "unknown width");
+            Rejected("{\"op\":\"pipe_create\",\"start\":[0,0,9],\"end\":[20,0,9],\"level\":\"L1\"}", "system is missing");
         }
 
         [Fact]
@@ -128,17 +128,17 @@ namespace Bimbridge.Tests
             Plan("{\"op\":\"circuit_create\",\"ids\":\"$receptaculos\"}");
             Rejected("{\"op\":\"circuit_create\",\"panel\":\"LP-1\"}", "ids is missing");
             Rejected("{\"op\":\"circuit_create\",\"ids\":\"101,101\"}", "repeated");
-            Rejected("{\"op\":\"place\",\"type\":\"F: T\",\"level\":\"L1\",\"puntos\":[[0,0]]},{\"op\":\"circuit_create\",\"ids\":\"@1\"}", "not @n");
+            Rejected("{\"op\":\"place\",\"type\":\"F: T\",\"level\":\"L1\",\"points\":[[0,0]]},{\"op\":\"circuit_create\",\"ids\":\"@1\"}", "not @n");
         }
 
         [Fact]
         public void Schedules_ValidateCategoryAndFields()
         {
-            Plan("{\"op\":\"schedule_create\",\"categoria\":\"OST_Rooms\",\"campos\":\"Number,Name,Area\"}");
-            Rejected("{\"op\":\"schedule_create\",\"categoria\":\"Lighting Fixtures\",\"campos\":[\"Type\"]}", "BuiltInCategory");
-            Rejected("{\"op\":\"schedule_create\",\"categoria\":\"Rooms\",\"campos\":[]}", "at least one field");
-            Rejected("{\"op\":\"schedule_create\",\"categoria\":\"Rooms\",\"campos\":[\"Name\",\"name\"]}", "repeated");
-            Rejected("{\"op\":\"schedule_create\",\"categoria\":\"Rooms\",\"campos\":[\"Name\"],\"nombre\":\"A|B\"}", "does not accept");
+            Plan("{\"op\":\"schedule_create\",\"category\":\"OST_Rooms\",\"fields\":\"Number,Name,Area\"}");
+            Rejected("{\"op\":\"schedule_create\",\"category\":\"Lighting Fixtures\",\"fields\":[\"Type\"]}", "BuiltInCategory");
+            Rejected("{\"op\":\"schedule_create\",\"category\":\"Rooms\",\"fields\":[]}", "at least one field");
+            Rejected("{\"op\":\"schedule_create\",\"category\":\"Rooms\",\"fields\":[\"Name\",\"name\"]}", "repeated");
+            Rejected("{\"op\":\"schedule_create\",\"category\":\"Rooms\",\"fields\":[\"Name\"],\"name\":\"A|B\"}", "does not accept");
             Assert.Equal("OST_LightingFixtures", ModelOps.NormalizeCategory("LightingFixtures"));
             Assert.Equal("OST_Rooms", ModelOps.NormalizeCategory(" OST_Rooms "));
             Assert.Null(ModelOps.NormalizeCategory("OST_"));

@@ -116,7 +116,7 @@ namespace Bimbridge.Engine.Workflows
             tf = tf ?? LinkTransform.Identity;
             var unsupported = tf.Unsupported();
             if (unsupported != null)
-                return new Dictionary<string, object> { ["resultado"] = "no_verificable", ["motivo"] = unsupported, ["origen"] = (long)(source?.Count ?? 0) };
+                return new Dictionary<string, object> { ["result"] = "not_verifiable", ["reason"] = unsupported, ["origin"] = (long)(source?.Count ?? 0) };
             var maps = (mappings ?? new List<TypeMapping>()).ToDictionary(m => m.Source, StringComparer.OrdinalIgnoreCase);
             var before = new HashSet<long>((hostBefore ?? new List<HostFixture>()).Select(h => h.Id));
             var created = (hostAfter ?? new List<HostFixture>()).Where(h => !before.Contains(h.Id)).ToList();
@@ -171,27 +171,27 @@ namespace Bimbridge.Engine.Workflows
             var passed = matched.Count == expected && missing.Count == 0 && wrongType.Count == 0 && unmonitored.Count == 0 && misplaced.Count == 0 && duplicates.Count == 0 && unexpected.Count == 0;
             var bySource = source.GroupBy(s => Key(s.Family, s.Type)).OrderBy(g => g.Key).ToDictionary(g => g.Key, g => (object)(long)g.Count());
             var byHost = created.GroupBy(h => Key(h.Family, h.Type)).OrderBy(g => g.Key).ToDictionary(g => g.Key, g => (object)(long)g.Count());
-            Dictionary<string, object> Bucket(List<object> l) => new Dictionary<string, object> { ["n"] = (long)l.Count, ["ejemplos"] = l.Take(20).ToList() };
+            Dictionary<string, object> Bucket(List<object> l) => new Dictionary<string, object> { ["n"] = (long)l.Count, ["examples"] = l.Take(20).ToList() };
             return new Dictionary<string, object>
             {
-                ["resultado"] = passed ? "verificado" : "fallido",
-                ["nivel_prueba_correspondencia"] = "inferred",   // matched by type and position, not by source id
+                ["result"] = passed ? "verified" : "failed",
+                ["correspondence_test_level"] = "inferred",   // matched by type and position, not by source id
                 // AUD-08: each dimension separately. This verifier does NOT observe the command, the end of the workflow or the save.
-                ["dimensiones"] = new Dictionary<string, object>
+                ["dimensions_list"] = new Dictionary<string, object>
                 {
-                    ["consistencia_geometrica"] = (long)(matched.Count + unmonitored.Count),
-                    ["supervision_al_vinculo"] = (long)matched.Count,
-                    ["correspondencia_individual_origen"] = "no_demostrada: inferred by type and position",
-                    ["comando_iniciado"] = "fuera_del_verificador (workflow receipt)",
-                    ["workflow_finalizado"] = "fuera_del_verificador (workflow receipt)",
-                    ["guardado_confirmado"] = "fuera_del_verificador (workflow receipt)",
+                    ["geometric_consistency"] = (long)(matched.Count + unmonitored.Count),
+                    ["link_supervision"] = (long)matched.Count,
+                    ["individual_origin_correspondence"] = "not_demonstrated: inferred by type and position",
+                    ["command_started"] = "fuera_del_verificador (workflow receipt)",
+                    ["workflow_finished"] = "fuera_del_verificador (workflow receipt)",
+                    ["save_confirmed"] = "fuera_del_verificador (workflow receipt)",
                 },
-                ["vinculo_reflejado"] = tf.Mirrored,
-                ["origen"] = (long)source.Count, ["esperados"] = (long)expected, ["creados"] = (long)created.Count,
-                ["origen_por_tipo"] = bySource, ["creados_por_tipo"] = byHost,
-                ["correctos"] = Bucket(matched), ["ausentes"] = Bucket(missing), ["tipo_incorrecto"] = Bucket(wrongType),
-                ["sin_supervision"] = Bucket(unmonitored), ["mal_colocados"] = Bucket(misplaced), ["duplicados"] = Bucket(duplicates),
-                ["inesperados"] = Bucket(unexpected), ["excluidos"] = Bucket(excluded),
+                ["mirrored_link"] = tf.Mirrored,
+                ["origin"] = (long)source.Count, ["expected_items"] = (long)expected, ["created"] = (long)created.Count,
+                ["origin_by_type"] = bySource, ["created_by_type"] = byHost,
+                ["correct"] = Bucket(matched), ["missing"] = Bucket(missing), ["wrong_type"] = Bucket(wrongType),
+                ["unsupervised"] = Bucket(unmonitored), ["misplaced"] = Bucket(misplaced), ["duplicates"] = Bucket(duplicates),
+                ["unexpected"] = Bucket(unexpected), ["excluded_items"] = Bucket(excluded),
             };
         }
 

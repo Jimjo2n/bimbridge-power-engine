@@ -20,7 +20,7 @@ namespace Bimbridge.Tests
             Environment.SetEnvironmentVariable("BIMBRIDGE_HOME", Path.Combine(Path.GetTempPath(), "bimbridge-home-" + Guid.NewGuid().ToString("N")));
         }
 
-        private static string TempJournal() => Path.Combine(Path.GetTempPath(), "bimbridge-j-" + Guid.NewGuid().ToString("N"), "operaciones.jsonl");
+        private static string TempJournal() => Path.Combine(Path.GetTempPath(), "bimbridge-j-" + Guid.NewGuid().ToString("N"), "operations.jsonl");
 
         [Fact]
         public void Journal_SameKey_IsNotAppliedTwice_EvenAfterRestart()
@@ -31,7 +31,7 @@ namespace Bimbridge.Tests
             var h = OperationJournal.HashArgs(Wire.OpCommit, args);
             Assert.Equal(OperationJournal.BeginKind.New, j.Begin("k1", "d1", Wire.OpCommit, h, "tareaA", "s1").Kind);
             Assert.Equal(OperationJournal.BeginKind.Running, j.Begin("k1", "d1", Wire.OpCommit, h, "tareaA", "s2").Kind);
-            j.Complete("k1", "d1", Status.Ok, new Dictionary<string, object> { ["cambiados"] = 3L });
+            j.Complete("k1", "d1", Status.Ok, new Dictionary<string, object> { ["changed"] = 3L });
 
             // Revit "restart": the journal is reread from disk.
             var j2 = new OperationJournal(path);
@@ -48,7 +48,7 @@ namespace Bimbridge.Tests
             var path = TempJournal();
             var j = new OperationJournal(path);
             j.Begin("k2", "d1", Wire.OpExec, "h", "t", "s1");
-            // It is cut off (Revit closes): no "fin". On reread, it stays interrupted and is NOT repeated on its own.
+            // It is cut off (Revit closes): no "end". On reread, it stays interrupted and is NOT repeated on its own.
             var j2 = new OperationJournal(path);
             var r = j2.Begin("k2", "d1", Wire.OpExec, "h", "t", "s2");
             Assert.Equal(OperationJournal.BeginKind.Interrupted, r.Kind);
@@ -60,9 +60,9 @@ namespace Bimbridge.Tests
         public void Journal_SameKeyDifferentContent_IsRejected()
         {
             var j = new OperationJournal(TempJournal());
-            var h1 = OperationJournal.HashArgs("exec", new Dictionary<string, object> { ["codigo"] = "a", [Wire.KeyArg] = "k", [Wire.TaskArg] = "t" });
-            var h2 = OperationJournal.HashArgs("exec", new Dictionary<string, object> { ["codigo"] = "b", [Wire.KeyArg] = "k" });
-            var h1b = OperationJournal.HashArgs("exec", new Dictionary<string, object> { ["codigo"] = "a", [Wire.KeyArg] = "otra" });
+            var h1 = OperationJournal.HashArgs("exec", new Dictionary<string, object> { ["code"] = "a", [Wire.KeyArg] = "k", [Wire.TaskArg] = "t" });
+            var h2 = OperationJournal.HashArgs("exec", new Dictionary<string, object> { ["code"] = "b", [Wire.KeyArg] = "k" });
+            var h1b = OperationJournal.HashArgs("exec", new Dictionary<string, object> { ["code"] = "a", [Wire.KeyArg] = "other" });
             Assert.Equal(h1, h1b); // the key and the task do not count toward the fingerprint
             j.Begin("k", "d", "exec", h1, null, "s");
             j.Complete("k", "d", Status.RolledBack, null);
@@ -111,10 +111,10 @@ namespace Bimbridge.Tests
             if (Environment.GetEnvironmentVariable("BIMBRIDGE_GEN_MATRIZ") == "1") File.WriteAllText(doc, Capabilities.Markdown(version));
             Assert.True(File.Exists(doc), "docs/CAPABILITY_MATRIX.md is missing");
             Assert.Equal(Capabilities.Markdown(version).Replace("\r\n", "\n"), File.ReadAllText(doc).Replace("\r\n", "\n"));
-            var fam = Capabilities.ForDoc("familia", 2024).Select(r => (string)((object[])r)[0]).ToList();
-            Assert.Contains("fam conector", fam);
+            var fam = Capabilities.ForDoc("family", 2024).Select(r => (string)((object[])r)[0]).ToList();
+            Assert.Contains("fam connector", fam);
             Assert.DoesNotContain("geo", fam);
-            Assert.Contains("geo", Capabilities.NotFor("familia"));
+            Assert.Contains("geo", Capabilities.NotFor("family"));
         }
 
         [Fact]
@@ -122,14 +122,14 @@ namespace Bimbridge.Tests
         {
             var fx = new List<LightingAudit.Fixture> { new LightingAudit.Fixture { Id = 1, Level = "L1" }, new LightingAudit.Fixture { Id = 2, Level = "L1" } };
             var tags = new List<LightingAudit.Tag> { new LightingAudit.Tag { Id = 10, ViewId = 5, Tagged = new long[] { 1 } } };
-            var one = LightingAudit.Summarize(fx, tags, null, out _, tagRule: "uno");
-            Assert.Equal(false, one["cumple_regla"]);
-            var none = LightingAudit.Summarize(fx, tags, null, out var sets, tagRule: "ninguno");
-            Assert.Equal(false, none["cumple_regla"]);
-            Assert.Equal(new long[] { 10 }, sets["$tags_de_luminarias"]);
-            var noneEmpty = LightingAudit.Summarize(fx, new List<LightingAudit.Tag>(), null, out _, tagRule: "ninguno");
-            Assert.Equal(true, noneEmpty["cumple_regla"]);
-            Assert.Throws<ArgumentException>(() => LightingAudit.Summarize(fx, tags, null, out _, tagRule: "dos"));
+            var one = LightingAudit.Summarize(fx, tags, null, out _, tagRule: "one");
+            Assert.Equal(false, one["meets_rule"]);
+            var none = LightingAudit.Summarize(fx, tags, null, out var sets, tagRule: "none");
+            Assert.Equal(false, none["meets_rule"]);
+            Assert.Equal(new long[] { 10 }, sets["$fixture_tags"]);
+            var noneEmpty = LightingAudit.Summarize(fx, new List<LightingAudit.Tag>(), null, out _, tagRule: "none");
+            Assert.Equal(true, noneEmpty["meets_rule"]);
+            Assert.Throws<ArgumentException>(() => LightingAudit.Summarize(fx, tags, null, out _, tagRule: "two"));
         }
 
         private static string FindRoot()

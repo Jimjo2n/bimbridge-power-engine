@@ -1,38 +1,38 @@
 {
- "esquema": "bimbridge.campana080/1",
+ "schema": "bimbridge.campaign080/1",
  "item": "N9-03",
- "titulo": "Placement from PDF as a trial (applies, verifies and reverts)",
- "estado_inicial": "Disposable LOCAL copy, not workshared, of an authorized public or synthetic model (e.g. an Autodesk sample) with named straight grids and a OneLevelBased lighting fixture family loaded. Revit 2024 with BIMBRIDGE 0.9.0 installed; config.json levels RPW, lab profile with the copy's folder in laboratorio.carpetas and carpetas_documentos with the test PDF folder. NEVER the user's working model.",
- "estado": "BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION",
+ "title": "Placement from PDF as a trial (applies, verifies and reverts)",
+ "initial_status": "Disposable LOCAL copy, not workshared, of an authorized public or synthetic model (e.g. an Autodesk sample) with named straight grids and a OneLevelBased lighting fixture family loaded. Revit 2024 with BIMBRIDGE 0.9.0 installed; config.json levels RPW, lab profile with the copy's folder in laboratorio.carpetas and carpetas_documentos with the test PDF folder. NEVER the user's working model.",
+ "status": "BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION",
  "variables": {
   "ops": "@<power-engine flujo-pdf output>/ops.json"
  },
- "pasos": [
+ "steps": [
   {
-   "nombre": "plan with the ops from the PDF workflow",
+   "name": "plan with the ops from the PDF workflow",
    "op": "plan",
    "args": {
     "ops": "${ops}",
     "summary": "campaign 0.9.0 trial"
    },
-   "guardar": {
+   "save": {
     "plan": "plan_id"
    }
   },
   {
-   "nombre": "trial",
+   "name": "trial",
    "op": "commit",
    "args": {
     "plan_id": "${plan}",
-    "modo": "ensayo"
+    "mode": "trial"
    },
-   "escritura": true,
-   "contiene": [
-    "ensayo"
+   "write": true,
+   "contains": [
+    "trial"
    ]
   },
   {
-   "nombre": "the model did not change",
+   "name": "the model did not change",
    "op": "query",
    "args": {
     "cat": [

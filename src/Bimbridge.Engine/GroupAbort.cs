@@ -41,18 +41,18 @@ namespace Bimbridge.Engine
         {
             plan.Reconciliation = new Dictionary<string, object>
             {
-                ["grupo_estado"] = state,
+                ["group_status"] = state,
                 ["rollback_error"] = error,
-                ["ids_creados"] = plan.Created.Cast<object>().ToList(),
-                ["creados_por_op"] = plan.CreatedByOp.ToDictionary(k => "@" + k.Key, k => (object)k.Value.Cast<object>().ToList()),
-                ["ids_borrados"] = e.Deleted.OrderBy(id => id).Cast<object>().ToList(),
-                ["cambios_intentados"] = (long)e.Changed,
-                ["borrados_intentados"] = (long)e.DeletedCount,
-                ["lotes_confirmados"] = (long)plan.AppliedBatches,
-                ["lotes_totales"] = (long)plan.TotalBatches,
-                ["omitidos"] = e.Skipped.ToDictionary(k => k.Key, k => (object)k.Value.Cast<object>().ToList()),
-                ["avisos"] = e.Warnings.Cast<object>().ToList(),
-                ["entradas"] = plan.Entries.Select(x => x.ToJson()).ToList(),
+                ["created_ids"] = plan.Created.Cast<object>().ToList(),
+                ["created_by_op"] = plan.CreatedByOp.ToDictionary(k => "@" + k.Key, k => (object)k.Value.Cast<object>().ToList()),
+                ["deleted_ids"] = e.Deleted.OrderBy(id => id).Cast<object>().ToList(),
+                ["attempted_changes"] = (long)e.Changed,
+                ["attempted_deletes"] = (long)e.DeletedCount,
+                ["committed_batches"] = (long)plan.AppliedBatches,
+                ["total_batches_count"] = (long)plan.TotalBatches,
+                ["skipped"] = e.Skipped.ToDictionary(k => k.Key, k => (object)k.Value.Cast<object>().ToList()),
+                ["warnings"] = e.Warnings.Cast<object>().ToList(),
+                ["inputs"] = plan.Entries.Select(x => x.ToJson()).ToList(),
             };
         }
 

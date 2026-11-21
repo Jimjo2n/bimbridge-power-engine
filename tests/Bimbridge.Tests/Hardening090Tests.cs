@@ -70,7 +70,7 @@ namespace Bimbridge.Tests
         [Fact]
         public void Profile_Lab_OnlyLabFolders_NoCloudNoUncNoTraversal()
         {
-            var lab = ProfilePolicy.Parse("laboratorio", new[] { LabDir }, false, null);
+            var lab = ProfilePolicy.Parse("lab", new[] { LabDir }, false, null);
             Assert.Null(lab.DenyRequest("query", Permissions.Read, "archivo:" + Path.Combine(LabDir, "copy.rvt"), CapabilityStates.Experimental));
             Assert.NotNull(lab.DenyRequest("query", Permissions.Read, "archivo:" + Path.Combine(Path.GetTempPath(), "other", "x.rvt"), CapabilityStates.Available));
             Assert.NotNull(lab.DenyRequest("query", Permissions.Read, "archivo:" + Path.Combine(LabDir, "..", "outside.rvt"), CapabilityStates.Available));
@@ -80,7 +80,7 @@ namespace Bimbridge.Tests
             Assert.Null(lab.DenyRequest(Wire.OpContext, Permissions.Read, "nube:abc/def", CapabilityStates.Available));
             Assert.Null(lab.DenyRequest("query", Permissions.Read, null, CapabilityStates.Available));
             // lab without folders = nothing
-            Assert.NotNull(ProfilePolicy.Parse("laboratorio", null, false, null).DenyRequest("query", Permissions.Read, "archivo:" + Path.Combine(LabDir, "c.rvt"), CapabilityStates.Available));
+            Assert.NotNull(ProfilePolicy.Parse("lab", null, false, null).DenyRequest("query", Permissions.Read, "archivo:" + Path.Combine(LabDir, "c.rvt"), CapabilityStates.Available));
         }
 
         [Fact]
@@ -89,11 +89,11 @@ namespace Bimbridge.Tests
             const string sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
             const string doc = "archivo:c:\\obra\\a.rvt";
             Assert.NotNull(new ProfilePolicy().DenyDynamicCode(sha, doc));
-            Assert.Null(ProfilePolicy.Parse("produccion", null, false, new[] { sha }).DenyDynamicCode(sha, doc));
-            Assert.Null(ProfilePolicy.Parse("produccion", null, false, new[] { sha + "@" + doc }).DenyDynamicCode(sha, doc));
-            Assert.NotNull(ProfilePolicy.Parse("produccion", null, false, new[] { sha + "@archivo:c:\\obra\\b.rvt" }).DenyDynamicCode(sha, doc));
-            Assert.NotNull(ProfilePolicy.Parse("produccion", null, false, new[] { sha }).DenyDynamicCode(sha.Replace('a', 'b'), doc));
-            var lab = ProfilePolicy.Parse("laboratorio", new[] { LabDir }, false, null);
+            Assert.Null(ProfilePolicy.Parse("production", null, false, new[] { sha }).DenyDynamicCode(sha, doc));
+            Assert.Null(ProfilePolicy.Parse("production", null, false, new[] { sha + "@" + doc }).DenyDynamicCode(sha, doc));
+            Assert.NotNull(ProfilePolicy.Parse("production", null, false, new[] { sha + "@archivo:c:\\obra\\b.rvt" }).DenyDynamicCode(sha, doc));
+            Assert.NotNull(ProfilePolicy.Parse("production", null, false, new[] { sha }).DenyDynamicCode(sha.Replace('a', 'b'), doc));
+            var lab = ProfilePolicy.Parse("lab", new[] { LabDir }, false, null);
             Assert.Null(lab.DenyDynamicCode(sha, "archivo:" + Path.Combine(LabDir, "c.rvt")));
             Assert.NotNull(lab.DenyDynamicCode(sha, doc));
         }
@@ -106,7 +106,7 @@ namespace Bimbridge.Tests
             try
             {
                 var f = Path.Combine(dir, "config.json");
-                File.WriteAllText(f, "{\"perfil\":\"laboratorio\",\"laboratorio\":{\"carpetas\":[\"" + LabDir.Replace("\\", "\\\\") + "\"],\"actualizacion_sin_firma\":true}}");
+                File.WriteAllText(f, "{\"profile\":\"lab\",\"lab\":{\"folders\":[\"" + LabDir.Replace("\\", "\\\\") + "\"],\"unsigned_updates\":true}}");
                 var c = EngineConfig.Load(f);
                 Assert.True(c.Profile.IsLab);
                 Assert.True(c.Profile.LabUnsignedUpdates);
@@ -134,24 +134,24 @@ namespace Bimbridge.Tests
             var markup = new SourceRef { Id = "markup-1", Kind = SourceKinds.Pdf, Sha256 = Sha('b') };
             // independent
             Assert.Null(IndependentVerifier.CheckIndependence(In(pdf, markup), out var proof));
-            Assert.Equal("sha256+linaje", proof["metodo"]);
+            Assert.Equal("sha256+linaje", proof["method"]);
             // no sha
-            Assert.Equal("independencia_no_comprobable", IndependentVerifier.CheckIndependence(In(new SourceRef { Id = "x", Kind = SourceKinds.Pdf }, markup), out _)?.State);
+            Assert.Equal("independence_not_checkable", IndependentVerifier.CheckIndependence(In(new SourceRef { Id = "x", Kind = SourceKinds.Pdf }, markup), out _)?.State);
             // no declared build
-            Assert.Equal("independencia_no_comprobable", IndependentVerifier.CheckIndependence(In(pdf), out _)?.State);
+            Assert.Equal("independence_not_checkable", IndependentVerifier.CheckIndependence(In(pdf), out _)?.State);
             // same content under another name
-            Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(In(pdf, new SourceRef { Id = "renamed", Sha256 = Sha('a') }), out _)?.State);
+            Assert.Equal("not_independent", IndependentVerifier.CheckIndependence(In(pdf, new SourceRef { Id = "renamed", Sha256 = Sha('a') }), out _)?.State);
             // the build was derived from the expected source
-            Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(In(pdf, new SourceRef { Id = "plan", Sha256 = Sha('c'), DerivedFrom = { "sha256:" + Sha('a') } }), out _)?.State);
+            Assert.Equal("not_independent", IndependentVerifier.CheckIndependence(In(pdf, new SourceRef { Id = "plan", Sha256 = Sha('c'), DerivedFrom = { "sha256:" + Sha('a') } }), out _)?.State);
             // the expected source was derived from the build
             var derived = new SourceRef { Id = "table", Kind = SourceKinds.Pdf, Sha256 = Sha('d'), DerivedFrom = { "markup-1" } };
-            Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(In(derived, markup), out _)?.State);
+            Assert.Equal("not_independent", IndependentVerifier.CheckIndependence(In(derived, markup), out _)?.State);
             // common origin
             var a = new SourceRef { Id = "a", Kind = SourceKinds.Pdf, Sha256 = Sha('e'), DerivedFrom = { "root" } };
-            Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(In(a, new SourceRef { Id = "b", Sha256 = Sha('f'), DerivedFrom = { "root" } }), out _)?.State);
+            Assert.Equal("not_independent", IndependentVerifier.CheckIndependence(In(a, new SourceRef { Id = "b", Sha256 = Sha('f'), DerivedFrom = { "root" } }), out _)?.State);
             // kinds that are never independent
             foreach (var k in new[] { SourceKinds.Inference, SourceKinds.Model, SourceKinds.ExecutionPlan })
-                Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(In(new SourceRef { Id = "z", Kind = k, Sha256 = Sha('9') }, markup), out _)?.State);
+                Assert.Equal("not_independent", IndependentVerifier.CheckIndependence(In(new SourceRef { Id = "z", Kind = k, Sha256 = Sha('9') }, markup), out _)?.State);
         }
 
         [Fact]
@@ -160,9 +160,9 @@ namespace Bimbridge.Tests
             var pdf = new SourceRef { Id = "E", Kind = SourceKinds.Pdf, Sha256 = Sha('a') };
             var inp = In(pdf, new SourceRef { Id = "plan", Sha256 = Sha('b') });
             inp.BuildPlanFingerprint = IndependentVerifier.Fingerprint(inp.Expected);
-            Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(inp, out _)?.State);
+            Assert.Equal("not_independent", IndependentVerifier.CheckIndependence(inp, out _)?.State);
             var r = IndependentVerifier.Verify(inp);
-            Assert.Equal("no_independiente", r.State);
+            Assert.Equal("not_independent", r.State);
             // order-independent fingerprint
             var x = new[] { new IndependentVerifier.Item { Key = "a", X = 1 }, new IndependentVerifier.Item { Key = "b", Y = 2 } };
             Assert.Equal(IndependentVerifier.Fingerprint(x), IndependentVerifier.Fingerprint(Enumerable.Reverse(x)));
@@ -180,16 +180,16 @@ namespace Bimbridge.Tests
         public void Delivery_CriticalReceipts_NeedRevisionOriginAndObservedEvidence()
         {
             var t = new DeliveryTrack("e1", "archivo:c:\\a.rvt", new[] { DeliveryStages.Exported, DeliveryStages.ArtifactVerified, DeliveryStages.DeliveryConfirmed });
-            Assert.Contains("without a model revision", t.Record(R(DeliveryStages.Exported, null, ("archivo", "a.pdf"), ("sha256", Sha('a')), ("origen", "export"), ("evidencia", Confidence.Verified))));
-            Assert.Contains("provenance", t.Record(R(DeliveryStages.Exported, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("evidencia", Confidence.Verified))));
-            Assert.Contains("COMPROBADO", t.Record(R(DeliveryStages.Exported, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("origen", "export"), ("evidencia", "REPORTADO"))));
-            Assert.Null(t.Record(R(DeliveryStages.Exported, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("origen", "export"), ("evidencia", Confidence.Verified))));
+            Assert.Contains("without a model revision", t.Record(R(DeliveryStages.Exported, null, ("file", "a.pdf"), ("sha256", Sha('a')), ("origin", "export"), ("evidence", Confidence.Verified))));
+            Assert.Contains("provenance", t.Record(R(DeliveryStages.Exported, "r5", ("file", "a.pdf"), ("sha256", Sha('a')), ("evidence", Confidence.Verified))));
+            Assert.Contains("VERIFIED", t.Record(R(DeliveryStages.Exported, "r5", ("file", "a.pdf"), ("sha256", Sha('a')), ("origin", "export"), ("evidence", "REPORTADO"))));
+            Assert.Null(t.Record(R(DeliveryStages.Exported, "r5", ("file", "a.pdf"), ("sha256", Sha('a')), ("origin", "export"), ("evidence", Confidence.Verified))));
             // verifying a revision other than the exported one
-            Assert.Contains("revision r5 was exported", t.Record(R(DeliveryStages.ArtifactVerified, "r6", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("paginas", 3), ("origen", "pdf_info"), ("evidencia", Confidence.Verified))));
-            Assert.Null(t.Record(R(DeliveryStages.ArtifactVerified, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("paginas", 3), ("origen", "pdf_info"), ("evidencia", Confidence.Verified))));
+            Assert.Contains("revision r5 was exported", t.Record(R(DeliveryStages.ArtifactVerified, "r6", ("file", "a.pdf"), ("sha256", Sha('a')), ("pages", 3), ("origin", "pdf_info"), ("evidence", Confidence.Verified))));
+            Assert.Null(t.Record(R(DeliveryStages.ArtifactVerified, "r5", ("file", "a.pdf"), ("sha256", Sha('a')), ("pages", 3), ("origin", "pdf_info"), ("evidence", Confidence.Verified))));
             // delivery is confirmed by a person, not by the agent
-            Assert.Contains("person", t.Record(R(DeliveryStages.DeliveryConfirmed, "r5", ("confirma", "ok"), ("origen", "agente"))));
-            Assert.Null(t.Record(R(DeliveryStages.DeliveryConfirmed, "r5", ("confirma", "ok"), ("origen", "usuario:operator"))));
+            Assert.Contains("person", t.Record(R(DeliveryStages.DeliveryConfirmed, "r5", ("confirms", "ok"), ("origin", "agent"))));
+            Assert.Null(t.Record(R(DeliveryStages.DeliveryConfirmed, "r5", ("confirms", "ok"), ("origin", "usuario:operator"))));
             Assert.True(t.Complete);
         }
 

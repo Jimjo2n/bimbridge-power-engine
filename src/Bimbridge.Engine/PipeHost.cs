@@ -124,22 +124,22 @@ namespace Bimbridge.Engine
                     }
                     session = _sessions.Open(Arg.GetString(hello.Args, "client"), (int)(Arg.GetLong(hello.Args, "pid") ?? 0));
                     // The pipe ACL only admits the Windows user of this Revit: that is the verified principal.
-                    _sessions.Describe(session, Arg.GetString(hello.Args, "client_version"), Arg.GetString(hello.Args, "agente"),
-                        Arg.GetString(hello.Args, "conversacion"), Arg.GetString(hello.Args, "modelo"),
-                        Arg.GetString(hello.Args, "agente_fuente") == AgentIdentity.SourceConfig ? AgentIdentity.SourceConfig
-                            : Arg.GetString(hello.Args, "agente_fuente") == AgentIdentity.SourceRegister ? AgentIdentity.SourceRegister : AgentIdentity.SourceHello,
+                    _sessions.Describe(session, Arg.GetString(hello.Args, "client_version"), Arg.GetString(hello.Args, "agent"),
+                        Arg.GetString(hello.Args, "conversation"), Arg.GetString(hello.Args, "model"),
+                        Arg.GetString(hello.Args, "agent_source") == AgentIdentity.SourceConfig ? AgentIdentity.SourceConfig
+                            : Arg.GetString(hello.Args, "agent_source") == AgentIdentity.SourceRegister ? AgentIdentity.SourceRegister : AgentIdentity.SourceHello,
                         Environment.UserName);
                     var info = SafeHelloInfo();
                     var largeResults = Arg.GetBool(hello.Args, Wire.LargeResultFeature) == true;
                     info[Wire.LargeResultFeature] = largeResults;
                     info["protocol"] = (long)Wire.ProtocolVersion;
-                    info["sesion"] = session.Id;
-                    info["agente"] = session.AgentName;
-                    info["identidad"] = session.AgentName == null ? "insuficiente" : "declarada";
+                    info["session"] = session.Id;
+                    info["agent"] = session.AgentName;
+                    info["identity"] = session.AgentName == null ? "insufficient" : "declared";
                     await Send(stream, writeLock, new Response { Id = hello.Id, State = Status.Ok, Data = info }, connCts.Token).ConfigureAwait(false);
-                    _journal?.Log(session.Id, "conectar", Status.Ok, 0, new Dictionary<string, object>
+                    _journal?.Log(session.Id, "connect", Status.Ok, 0, new Dictionary<string, object>
                     {
-                        ["cliente"] = session.ClientName, ["pid"] = (long)session.ClientPid, ["agente"] = session.AgentName, ["identidad_fuente"] = session.IdentitySource,
+                        ["client"] = session.ClientName, ["pid"] = (long)session.ClientPid, ["agent"] = session.AgentName, ["identity_source"] = session.IdentitySource,
                     });
                     _log("session opened: " + session.Id);
 
@@ -154,7 +154,7 @@ namespace Bimbridge.Engine
                         if (waited != pendingRead)
                         {
                             if (!SessionLifecycle.ShouldExpireOnIdle(session.Active)) continue;
-                            closeReason = "inactividad";
+                            closeReason = "inactivity";
                             connCts.Cancel();
                             stream.Dispose();
                             try { await pendingRead.ConfigureAwait(false); } catch (Exception) { }
@@ -187,7 +187,7 @@ namespace Bimbridge.Engine
                         if (_config.IdentityRequired && anonymous && IdentityPolicy.RequiresIdentity(req))
                         {
                             var refused = Response.Fail(req.Id, Status.Rejected, IdentityPolicy.RefusalMessage(s));
-                            var rj = new Dictionary<string, object> { ["aviso"] = "identidad_insuficiente", ["cliente"] = s.ClientName };
+                            var rj = new Dictionary<string, object> { ["warning"] = "insufficient_identity", ["client"] = s.ClientName };
                             corr.WriteTo(rj);
                             if (reqDoc != null) rj["doc"] = reqDoc;
                             _journal?.Log(s.Id, ToolName(req), refused.State, 0, rj);
@@ -221,13 +221,13 @@ namespace Bimbridge.Engine
                             _sessions.RequestFinished(s, ms, failed);
                             var extra = JournalExtra(resp) ?? new Dictionary<string, object>();
                             // Attribution: every journal line carries the agent, the client, the trace and the requested document.
-                            extra["agente"] = s.AgentName;
-                            extra["cliente"] = s.ClientName;
-                            extra["traza"] = corr.TraceId;
+                            extra["agent"] = s.AgentName;
+                            extra["client"] = s.ClientName;
+                            extra["trace"] = corr.TraceId;
                             corr.Complete(req, resp);
                             corr.WriteTo(extra);
                             // Explicit legacy mode (identidad_obligatoria=false): the anonymous operation is marked as such in the journal.
-                            if (anonymous && !IdentityPolicy.IsRegistration(req)) extra["identidad"] = _config.IdentityRequired ? "sin_nombre" : "sin_nombre_modo_heredado";
+                            if (anonymous && !IdentityPolicy.IsRegistration(req)) extra["identity"] = _config.IdentityRequired ? "unnamed" : "unnamed_legacy_mode";
                             if (reqDoc != null) extra["doc"] = reqDoc;
                             _journal?.Log(s.Id, ToolName(req), resp.State, ms, extra);
                             try { await Send(stream, writeLock, resp, connCts.Token, largeResults).ConfigureAwait(false); }
@@ -245,9 +245,9 @@ namespace Bimbridge.Engine
                     connCts.Cancel();
                     if (session != null)
                     {
-                        _sessions.Close(session, closeReason ?? (lost ? "conexion_cerrada" : "revit_cerrando"));
+                        _sessions.Close(session, closeReason ?? (lost ? "connection_closed" : "revit_closing"));
                         try { _handler.OnSessionClosed(session); } catch (Exception ex) { _log("OnSessionClosed: " + ex.Message); }
-                        _journal?.Log(session.Id, "desconectar", Status.Ok, 0);
+                        _journal?.Log(session.Id, "disconnect", Status.Ok, 0);
                         _log("session closed: " + session.Id);
                     }
                 }
@@ -268,13 +268,13 @@ namespace Bimbridge.Engine
         {
             if (resp.State == Status.Ok || string.IsNullOrEmpty(resp.Warning)) return null;
             var a = resp.Warning.Length > 200 ? resp.Warning.Substring(0, 200) + "…" : resp.Warning;
-            return new Dictionary<string, object> { ["aviso"] = a };
+            return new Dictionary<string, object> { ["warning"] = a };
         }
 
         private Dictionary<string, object> SafeHelloInfo()
         {
             try { return _handler.HelloInfo() ?? new Dictionary<string, object>(); }
-            catch (Exception ex) { return new Dictionary<string, object> { ["aviso"] = ex.Message }; }
+            catch (Exception ex) { return new Dictionary<string, object> { ["warning"] = ex.Message }; }
         }
 
         /// <summary>
@@ -310,30 +310,30 @@ namespace Bimbridge.Engine
             var budget = largeResults ? 1024 * 1024 : Frame.MaxBytes;
             if (bytes <= budget) return json;
 
-            var summary = new Dictionary<string, object> { ["bytes_respuesta"] = (long)bytes };
+            var summary = new Dictionary<string, object> { ["response_bytes"] = (long)bytes };
             if (response.Data is Dictionary<string, object> data)
-                foreach (var key in new[] { "total", "page", "pages", "cursor", "rev_instantanea", "recibo", "job_id", "plan_id" })
+                foreach (var key in new[] { "total", "page", "pages", "cursor", "snapshot_rev", "receipt", "job_id", "plan_id" })
                     if (data.TryGetValue(key, out var field)) summary[key] = field;
             if (largeResults)
             {
                 try
                 {
                     summary["res"] = save(ResultStore.FragmentJson(json));
-                    summary["formato_res"] = ResultStore.JsonFragmentFormat;
+                    summary["result_format"] = ResultStore.JsonFragmentFormat;
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
-                    summary["aviso_resultado"] = "Could not save the detail: " + ex.Message;
+                    summary["result_warning"] = "Could not save the detail: " + ex.Message;
                 }
             }
-            else summary["aviso_resultado"] = "The response exceeds the bridge limit. Narrow the read or restart the conversation with the updated bridge.";
+            else summary["result_warning"] = "The response exceeds the bridge limit. Narrow the read or restart the conversation with the updated bridge.";
             var result = new Response { Id = response.Id, State = response.State, Rev = response.Rev, Warning = response.Warning, Data = summary };
             var fitted = Json.Write(result);
             if (System.Text.Encoding.UTF8.GetByteCount(fitted) <= budget) return fitted;
             result.Warning = ResultTable.Trim(result.Warning, 2000);
             fitted = Json.Write(result);
             if (System.Text.Encoding.UTF8.GetByteCount(fitted) <= budget) return fitted;
-            foreach (var key in new[] { "cursor", "recibo", "job_id", "plan_id" })
+            foreach (var key in new[] { "cursor", "receipt", "job_id", "plan_id" })
                 if (summary.TryGetValue(key, out var field) && System.Text.Encoding.UTF8.GetByteCount(Json.Write(field)) > 16384)
                     summary.Remove(key);
             return Json.Write(result);

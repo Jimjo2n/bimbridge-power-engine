@@ -11,16 +11,16 @@ public class ExportSheets : Recipe
 
     public override void Prepare(ScriptContext ctx)
     {
-        if (!ctx.Args.ContainsKey("conjunto") && !ctx.Args.ContainsKey("hojas")) throw new ArgumentException("missing conjunto or hojas");
+        if (!ctx.Args.ContainsKey("sheet_set") && !ctx.Args.ContainsKey("sheets")) throw new ArgumentException("missing sheet_set or sheets");
     }
 
     public override IEnumerable<Unit> Units(ScriptContext ctx)
     {
-        var before = ctx.Args.TryGetValue("antes", out var a) ? Convert.ToString(a) : "nada";
-        if (before == "guardar") yield return Unit.Save("guardar_antes");
-        else if (before == "sync") yield return Unit.Sync("sync_antes", "BIMBRIDGE: before export");
+        var before = ctx.Args.TryGetValue("before", out var a) ? Convert.ToString(a) : "nothing";
+        if (before == "save") yield return Unit.Save("save_before");
+        else if (before == "sync") yield return Unit.Sync("sync_before", "BIMBRIDGE: before export");
         var opts = new Dictionary<string, object>();
-        foreach (var k in new[] { "conjunto", "hojas", "carpeta", "nombre", "combinar", "sobrescribir", "color" })
+        foreach (var k in new[] { "sheet_set", "sheets", "folder", "name", "combine", "overwrite", "color" })
             if (ctx.Args.TryGetValue(k, out var v)) opts[k] = v;
         yield return Unit.Pdf("pdf", opts);
     }

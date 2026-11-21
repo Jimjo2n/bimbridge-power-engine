@@ -21,7 +21,7 @@ namespace Bimbridge.Tests
 
         private Plan NewPlan(PlanStore s, string session, params (long id, string before, string after)[] entries)
         {
-            var p = new Plan { Id = s.NewId(), SessionId = session, Client = session, DocKey = "C:\\modelos\\Tampa.rvt", DocTitle = "Tampa", CreatedUtc = _now, Summary = "prueba" };
+            var p = new Plan { Id = s.NewId(), SessionId = session, Client = session, DocKey = "C:\\modelos\\Tampa.rvt", DocTitle = "Tampa", CreatedUtc = _now, Summary = "test" };
             foreach (var e in entries) p.Entries.Add(new PlanEntry { Id = e.id, Op = "set_elevation", Key = "elev", Before = e.before, After = e.after, Target = double.Parse(e.after) });
             s.Add(p);
             return p;
@@ -120,7 +120,7 @@ namespace Bimbridge.Tests
             var b = NewPlan(s, "S-claude", (2, "1", "2"));
             NewPlan(s, "S-codex", (3, "1", "2"));
             s.Hold(a); s.Hold(b);
-            Assert.Equal(2, s.DiscardHeld(a.DocKey, "usuario"));
+            Assert.Equal(2, s.DiscardHeld(a.DocKey, "user"));
             Assert.Equal(PlanStatus.Discarded, a.Status);
             Assert.Empty(s.Held(a.DocKey));
             Assert.Equal(2, s.ForSession("S-claude").Count);
@@ -145,9 +145,9 @@ namespace Bimbridge.Tests
             var s = NewStore();
             var p = NewPlan(s, "S", Enumerable.Range(1, 40).Select(i => ((long)i, "10", "11")).ToArray());
             var d = p.Describe(5);
-            Assert.Equal(5, ((List<object>)d["filas"]).Count);
-            Assert.Equal(35L, d["filas_omitidas"]);
-            Assert.Equal(40L, d["cambios"]);
+            Assert.Equal(5, ((List<object>)d["rows"]).Count);
+            Assert.Equal(35L, d["skipped_rows"]);
+            Assert.Equal(40L, d["changes"]);
         }
     }
 }

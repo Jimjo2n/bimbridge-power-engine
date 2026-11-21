@@ -31,8 +31,8 @@ namespace Bimbridge.AgentHost
             {
                 var rec = st.Ops[id];
                 var op = plan.ById[id];
-                var row = new Dictionary<string, object> { ["op"] = id, ["operacion"] = op.Operation, ["estado"] = rec.State };
-                if (rec.Note != null) row["nota"] = Trim(rec.Note, 160);
+                var row = new Dictionary<string, object> { ["op"] = id, ["operation"] = op.Operation, ["status"] = rec.State };
+                if (rec.Note != null) row["note"] = Trim(rec.Note, 160);
                 switch (rec.State)
                 {
                     case OpState.Verified: case OpState.Trialed: confirmed.Add(row); break;
@@ -56,29 +56,29 @@ namespace Bimbridge.AgentHost
 
             var d = new Dictionary<string, object>
             {
-                ["esquema"] = Schema,
-                ["creado"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
-                ["modelo"] = new Dictionary<string, object> { ["clave"] = plan.DocKey, ["huella"] = plan.DocPrint, ["revision"] = docRevision, ["instancia"] = instance },
-                ["plan"] = new Dictionary<string, object> { ["hash"] = plan.Hash, ["objetivo"] = plan.Objective, ["operaciones"] = (long)plan.Ops.Count, ["estado"] = st.PlanState, ["fencing"] = st.Fencing, ["seq"] = st.Seq },
-                ["confirmadas"] = confirmed,
-                ["inciertas"] = uncertain,
-                ["fallidas"] = failed,
-                ["pendientes"] = pending,
-                ["siguiente_paso_seguro"] = next,
-                ["diario"] = st.JournalPath,
+                ["schema"] = Schema,
+                ["created"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
+                ["model"] = new Dictionary<string, object> { ["key"] = plan.DocKey, ["fingerprint"] = plan.DocPrint, ["revision"] = docRevision, ["instance"] = instance },
+                ["plan"] = new Dictionary<string, object> { ["hash"] = plan.Hash, ["target"] = plan.Objective, ["operations"] = (long)plan.Ops.Count, ["status"] = st.PlanState, ["fencing"] = st.Fencing, ["seq"] = st.Seq },
+                ["committed_items"] = confirmed,
+                ["uncertain_items"] = uncertain,
+                ["failed"] = failed,
+                ["pending_items"] = pending,
+                ["safe_next_step"] = next,
+                ["journal"] = st.JournalPath,
             };
-            if (plan.Sources.Count > 0) d["fuentes"] = plan.Sources.Select(s => (object)s.ToJson()).ToList();
+            if (plan.Sources.Count > 0) d["sources"] = plan.Sources.Select(s => (object)s.ToJson()).ToList();
             if (requirements != null)
             {
                 var (conflicts, missing) = requirements.Audit();
-                d["requisitos"] = new Dictionary<string, object>
+                d["requirements"] = new Dictionary<string, object>
                 {
                     ["total"] = (long)requirements.All.Count,
-                    ["conflictos"] = conflicts.Select(c => (object)c.ToJson()).ToList(),
-                    ["datos_sin_fuente"] = missing.Select(m => (object)(m.Id + " " + m.Key + "@" + m.Scope)).ToList(),
+                    ["conflicts"] = conflicts.Select(c => (object)c.ToJson()).ToList(),
+                    ["data_without_source"] = missing.Select(m => (object)(m.Id + " " + m.Key + "@" + m.Scope)).ToList(),
                 };
             }
-            if (delivery != null) d["entrega"] = delivery.ToJson();
+            if (delivery != null) d["delivery"] = delivery.ToJson();
             return d;
         }
 

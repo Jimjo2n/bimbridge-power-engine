@@ -29,7 +29,7 @@ namespace Bimbridge.Engine.Tasks
                 parts.Add("Last save: " + t.LastPersist.Kind + " " + t.LastPersist.When + " after " + t.LastPersist.Seq + " committed" +
                           (t.ConfirmSeq > t.LastPersist.Seq ? " (" + (t.ConfirmSeq - t.LastPersist.Seq) + " committed unsaved)" : "") + ".");
             else if (t.ConfirmSeq > 0) parts.Add("Not saved yet (" + t.ConfirmSeq + " committed only in Revit memory).");
-            if (t.Decisions.Count > 0) parts.Add("Decisions: " + string.Join("; ", t.Decisions.Skip(Math.Max(0, t.Decisions.Count - 3)).Select(d => Clip(Convert.ToString(d.TryGetValue("texto", out var x) ? x : "", CultureInfo.InvariantCulture), 80))) + ".");
+            if (t.Decisions.Count > 0) parts.Add("Decisions: " + string.Join("; ", t.Decisions.Skip(Math.Max(0, t.Decisions.Count - 3)).Select(d => Clip(Convert.ToString(d.TryGetValue("text", out var x) ? x : "", CultureInfo.InvariantCulture), 80))) + ".");
             if (t.Exceptions.Count > 0) parts.Add("Exceptions: " + t.Exceptions.Count + ".");
             if (!string.IsNullOrEmpty(t.Reason)) parts.Add("Reason: " + Clip(t.Reason, 200) + ".");
             parts.Add("Next: " + Next(t, units) + ".");
@@ -46,16 +46,16 @@ namespace Bimbridge.Engine.Tasks
                     // Points to the state that actually has units pending review (it is not always conflict).
                     var st = new[] { UnitState.RolledBack, UnitState.Conflict, UnitState.Partial, UnitState.Skipped }
                         .FirstOrDefault(s => units.Units.Values.Any(u => u.State == s));
-                    var which = units.Units.Values.Any(u => u.State == st) ? "tarea unidades estado=" + st.ToString().ToLowerInvariant() + ", " : "";
-                    return "review deviations (" + which + "qc_final) and decide; tarea reanudar retries the rolled-back ones";
+                    var which = units.Units.Values.Any(u => u.State == st) ? "task units status=" + st.ToString().ToLowerInvariant() + ", " : "";
+                    return "review deviations (" + which + "final_qc) and decide; task resume retries the rolled-back ones";
                 }
-                case TaskState.Cancelled: return "nothing unless you want to resume (tarea reanudar)";
+                case TaskState.Cancelled: return "nothing unless you want to resume (task resume)";
                 case TaskState.Interrupted: return units.Units.Values.Any(u => u.State == UnitState.Unknown)
-                    ? "tarea reconciliar with decision=aplicada|no_aplicada for the doubtful ones; then tarea reanudar"
-                    : "tarea reanudar (verifies what is doubtful and continues)";
-                case TaskState.Partial: return "read the reason; fix and tarea reanudar";
-                case TaskState.WaitingContext: return "resolve what the reason says; the task continues on its own (or tarea reanudar if it stopped waiting)";
-                default: return "wait (tarea esperar desde=" + t.Rev + ")";
+                    ? "task reconcile with decision=applied|not_applied for the doubtful ones; then task resume"
+                    : "task resume (verifies what is doubtful and continues)";
+                case TaskState.Partial: return "read the reason; fix and task resume";
+                case TaskState.WaitingContext: return "resolve what the reason says; the task continues on its own (or task resume if it stopped waiting)";
+                default: return "wait (task wait from=" + t.Rev + ")";
             }
         }
 
@@ -66,27 +66,27 @@ namespace Bimbridge.Engine.Tasks
             long N(string s) => c.TryGetValue(s, out var n) ? n : 0;
             var d = new Dictionary<string, object>
             {
-                ["tarea"] = t.Id,
-                ["estado"] = t.State,
+                ["task"] = t.Id,
+                ["status"] = t.State,
                 ["rev"] = t.Rev,
-                ["progreso"] = (N(UnitState.Committed) + N(UnitState.Skipped)) + "/" + t.UnitsTotal,
+                ["progress"] = (N(UnitState.Committed) + N(UnitState.Skipped)) + "/" + t.UnitsTotal,
             };
             var counts = new Dictionary<string, object>();
             foreach (var kv in c.OrderBy(k => k.Key, StringComparer.Ordinal)) counts[kv.Key] = kv.Value;
-            d["unidades"] = counts;
-            if (!string.IsNullOrEmpty(t.Reason)) d["motivo"] = t.Reason;
+            d["units"] = counts;
+            if (!string.IsNullOrEmpty(t.Reason)) d["reason"] = t.Reason;
             var dev = units.Units.Values.Where(u => u.State == UnitState.Conflict || u.State == UnitState.RolledBack || UnitState.NeedsReconcile(u.State))
                 .Take(5).Select(u => (object)(u.Key + ": " + u.State + (string.IsNullOrEmpty(u.Error) ? "" : " — " + Clip(u.Error, 120)))).ToList();
-            if (dev.Count > 0) d["desviaciones"] = dev;
-            if (t.Postcondition != null) d["qc_final"] = Compact(t.Postcondition);
+            if (dev.Count > 0) d["deviations"] = dev;
+            if (t.Postcondition != null) d["final_qc"] = Compact(t.Postcondition);
             if (t.Artifacts.Count > 0)
-                d["artefactos"] = t.Artifacts.Skip(Math.Max(0, t.Artifacts.Count - 5)).Select(a => (object)new Dictionary<string, object>
+                d["artifacts"] = t.Artifacts.Skip(Math.Max(0, t.Artifacts.Count - 5)).Select(a => (object)new Dictionary<string, object>
                 {
-                    ["ruta"] = a.TryGetValue("ruta", out var r) ? r : null, ["sha256"] = a.TryGetValue("sha256", out var h) ? h : null,
+                    ["path"] = a.TryGetValue("path", out var r) ? r : null, ["sha256"] = a.TryGetValue("sha256", out var h) ? h : null,
                 }).ToList();
-            if (t.LastPersist != null) d["ultimo_guardado"] = t.LastPersist.Kind + " " + t.LastPersist.When + " (seq " + t.LastPersist.Seq + "/" + t.ConfirmSeq + ")";
-            d["siguiente"] = Next(t, units);
-            if (includeContinuation) d["resumen"] = t.Summary ?? Continuation(t, units);
+            if (t.LastPersist != null) d["last_save"] = t.LastPersist.Kind + " " + t.LastPersist.When + " (seq " + t.LastPersist.Seq + "/" + t.ConfirmSeq + ")";
+            d["next"] = Next(t, units);
+            if (includeContinuation) d["summary"] = t.Summary ?? Continuation(t, units);
             return d;
         }
 

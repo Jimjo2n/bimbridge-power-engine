@@ -25,7 +25,7 @@ namespace Bimbridge.Tests
             public async Task<Response> HandleAsync(Session session, Request request, CancellationToken ct)
             {
                 await Task.Delay(DelayMs).ConfigureAwait(false);   // non-interruptible phase: does not observe ct
-                return new Response { Id = request.Id, State = Status.Ok, Data = new Dictionary<string, object> { ["hecho"] = true } };
+                return new Response { Id = request.Id, State = Status.Ok, Data = new Dictionary<string, object> { ["done"] = true } };
             }
             public void OnSessionClosed(Session session) => Interlocked.Increment(ref Closed);
         }
@@ -37,7 +37,7 @@ namespace Bimbridge.Tests
             await Frame.WriteAsync(c, Json.Write(new Request { Id = 1, Op = Wire.OpHello, Args = new Dictionary<string, object>
             {
                 // Mandatory identity: each test connection declares a unique agent via configuration.
-                ["protocol"] = (long)Wire.ProtocolVersion, ["client"] = "prueba", ["agente"] = "Prueba " + Guid.NewGuid().ToString("N").Substring(0, 6), ["agente_fuente"] = AgentIdentity.SourceConfig,
+                ["protocol"] = (long)Wire.ProtocolVersion, ["client"] = "test", ["agent"] = "Prueba " + Guid.NewGuid().ToString("N").Substring(0, 6), ["agent_source"] = AgentIdentity.SourceConfig,
             } }), CancellationToken.None);
             Assert.Equal(Status.Ok, Response.FromJson(await Frame.ReadAsync(c, CancellationToken.None)).State);
             return c;
@@ -88,7 +88,7 @@ namespace Bimbridge.Tests
                     while (handler.Closed == 0 && DateTime.UtcNow < limit) await Task.Delay(50);
                     Assert.Equal(1, handler.Closed);
                     Assert.Equal(0, sessions.Count);
-                    Assert.Contains(sessions.Closed(), x => x.Reason == "inactividad");
+                    Assert.Contains(sessions.Closed(), x => x.Reason == "inactivity");
                 }
             }
         }

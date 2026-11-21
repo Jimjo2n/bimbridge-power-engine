@@ -28,7 +28,7 @@ namespace Bimbridge.Bridge
 
         [McpServerTool(Name = "power", ReadOnly = true, Idempotent = true, OpenWorld = false)]
         [Description(PowerCommands.Help)]
-        public Task<CallToolResult> Power([Description("Commands, e.g. \"cap pdf\" or \"pdf symbols ruta=… paginas=1\"")] string c, CancellationToken ct = default)
+        public Task<CallToolResult> Power([Description("Commands, e.g. \"cap pdf\" or \"pdf symbols path=… pages=1\"")] string c, CancellationToken ct = default)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var lines = Command.SplitLines(c);
@@ -42,7 +42,7 @@ namespace Bimbridge.Bridge
             {
                 ct.ThrowIfCancellationRequested();
                 var d = PowerCommands.Run(pe, folders, l);
-                err |= d.TryGetValue("codigo", out var code) && code is string s && s != "OK";
+                err |= d.TryGetValue("code", out var code) && code is string s && s != "OK";
                 outs.Add(ResultStore.RenderPowerResult(d, perCommand));
             }
             var text = string.Join("\n", outs);

@@ -46,7 +46,7 @@ namespace Bimbridge.Setup
         public string CodexConfig => Path.Combine(UserProfile, ".codex", "config.toml");
         public string Downloads => Path.Combine(UserProfile, "Downloads");
         /// <summary>Copies of the installers (current and previous) for "Go back to the previous version", and the temp folder.</summary>
-        public string UpdatesDir => Path.Combine(Home, "actualizaciones");
+        public string UpdatesDir => Path.Combine(Home, "updates");
         public string UpdatesTemp => Path.Combine(UpdatesDir, "tmp");
         public string CachedSetup(string version) => Path.Combine(UpdatesDir, "Bimbridge.Setup-" + version + ".exe");
         /// <summary>Folders that may contain files renamed *.viejo-* when something in use was replaced.</summary>
@@ -137,7 +137,7 @@ namespace Bimbridge.Setup
             try
             {
                 if (!File.Exists(file)) return null;
-                var o = Json.ParseObject(File.ReadAllText(file));
+                var o = LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(file)));
                 var info = new InstalledInfo
                 {
                     ProductVersion = Arg.GetString(o, "version"),
@@ -162,7 +162,7 @@ namespace Bimbridge.Setup
         {
             if (o.Versions.Count == 0) throw new ArgumentException("choose at least one Revit version");
             var levels = (o.Levels ?? "R").ToUpperInvariant();
-            if (levels != "R" && levels != "RP" && levels != "RPW") throw new ArgumentException("invalid niveles: " + levels);
+            if (levels != "R" && levels != "RP" && levels != "RPW") throw new ArgumentException("invalid levels: " + levels);
 
             var previous = ReadInstalled();
             // 0.6.0: the package carries manifest.json with each file's SHA-256; if it does not match, nothing is installed.
@@ -187,7 +187,7 @@ namespace Bimbridge.Setup
             {
                 // Atomic from the outside: a failure halfway goes back to the previous backup instead of leaving mixed files.
                 try { InstallBackup.Restore(_p, LastBackup, DateTime.UtcNow); }
-                catch (Exception undo) { throw new IOException("The install failed (" + ex.Message + ") and could not go back to the backup (" + undo.Message + "). Use /restaurar=\"" + LastBackup + "\".", ex); }
+                catch (Exception undo) { throw new IOException("The install failed (" + ex.Message + ") and could not go back to the backup (" + undo.Message + "). Use /restore=\"" + LastBackup + "\".", ex); }
                 throw new IOException("The install failed and the previous state was restored: " + ex.Message, ex);
             }
         }
@@ -261,9 +261,9 @@ namespace Bimbridge.Setup
                     : previous.ProductVersion != productVersion ? previous.ProductVersion : previous.Previous,
                 ["installed_utc"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
                 // 0.6.0: hash of each installed file (relative to its root folder) for later diagnostics.
-                ["archivos"] = _installed.ToDictionary(kv => kv.Key, kv => (object)kv.Value),
-                ["manifiesto_paquete"] = manifest != null,
-                ["reemplazados_en_uso"] = _replacedInUse,
+                ["files"] = _installed.ToDictionary(kv => kv.Key, kv => (object)kv.Value),
+                ["package_manifest"] = manifest != null,
+                ["replaced_in_use"] = _replacedInUse,
             };
             Directory.CreateDirectory(_p.Home);
             File.WriteAllText(_p.InstallRecord, Json.Write(record));
@@ -304,10 +304,10 @@ namespace Bimbridge.Setup
             using (var r = new StreamReader(m.Open(), Encoding.UTF8))
             {
                 var o = Json.ParseObject(r.ReadToEnd());
-                if (!(o.TryGetValue("archivos", out var a) && a is Dictionary<string, object> files)) throw new InvalidDataException("manifest.json without 'archivos'");
-                if (o.ContainsKey("requeridos"))
+                if (!(o.TryGetValue("files", out var a) && a is Dictionary<string, object> files)) throw new InvalidDataException("manifest.json without 'files'");
+                if (o.ContainsKey("required"))
                 {
-                    var required = Arg.GetStringList(o, "requeridos");
+                    var required = Arg.GetStringList(o, "required");
                     var present = new HashSet<string>(payload.Entries.Where(e => e.Name.Length > 0 && e.Length > 0).Select(Norm), StringComparer.Ordinal);
                     if (required.Count == 0 || required.Any(n => !present.Contains(n) || !files.ContainsKey(n)))
                         throw new InvalidDataException("required payload components are missing");
@@ -358,11 +358,11 @@ namespace Bimbridge.Setup
         {
             var info = ReadInstalled();
             Dictionary<string, object> files = null;
-            try { if (File.Exists(_p.InstallRecord)) files = Json.ParseObject(File.ReadAllText(_p.InstallRecord)).TryGetValue("archivos", out var a) ? a as Dictionary<string, object> : null; }
+            try { if (File.Exists(_p.InstallRecord)) files = LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(_p.InstallRecord))).TryGetValue("files", out var a) ? a as Dictionary<string, object> : null; }
             catch (Exception) { }
             var res = new Dictionary<string, object>
             {
-                ["instalada"] = info?.ProductVersion, ["anterior"] = info?.Previous, ["revit_elegidos"] = info?.Versions?.Cast<object>().ToList(),
+                ["installed"] = info?.ProductVersion, ["previous"] = info?.Previous, ["revit_selected"] = info?.Versions?.Cast<object>().ToList(),
             };
             var years = new Dictionary<string, object>();
             foreach (var v in SupportedVersions)
@@ -384,8 +384,8 @@ namespace Bimbridge.Setup
                     && Directory.GetFiles(Path.Combine(dir, "Bimbridge"), "*" + Updates.LeftoverMark + "*", SearchOption.AllDirectories).Length > 0;
                 years[v] = new Dictionary<string, object>
                 {
-                    ["archivos"] = n, ["coinciden"] = files == null ? (object)"no hash record (install older than 0.6.0)" : diff.Count == 0,
-                    ["diferencias"] = diff, ["reinicio_pendiente"] = pending,
+                    ["files"] = n, ["match"] = files == null ? (object)"no hash record (install older than 0.6.0)" : diff.Count == 0,
+                    ["differences"] = diff, ["restart_pending"] = pending,
                 };
             }
             res["addin"] = years;
@@ -393,10 +393,10 @@ namespace Bimbridge.Setup
             object bridgeMatch = null;
             if (bridgeOk && files != null && files.TryGetValue("bridge/Bimbridge.Bridge.exe", out var bs))
                 bridgeMatch = string.Equals(FileSha(_p.BridgeExe), Convert.ToString(bs), StringComparison.OrdinalIgnoreCase);
-            res["puente"] = new Dictionary<string, object>
+            res["bridge"] = new Dictionary<string, object>
             {
-                ["existe"] = bridgeOk, ["coincide"] = bridgeMatch,
-                ["reinicio_pendiente"] = Directory.Exists(_p.BinDir) && Directory.GetFiles(_p.BinDir, "*" + Updates.LeftoverMark + "*").Length > 0,
+                ["exists"] = bridgeOk, ["matches"] = bridgeMatch,
+                ["restart_pending"] = Directory.Exists(_p.BinDir) && Directory.GetFiles(_p.BinDir, "*" + Updates.LeftoverMark + "*").Length > 0,
             };
             var loaded = new List<object>();
             var inst = Path.Combine(_p.Home, "instances");
@@ -411,18 +411,18 @@ namespace Bimbridge.Setup
                         if (!alive) continue;
                         loaded.Add(new Dictionary<string, object>
                         {
-                            ["revit"] = d.RevitVersion, ["pid"] = d.Pid, ["addin_cargado"] = d.AddinVersion, ["desde"] = d.StartedUtc,
-                            ["coincide_con_instalada"] = info?.ProductVersion != null && d.AddinVersion != null && d.AddinVersion.StartsWith(info.ProductVersion, StringComparison.Ordinal),
+                            ["revit"] = d.RevitVersion, ["pid"] = d.Pid, ["addin_loaded"] = d.AddinVersion, ["from"] = d.StartedUtc,
+                            ["matches_installed"] = info?.ProductVersion != null && d.AddinVersion != null && d.AddinVersion.StartsWith(info.ProductVersion, StringComparison.Ordinal),
                         });
                     }
                     catch (Exception) { }
                 }
-            res["revit_abiertos"] = loaded;
+            res["open_revits"] = loaded;
             try
             {
                 if (File.Exists(_p.ConfigFile))
                 {
-                    var c = Json.ParseObject(File.ReadAllText(_p.ConfigFile));
+                    var c = LegacyAliases.NormalizeConfig(Json.ParseObject(File.ReadAllText(_p.ConfigFile)));
                     res["config"] = new Dictionary<string, object> { ["enabled"] = Arg.GetBool(c, "enabled"), ["levels"] = Arg.GetString(c, "levels"), ["runner"] = Arg.GetString(c, "runner") ?? "auto" };
                 }
             }
@@ -506,7 +506,7 @@ namespace Bimbridge.Setup
             if (File.Exists(_p.ConfigFile))
             {
                 try { o = Json.ParseObject(File.ReadAllText(_p.ConfigFile)); }
-                catch (Exception) { File.Copy(_p.ConfigFile, _p.ConfigFile + ".danado", true); }
+                catch (Exception) { File.Copy(_p.ConfigFile, _p.ConfigFile + ".damaged", true); }
             }
             // F19: an update does not turn back on an MCP the user turned off; only a fresh install leaves it on.
             if (o == null) o = new Dictionary<string, object> { ["enabled"] = true };
@@ -642,10 +642,11 @@ namespace Bimbridge.Setup
             try { File.Delete(_p.InstallRecord); } catch (Exception) { }
             if (removeData)
             {
-                foreach (var d in new[] { Path.Combine(_p.Home, "journal"), Path.Combine(_p.Home, "cola"), Path.Combine(_p.Home, "instances"),
-                                       Path.Combine(_p.Home, "operaciones"), Path.Combine(_p.Home, "resultados"), Path.Combine(_p.Home, "scripts") })
+                // Data never migrated by an install keeps its 0.9.3 name: both spellings are removed.
+                string[] AndLegacy(params string[] names) => names.Concat(names.Where(LegacyAliases.HomeNames.ContainsKey).Select(n => LegacyAliases.HomeNames[n])).ToArray();
+                foreach (var d in AndLegacy("journal", "queue", "instances", "operations", "results", "scripts").Select(n => Path.Combine(_p.Home, n)))
                     try { if (Directory.Exists(d)) Directory.Delete(d, true); } catch (Exception) { }
-                foreach (var f in new[] { "addin.log", "retener.on", "pausado.on" })
+                foreach (var f in AndLegacy("addin.log", "hold.on", "paused.on"))
                     try { File.Delete(Path.Combine(_p.Home, f)); } catch (Exception) { }
                 try { var cfg = Path.GetDirectoryName(_p.ConfigFile); if (Directory.Exists(cfg)) Directory.Delete(cfg, true); } catch (Exception) { }
                 _log("Logs, queue and configuration deleted");

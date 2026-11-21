@@ -25,15 +25,15 @@ namespace Bimbridge.Tests
             var dir = Path.Combine(Root(), "tools", "acceptance", "0.9.0");
             var files = Directory.GetFiles(dir, "N9-*.json");
             Assert.Equal(6, files.Length);
-            var ops = "[{\"op\":\"place\",\"type\":\"F: T\",\"level\":\"Level 1\",\"puntos\":[[1,2],[3,4]],\"montaje\":\"losa\"}]";
+            var ops = "[{\"op\":\"place\",\"type\":\"F: T\",\"level\":\"Level 1\",\"points\":[[1,2],[3,4]],\"mounting\":\"slab\"}]";
             foreach (var f in files)
             {
                 var spec = Json.ParseObject(File.ReadAllText(f));
-                Assert.Equal(Campaign080.Schema, spec["esquema"]);
-                Assert.Equal("BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION", spec["estado"]);
-                var vars = ((Dictionary<string, object>)spec["variables"]).Keys.ToDictionary(k => k, k => k == "ops" ? ops : k == "nivel" ? "Level 1" : k.StartsWith("ids") ? "101,102" : k.StartsWith("codigo") ? "return 1;" : "123");
+                Assert.Equal(Campaign080.Schema, spec["schema"]);
+                Assert.Equal("BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION", spec["status"]);
+                var vars = ((Dictionary<string, object>)spec["variables"]).Keys.ToDictionary(k => k, k => k == "ops" ? ops : k == "level" ? "Level 1" : k.StartsWith("ids") ? "101,102" : k.Contains("code") ? "return 1;" : "123");
                 vars["plan"] = "P-1";
-                foreach (Dictionary<string, object> s in (List<object>)spec["pasos"])
+                foreach (Dictionary<string, object> s in (List<object>)spec["steps"])
                 {
                     var args = (Dictionary<string, object>)Campaign080.Subst(s["args"], vars);
                     if ((string)s["op"] == "plan") Bimbridge.Engine.OpSpec.ParseAll(args);

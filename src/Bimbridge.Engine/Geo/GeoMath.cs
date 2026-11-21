@@ -178,10 +178,10 @@ namespace Bimbridge.Engine.Geo
     public static class MountClass
     {
         public const string Ok = "ok";
-        public const string Floating = "flotando";
-        public const string Embedded = "empotrada";
-        public const string NoSurface = "sin_superficie";
-        public const string NoBody = "sin_cuerpo";
+        public const string Floating = "floating";
+        public const string Embedded = "embedded";
+        public const string NoSurface = "no_surface";
+        public const string NoBody = "no_body";
     }
 
     /// <summary>Summary of all the points of a fixture.</summary>
@@ -285,7 +285,7 @@ namespace Bimbridge.Engine.Geo
 
         public static List<double[]> Points(Box3 footprint, int n, double inset = 1.0 / 24.0)
         {
-            if (Array.IndexOf(Allowed, n) < 0) throw new ArgumentException("puntos must be 1, 5 or 9");
+            if (Array.IndexOf(Allowed, n) < 0) throw new ArgumentException("points must be 1, 5 or 9");
             // Measure slightly inside the border: right on the edge the intersection is unstable.
             var ix = Math.Min(inset, footprint.SizeX * 0.1);
             var iy = Math.Min(inset, footprint.SizeY * 0.1);
@@ -418,9 +418,9 @@ namespace Bimbridge.Engine.Geo
     /// </summary>
     public static class ViewBand
     {
-        public const string Inside = "dentro";
-        public const string Above = "encima";
-        public const string Below = "debajo";
+        public const string Inside = "inside";
+        public const string Above = "above";
+        public const string Below = "below";
 
         public static string Classify(bool ceilingPlan, double cut, double top, double bottom, double depth, double zBot, double zTop, out double low, out double high)
         {

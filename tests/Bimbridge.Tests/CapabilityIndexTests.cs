@@ -14,7 +14,7 @@ namespace Bimbridge.Tests
         [Theory]
         [InlineData("Lighting fixture QA", "F20-LIGHT-QA-001")]
         [InlineData("QA de luminarias y etiquetas", "F20-LIGHT-QA-001")]
-        [InlineData("choques", "F32-GEO-CLASH-001")]
+        [InlineData("clashes", "F32-GEO-CLASH-001")]
         [InlineData("Clash / mounting analysis", "F32-GEO-CLASH-001")]
         [InlineData("f28-link-rvt-001", "F28-LINK-RVT-001")]
         public void Relevance_FindsBilingualTasksAndRespectsFilters(string query, string expected)
@@ -31,9 +31,9 @@ namespace Bimbridge.Tests
             var c = Idx.Get("f20-circuit-create-001");
             Assert.NotNull(c);
             var k = CapabilityIndex.Contract(c);
-            Assert.Equal("circuit_create", ((string)k["estrategia"]).Substring(6));
-            Assert.Equal("DIRECT_REVIT_API", k["ejecutor"]);
-            Assert.Equal("pendiente", k["verificacion_nativa"]);
+            Assert.Equal("circuit_create", ((string)k["strategy"]).Substring(6));
+            Assert.Equal("DIRECT_REVIT_API", k["executor"]);
+            Assert.Equal("pending", k["native_verification"]);
             Assert.Null(Idx.Get("F99-NADA-001"));
         }
 

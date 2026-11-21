@@ -88,7 +88,7 @@ namespace Bimbridge.Addin.Revit
         private string Raise()
         {
             var ev = _event;
-            if (ev == null) return "sin_evento";
+            if (ev == null) return "no_event";
             var r = ev.Raise();
             if (r == ExternalEventRequest.Denied || r == ExternalEventRequest.TimedOut)
                 _log("ExternalEvent.Raise: " + r);
@@ -196,14 +196,14 @@ namespace Bimbridge.Addin.Revit
         /// <summary>Revit thread numbers since the add-in started (for the audit and the status).</summary>
         public Dictionary<string, object> Stats() => new Dictionary<string, object>
         {
-            ["visitas"] = Interlocked.Read(ref _visits),
-            ["ms_ocupado"] = Interlocked.Read(ref _busyMs),
-            ["visita_max_ms"] = Interlocked.Read(ref _maxVisitMs),
-            ["visitas_largas"] = Interlocked.Read(ref _overBudget),
-            ["presupuesto_ms"] = (long)_budgetMs,
-            ["trabajos"] = Interlocked.Read(ref _done),
-            ["cancelados"] = Interlocked.Read(ref _cancelled),
-            ["fallidos"] = Interlocked.Read(ref _failed),
+            ["visits"] = Interlocked.Read(ref _visits),
+            ["busy_ms"] = Interlocked.Read(ref _busyMs),
+            ["max_visit_ms"] = Interlocked.Read(ref _maxVisitMs),
+            ["long_visits"] = Interlocked.Read(ref _overBudget),
+            ["budget_ms"] = (long)_budgetMs,
+            ["jobs"] = Interlocked.Read(ref _done),
+            ["cancelled_items"] = Interlocked.Read(ref _cancelled),
+            ["failed_items"] = Interlocked.Read(ref _failed),
         };
 
         public void Dispose()
@@ -268,8 +268,8 @@ namespace Bimbridge.Addin.Revit
         /// <summary>Dispatch breakdown for timing=true and for revit_ocupado responses.</summary>
         public Dictionary<string, object> DispatchJson() => new Dictionary<string, object>
         {
-            ["espera_cola_ms"] = WaitMs, ["hilo_revit_ms"] = BusyMs, ["tramos"] = (long)Slices, ["tramo_max_ms"] = MaxSliceMs,
-            ["raise"] = RaiseResult, ["visitas_antes_de_iniciar"] = VisitsBeforeStart,
+            ["queue_wait_ms"] = WaitMs, ["revit_thread_ms"] = BusyMs, ["segments"] = (long)Slices, ["max_segment_ms"] = MaxSliceMs,
+            ["raise"] = RaiseResult, ["visits_before_start"] = VisitsBeforeStart,
         };
     }
 }

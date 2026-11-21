@@ -28,35 +28,35 @@ namespace Bimbridge.Engine
 
             public Dictionary<string, object> ToJson() => new Dictionary<string, object>
             {
-                ["job_id"] = JobId, ["tipo"] = Kind, ["sesion"] = Session, ["agente"] = Agent, ["tarea"] = Task, ["estado"] = State, ["error"] = Error,
-                ["inicio"] = CreatedUtc.ToString("o", CultureInfo.InvariantCulture), ["fin"] = FinishedUtc.ToString("o", CultureInfo.InvariantCulture),
-                ["ms"] = Ms, ["reintento"] = Retry,
+                ["job_id"] = JobId, ["type"] = Kind, ["session"] = Session, ["agent"] = Agent, ["task"] = Task, ["status"] = State, ["error"] = Error,
+                ["start"] = CreatedUtc.ToString("o", CultureInfo.InvariantCulture), ["end"] = FinishedUtc.ToString("o", CultureInfo.InvariantCulture),
+                ["ms"] = Ms, ["retry"] = Retry,
             };
 
             public static Record FromJson(Dictionary<string, object> d) => new Record
             {
-                JobId = Arg.GetString(d, "job_id"), Kind = Arg.GetString(d, "tipo"), Session = Arg.GetString(d, "sesion"), Agent = Arg.GetString(d, "agente"), Task = Arg.GetString(d, "tarea"),
-                State = Arg.GetString(d, "estado"), Error = Arg.GetString(d, "error"), Retry = Arg.GetString(d, "reintento"), Ms = Arg.GetLong(d, "ms") ?? 0,
-                CreatedUtc = DateTime.Parse(Arg.GetString(d, "inicio"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                FinishedUtc = DateTime.Parse(Arg.GetString(d, "fin"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                JobId = Arg.GetString(d, "job_id"), Kind = LegacyAliases.Token(Arg.GetString(d, "type")), Session = Arg.GetString(d, "session"), Agent = Arg.GetString(d, "agent"), Task = Arg.GetString(d, "task"),
+                State = Arg.GetString(d, "status"), Error = Arg.GetString(d, "error"), Retry = Arg.GetString(d, "retry"), Ms = Arg.GetLong(d, "ms") ?? 0,
+                CreatedUtc = DateTime.Parse(Arg.GetString(d, "start"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                FinishedUtc = DateTime.Parse(Arg.GetString(d, "end"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
             };
         }
 
         /// <summary>
-        /// Retry advice per final status. "reintentable": nothing was applied (rejection, conflict, validation, busy, expired).
-        /// "reconciliar_antes": the result is uncertain or may have been partly applied. "no_necesario": it finished fine.
-        /// "revisar_diferencias" (AUD-14): it was applied, but the verification does not match what was requested; the differences
+        /// Retry advice per final status. "retryable": nothing was applied (rejection, conflict, validation, busy, expired).
+        /// "reconcile_first": the result is uncertain or may have been partly applied. "not_needed": it finished fine.
+        /// "review_differences" (AUD-14): it was applied, but the verification does not match what was requested; the differences
         /// must be reviewed or reconciled before accepting it, and the operation must NOT be repeated (it is already applied).
         /// </summary>
         public static string RetryAdvice(string status)
         {
             switch (status)
             {
-                case Status.Ok: return "no_necesario";
-                case Status.CompletedWithDifferences: return "revisar_diferencias";
-                case Status.Rejected: case Status.Conflict: case Status.Invalid: case Status.Expired: case Status.RolledBack: return "reintentable";
-                case Status.Cancelled: return "reconciliar_antes";   // it may have been cancelled midway
-                default: return "reconciliar_antes";
+                case Status.Ok: return "not_needed";
+                case Status.CompletedWithDifferences: return "review_differences";
+                case Status.Rejected: case Status.Conflict: case Status.Invalid: case Status.Expired: case Status.RolledBack: return "retryable";
+                case Status.Cancelled: return "reconcile_first";   // it may have been cancelled midway
+                default: return "reconcile_first";
             }
         }
 
@@ -76,7 +76,7 @@ namespace Bimbridge.Engine
             {
                 n++;
                 if (line.Trim().Length == 0) continue;
-                try { Push(Record.FromJson(Json.ParseObject(line))); }
+                try { Push(Record.FromJson(LegacyAliases.NormalizeRecord(Json.ParseObject(line)))); }
                 catch (Exception ex) when (ex is FormatException || ex is ArgumentException || ex is InvalidOperationException)
                 { if (LoadErrors.Count < 20) LoadErrors.Add("line " + n + ": " + ex.GetType().Name); }
             }
@@ -145,7 +145,7 @@ namespace Bimbridge.Engine
             refusal = null;
             if (wantAll && !sharedAuthorized)
             {
-                refusal = "seeing operations from other sessions requires the user to authorize it (config historial_compartido=true). Without that, only your own are visible.";
+                refusal = "seeing operations from other sessions requires the user to authorize it (config shared_history=true). Without that, only your own are visible.";
                 return null;
             }
             return new Scope { SessionId = sessionId, AgentId = agentId, SeeAll = wantAll };

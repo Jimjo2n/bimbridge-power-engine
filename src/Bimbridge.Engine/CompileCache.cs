@@ -137,10 +137,10 @@ namespace Bimbridge.Engine
 
         public Dictionary<string, object> Stats() => new Dictionary<string, object>
         {
-            ["guardados"] = (long)Count, ["limite"] = (long)MaxEntries, ["aciertos"] = Hits, ["fallos_cache"] = Misses, ["errores_compilacion"] = Failures,
-            ["esperas_compartidas"] = CoalescedWaits, ["compilacion_ms_total"] = TotalCompileMs, ["rechazadas_por_limite"] = Refused,
-            ["bytes_ensamblados_estimados"] = LoadedBytes,
-            ["por_agente"] = ByOwner().ToDictionary(kv => kv.Key, kv => (object)kv.Value),
+            ["saved_items"] = (long)Count, ["limit"] = (long)MaxEntries, ["hits"] = Hits, ["cache_misses_count"] = Misses, ["compile_errors"] = Failures,
+            ["shared_waits"] = CoalescedWaits, ["compile_ms_total"] = TotalCompileMs, ["rejected_by_limit"] = Refused,
+            ["estimated_assembly_bytes"] = LoadedBytes,
+            ["per_agent"] = ByOwner().ToDictionary(kv => kv.Key, kv => (object)kv.Value),
         };
     }
 }

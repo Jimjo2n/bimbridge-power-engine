@@ -32,7 +32,7 @@ namespace Bimbridge.Engine.Qc
             public string Group;
             public string Mounting;
             public string Source;
-            /// <summary>Fields the drawing reading could not confirm (e.g. "altura"): not approved as checked.</summary>
+            /// <summary>Fields the drawing reading could not confirm (e.g. "height"): not approved as checked.</summary>
             public List<string> Unconfirmed = new List<string>();
         }
 
@@ -83,15 +83,15 @@ namespace Bimbridge.Engine.Qc
 
             public Dictionary<string, object> ToJson(int maxFindings = 50) => new Dictionary<string, object>
             {
-                ["aprobado"] = Passed,
-                ["esperados"] = (long)Expected, ["modelo"] = (long)Model, ["correctos"] = (long)Approved, ["con_desviacion"] = (long)WithDeviation,
-                ["ambiguos"] = (long)Ambiguous, ["faltantes"] = (long)Missing, ["sobrantes"] = (long)Extra, ["casi_duplicados"] = (long)NearDuplicates,
-                ["campos_no_confirmados"] = (long)Unconfirmed,
-                ["por_codigo"] = Findings.GroupBy(f => f.Code).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => (object)(long)g.Count()),
-                ["cols"] = new List<object> { "codigo", "ref", "id", "detalle" },
+                ["approved"] = Passed,
+                ["expected_items"] = (long)Expected, ["model"] = (long)Model, ["correct"] = (long)Approved, ["with_deviation"] = (long)WithDeviation,
+                ["ambiguous_items"] = (long)Ambiguous, ["missing"] = (long)Missing, ["leftovers"] = (long)Extra, ["near_duplicates"] = (long)NearDuplicates,
+                ["unconfirmed_fields"] = (long)Unconfirmed,
+                ["by_code"] = Findings.GroupBy(f => f.Code).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => (object)(long)g.Count()),
+                ["cols"] = new List<object> { "code", "ref", "id", "detail" },
                 ["rows"] = Findings.Take(maxFindings).Select(f => (object)f.Row().ToList()).ToList(),
                 ["rows_total"] = (long)Findings.Count,
-                ["desviaciones"] = Findings.Where(f => f.Code != "no_confirmado").Take(maxFindings).Select(f => (object)(f.Code + " " + (f.Ref ?? "") + (f.Id.HasValue ? " #" + f.Id : "") + (f.Detail != null ? ": " + f.Detail : ""))).ToList(),
+                ["deviations"] = Findings.Where(f => f.Code != "not_committed").Take(maxFindings).Select(f => (object)(f.Code + " " + (f.Ref ?? "") + (f.Id.HasValue ? " #" + f.Id : "") + (f.Detail != null ? ": " + f.Detail : ""))).ToList(),
             };
         }
 
@@ -154,7 +154,7 @@ namespace Bimbridge.Engine.Qc
                 foreach (var f in e.Unconfirmed ?? new List<string>())
                 {
                     r.Unconfirmed++;
-                    r.Findings.Add(new Finding { Code = "no_confirmado", Ref = e.Ref, Detail = f + " not confirmed in the source" + (e.Source != null ? " (" + e.Source + ")" : "") });
+                    r.Findings.Add(new Finding { Code = "not_committed", Ref = e.Ref, Detail = f + " not confirmed in the source" + (e.Source != null ? " (" + e.Source + ")" : "") });
                 }
                 if (!eTaken[i].HasValue)
                 {
@@ -162,7 +162,7 @@ namespace Bimbridge.Engine.Qc
                     var near = model.Select((a, j) => new { a, j, d = D2(e.X, e.Y, a.X, a.Y) }).OrderBy(x => x.d).FirstOrDefault();
                     r.Findings.Add(new Finding
                     {
-                        Code = "faltante", Ref = e.Ref,
+                        Code = "missing", Ref = e.Ref,
                         Detail = "no element within ≤" + F(o.TolXY) + " mm" + (o.SameLevel && e.Level != null ? " on " + e.Level : "") +
                                  (near != null ? "; the closest is #" + near.a.Id + " at " + F(near.d) + " mm" + (aTaken[near.j].HasValue ? " (already assigned to " + expected[aTaken[near.j].Value].Ref + ")" : "") : ""),
                     });
@@ -182,7 +182,7 @@ namespace Bimbridge.Engine.Qc
                     r.Ambiguous++;
                     r.Findings.Add(new Finding
                     {
-                        Code = "ambiguo", Ref = e.Ref, Id = a0.Id,
+                        Code = "ambiguous", Ref = e.Ref, Id = a0.Id,
                         Detail = rivalA.Count > 0
                             ? "candidates #" + a0.Id + " (" + F(d0) + " mm) and " + string.Join(", ", rivalA.Select(c => "#" + model[c.Item1].Id + " (" + F(c.Item2) + " mm)")) + ": proximity does not prove which one it is"
                             : "#" + a0.Id + " is almost equally close to " + string.Join(", ", rivalE.Select(c => expected[c.Item1].Ref)) + ": not approved on proximity",
@@ -190,22 +190,22 @@ namespace Bimbridge.Engine.Qc
                     continue;
                 }
                 var devs = new List<Finding>();
-                if (d0 > o.TolXY * 0.5) devs.Add(new Finding { Code = "posicion", Ref = e.Ref, Id = a0.Id, Detail = "displaced " + F(d0) + " mm (tolerance " + F(o.TolXY) + ")" });
+                if (d0 > o.TolXY * 0.5) devs.Add(new Finding { Code = "position", Ref = e.Ref, Id = a0.Id, Detail = "displaced " + F(d0) + " mm (tolerance " + F(o.TolXY) + ")" });
                 if (e.Z.HasValue && Math.Abs(a0.Z - e.Z.Value) > o.TolZ)
-                    devs.Add(new Finding { Code = "altura", Ref = e.Ref, Id = a0.Id, Detail = "z " + F(a0.Z) + " mm, expected " + F(e.Z.Value) + " (±" + F(o.TolZ) + ")" });
+                    devs.Add(new Finding { Code = "height", Ref = e.Ref, Id = a0.Id, Detail = "z " + F(a0.Z) + " mm, expected " + F(e.Z.Value) + " (±" + F(o.TolZ) + ")" });
                 if (e.RotDeg.HasValue && a0.RotDeg.HasValue && RotDiff(a0.RotDeg.Value, e.RotDeg.Value, o.Symmetry) > o.TolRot)
-                    devs.Add(new Finding { Code = "orientacion", Ref = e.Ref, Id = a0.Id, Detail = "rotation " + F(a0.RotDeg.Value) + "°, expected " + F(e.RotDeg.Value) + "°" });
+                    devs.Add(new Finding { Code = "orientation", Ref = e.Ref, Id = a0.Id, Detail = "rotation " + F(a0.RotDeg.Value) + "°, expected " + F(e.RotDeg.Value) + "°" });
                 if (!TypeAllowed(e, a0))
-                    devs.Add(new Finding { Code = "tipo", Ref = e.Ref, Id = a0.Id, Detail = a0.FullType + " is not among " + string.Join(" | ", e.Types) });
+                    devs.Add(new Finding { Code = "type", Ref = e.Ref, Id = a0.Id, Detail = a0.FullType + " is not among " + string.Join(" | ", e.Types) });
                 if (!o.SameLevel && !LevelOk(e, a0))
-                    devs.Add(new Finding { Code = "nivel", Ref = e.Ref, Id = a0.Id, Detail = a0.Level + ", expected " + e.Level });
-                if (e.Tag == true && a0.Tags == 0) devs.Add(new Finding { Code = "sin_etiqueta", Ref = e.Ref, Id = a0.Id });
-                if (e.Tag == true && a0.Tags > 1) devs.Add(new Finding { Code = "etiqueta_duplicada", Ref = e.Ref, Id = a0.Id, Detail = a0.Tags + " tags" });
-                if (e.Tag == false && a0.Tags > 0) devs.Add(new Finding { Code = "etiqueta_sobra", Ref = e.Ref, Id = a0.Id, Detail = a0.Tags + " tags and the rule says none" });
+                    devs.Add(new Finding { Code = "level", Ref = e.Ref, Id = a0.Id, Detail = a0.Level + ", expected " + e.Level });
+                if (e.Tag == true && a0.Tags == 0) devs.Add(new Finding { Code = "no_tag", Ref = e.Ref, Id = a0.Id });
+                if (e.Tag == true && a0.Tags > 1) devs.Add(new Finding { Code = "duplicate_tag", Ref = e.Ref, Id = a0.Id, Detail = a0.Tags + " tags" });
+                if (e.Tag == false && a0.Tags > 0) devs.Add(new Finding { Code = "extra_tag", Ref = e.Ref, Id = a0.Id, Detail = a0.Tags + " tags and the rule says none" });
                 if (!string.IsNullOrEmpty(e.Group) && !string.Equals(e.Group, a0.Group, StringComparison.OrdinalIgnoreCase))
-                    devs.Add(new Finding { Code = "grupo", Ref = e.Ref, Id = a0.Id, Detail = "in " + (a0.Group ?? "(no group)") + ", expected " + e.Group });
+                    devs.Add(new Finding { Code = "group", Ref = e.Ref, Id = a0.Id, Detail = "in " + (a0.Group ?? "(no group)") + ", expected " + e.Group });
                 if (!string.IsNullOrEmpty(e.Mounting) && !string.IsNullOrEmpty(a0.Mounting) && !string.Equals(e.Mounting, a0.Mounting, StringComparison.OrdinalIgnoreCase))
-                    devs.Add(new Finding { Code = "montaje", Ref = e.Ref, Id = a0.Id, Detail = a0.Mounting + ", expected " + e.Mounting });
+                    devs.Add(new Finding { Code = "mounting", Ref = e.Ref, Id = a0.Id, Detail = a0.Mounting + ", expected " + e.Mounting });
                 r.Pairs[e.Ref] = a0.Id;
                 if (devs.Count == 0) r.Approved++;
                 else { r.WithDeviation++; r.Findings.AddRange(devs); }
@@ -220,7 +220,7 @@ namespace Bimbridge.Engine.Qc
                 var near = expected.Select((e, i) => new { e, d = D2(e.X, e.Y, a.X, a.Y) }).OrderBy(x => x.d).FirstOrDefault();
                 r.Findings.Add(new Finding
                 {
-                    Code = "sobrante", Id = a.Id,
+                    Code = "leftover", Id = a.Id,
                     Detail = a.FullType + " on " + (a.Level ?? "?") + (near != null ? "; closest reference " + near.e.Ref + " at " + F(near.d) + " mm" : ""),
                 });
             }
@@ -251,7 +251,7 @@ namespace Bimbridge.Engine.Qc
                             var d3 = Math.Sqrt(Math.Pow(a.X - b.X, 2) + Math.Pow(a.Y - b.Y, 2) + Math.Pow(a.Z - b.Z, 2));
                             if (d3 > o.NearDuplicate || !seen.Add(Tuple.Create(j, k))) continue;
                             r.NearDuplicates++;
-                            r.Findings.Add(new Finding { Code = "casi_duplicado", Id = a.Id, Detail = "#" + a.Id + " and #" + b.Id + " (" + a.FullType + ") at " + F(d3) + " mm" });
+                            r.Findings.Add(new Finding { Code = "near_duplicate", Id = a.Id, Detail = "#" + a.Id + " and #" + b.Id + " (" + a.FullType + ") at " + F(d3) + " mm" });
                         }
                     }
             }
@@ -263,24 +263,24 @@ namespace Bimbridge.Engine.Qc
         // ---------------- manifest from JSON ----------------
 
         /// <summary>
-        /// Reads a manifest: {"tolerancias":{xy,z,giro,simetria,ambiguedad,duplicado,mismo_nivel},"elementos":[{ref,x,y,z,giro,nivel,tipos,
+        /// Reads a manifest: {"tolerances":{xy,z,giro,simetria,ambiguedad,duplicado,mismo_nivel},"elements":[{ref,x,y,z,giro,nivel,tipos,
         /// etiqueta,grupo,montaje,fuente,no_confirmado}]} (mm and degrees).
         /// </summary>
         public static List<Expected> Parse(Dictionary<string, object> json, out Options options)
         {
             options = new Options();
-            if (json.TryGetValue("tolerancias", out var tv) && tv is Dictionary<string, object> t)
+            if (json.TryGetValue("tolerances", out var tv) && tv is Dictionary<string, object> t)
             {
                 options.TolXY = Num(t, "xy") ?? options.TolXY;
                 options.TolZ = Num(t, "z") ?? options.TolZ;
-                options.TolRot = Num(t, "giro") ?? options.TolRot;
-                options.Symmetry = Num(t, "simetria") ?? options.Symmetry;
-                options.AmbiguityMargin = Num(t, "ambiguedad") ?? options.AmbiguityMargin;
-                options.NearDuplicate = Num(t, "duplicado") ?? options.NearDuplicate;
-                options.SameLevel = Arg.GetBool(t, "mismo_nivel") ?? options.SameLevel;
+                options.TolRot = Num(t, "rotation") ?? options.TolRot;
+                options.Symmetry = Num(t, "symmetry") ?? options.Symmetry;
+                options.AmbiguityMargin = Num(t, "ambiguity") ?? options.AmbiguityMargin;
+                options.NearDuplicate = Num(t, "duplicate") ?? options.NearDuplicate;
+                options.SameLevel = Arg.GetBool(t, "same_level") ?? options.SameLevel;
             }
             var list = new List<Expected>();
-            if (!(json.TryGetValue("elementos", out var ev) && ev is List<object> el)) throw new ArgumentException("the manifest needs 'elementos': [...]");
+            if (!(json.TryGetValue("elements", out var ev) && ev is List<object> el)) throw new ArgumentException("the manifest needs 'elements': [...]");
             var n = 0;
             foreach (var o in el.OfType<Dictionary<string, object>>())
             {
@@ -288,13 +288,13 @@ namespace Bimbridge.Engine.Qc
                 var x = Num(o, "x");
                 var y = Num(o, "y");
                 if (!x.HasValue || !y.HasValue) throw new ArgumentException("manifest element " + n + " has no x/y (mm)");
-                var types = o.TryGetValue("tipos", out var tp) && tp is List<object> tl ? tl.Select(s => Convert.ToString(s, CultureInfo.InvariantCulture)).ToList()
-                    : Arg.GetString(o, "tipo") is string one ? new List<string> { one } : new List<string>();
+                var types = o.TryGetValue("types", out var tp) && tp is List<object> tl ? tl.Select(s => Convert.ToString(s, CultureInfo.InvariantCulture)).ToList()
+                    : Arg.GetString(o, "type") is string one ? new List<string> { one } : new List<string>();
                 list.Add(new Expected
                 {
-                    Ref = Arg.GetString(o, "ref") ?? ("#" + n), X = x.Value, Y = y.Value, Z = Num(o, "z"), RotDeg = Num(o, "giro"),
-                    Level = Arg.GetString(o, "nivel"), Types = types, Tag = Arg.GetBool(o, "etiqueta"), Group = Arg.GetString(o, "grupo"),
-                    Mounting = Arg.GetString(o, "montaje"), Source = Arg.GetString(o, "fuente"), Unconfirmed = Arg.GetStringList(o, "no_confirmado"),
+                    Ref = Arg.GetString(o, "ref") ?? ("#" + n), X = x.Value, Y = y.Value, Z = Num(o, "z"), RotDeg = Num(o, "rotation"),
+                    Level = Arg.GetString(o, "level"), Types = types, Tag = Arg.GetBool(o, "tag"), Group = Arg.GetString(o, "group"),
+                    Mounting = Arg.GetString(o, "mounting"), Source = Arg.GetString(o, "source"), Unconfirmed = Arg.GetStringList(o, "not_committed"),
                 });
             }
             var dup = list.GroupBy(e => e.Ref).FirstOrDefault(g => g.Count() > 1);

@@ -25,7 +25,11 @@ namespace Bimbridge.Engine
             }
         }
 
-        public static string Sub(string name) => Path.Combine(Root, name);
+        /// <summary>A folder or file under <see cref="Root"/> (English name). While data written by 0.9.3 or earlier is still under its legacy
+        /// name (the installer migrates it; tests and sandbox homes skip the installer), the legacy one is used.</summary>
+        public static string Sub(string name) => Resolve(Path.Combine(Root, name));
+
+        public static string Resolve(string path) => LegacyAliases.ResolveExisting(Root, path);
 
         public static string Sha256Hex(byte[] data, int chars = 64)
         {
@@ -155,7 +159,7 @@ namespace Bimbridge.Engine
             foreach (var line in text.Split('\n'))
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
-                try { into.Add(Json.ParseObject(line)); }
+                try { into.Add(LegacyAliases.NormalizeRecord(Json.ParseObject(line))); }
                 catch (FormatException) { CorruptLines++; }
             }
         }
@@ -285,9 +289,9 @@ namespace Bimbridge.Engine
             switch (s)
             {
                 case "": case "no": case "false": return ReconcileMode.None;
-                case "aplicado": case "hecho": case "applied": return ReconcileMode.Applied;
-                case "si": case "sí": case "true": case "no_aplicado": case "repetir": return ReconcileMode.NotApplied;
-                default: throw new ArgumentException("reconciliar= must be no_aplicado (repeat) or aplicado (mark done)");
+                case "applied": case "done":  return ReconcileMode.Applied;
+                case "yes":  case "true": case "not_applied": case "repeat": return ReconcileMode.NotApplied;
+                default: throw new ArgumentException("reconcile= must be not_applied (repeat) or applied (mark done)");
             }
         }
 
@@ -304,7 +308,7 @@ namespace Bimbridge.Engine
         private readonly Dictionary<string, Record> _index = new Dictionary<string, Record>(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _running = new Dictionary<string, string>(StringComparer.Ordinal); // id → job id (or "")
 
-        public static string DefaultPath => Path.Combine(Home.Sub("operaciones"), "operaciones.jsonl");
+        public static string DefaultPath => Home.Resolve(Path.Combine(Home.Root, "operations", "operations.jsonl"));
 
         public OperationJournal(string path = null)
         {
@@ -327,14 +331,14 @@ namespace Bimbridge.Engine
                     ApplyAlias(Arg.GetString(o, "de"), Arg.GetString(o, "a"));
                     continue;
                 }
-                var key = Arg.GetString(o, "clave");
+                var key = Arg.GetString(o, "key");
                 var doc = Arg.GetString(o, "doc");
                 if (key == null) continue;
                 var id = Id(doc, key);
                 _index.TryGetValue(id, out var r);
                 switch (ev)
                 {
-                    case "inicio":
+                    case "start":
                         if (r == null)
                         {
                             r = new Record { Key = key, Doc = doc };
@@ -342,11 +346,11 @@ namespace Bimbridge.Engine
                         }
                         r.Op = Arg.GetString(o, "op");
                         r.Hash = Arg.GetString(o, "hash");
-                        r.Task = Arg.GetString(o, "tarea") ?? r.Task;
-                        r.Session = Arg.GetString(o, "sesion");
+                        r.Task = Arg.GetString(o, "task") ?? r.Task;
+                        r.Session = Arg.GetString(o, "session");
                         r.Started = Arg.GetString(o, "t");
-                        r.DocPrint = Arg.GetString(o, "huella_doc") ?? r.DocPrint;
-                        r.Generation = Arg.GetString(o, "generacion");
+                        r.DocPrint = Arg.GetString(o, "doc_fingerprint") ?? r.DocPrint;
+                        r.Generation = Arg.GetString(o, "generation");
                         r.Finished = null;
                         r.State = null;
                         r.Result = null;
@@ -354,7 +358,7 @@ namespace Bimbridge.Engine
                         r.Attempts.Add(new Attempt
                         {
                             N = r.Attempts.Count + 1, Session = r.Session, Started = r.Started,
-                            Correlation = Arg.GetString(o, "intento_id"), Agent = Arg.GetString(o, "agente"),
+                            Correlation = Arg.GetString(o, "attempt_id"), Agent = Arg.GetString(o, "agent"),
                             PlanId = Arg.GetString(o, "plan_id"), DocPrint = r.DocPrint,
                         });
                         break;
@@ -362,23 +366,24 @@ namespace Bimbridge.Engine
                         r.JobId = Arg.GetString(o, "job_id");
                         if (r.Attempts.Count > 0) r.Attempts[r.Attempts.Count - 1].JobId = r.JobId;
                         break;
-                    case "fin" when r != null:
+                    case "end" when r != null:
                         r.Finished = Arg.GetString(o, "t");
-                        r.State = Arg.GetString(o, "estado");
-                        o.TryGetValue("resultado", out r.Result);
+                        r.State = Arg.GetString(o, "status");
+                        o.TryGetValue("result", out r.Result);
+                        r.Result = LegacyAliases.NormalizePayloadStatus(r.Result);   // replayed as stored; only a legacy status is mapped
                         if (r.Attempts.Count > 0) { var a = r.Attempts[r.Attempts.Count - 1]; a.Finished = r.Finished; a.State = r.State; }
                         break;
-                    case "reconciliado" when r != null:
+                    case "reconciled" when r != null:
                         var dec = Arg.GetString(o, "decision");
                         if (r.Attempts.Count > 0) r.Attempts[r.Attempts.Count - 1].Reconciled = dec;
-                        if (dec == "aplicado")
+                        if (dec == "applied")
                         {
                             r.Finished = Arg.GetString(o, "t");
                             r.State = Status.Ok;
-                            o.TryGetValue("evidencia", out r.Result);
+                            o.TryGetValue("evidence", out r.Result);
                         }
                         break;
-                    case "olvidar":
+                    case "forget":
                         _index.Remove(id);
                         break;
                 }
@@ -413,13 +418,16 @@ namespace Bimbridge.Engine
             Begin(key, doc, op, hash, task, session, reconcile ? ReconcileMode.NotApplied : ReconcileMode.None);
 
         /// <summary>
-        /// Records the intent ("inicio" event, durable) or explains why not. Throws <see cref="JournalUnavailableException"/> if it cannot
+        /// Records the intent ("start" event, durable) or explains why not. Throws <see cref="JournalUnavailableException"/> if it cannot
         /// read or write the journal: the caller must NOT apply the operation in that case.
         /// </summary>
+        /// <param name="legacyHash">The fingerprint the same operation had in 0.9.3 and earlier (legacy argument names, see
+        /// <see cref="LegacyHashArgs"/>): a retry of a key recorded before the upgrade is the same operation, not a conflict.</param>
         public BeginResult Begin(string key, string doc, string op, string hash, string task, string session, ReconcileMode mode,
-            string docPrint = null, string generation = null, string correlation = null, string agent = null, string planId = null)
+            string docPrint = null, string generation = null, string correlation = null, string agent = null, string planId = null, string legacyHash = null)
         {
             if (string.IsNullOrWhiteSpace(key)) throw new ArgumentException("empty key");
+            bool Differs(string stored) => stored != null && hash != null && stored != hash && !(legacyHash != null && stored == legacyHash);
             lock (_lock)
             {
                 Refresh();
@@ -427,12 +435,12 @@ namespace Bimbridge.Engine
                 if (_running.TryGetValue(id, out var runningJob))
                 {
                     _index.TryGetValue(id, out var cur);
-                    if (cur != null && hash != null && cur.Hash != null && cur.Hash != hash) return new BeginResult { Kind = BeginKind.Mismatch, Previous = cur };
+                    if (cur != null && Differs(cur.Hash)) return new BeginResult { Kind = BeginKind.Mismatch, Previous = cur };
                     return new BeginResult { Kind = BeginKind.Running, Previous = cur };
                 }
                 if (_index.TryGetValue(id, out var prev))
                 {
-                    if (prev.Hash != null && hash != null && prev.Hash != hash)
+                    if (Differs(prev.Hash))
                         return new BeginResult { Kind = BeginKind.Mismatch, Previous = prev };
                     if (prev.DocPrint != null && docPrint != null && prev.DocPrint != docPrint)
                         return new BeginResult { Kind = BeginKind.DocumentReplaced, Previous = prev };
@@ -444,10 +452,10 @@ namespace Bimbridge.Engine
                         if (mode == ReconcileMode.None) return new BeginResult { Kind = BeginKind.Interrupted, Previous = prev };
                         if (mode == ReconcileMode.Applied)
                         {
-                            MarkReconciled(prev, "aplicado", null);
+                            MarkReconciled(prev, "applied", null);
                             return new BeginResult { Kind = BeginKind.Completed, Previous = prev };
                         }
-                        MarkReconciled(prev, "no_aplicado", null);
+                        MarkReconciled(prev, "not_applied", null);
                     }
                 }
                 else if (docPrint != null)
@@ -457,22 +465,22 @@ namespace Bimbridge.Engine
                                                                  !(r.Finished != null && Status.ConfirmsNothingApplied(r.State)));
                     if (copy != null)
                     {
-                        if (copy.Hash != null && hash != null && copy.Hash != hash) return new BeginResult { Kind = BeginKind.Mismatch, Previous = copy, OtherDoc = copy.Doc };
+                        if (Differs(copy.Hash)) return new BeginResult { Kind = BeginKind.Mismatch, Previous = copy, OtherDoc = copy.Doc };
                         if (mode == ReconcileMode.None) return new BeginResult { Kind = BeginKind.PossibleCopy, Previous = copy, OtherDoc = copy.Doc };
                         if (mode == ReconcileMode.Applied)
                         {
                             Write(new Dictionary<string, object> { ["ev"] = "alias", ["de"] = copy.Doc, ["a"] = doc });
                             var aliased = _index[Id(doc, key)];
-                            MarkReconciled(aliased, "aplicado", null);
+                            MarkReconciled(aliased, "applied", null);
                             return new BeginResult { Kind = BeginKind.Completed, Previous = aliased };
                         }
                     }
                 }
                 Write(new Dictionary<string, object>
                 {
-                    ["ev"] = "inicio", ["clave"] = key, ["doc"] = doc, ["op"] = op, ["hash"] = hash, ["tarea"] = task, ["sesion"] = session,
-                    ["huella_doc"] = docPrint, ["generacion"] = generation,
-                    ["intento_id"] = correlation, ["agente"] = agent, ["plan_id"] = planId,
+                    ["ev"] = "start", ["key"] = key, ["doc"] = doc, ["op"] = op, ["hash"] = hash, ["task"] = task, ["session"] = session,
+                    ["doc_fingerprint"] = docPrint, ["generation"] = generation,
+                    ["attempt_id"] = correlation, ["agent"] = agent, ["plan_id"] = planId,
                 });
                 _running[id] = "";
                 return new BeginResult { Kind = BeginKind.New, Previous = _index.TryGetValue(id, out var now) ? now : null };
@@ -494,16 +502,16 @@ namespace Bimbridge.Engine
                 var active = ReferenceEquals(attempt, record.Attempts.Last()) && _running.ContainsKey(Id(doc, record.Key));
                 return new Dictionary<string, object>
                 {
-                    ["intento_id"] = correlation, ["estado"] = attempt.State ?? (active ? Status.InProgress : Status.Unknown),
-                    ["clave"] = record.Key, ["plan_id"] = attempt.PlanId, ["doc"] = doc, ["huella_doc"] = docPrint,
-                    ["job_id"] = attempt.JobId, ["inicio"] = attempt.Started, ["fin"] = attempt.Finished,
+                    ["attempt_id"] = correlation, ["status"] = attempt.State ?? (active ? Status.InProgress : Status.Unknown),
+                    ["key"] = record.Key, ["plan_id"] = attempt.PlanId, ["doc"] = doc, ["doc_fingerprint"] = docPrint,
+                    ["job_id"] = attempt.JobId, ["start"] = attempt.Started, ["end"] = attempt.Finished,
                 };
             }
         }
 
         private void MarkReconciled(Record r, string decision, object evidence)
         {
-            Write(new Dictionary<string, object> { ["ev"] = "reconciliado", ["clave"] = r.Key, ["doc"] = r.Doc, ["decision"] = decision, ["evidencia"] = evidence });
+            Write(new Dictionary<string, object> { ["ev"] = "reconciled", ["key"] = r.Key, ["doc"] = r.Doc, ["decision"] = decision, ["evidence"] = evidence });
         }
 
         /// <summary>Links the job (job_id) carrying the operation: repeating the key while it runs returns that same job.</summary>
@@ -512,7 +520,7 @@ namespace Bimbridge.Engine
             lock (_lock)
             {
                 var id = Id(doc, key);
-                Write(new Dictionary<string, object> { ["ev"] = "job", ["clave"] = key, ["doc"] = doc, ["job_id"] = jobId });
+                Write(new Dictionary<string, object> { ["ev"] = "job", ["key"] = key, ["doc"] = doc, ["job_id"] = jobId });
                 if (_running.ContainsKey(id)) _running[id] = jobId ?? "";
             }
         }
@@ -534,7 +542,7 @@ namespace Bimbridge.Engine
                 var id = Id(doc, key);
                 try
                 {
-                    Write(new Dictionary<string, object> { ["ev"] = "fin", ["clave"] = key, ["doc"] = doc, ["estado"] = status, ["resultado"] = Trim(result) });
+                    Write(new Dictionary<string, object> { ["ev"] = "end", ["key"] = key, ["doc"] = doc, ["status"] = status, ["result"] = Trim(result) });
                 }
                 finally
                 {
@@ -558,11 +566,11 @@ namespace Bimbridge.Engine
                 Refresh();
                 if (!_index.TryGetValue(Id(doc, key), out var r)) return false;
                 if (_running.ContainsKey(Id(doc, key))) throw new InvalidOperationException("the operation is still running; wait for it to finish");
-                MarkReconciled(r, applied ? "aplicado" : "no_aplicado", evidence);
+                MarkReconciled(r, applied ? "applied" : "not_applied", evidence);
                 if (!applied)
                 {
                     // Explicitly marked as not applied: a new attempt with the same fingerprint may run.
-                    Write(new Dictionary<string, object> { ["ev"] = "fin", ["clave"] = key, ["doc"] = doc, ["estado"] = Status.RolledBack, ["resultado"] = Trim(evidence) });
+                    Write(new Dictionary<string, object> { ["ev"] = "end", ["key"] = key, ["doc"] = doc, ["status"] = Status.RolledBack, ["result"] = Trim(evidence) });
                 }
                 return true;
             }
@@ -572,7 +580,7 @@ namespace Bimbridge.Engine
         {
             if (result == null) return null;
             var txt = Json.Write(result);
-            return txt.Length <= 4000 ? result : new Dictionary<string, object> { ["resumen"] = txt.Substring(0, 4000) + "…" };
+            return txt.Length <= 4000 ? result : new Dictionary<string, object> { ["summary"] = txt.Substring(0, 4000) + "…" };
         }
 
         public Record Get(string key, string doc)
@@ -604,8 +612,13 @@ namespace Bimbridge.Engine
         public static string HashArgs(string op, IDictionary<string, object> args, string resolvedContent = null)
         {
             var canon = OpSemantics.Canonical(args ?? new Dictionary<string, object>());
+            // "|contenido:" is a fixed domain separator of stored fingerprints: changing it would turn every retry after an upgrade into a conflict.
             var content = resolvedContent == null ? "" : "|contenido:" + Home.Sha256Hex(resolvedContent);
             return Home.Sha256Hex(op + "|" + canon + content, 16);
         }
+
+        /// <summary>The fingerprint 0.9.3 and earlier computed for the same operation (legacy argument names and values). Remove after 0.9.5.</summary>
+        public static string LegacyHashArgs(string op, IDictionary<string, object> args, string resolvedContent = null) =>
+            HashArgs(LegacyAliases.LegacyOp(op), (IDictionary<string, object>)LegacyAliases.ToLegacy(args ?? new Dictionary<string, object>()), resolvedContent);
     }
 }

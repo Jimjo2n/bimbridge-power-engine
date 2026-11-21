@@ -19,7 +19,7 @@ namespace Bimbridge.Addin.Revit.Writes
     ///     TransactionGroup: a single Undo entry. Any Revit error rolls back the whole plan.
     ///  3. @n: what operation n creates is recorded and later operations use it (ids=@n, view=@n, hoja=@n…).
     ///  4. Identical moves, deletes and hides are grouped into a single API call (MoveElements, Delete, HideElements).
-    ///  5. When done, re-reads what it touched and compares it with the plan ("verificacion").
+    ///  5. When done, re-reads what it touched and compares it with the plan ("verification").
     /// </summary>
     internal sealed partial class PlanApplier
     {
@@ -53,7 +53,7 @@ namespace Bimbridge.Addin.Revit.Writes
         public string Current(PlanEntry entry)
         {
             if (entry.Ref > 0) return "";                    // template over what the plan will create: there is no "before"
-            if (entry.Key == "nuevo") return Guard(entry);   // creation: guards
+            if (entry.Key == "new") return Guard(entry);   // creation: guards
             if (entry.Key != null && entry.Key.Contains("@@")) return ""; // depends on a view the plan creates
             var e = _doc.GetElement(Ids.ToId(entry.Id));
             if (entry.Key == "exists") return e == null ? "0" : "1";
@@ -70,7 +70,7 @@ namespace Bimbridge.Addin.Revit.Writes
                 case "loc": return WriteKit.Loc(e);
                 case "rot": return WriteKit.Loc(e) + "|" + WriteKit.Rot(e);
                 case "head": return e is IndependentTag tag ? PlanBuilder.HeadCanon(tag) : WriteKit.Missing;
-                case "llamada_luminaria":
+                case "fixture_callout":
                     if (!(e is TextNote note) || LightingCallout.Read(note) is not Dictionary<string, object> link) return WriteKit.Missing;
                     try
                     {
@@ -78,25 +78,25 @@ namespace Bimbridge.Addin.Revit.Writes
                         return LightingCallout.NoteFingerprint(note, link, LightingCallout.Fingerprint(link, state.Text, state.Point, state.TypeUid));
                     }
                     catch (QueryException ex) { return "\u0000" + ex.Message; }
-                case "plantilla": return v == null ? WriteKit.Missing : (_doc.GetElement(v.ViewTemplateId) as View)?.Name ?? "ninguna";
-                case "rango": return v is ViewPlan vp ? PlanBuilder.RangeCanon(_doc, vp) : "";
-                case "escala": return v == null ? WriteKit.Missing : PlanEntry.Canon((long)v.Scale);
-                case "detalle": return v == null ? WriteKit.Missing : PlanBuilder.DetailName(v.DetailLevel);
-                case "nombre": return e.Name;
-                case "recorte": return v == null ? WriteKit.Missing : (v.CropBoxActive ? "1" : "0");
+                case "template": return v == null ? WriteKit.Missing : (_doc.GetElement(v.ViewTemplateId) as View)?.Name ?? "none";
+                case "range": return v is ViewPlan vp ? PlanBuilder.RangeCanon(_doc, vp) : "";
+                case "scale": return v == null ? WriteKit.Missing : PlanEntry.Canon((long)v.Scale);
+                case "detail": return v == null ? WriteKit.Missing : PlanBuilder.DetailName(v.DetailLevel);
+                case "name": return e.Name;
+                case "crop": return v == null ? WriteKit.Missing : (v.CropBoxActive ? "1" : "0");
                 case "scope_box":
                 {
                     var sp = e.get_Parameter(BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP);
-                    return sp == null ? WriteKit.Missing : _doc.GetElement(sp.AsElementId())?.Name ?? "ninguno";
+                    return sp == null ? WriteKit.Missing : _doc.GetElement(sp.AsElementId())?.Name ?? "none";
                 }
-                case "caja_seccion": return v is View3D v3 ? PlanBuilder.SectionBoxCanon(v3) : WriteKit.Missing;
+                case "section_box": return v is View3D v3 ? PlanBuilder.SectionBoxCanon(v3) : WriteKit.Missing;
             }
             if (entry.Key.StartsWith("oculto@", StringComparison.Ordinal))
             {
                 var view = ViewOf(WriteKit.Dict(entry.Target));
                 return view == null ? WriteKit.Missing : (e.IsHidden(view) ? "1" : "0");
             }
-            if (entry.Key.StartsWith("graficos@", StringComparison.Ordinal))
+            if (entry.Key.StartsWith("graphics@", StringComparison.Ordinal))
             {
                 var view = ViewOf(WriteKit.Dict(entry.Target));
                 return view == null ? WriteKit.Missing : WriteKit.Overrides(view.GetElementOverrides(e.Id));
@@ -138,8 +138,8 @@ namespace Bimbridge.Addin.Revit.Writes
                     }
                     return "";
                 case "group_place":
-                    if (!Exists("gtype") || !Exists("nivel") || !Exists("prototipo")) return "\u0000the group type, level or prototype no longer exists";
-                    if (t.ContainsKey("prototipo") && GroupPlacement.Signature((Group)_doc.GetElement(Ids.ToId(WriteKit.L(t, "prototipo")))) != WriteKit.S(t, "firma_miembros"))
+                    if (!Exists("gtype") || !Exists("level") || !Exists("prototype")) return "\u0000the group type, level or prototype no longer exists";
+                    if (t.ContainsKey("prototype") && GroupPlacement.Signature((Group)_doc.GetElement(Ids.ToId(WriteKit.L(t, "prototype")))) != WriteKit.S(t, "member_signature"))
                         return "\u0000the prototype's members changed";
                     return "";
                 case "group_variant":
@@ -147,9 +147,9 @@ namespace Bimbridge.Addin.Revit.Writes
                     catch (QueryException ex) { return "\u0000" + ex.Message; }
                 case "view_create":
                 {
-                    if (!Exists("nivel") || !Exists("vft") || !Exists("origen") || (t.ContainsKey("plantilla") && !Exists("plantilla"))) return "\u0000the level, type, template or source no longer exists";
-                    var name = WriteKit.S(t, "nombre");
-                    var vtype = ModelIndex.ViewTypeFor(WriteKit.S(t, "tipo"));
+                    if (!Exists("level") || !Exists("vft") || !Exists("origin") || (t.ContainsKey("template") && !Exists("template"))) return "\u0000the level, type, template or source no longer exists";
+                    var name = WriteKit.S(t, "name");
+                    var vtype = ModelIndex.ViewTypeFor(WriteKit.S(t, "type"));
                     if (name != null && vtype != null && new ModelIndex(_doc).ViewNameTaken(name, vtype))
                         return "\u0000a " + vtype + " view named '" + name + "' already exists";
                     return "";
@@ -157,35 +157,35 @@ namespace Bimbridge.Addin.Revit.Writes
                 case "sheet_create":
                 {
                     if (!Exists("tb")) return "\u0000the titleblock no longer exists";
-                    var number = WriteKit.S(t, "numero");
+                    var number = WriteKit.S(t, "number");
                     if (new FilteredElementCollector(_doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>().Any(x => string.Equals(x.SheetNumber, number, StringComparison.OrdinalIgnoreCase)))
                         return "\u0000sheet " + number + " already exists";
                     return "";
                 }
                 case "sheet_set":
                 {
-                    if (!Exists("reemplaza")) return "\u0000the set to be replaced no longer exists";
-                    if (((List<object>)t["hojas"]).Any(h => _doc.GetElement(Ids.ToId(Convert.ToInt64(h, CultureInfo.InvariantCulture))) == null)) return "\u0000a sheet no longer exists";
-                    var nm = WriteKit.S(t, "nombre");
-                    if (!t.ContainsKey("reemplaza") && new FilteredElementCollector(_doc).OfClass(typeof(ViewSheetSet)).Cast<ViewSheetSet>().Any(s => string.Equals(s.Name, nm, StringComparison.OrdinalIgnoreCase)))
+                    if (!Exists("replaces")) return "\u0000the set to be replaced no longer exists";
+                    if (((List<object>)t["sheets"]).Any(h => _doc.GetElement(Ids.ToId(Convert.ToInt64(h, CultureInfo.InvariantCulture))) == null)) return "\u0000a sheet no longer exists";
+                    var nm = WriteKit.S(t, "name");
+                    if (!t.ContainsKey("replaces") && new FilteredElementCollector(_doc).OfClass(typeof(ViewSheetSet)).Cast<ViewSheetSet>().Any(s => string.Equals(s.Name, nm, StringComparison.OrdinalIgnoreCase)))
                         return "\u0000the set '" + nm + "' already exists";
                     return "";
                 }
                 case "sheet_place":
                 {
-                    if (!Exists("hoja") || !Exists("vista")) return "\u0000the sheet or the view no longer exists";
-                    if (t.ContainsKey("hoja") && t.ContainsKey("vista") &&
-                        !Viewport.CanAddViewToSheet(_doc, Ids.ToId(WriteKit.L(t, "hoja")), Ids.ToId(WriteKit.L(t, "vista"))))
+                    if (!Exists("sheet") || !Exists("view")) return "\u0000the sheet or the view no longer exists";
+                    if (t.ContainsKey("sheet") && t.ContainsKey("view") &&
+                        !Viewport.CanAddViewToSheet(_doc, Ids.ToId(WriteKit.L(t, "sheet")), Ids.ToId(WriteKit.L(t, "view"))))
                         return "\u0000Revit no longer allows placing that view on that sheet (did someone place it on another one?)";
                     return "";
                 }
                 case "text_note":
-                    if (t.TryGetValue("llamada", out var data) && data is Dictionary<string, object> config)
+                    if (t.TryGetValue("callout", out var data) && data is Dictionary<string, object> config)
                     {
                         try
                         {
                             var state = LightingCallout.Observe(_doc, config);
-                            if (LightingCallout.Fingerprint(config, state.Text, state.Point, state.TypeUid) != WriteKit.S(t, "huella_origen"))
+                            if (LightingCallout.Fingerprint(config, state.Text, state.Point, state.TypeUid) != WriteKit.S(t, "origin_fingerprint"))
                                 return "\u0000the source fixture changed";
                         }
                         catch (QueryException ex) { return "\u0000" + ex.Message; }
@@ -339,7 +339,7 @@ namespace Bimbridge.Addin.Revit.Writes
                     }
                     var verificationError = VerifySourcePlacements() ?? VerifyConduitRoutes();
                     if (verificationError != null) return AbortGroup(group, verificationError);
-                    foreach (var callout in _plan.Entries.Where(e => e.Key == "llamada_luminaria"))
+                    foreach (var callout in _plan.Entries.Where(e => e.Key == "fixture_callout"))
                         if (!PlanEntry.Same(Current(callout), callout.After))
                             return AbortGroup(group, "Callout " + callout.Id + " did not keep its text, position or link after regenerating");
                     foreach (var (target, id) in _managedGroups)
@@ -349,7 +349,7 @@ namespace Bimbridge.Addin.Revit.Writes
                         if (!ReplacementAnnotationIsValid(annotation))
                             return AbortGroup(group, "The new annotation " + Ids.ToLong(annotation.NewId) + " lost the expected references");
                     foreach (var (target, id) in _groupVariants)
-                        if (_doc.GetElement(Ids.ToId(WriteKit.L(target, "grupo"))) != null ||
+                        if (_doc.GetElement(Ids.ToId(WriteKit.L(target, "group"))) != null ||
                             !GroupVariant.Matches(_doc.GetElement(id) as Group, target))
                             return AbortGroup(group, "The group variant lost its members or its placement");
                     if (Trial) return FinishTrial(group);
@@ -415,7 +415,7 @@ namespace Bimbridge.Addin.Revit.Writes
                 {
                     foreach (var e in _plan.Entries)
                     {
-                        if (e.Ref > 0 || e.Id == 0 || e.Key == "nuevo" || (e.Key != null && e.Key.Contains("@@"))) continue;
+                        if (e.Ref > 0 || e.Id == 0 || e.Key == "new" || (e.Key != null && e.Key.Contains("@@"))) continue;
                         var now = Current(e);
                         checkedCount++;
                         if (PlanEntry.Same(now, e.Before)) { restored++; continue; }
@@ -433,21 +433,21 @@ namespace Bimbridge.Addin.Revit.Writes
             r.Status = TrialGuard.TrialStatus(functional, restoration);
             r.Trial = new Dictionary<string, object>
             {
-                ["verificacion_temporal"] = during,
-                ["clasificacion"] = TrialGuard.Classify(functional, rollbackConfirmed, restoration),
-                ["temporal_ok"] = functional,
-                ["grupo_estado"] = state,
-                ["rollback_confirmado"] = rollbackConfirmed,
+                ["temporary_verification"] = during,
+                ["classification"] = TrialGuard.Classify(functional, rollbackConfirmed, restoration),
+                ["temporary_ok"] = functional,
+                ["group_status"] = state,
+                ["rollback_confirmed"] = rollbackConfirmed,
                 ["rollback_error"] = rollbackError,
-                ["relectura_error"] = readError,
-                ["releidos_tras_revertir"] = (long)checkedCount,
-                ["restaurados"] = (long)restored,
-                ["creados_temporales"] = (long)created.Count,
-                ["creados_que_persisten"] = rollbackConfirmed && readError == null ? leftovers : null,
-                ["creados_sin_observar"] = rollbackConfirmed && readError == null ? null : created.Cast<object>().ToList(),
-                ["restauracion_ok"] = restoration,
+                ["reread_error"] = readError,
+                ["reread_after_revert"] = (long)checkedCount,
+                ["restored"] = (long)restored,
+                ["temporary_created"] = (long)created.Count,
+                ["created_persisting"] = rollbackConfirmed && readError == null ? leftovers : null,
+                ["created_unobserved"] = rollbackConfirmed && readError == null ? null : created.Cast<object>().ToList(),
+                ["restoration_ok"] = restoration,
             };
-            if (diffs.Count > 0) r.Trial["no_restaurados"] = diffs;
+            if (diffs.Count > 0) r.Trial["not_restored"] = diffs;
             if (restoration) ResetCreated();
             else GroupAbort.Preserve(_plan, state, rollbackError ?? readError, Evidence());
             r.Detail = !restoration ? "Trial uncertain. Review the reconciliation evidence before repeating."
@@ -470,11 +470,11 @@ namespace Bimbridge.Addin.Revit.Writes
                 var expectedDeletes = _plan.Entries.Where(e => e.Ref == 0 && e.Id != 0 && e.Key == "exists" && e.After == "0")
                     .Select(e => e.Id).Concat(_deleted).Distinct();
                 var missingDeletes = expectedDeletes.Where(id => _doc.GetElement(Ids.ToId(id)) != null).Cast<object>().ToList();
-                result["creaciones_esperadas"] = (long)expectedCreations;
-                result["creaciones_verificadas"] = (long)verifiedCreations;
-                result["ops_sin_creacion_esperada"] = missingCreations;
-                result["borrados_que_persisten"] = missingDeletes;
-                result["ok"] = TrialGuard.FunctionalSuccess((int)(Arg.GetLong(result, "releidos") ?? 0),
+                result["expected_creations"] = (long)expectedCreations;
+                result["verified_creations"] = (long)verifiedCreations;
+                result["ops_without_expected_creation"] = missingCreations;
+                result["deleted_persisting"] = missingDeletes;
+                result["ok"] = TrialGuard.FunctionalSuccess((int)(Arg.GetLong(result, "reread") ?? 0),
                     PlanVerification.Postconditions(result) != PlanVerification.Met || missingDeletes.Count > 0, _skipped.Count > 0,
                     expectedCreations, verifiedCreations, missingCreations.Count > 0 || verifiedCreations != surviving.Count);
                 return result;
@@ -497,7 +497,7 @@ namespace Bimbridge.Addin.Revit.Writes
             string now;
             try { now = Current(c); } catch (Exception ex) { now = "\u0000" + ex.Message; }
             var shown = now.StartsWith("\u0000", StringComparison.Ordinal) ? now.Substring(1) : now;
-            if (c.Key == "nuevo") return OpCatalog.NameOf(c.Op) + ": " + shown;
+            if (c.Key == "new") return OpCatalog.NameOf(c.Op) + ": " + shown;
             return c.Id + " " + c.Key + ": expected '" + Plan.ShowValue(c, c.Before, true) + "', found '" + Plan.ShowValue(c, shown, true) + "'";
         }
 
@@ -505,7 +505,7 @@ namespace Bimbridge.Addin.Revit.Writes
         {
             if (e == null) return "the plan";
             var who = e.Ref > 0 ? "what was created by @" + e.Ref : e.Id == 0 ? "a creation" : e.Id.ToString(CultureInfo.InvariantCulture);
-            return OpCatalog.NameOf(e.Op) + " (op " + e.OpIndex + ") on " + who + (e.Key != null && e.Key != "nuevo" ? " [" + e.Key + "]" : "");
+            return OpCatalog.NameOf(e.Op) + " (op " + e.OpIndex + ") on " + who + (e.Key != null && e.Key != "new" ? " [" + e.Key + "]" : "");
         }
 
         /// <summary>
@@ -566,7 +566,7 @@ namespace Bimbridge.Addin.Revit.Writes
             if (e.Ref > 0 || e.Id == 0) return null;
             if (e.Key == "exists" && e.Op == "delete") return "del";
             if (e.Key == "loc" && e.Op == "move" && e.Target is List<object> v) return "mv|" + string.Join(",", v.Select(x => PlanEntry.Canon(Convert.ToDouble(x, CultureInfo.InvariantCulture))));
-            if (e.Key == "loc" && e.Op == "mirror") return "mi|" + Canonical(WriteKit.Dict(e.Target), "eje");
+            if (e.Key == "loc" && e.Op == "mirror") return "mi|" + Canonical(WriteKit.Dict(e.Target), "axis");
             if (e.Key == "rot" && e.Target is Dictionary<string, object> rt && rt.ContainsKey("cx")) return "ro|" + WriteKit.D(rt, "deg") + "|" + WriteKit.D(rt, "cx") + "|" + WriteKit.D(rt, "cy");
             if (e.Key.StartsWith("oculto@", StringComparison.Ordinal) && !e.Key.Contains("@@")) return e.Key + "|" + WriteKit.B(WriteKit.Dict(e.Target), "hide");
             return null;
@@ -627,7 +627,7 @@ namespace Bimbridge.Addin.Revit.Writes
         /// <summary>Vertical plane containing the mirror axis [x1,y1,x2,y2].</summary>
         private static Plane MirrorPlane(Dictionary<string, object> t)
         {
-            var a = (List<object>)t["eje"];
+            var a = (List<object>)t["axis"];
             double x1 = Convert.ToDouble(a[0], CultureInfo.InvariantCulture), y1 = Convert.ToDouble(a[1], CultureInfo.InvariantCulture);
             double x2 = Convert.ToDouble(a[2], CultureInfo.InvariantCulture), y2 = Convert.ToDouble(a[3], CultureInfo.InvariantCulture);
             var normal = new XYZ(y2 - y1, -(x2 - x1), 0).Normalize();
@@ -655,11 +655,11 @@ namespace Bimbridge.Addin.Revit.Writes
         private void ApplyEntry(PlanEntry entry)
         {
             if (entry.Ref > 0) { ApplyTemplate(entry); return; }
-            if (entry.Key == "nuevo")
+            if (entry.Key == "new")
             {
                 var target = WriteKit.Dict(entry.Target);
                 var ids = Create(entry.Op, target, 0, entry.OpIndex);
-                if (entry.Op == "place" && target.ContainsKey("z_verificar"))
+                if (entry.Op == "place" && target.ContainsKey("z_check"))
                 {
                     var made = ids.Single();
                     _sourcePlacements.Add((entry, made));
@@ -675,7 +675,7 @@ namespace Bimbridge.Addin.Revit.Writes
 
         private string VerifySourcePlacements()
         {
-            var expected = _plan.Entries.Count(e => e.Op == "place" && e.Key == "nuevo" && WriteKit.Dict(e.Target).ContainsKey("z_verificar"));
+            var expected = _plan.Entries.Count(e => e.Op == "place" && e.Key == "new" && WriteKit.Dict(e.Target).ContainsKey("z_check"));
             if (expected != _sourcePlacements.Count) return "Placement: elements are missing for verification";
             const double oneMillimeter = 1.0 / 304.8;
             foreach (var (entry, id) in _sourcePlacements)
@@ -683,11 +683,11 @@ namespace Bimbridge.Addin.Revit.Writes
                 var t = WriteKit.Dict(entry.Target);
                 var f = _doc.GetElement(id) as FamilyInstance;
                 var point = (f?.Location as LocationPoint)?.Point;
-                var wanted = new XYZ(WriteKit.D(t, "x"), WriteKit.D(t, "y"), WriteKit.D(t, "z_verificar"));
+                var wanted = new XYZ(WriteKit.D(t, "x"), WriteKit.D(t, "y"), WriteKit.D(t, "z_check"));
                 if (point == null || Ids.ToLong(f.GetTypeId()) != WriteKit.L(t, "sym") ||
                     Ids.ToLong(f.LevelId) != WriteKit.L(t, "lvl") || point.DistanceTo(wanted) > oneMillimeter ||
                     (t.ContainsKey("ws") && f.WorksetId.IntegerValue != WriteKit.L(t, "ws")))
-                    return "Placement: " + (WriteKit.S(t, "item_fuente") ?? Where(entry)) + " (id " + Ids.ToLong(id) + ") does not match in type, level, position or workset";
+                    return "Placement: " + (WriteKit.S(t, "source") ?? Where(entry)) + " (id " + Ids.ToLong(id) + ") does not match in type, level, position or workset";
                 if (t.TryGetValue("params", out var parameters) && parameters is Dictionary<string, object> expectedParams)
                     foreach (var pair in expectedParams)
                     {
@@ -716,7 +716,7 @@ namespace Bimbridge.Addin.Revit.Writes
             {
                 switch (entry.Key)
                 {
-                    case "nuevo":
+                    case "new":
                         Record(entry.OpIndex, Create(entry.Op, t, id, entry.OpIndex));
                         break;
                     case "tag":
@@ -820,30 +820,30 @@ namespace Bimbridge.Addin.Revit.Writes
                 case "head":
                     MoveTag(e as IndependentTag ?? throw new InvalidOperationException("is not a tag"), t);
                     break;
-                case "llamada_luminaria":
+                case "fixture_callout":
                     RefreshCallout(entry, e as TextNote ?? throw new InvalidOperationException("the note no longer exists"));
                     break;
-                case "plantilla":
+                case "template":
                     if (v == null) throw new InvalidOperationException("is not a view");
                     var tpl = Convert.ToInt64(target, CultureInfo.InvariantCulture);
                     v.ViewTemplateId = tpl == -1 ? ElementId.InvalidElementId : Ids.ToId(tpl);
                     break;
-                case "rango":
+                case "range":
                     SetRange(v as ViewPlan ?? throw new InvalidOperationException("view range only exists in floor plans"), t, fromTemplate);
                     break;
-                case "escala":
+                case "scale":
                     if (v == null) throw new InvalidOperationException("is not a view");
                     v.Scale = (int)Convert.ToInt64(target, CultureInfo.InvariantCulture);
                     break;
-                case "detalle":
+                case "detail":
                     if (v == null) throw new InvalidOperationException("is not a view");
                     var d = Convert.ToString(target, CultureInfo.InvariantCulture);
-                    v.DetailLevel = d == "fino" ? ViewDetailLevel.Fine : d == "medio" ? ViewDetailLevel.Medium : ViewDetailLevel.Coarse;
+                    v.DetailLevel = d == "fine" ? ViewDetailLevel.Fine : d == "medium" ? ViewDetailLevel.Medium : ViewDetailLevel.Coarse;
                     break;
-                case "nombre":
+                case "name":
                     e.Name = Convert.ToString(target, CultureInfo.InvariantCulture);
                     break;
-                case "recorte":
+                case "crop":
                     if (v == null) throw new InvalidOperationException("is not a view");
                     v.CropBoxActive = target is bool b ? b : Convert.ToInt64(target, CultureInfo.InvariantCulture) != 0;
                     break;
@@ -859,9 +859,9 @@ namespace Bimbridge.Addin.Revit.Writes
                     if (!p.Set(sb == -1 ? ElementId.InvalidElementId : Ids.ToId(sb))) throw new InvalidOperationException("Revit did not accept the scope box");
                     break;
                 }
-                case "caja_seccion":
+                case "section_box":
                 {
-                    if (!(v is View3D v3)) { if (fromTemplate) { Skip("caja_seccion only in 3D views", id); return; } throw new InvalidOperationException("is not a 3D view"); }
+                    if (!(v is View3D v3)) { if (fromTemplate) { Skip("section_box only in 3D views", id); return; } throw new InvalidOperationException("is not a 3D view"); }
                     var l = (List<object>)target;
                     v3.SetSectionBox(Box((List<object>)l[0], (List<object>)l[1]));
                     break;
@@ -876,7 +876,7 @@ namespace Bimbridge.Addin.Revit.Writes
                         if (!can) { Skip("cannot be hidden in that view", id); return; }
                         if (WriteKit.B(t, "hide")) view.HideElements(list); else view.UnhideElements(list);
                     }
-                    else if (entry.Key.StartsWith("graficos@", StringComparison.Ordinal))
+                    else if (entry.Key.StartsWith("graphics@", StringComparison.Ordinal))
                     {
                         var view = ViewOf(t) ?? throw new InvalidOperationException("the view no longer exists");
                         view.SetElementOverrides(e.Id, PlanBuilder.Merge(_doc, view.GetElementOverrides(e.Id), t));
@@ -945,9 +945,9 @@ namespace Bimbridge.Addin.Revit.Writes
                 switch (kv.Key)
                 {
                     case "top": plane = PlanViewPlane.TopClipPlane; break;
-                    case "corte": plane = PlanViewPlane.CutPlane; break;
-                    case "fondo": plane = PlanViewPlane.BottomClipPlane; break;
-                    case "profundidad": plane = PlanViewPlane.ViewDepthPlane; break;
+                    case "cut": plane = PlanViewPlane.CutPlane; break;
+                    case "bottom": plane = PlanViewPlane.BottomClipPlane; break;
+                    case "depth": plane = PlanViewPlane.ViewDepthPlane; break;
                     default: continue;
                 }
                 var pair = (List<object>)kv.Value;
@@ -996,7 +996,7 @@ namespace Bimbridge.Addin.Revit.Writes
         // Creation
         // =====================================================================================================
 
-        /// <summary>Creates what a "nuevo" entry asks for. <paramref name="src"/> &gt; 0: the source element comes from @n (copy/mirror templates).</summary>
+        /// <summary>Creates what a "new" entry asks for. <paramref name="src"/> &gt; 0: the source element comes from @n (copy/mirror templates).</summary>
         private IEnumerable<ElementId> Create(string op, Dictionary<string, object> t, long src, int opIndex)
         {
             switch (op)
@@ -1035,12 +1035,12 @@ namespace Bimbridge.Addin.Revit.Writes
         private IEnumerable<ElementId> CopyOne(Dictionary<string, object> t, long srcId)
         {
             var e = _doc.GetElement(Ids.ToId(srcId)) ?? throw new InvalidOperationException(srcId + " no longer exists");
-            if (!t.ContainsKey("nivel"))
+            if (!t.ContainsKey("level"))
             {
                 var v = (List<object>)t["v"];
                 return ElementTransformUtils.CopyElement(_doc, e.Id, Vec(v));
             }
-            var lvl = _doc.GetElement(Ids.ToId(WriteKit.L(t, "nivel"))) as Level ?? throw new InvalidOperationException("the level no longer exists");
+            var lvl = _doc.GetElement(Ids.ToId(WriteKit.L(t, "level"))) as Level ?? throw new InvalidOperationException("the level no longer exists");
             var old = WriteKit.LevelOf(_doc, e);
             if (old == null) { Skip("has no level", srcId); return new ElementId[0]; }
             if (old.Id == lvl.Id) { Skip("already on " + lvl.Name, srcId); return new ElementId[0]; }
@@ -1115,7 +1115,7 @@ namespace Bimbridge.Addin.Revit.Writes
             if (t.TryGetValue("offset", out var o) && o is List<object> ol && ol.Count >= 2)
                 offset = new[] { Convert.ToDouble(ol[0], CultureInfo.InvariantCulture), Convert.ToDouble(ol[1], CultureInfo.InvariantCulture) };
             bool? leader = t.ContainsKey("leader") ? WriteKit.B(t, "leader") : (bool?)null;
-            if (!kit.TryChoose(elem, forcedType, offset, leader, WriteKit.S(t, "orientacion"), Math.Max(1, view.Scale), out var ch, out var why))
+            if (!kit.TryChoose(elem, forcedType, offset, leader, WriteKit.S(t, "orientation"), Math.Max(1, view.Scale), out var ch, out var why))
             {
                 Skip(why, elemId);
                 return new ElementId[0];
@@ -1144,7 +1144,7 @@ namespace Bimbridge.Addin.Revit.Writes
             ids = ids.Where(x => _doc.GetElement(x) != null).Distinct().ToList();
             if (ids.Count == 0) throw new InvalidOperationException("nothing left to group");
             var g = _doc.Create.NewGroup(ids) ?? throw new InvalidOperationException("Revit did not create the group");
-            var name = WriteKit.S(t, "nombre");
+            var name = WriteKit.S(t, "name");
             if (name != null) g.GroupType.Name = name;
             return g.Id;
         }
@@ -1157,7 +1157,7 @@ namespace Bimbridge.Addin.Revit.Writes
         private ElementId RebuildGroupVariant(Dictionary<string, object> target)
         {
             var group = GroupVariant.Rebuild(_doc, target);
-            _deleted.Add(WriteKit.L(target, "grupo"));
+            _deleted.Add(WriteKit.L(target, "group"));
             _r.Deleted++;
             _groupVariants.Add((target, group.Id));
             return group.Id;
@@ -1167,15 +1167,15 @@ namespace Bimbridge.Addin.Revit.Writes
         {
             GroupType gt;
             if (t.ContainsKey("gtype")) gt = _doc.GetElement(Ids.ToId(WriteKit.L(t, "gtype"))) as GroupType;
-            else gt = (_doc.GetElement(Ids.ToId(FirstCreated((int)WriteKit.L(t, "gref"), "tipo"))) as Group)?.GroupType;
+            else gt = (_doc.GetElement(Ids.ToId(FirstCreated((int)WriteKit.L(t, "gref"), "type"))) as Group)?.GroupType;
             if (gt == null) throw new InvalidOperationException("the group type no longer exists");
             var point = GroupPlacement.Point(t);
-            if (WriteKit.B(t, "reutilizar") && GroupPlacement.AtPoint(_doc, gt.Id, point).Count > 0)
+            if (WriteKit.B(t, "reuse") && GroupPlacement.AtPoint(_doc, gt.Id, point).Count > 0)
                 throw new InvalidOperationException("a group appeared at the planned point; plan again");
             var g = _doc.Create.PlaceGroup(point, gt) ?? throw new InvalidOperationException("Revit did not place the group");
-            if (t.ContainsKey("nivel"))
+            if (t.ContainsKey("level"))
             {
-                var wanted = Ids.ToId(WriteKit.L(t, "nivel"));
+                var wanted = Ids.ToId(WriteKit.L(t, "level"));
                 var parameter = g.get_Parameter(BuiltInParameter.GROUP_LEVEL);
                 if (parameter == null || (parameter.AsElementId() != wanted && (parameter.IsReadOnly || !parameter.Set(wanted))))
                     throw new InvalidOperationException("Revit did not accept the group's reference level");
@@ -1195,25 +1195,25 @@ namespace Bimbridge.Addin.Revit.Writes
                 if (workset == null || (workset.AsInteger() != wanted && (workset.IsReadOnly || !workset.Set(wanted))))
                     throw new InvalidOperationException("Revit did not accept the group's workset");
             }
-            if (t.ContainsKey("nivel") || t.ContainsKey("rot") || t.ContainsKey("ws") || t.ContainsKey("firma_miembros"))
+            if (t.ContainsKey("level") || t.ContainsKey("rot") || t.ContainsKey("ws") || t.ContainsKey("member_signature"))
                 _managedGroups.Add((t, g.Id));
             return g.Id;
         }
 
         private ElementId ViewCreate(Dictionary<string, object> t)
         {
-            var kind = WriteKit.S(t, "tipo");
+            var kind = WriteKit.S(t, "type");
             var vft = Ids.ToId(WriteKit.L(t, "vft", -1));
             View v;
             switch (kind)
             {
-                case "plano":
+                case "plan":
                 case "rcp":
-                    v = ViewPlan.Create(_doc, vft, Ids.ToId(WriteKit.L(t, "nivel")));
+                    v = ViewPlan.Create(_doc, vft, Ids.ToId(WriteKit.L(t, "level")));
                     break;
-                case "seccion":
+                case "section":
                 {
-                    var corners = (List<object>)t["caja"];
+                    var corners = (List<object>)t["box"];
                     var a = (List<object>)corners[0]; var b = (List<object>)corners[1];
                     double ax = N(a, 0), ay = N(a, 1), az = N(a, 2), bx = N(b, 0), by = N(b, 1), bz = N(b, 2);
                     var dir = new XYZ(bx - ax, by - ay, 0);
@@ -1236,39 +1236,39 @@ namespace Bimbridge.Addin.Revit.Writes
                 }
                 case "callout":
                 {
-                    var corners = (List<object>)t["caja"];
+                    var corners = (List<object>)t["box"];
                     var a = (List<object>)corners[0]; var b = (List<object>)corners[1];
-                    v = ViewSection.CreateCallout(_doc, Ids.ToId(WriteKit.L(t, "origen")), vft, new XYZ(N(a, 0), N(a, 1), 0), new XYZ(N(b, 0), N(b, 1), 0));
+                    v = ViewSection.CreateCallout(_doc, Ids.ToId(WriteKit.L(t, "origin")), vft, new XYZ(N(a, 0), N(a, 1), 0), new XYZ(N(b, 0), N(b, 1), 0));
                     break;
                 }
-                case "dibujo":
+                case "drafting":
                 {
                     var vd = ViewDrafting.Create(_doc, vft);
-                    if (t.ContainsKey("escala")) vd.Scale = (int)WriteKit.L(t, "escala");
+                    if (t.ContainsKey("scale")) vd.Scale = (int)WriteKit.L(t, "scale");
                     v = vd;
                     break;
                 }
                 case "3d":
                 {
                     var v3 = View3D.CreateIsometric(_doc, vft);
-                    if (t.TryGetValue("caja", out var c) && c is List<object> corners) v3.SetSectionBox(Box((List<object>)corners[0], (List<object>)corners[1]));
+                    if (t.TryGetValue("box", out var c) && c is List<object> corners) v3.SetSectionBox(Box((List<object>)corners[0], (List<object>)corners[1]));
                     v = v3;
                     break;
                 }
-                case "duplicar":
+                case "duplicate":
                 {
-                    var src = _doc.GetElement(Ids.ToId(WriteKit.L(t, "origen"))) as View ?? throw new InvalidOperationException("the source view no longer exists");
-                    var opt = WriteKit.S(t, "opcion");
-                    var dup = opt == "detalles" ? ViewDuplicateOption.WithDetailing : opt == "dependiente" ? ViewDuplicateOption.AsDependent : ViewDuplicateOption.Duplicate;
+                    var src = _doc.GetElement(Ids.ToId(WriteKit.L(t, "origin"))) as View ?? throw new InvalidOperationException("the source view no longer exists");
+                    var opt = WriteKit.S(t, "option");
+                    var dup = opt == "with_detailing" ? ViewDuplicateOption.WithDetailing : opt == "dependent" ? ViewDuplicateOption.AsDependent : ViewDuplicateOption.Duplicate;
                     v = _doc.GetElement(src.Duplicate(dup)) as View;
                     break;
                 }
                 default: throw new InvalidOperationException("unknown view type: " + kind);
             }
             if (v == null) throw new InvalidOperationException("Revit did not create the view");
-            var name = WriteKit.S(t, "nombre");
+            var name = WriteKit.S(t, "name");
             if (name != null) v.Name = name;
-            if (t.ContainsKey("plantilla")) v.ViewTemplateId = Ids.ToId(WriteKit.L(t, "plantilla"));
+            if (t.ContainsKey("template")) v.ViewTemplateId = Ids.ToId(WriteKit.L(t, "template"));
             return v.Id;
         }
 
@@ -1277,17 +1277,17 @@ namespace Bimbridge.Addin.Revit.Writes
         private ElementId SheetCreate(Dictionary<string, object> t)
         {
             var s = ViewSheet.Create(_doc, Ids.ToId(WriteKit.L(t, "tb"))) ?? throw new InvalidOperationException("Revit did not create the sheet");
-            s.SheetNumber = WriteKit.S(t, "numero");
-            s.Name = WriteKit.S(t, "nombre");
+            s.SheetNumber = WriteKit.S(t, "number");
+            s.Name = WriteKit.S(t, "name");
             return s.Id;
         }
 
         /// <summary>ViewSheetSet via PrintManager (leaves PrintRange=Select in the document, as the UI does). Verifies the saved views.</summary>
         private ElementId SheetSetCreate(Dictionary<string, object> t)
         {
-            var name = WriteKit.S(t, "nombre");
-            var ids = ((List<object>)t["hojas"]).Select(h => Ids.ToId(Convert.ToInt64(h, CultureInfo.InvariantCulture))).ToList();
-            if (t.ContainsKey("reemplaza")) _doc.Delete(Ids.ToId(WriteKit.L(t, "reemplaza")));
+            var name = WriteKit.S(t, "name");
+            var ids = ((List<object>)t["sheets"]).Select(h => Ids.ToId(Convert.ToInt64(h, CultureInfo.InvariantCulture))).ToList();
+            if (t.ContainsKey("replaces")) _doc.Delete(Ids.ToId(WriteKit.L(t, "replaces")));
             var pm = _doc.PrintManager;
             pm.PrintRange = PrintRange.Select;
             var vss = pm.ViewSheetSetting;
@@ -1299,7 +1299,7 @@ namespace Bimbridge.Addin.Revit.Writes
                 .FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.Ordinal)) ?? throw new InvalidOperationException("Revit did not save the set '" + name + "'");
             var got = new HashSet<long>(saved.Views.Cast<View>().Select(v => Ids.ToLong(v.Id)));
             if (got.Count != ids.Count || ids.Any(i => !got.Contains(Ids.ToLong(i)))) throw new InvalidOperationException("the saved set has " + got.Count + " views, expected " + ids.Count);
-            t.TryGetValue("preset_pdf", out var preset);
+            t.TryGetValue("pdf_preset", out var preset);
             SheetSetPdf.Write(saved, ids, preset);
             var stored = SheetSetPdf.Read(saved);
             if (!ids.SequenceEqual(stored.Order) || OpSemantics.Canonical(preset) != OpSemantics.Canonical(stored.Preset))
@@ -1309,8 +1309,8 @@ namespace Bimbridge.Addin.Revit.Writes
 
         private ElementId SheetPlace(Dictionary<string, object> t)
         {
-            var sheet = ViewOf(t, "hoja", "hoja_ref") as ViewSheet ?? throw new InvalidOperationException("the sheet no longer exists");
-            var view = ViewOf(t, "vista", "vista_ref") ?? throw new InvalidOperationException("the view no longer exists");
+            var sheet = ViewOf(t, "sheet", "sheet_ref") as ViewSheet ?? throw new InvalidOperationException("the sheet no longer exists");
+            var view = ViewOf(t, "view", "view_ref_of") ?? throw new InvalidOperationException("the view no longer exists");
             if (!Viewport.CanAddViewToSheet(_doc, sheet.Id, view.Id))
                 throw new InvalidOperationException("Revit does not allow placing '" + view.Name + "' on " + sheet.SheetNumber + " (is it already on another sheet, or is it a template?)");
             XYZ at;
@@ -1356,17 +1356,17 @@ namespace Bimbridge.Addin.Revit.Writes
         private ElementId TextNoteCreate(Dictionary<string, object> t)
         {
             var view = ViewOf(t) ?? throw new InvalidOperationException("the view no longer exists");
-            var config = t.TryGetValue("llamada", out var data) ? data as Dictionary<string, object> : null;
+            var config = t.TryGetValue("callout", out var data) ? data as Dictionary<string, object> : null;
             if (config != null && LightingCallout.InView(_doc, view.Id)
                 .Any(existing => Arg.GetString(LightingCallout.Read(existing), "uid") == Arg.GetString(config, "uid")))
                 throw new InvalidOperationException("the fixture already has a managed callout in the view");
-            var note = TextNote.Create(_doc, view.Id, ViewPoint(view, WriteKit.D(t, "x"), WriteKit.D(t, "y")), WriteKit.S(t, "texto") ?? "", Ids.ToId(WriteKit.L(t, "ttype")));
+            var note = TextNote.Create(_doc, view.Id, ViewPoint(view, WriteKit.D(t, "x"), WriteKit.D(t, "y")), WriteKit.S(t, "text") ?? "", Ids.ToId(WriteKit.L(t, "ttype")));
             if (note == null) throw new InvalidOperationException("Revit did not create the note");
             LightingCallout.Format(note, t);
             if (config != null)
             {
                 var state = LightingCallout.Observe(_doc, config);
-                if (LightingCallout.Fingerprint(config, state.Text, state.Point, state.TypeUid) != WriteKit.S(t, "huella_origen"))
+                if (LightingCallout.Fingerprint(config, state.Text, state.Point, state.TypeUid) != WriteKit.S(t, "origin_fingerprint"))
                     throw new InvalidOperationException("the source fixture changed after the note was planned");
                 LightingCallout.Write(note, config, state.Point, state.TypeUid);
             }
@@ -1396,10 +1396,10 @@ namespace Bimbridge.Addin.Revit.Writes
         private (Element Original, List<Reference> Resolved) ReadAnnotationTargets(Dictionary<string, object> data)
         {
             var old = _doc.GetElement(Ids.ToId(WriteKit.L(data, "original")));
-            if (old == null || old.Pinned || AnnotationRepair.Fingerprint(old) != WriteKit.S(data, "original_firma"))
+            if (old == null || old.Pinned || AnnotationRepair.Fingerprint(old) != WriteKit.S(data, "original_signature"))
                 throw new QueryException("the original annotation changed after planning");
             var targets = AnnotationRepair.ResolveTargets(_doc, old, data);
-            if (!targets.Select(r => r.ConvertToStableRepresentation(_doc)).SequenceEqual(Arg.GetStringList(data, "refs_destino")))
+            if (!targets.Select(r => r.ConvertToStableRepresentation(_doc)).SequenceEqual(Arg.GetStringList(data, "target_refs")))
                 throw new QueryException("the target references changed");
             return (old, targets);
         }
@@ -1415,7 +1415,7 @@ namespace Bimbridge.Addin.Revit.Writes
                 throw new InvalidOperationException("Revit tried to delete other elements while replacing the annotation");
             _deleted.Add(Ids.ToLong(oldId));
             _r.Deleted++;
-            _replacementAnnotations.Add((oldId, created.Id, view.Id, Arg.GetStringList(data, "refs_destino")));
+            _replacementAnnotations.Add((oldId, created.Id, view.Id, Arg.GetStringList(data, "target_refs")));
             return created.Id;
         }
 
@@ -1520,7 +1520,7 @@ namespace Bimbridge.Addin.Revit.Writes
             var diffs = new List<object>();
             foreach (var e in _plan.Entries)
             {
-                if (e.Ref > 0 || e.Id == 0 || e.Key == "nuevo" || (e.Key != null && e.Key.Contains("@@"))) continue;
+                if (e.Ref > 0 || e.Id == 0 || e.Key == "new" || (e.Key != null && e.Key.Contains("@@"))) continue;
                 if (e.Key == "exists") { checkedCount++; same++; continue; }
                 if (_deleted.Contains(e.Id)) continue;
                 string now;
@@ -1531,19 +1531,19 @@ namespace Bimbridge.Addin.Revit.Writes
                 if (diffs.Count < 5)
                     diffs.Add(e.Id + " " + e.Key + ": planned " + Plan.ShowValue(e, want, false) + ", got " + Plan.ShowValue(e, now.StartsWith("\u0000", StringComparison.Ordinal) ? now.Substring(1) : now, false));
             }
-            var d = new Dictionary<string, object> { ["releidos"] = (long)checkedCount, ["como_se_planifico"] = (long)same };
+            var d = new Dictionary<string, object> { ["reread"] = (long)checkedCount, ["as_planned"] = (long)same };
             if (checkedCount > same)
             {
-                d["distintos"] = (long)(checkedCount - same);
-                d["ejemplos"] = diffs;
-                d["nota"] = "Revit adjusted those values when applying them (constraints, rounding or the family); review them";
+                d["different_items"] = (long)(checkedCount - same);
+                d["examples"] = diffs;
+                d["note"] = "Revit adjusted those values when applying them (constraints, rounding or the family); review them";
             }
             if (_plan.CreatedByOp.Count > 0)
-                d["creados_por_op"] = _plan.CreatedByOp.OrderBy(k => k.Key).ToDictionary(k => "@" + k.Key.ToString(CultureInfo.InvariantCulture), k => (object)(long)k.Value.Count);
+                d["created_by_op"] = _plan.CreatedByOp.OrderBy(k => k.Key).ToDictionary(k => "@" + k.Key.ToString(CultureInfo.InvariantCulture), k => (object)(long)k.Value.Count);
             if (_skipped.Count > 0)
-                d["omitidos"] = _skipped.ToDictionary(k => k.Key, k => (object)(long)k.Value.Count);
+                d["skipped"] = _skipped.ToDictionary(k => k.Key, k => (object)(long)k.Value.Count);
             var mv = VerifyModelCreations();
-            if (mv != null) d["verificacion_creacion"] = mv;
+            if (mv != null) d["creation_verification"] = mv;
             return d;
         }
 

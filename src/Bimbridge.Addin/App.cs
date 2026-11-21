@@ -265,7 +265,7 @@ namespace Bimbridge.Addin
 
         private static string Sanitize(string s)
         {
-            var chars = (s ?? "usuario").ToCharArray();
+            var chars = (s ?? "user").ToCharArray();
             for (var i = 0; i < chars.Length; i++)
                 if (!char.IsLetterOrDigit(chars[i])) chars[i] = '_';
             return new string(chars);

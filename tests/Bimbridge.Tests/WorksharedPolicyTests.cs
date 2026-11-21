@@ -9,7 +9,7 @@ namespace Bimbridge.Tests
     {
         private static Dictionary<string, object> Ctx(bool ws, string path, string central = null)
         {
-            var d = new Dictionary<string, object> { ["worksharing"] = ws, ["ruta"] = path };
+            var d = new Dictionary<string, object> { ["worksharing"] = ws, ["path"] = path };
             if (central != null) d["central"] = central;
             return d;
         }

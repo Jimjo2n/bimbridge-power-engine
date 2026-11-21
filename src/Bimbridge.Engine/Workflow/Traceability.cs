@@ -60,8 +60,8 @@ namespace Bimbridge.Engine.Workflow
             // ---------------- core: identity, plan, resume ----------------
             R("WF-13", "CAP-001", "ctx / identity / instances", "core", "Add-in · AgentHost RevitLink", NativePending, "Rc1_FailClosed_MissingContextFlag (5), AgentHostRevitTests", SimOk, "B7", Rc1),
             R("WF-13", "CAP-001", "per-document capabilities (ctx) and this registry", "core", "Engine Capabilities + Traceability", Unit, "Capabilities_DocMatchesCode, Traceability_DocMatchesCode", "OK", "—", Read050),
-            R("WF-02,WF-05", "CAP-002", "consultar / q / get / params (paging, projection)", "core", "Add-in Query · AgentHost ReadRows", NativePending, "Rc1 paging (ForcePage, changing total)", SimOk, "B0", Read024 + "; " + Rc1),
-            R("WF-02,WF-09,WF-13", "CAP-003", "plan → commit (diff, one Undo, clave idempotency)", "core", "Add-in PlanBuilder/PlanApplier · AgentHost PlanRunner", NativePending, "PlanTests, PlanQueueTests, AgentHostRevitTests", SimOk + " (0.8.0 changed the commit audit)", "B0, B7", Rc1),
+            R("WF-02,WF-05", "CAP-002", "query_check / q / get / params (paging, projection)", "core", "Add-in Query · AgentHost ReadRows", NativePending, "Rc1 paging (ForcePage, changing total)", SimOk, "B0", Read024 + "; " + Rc1),
+            R("WF-02,WF-09,WF-13", "CAP-003", "plan → commit (diff, one Undo, key idempotency)", "core", "Add-in PlanBuilder/PlanApplier · AgentHost PlanRunner", NativePending, "PlanTests, PlanQueueTests, AgentHostRevitTests", SimOk + " (0.8.0 changed the commit audit)", "B0, B7", Rc1),
             R("WF-13", "CAP-003", "per-document exclusion: lease + fencing", "core", "AgentHost ExecJournal/Lease", NativePending, "LeaseFencingTests", SimOk, "B7", Rc1),
             R("WF-13", "CAP-003", "durable audit of every persistent commit (intent → result)", "core", "Add-in RequestHandler.Commit · Engine AuditLog", NativePending, "AuditLogTests, V080_Nrt07Harness", SimOk + " (closes rc1 H2)", "B7", "—"),
             R("WF-13", "CAP-004", "resume after a crash; uncertain ⇒ observe, never repeat", "core", "AgentHost PlanRunner/RevitBackend", NativePending, "NRT-03/05/06 simulated, V080_Handoff_AfterCrash", SimOk, "B7", Rc1),
@@ -72,12 +72,12 @@ namespace Bimbridge.Engine.Workflow
 
             // ---------------- sources, requirements, verification ----------------
             R("WF-02,WF-10,WF-11", "CAP-008", "requirements with provenance and authority; inference never OBSERVED", "core", "Engine Workflow.Requirements", Unit, "WorkflowTests (9)", "OK", "B2, B5", "—"),
-            R("WF-02,WF-11", "CAP-008", "verificar_independiente: independent source → model → differences", "coordination", "Engine IndependentVerifier · AgentHost RevitBackend", NativePending, "V080_IndependentVerification_AgainstModel", SimOk + " (read only)", "B2, B5", "—"),
+            R("WF-02,WF-11", "CAP-008", "verify_independent: independent source → model → differences", "coordination", "Engine IndependentVerifier · AgentHost RevitBackend", NativePending, "V080_IndependentVerification_AgainstModel", SimOk + " (read only)", "B2, B5", "—"),
             R("WF-02", "CAP-008", "source adapters (extract PDF/tables with coordinates)", "coordination", "—", Deferred, "—", "0.9.0", "B2", "—"),
             R("WF-04,WF-09,WF-11", "CAP-006", "delivery states (12 stages) and receipts", "documents", "Engine Workflow.Delivery", Unit, "WorkflowTests", "OK", "B6", "—"),
 
             // ---------------- editing and modeling ----------------
-            R("WF-02", "CAP-005", "set_param / set_values / fijar_parametro_lote", "editing", "Add-in PlanApplier · AgentHost", NativePending, "PlanTests, Rc11_SlowIdleRevit, Bench_B0_586", SimOk, "B0", Rc1),
+            R("WF-02", "CAP-005", "set_param / set_values / set_parameter_batch", "editing", "Add-in PlanApplier · AgentHost", NativePending, "PlanTests, Rc11_SlowIdleRevit, Bench_B0_586", SimOk, "B0", Rc1),
             R("WF-02", "CAP-005", "change_type / set_type_param / set_level / set_workset / set_elevation", "editing", "Add-in PlanApplier", NativePending, "PlanTests, WriteEngineTests", SimOk, "B2", "—"),
             R("WF-02,WF-05", "CAP-005", "move / rotate / mirror / copy / delete", "editing", "Add-in PlanApplier", NativePending, "WriteEngineTests.BuildMoved, PlanTests", SimOk, "—", "—"),
             R("WF-02", "CAP-005", "place (instance at a point, slab/level mounting)", "modeling", "Add-in PlanApplier", NativePending, "WriteEngineTests.Parse_Validates", SimOk, "B2", "—"),
@@ -113,17 +113,17 @@ namespace Bimbridge.Engine.Workflow
 
             // ---------------- families ----------------
             R("WF-12", "CAP-014", "fam info / faces", "families", "Add-in FamilyOps", NativePending, "—", "native: " + Bk, "B8", Read050),
-            R("WF-12,WF-07", "CAP-014", "fam abrir / conector / param / cargar", "families", "Add-in FamilyOps", NativePending, "ScriptingTests (compiles per year)", "native: " + Bk + " (requires modificar_familia permission)", "B8", "—"),
-            R("WF-12", "CAP-014", "fam buscar (index of authorized folders, no disk browsing)", "families", "Engine FamilyLibrary", Unit, "FamilyLibraryTests (3)", "OK", "B8", "—"),
-            R("WF-12", "CAP-014", "fam cargar_archivo (indexed, unchanged RFA, sha-256)", "families", "Engine FamilyLibrary · Add-in", NativePending, "FamilyLibraryTests", SimOk + " (requires cargar_archivo permission)", "B8", "—"),
+            R("WF-12,WF-07", "CAP-014", "fam open / connector / param / load", "families", "Add-in FamilyOps", NativePending, "ScriptingTests (compiles per year)", "native: " + Bk + " (requires modify_family permission)", "B8", "—"),
+            R("WF-12", "CAP-014", "fam search (index of authorized folders, no disk browsing)", "families", "Engine FamilyLibrary", Unit, "FamilyLibraryTests (3)", "OK", "B8", "—"),
+            R("WF-12", "CAP-014", "fam load_file (indexed, unchanged RFA, sha-256)", "families", "Engine FamilyLibrary · Add-in", NativePending, "FamilyLibraryTests", SimOk + " (requires load_file permission)", "B8", "—"),
 
             // ---------------- MEP and coordination ----------------
             R("WF-07,WF-08", "CAP-011", "physical routing, fittings, stubs and dimension reconciliation", "MEP", "—", Deferred, "—", "0.9.0", "B4", "—"),
             R("WF-08", "CAP-011", "clash detection with links", "coordination", "Add-in GeoRunner", NativePending, "GeoComputeTests", SimOk, "B4", Read024),
 
             // ---------------- documents ----------------
-            R("WF-04,WF-13", "CAP-004", "doc guardar / guardar_como (file and hash verification)", "documents", "Add-in DocOps", NativePending, "NRT-05 simulated", SimOk + " (requires guardar permission)", "B6", Rc1),
-            R("WF-04,WF-13", "CAP-004", "doc sync (workshared only, sincronizar permission)", "documents", "Add-in DocOps", NativePending, "WorksharedPolicyTests", "native: " + Bk + " (never on corporate central models)", "B6", "—"),
+            R("WF-04,WF-13", "CAP-004", "doc save / save_as (file and hash verification)", "documents", "Add-in DocOps", NativePending, "NRT-05 simulated", SimOk + " (requires save permission)", "B6", Rc1),
+            R("WF-04,WF-13", "CAP-004", "doc sync (workshared only, sync permission)", "documents", "Add-in DocOps", NativePending, "WorksharedPolicyTests", "native: " + Bk + " (never on corporate central models)", "B6", "—"),
 
             // ---------------- interoperability, publishing, administration ----------------
             R("—", "CAP-006", "export IFC / DWG / NWC (typed)", "interoperability", "—", NotSupported, "—", "exec only (level B)", "—", "—"),
@@ -131,8 +131,8 @@ namespace Bimbridge.Engine.Workflow
             R("WF-13", "CAP-001", "separate permissions (10 classes) enforced in the add-in", "administration", "Protocol Permissions · Add-in", NativePending, "PermissionsTests (3)", SimOk, "—", "—"),
             R("WF-13", "CAP-005", "controlled C# exec (query / trial / run) with review and audit", "administration", "Add-in Exec · Scripting", NativePending, "ScriptingTests, TrialGuardTests", SimOk, "—", "—"),
             R("—", "CAP-005", "supervised UI interaction (level C)", "administration", "—", NotSupported, "—", "show/capture only; no automated clicks", "—", "—"),
-            R("WF-13", "CAP-001", "Update from ZIP (signature, hashes, compatibility, apply on Revit close, rollback)", "administration", "Setup.Core ZipUpdate · Setup /aplicar-pendiente · Add-in", NativePending, "ZipUpdateTests (12)", SimOk + "; signature: key pending from IT", "—", "—"),
-            R("WF-13", "CAP-001", "installer with SHA-256 manifest and /diagnostico", "administration", "Setup.Core", Unit, "SetupTests", "OK", "B8", Rc1),
+            R("WF-13", "CAP-001", "Update from ZIP (signature, hashes, compatibility, apply on Revit close, rollback)", "administration", "Setup.Core ZipUpdate · Setup /apply-pendinte · Add-in", NativePending, "ZipUpdateTests (12)", SimOk + "; signature: key pending from IT", "—", "—"),
+            R("WF-13", "CAP-001", "installer with SHA-256 manifest and /diagnostics", "administration", "Setup.Core", Unit, "SetupTests", "OK", "B8", Rc1),
             R("—", "CAP-001", "measurement of ESTIMATED tokens and wire calls", "administration", "Engine TokenEstimate · AgentHost Bench", Simulated, "Bench_B0_586_OneByOne_vs_Plan", "OK (1,172 → 3 agent calls, simulated)", "B0", "—"),
         };
 

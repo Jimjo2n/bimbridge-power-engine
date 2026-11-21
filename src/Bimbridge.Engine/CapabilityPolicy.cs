@@ -22,9 +22,9 @@ namespace Bimbridge.Engine
     /// </summary>
     public static class CapabilityPolicy
     {
-        public static readonly string[] AlwaysDeniedAutonomous = { "proceso", "red", "reflexion", "nativo", "registro", "salida_proceso", "entorno", "hilos", "revit_cerrar", "revit_abrir", "revit_transaccion" };
+        public static readonly string[] AlwaysDeniedAutonomous = { "process", "network", "reflection", "native", "registry", "process_output", "environment", "threads", "revit_close", "revit_open", "revit_transaction" };
         /// <summary>In autonomous mode these can be granted explicitly (task args; they are part of its fingerprint).</summary>
-        public static readonly string[] GrantableAutonomous = { "archivo_escritura", "revit_guardar", "revit_sync", "revit_exportar" };
+        public static readonly string[] GrantableAutonomous = { "write_file", "revit_save", "revit_sync", "revit_export" };
 
         public static string Kind(string capability) { var i = capability.IndexOf(':'); return i < 0 ? capability : capability.Substring(0, i); }
 
@@ -54,8 +54,8 @@ namespace Bimbridge.Engine
             profile = trustedSessionActive ? ExecutionProfile.TrustedInteractive : ExecutionProfile.RestrictedAutonomous;
             if (trustedSessionActive) return null;
             if (run)
-                return "codigo_confiable_requerido: running arbitrary C# code that writes requires a person to enable \"Trusted code\" on the BIMBRIDGE ribbon in Revit. " +
-                       "Without that: modo=consulta (read-only), plan/commit, or a task with a recipe and a grant.";
+                return "trusted_code_required: running arbitrary C# code that writes requires a person to enable \"Trusted code\" on the BIMBRIDGE ribbon in Revit. " +
+                       "Without that: mode=query (read-only), plan/commit, or a task with a recipe and a grant.";
             var denied = Denied(ExecutionProfile.RestrictedAutonomous, usedCapabilities);
             return denied.Count == 0 ? null : Explain(denied);
         }
@@ -72,7 +72,7 @@ namespace Bimbridge.Engine
     /// </summary>
     public static class ReferencePolicy
     {
-        public static string TrustedListPath => System.IO.Path.Combine(Home.Root, "referencias_confiables.txt");
+        public static string TrustedListPath => Home.Sub("trusted_references.txt");
 
         public static HashSet<string> LoadTrusted(string path = null)
         {

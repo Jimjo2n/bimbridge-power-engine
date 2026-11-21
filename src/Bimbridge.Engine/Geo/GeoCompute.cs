@@ -118,24 +118,24 @@ namespace Bimbridge.Engine.Geo
             {
                 ["id"] = t.Id,
                 ["lvl"] = t.Level,
-                ["clase"] = r.Class,
+                ["class"] = r.Class,
                 ["gap"] = r.GapMin,
                 ["pts"] = r.PointsWithSurface + "/" + r.PointsTotal,
-                ["contra"] = r.Item >= 0 && r.Item < bodies.Count ? bodies[r.Item].Label : null,
+                ["against"] = r.Item >= 0 && r.Item < bodies.Count ? bodies[r.Item].Label : null,
             };
             if (spec.Points > 1) row["gap_max"] = r.GapMax;
             if (r.Sloped) row["pend"] = true;
-            if (usedBox) row["cuerpo"] = "caja";
-            if (!double.IsNaN(r.GapMin)) row["mover"] = spec.Up ? r.GapMin : -r.GapMin;
+            if (usedBox) row["body"] = "box";
+            if (!double.IsNaN(r.GapMin)) row["move"] = spec.Up ? r.GapMin : -r.GapMin;
             if (spec.SurfaceReference && r.Item >= 0 && r.Item < bodies.Count)
             {
                 var surface = bodies[r.Item];
-                row["elemento_id"] = surface.Id;
-                row["vinculo_id"] = surface.LinkId;
-                row["cara_x"] = r.SurfaceX;
-                row["cara_y"] = r.SurfaceY;
-                row["cara_z"] = r.SurfaceZ;
-                row["cara_lado"] = spec.Up ? "inferior" : "superior";
+                row["element_id"] = surface.Id;
+                row["link_id"] = surface.LinkId;
+                row["face_x"] = r.SurfaceX;
+                row["face_y"] = r.SurfaceY;
+                row["face_z"] = r.SurfaceZ;
+                row["face_side"] = spec.Up ? "bottom" : "top";
             }
             return row;
         }
@@ -190,7 +190,7 @@ namespace Bimbridge.Engine.Geo
             {
                 GeoBody best = null;
                 double bestD = double.MaxValue, bestDz = 0;
-                string cls = "libre";
+                string cls = "free";
                 var count = 0;
                 foreach (var c in t.Candidates)
                 {
@@ -201,14 +201,14 @@ namespace Bimbridge.Engine.Geo
                     var overlapZ = b.Box.MinZ < t.Box.MaxZ - spec.Tolerance && b.Box.MaxZ > t.Box.MinZ + spec.Tolerance;
                     double dz = b.Box.MinZ >= t.Box.MaxZ - spec.Tolerance ? b.Box.MinZ - t.Box.MaxZ
                               : b.Box.MaxZ <= t.Box.MinZ + spec.Tolerance ? b.Box.MaxZ - t.Box.MinZ : 0;
-                    string c2 = dxy <= 0 && overlapZ ? "choque" : dxy <= 0 ? (dz >= 0 ? "encima" : "debajo") : "cerca";
+                    string c2 = dxy <= 0 && overlapZ ? "clash" : dxy <= 0 ? (dz >= 0 ? "above" : "below") : "near";
                     var better = best == null || Rank(c2) < Rank(cls) || (Rank(c2) == Rank(cls) && (dxy < bestD || (dxy == bestD && Math.Abs(dz) < Math.Abs(bestDz))));
                     if (better) { best = b; bestD = dxy; bestDz = dz; cls = c2; }
                 }
-                var row = new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level, ["clase"] = cls };
+                var row = new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level, ["class"] = cls };
                 if (best != null)
                 {
-                    row["otro"] = best.Label;
+                    row["other"] = best.Label;
                     row["dist_xy"] = bestD;
                     row["dz"] = bestDz;
                     if (count > 1) row["n"] = (long)count;
@@ -222,10 +222,10 @@ namespace Bimbridge.Engine.Geo
         {
             switch (c)
             {
-                case "choque": return 0;
-                case "encima": return 1;
-                case "debajo": return 2;
-                case "cerca": return 3;
+                case "clash": return 0;
+                case "above": return 1;
+                case "below": return 2;
+                case "near": return 3;
                 default: return 4;
             }
         }
@@ -256,11 +256,11 @@ namespace Bimbridge.Engine.Geo
                     }
                 }
                 var row = new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level };
-                if (bw == null || best > spec.Radius) { row["clase"] = "sin_muro"; rows.Add(row); continue; }
-                row["clase"] = best < -spec.Tolerance ? "penetra" : best <= spec.Tolerance ? "toca" : "separada";
+                if (bw == null || best > spec.Radius) { row["class"] = "no_wall"; rows.Add(row); continue; }
+                row["class"] = best < -spec.Tolerance ? "penetrates" : best <= spec.Tolerance ? "touches" : "separated";
                 row["dist"] = best;
-                row["muro"] = bw.Label;
-                row["lado"] = side > 0 ? "izq" : "der";
+                row["wall"] = bw.Label;
+                row["side"] = side > 0 ? "left_side" : "right_side";
                 rows.Add(row);
             }
             return rows;
@@ -279,7 +279,7 @@ namespace Bimbridge.Engine.Geo
                 var same = real != null && string.Equals(real.Name, t.Level, StringComparison.OrdinalIgnoreCase);
                 var row = new Dictionary<string, object>
                 {
-                    ["id"] = t.Id, ["lvl"] = t.Level, ["nivel_real"] = real?.Name, ["clase"] = same ? "igual" : "distinto", ["z"] = z,
+                    ["id"] = t.Id, ["lvl"] = t.Level, ["actual_level"] = real?.Name, ["class"] = same ? "equal" : "different", ["z"] = z,
                 };
                 if (!double.IsNaN(t.LevelElev)) row["dz"] = z - t.LevelElev;
                 rows.Add(row);
@@ -303,8 +303,8 @@ namespace Bimbridge.Engine.Geo
                     var dx = p.X - keep.X; var dy = p.Y - keep.Y; var dz = p.Z - keep.Z;
                     rows.Add(new Dictionary<string, object>
                     {
-                        ["id"] = p.Id, ["lvl"] = level.TryGetValue(p.Id, out var l) ? l : null, ["clase"] = "sobrante",
-                        ["igual_a"] = keep.Id, ["dist"] = Math.Sqrt(dx * dx + dy * dy + dz * dz),
+                        ["id"] = p.Id, ["lvl"] = level.TryGetValue(p.Id, out var l) ? l : null, ["class"] = "leftover",
+                        ["equal_to"] = keep.Id, ["dist"] = Math.Sqrt(dx * dx + dy * dy + dz * dz),
                     });
                 }
             }
@@ -318,10 +318,10 @@ namespace Bimbridge.Engine.Geo
             var rows = new List<Dictionary<string, object>>(targets.Count);
             foreach (var t in targets)
             {
-                var has = source == "espacios" ? t.Space != null : source == "cuartos" ? t.Room != null : (t.Room != null || t.Space != null);
-                var row = new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level, ["clase"] = has ? "con_cuarto" : "sin_cuarto" };
-                if (source != "espacios") row["cuarto"] = t.Room;
-                if (source != "cuartos") row["espacio"] = t.Space;
+                var has = source == "spaces" ? t.Space != null : source == "rooms" ? t.Room != null : (t.Room != null || t.Space != null);
+                var row = new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level, ["class"] = has ? "with_room" : "no_room" };
+                if (source != "spaces") row["room"] = t.Room;
+                if (source != "rooms") row["space"] = t.Space;
                 rows.Add(row);
             }
             return rows;
@@ -331,7 +331,7 @@ namespace Bimbridge.Engine.Geo
 
         /// <summary>
         /// For each plan view: fixtures on its level fall inside, above or below the range, or outside the crop;
-        /// those on other levels that fall inside the range are marked "ajena" (they will show in that view).
+        /// those on other levels that fall inside the range are marked "foreign" (they will show in that view).
         /// Those inside a plan region are marked en_region: the API does not expose its range.
         /// </summary>
         public static List<Dictionary<string, object>> ViewRange(IList<GeoTarget> targets, IList<GeoView> views)
@@ -344,13 +344,13 @@ namespace Bimbridge.Engine.Geo
                     var own = string.Equals(t.Level, v.Level, StringComparison.OrdinalIgnoreCase);
                     var cls = ViewBand.Classify(v.Ceiling, v.Cut, v.Top, v.Bottom, v.Depth, t.Box.MinZ, t.Box.MaxZ, out var low, out var high);
                     if (!own && cls != ViewBand.Inside) continue;
-                    if (!v.Crop.IsEmpty && !v.Crop.ContainsXY(t.Box.CenterX, t.Box.CenterY)) { if (!own) continue; cls = "fuera"; }
-                    else if (v.Regions.Any(r => r.ContainsXY(t.Box.CenterX, t.Box.CenterY))) cls = "en_region";
-                    else if (!own) cls = "ajena";
+                    if (!v.Crop.IsEmpty && !v.Crop.ContainsXY(t.Box.CenterX, t.Box.CenterY)) { if (!own) continue; cls = "outside"; }
+                    else if (v.Regions.Any(r => r.ContainsXY(t.Box.CenterX, t.Box.CenterY))) cls = "in_region";
+                    else if (!own) cls = "foreign";
                     rows.Add(new Dictionary<string, object>
                     {
-                        ["vista"] = v.Name, ["id"] = t.Id, ["lvl"] = t.Level, ["clase"] = cls,
-                        ["zbot"] = t.Box.MinZ, ["ztop"] = t.Box.MaxZ, ["bajo"] = low, ["alto"] = high,
+                        ["view"] = v.Name, ["id"] = t.Id, ["lvl"] = t.Level, ["class"] = cls,
+                        ["zbot"] = t.Box.MinZ, ["ztop"] = t.Box.MaxZ, ["low"] = low, ["high"] = high,
                     });
                 }
             }
@@ -407,14 +407,14 @@ namespace Bimbridge.Engine.Geo
                     {
                         rows.Add(new Dictionary<string, object>
                         {
-                            ["id"] = t.Id, ["lvl"] = t.Level, ["clase"] = "choque", ["contra"] = b.Label, ["prof"] = depth, ["metodo"] = "rayos",
+                            ["id"] = t.Id, ["lvl"] = t.Level, ["class"] = "clash", ["against"] = b.Label, ["prof"] = depth, ["method"] = "rays",
                         });
                         found = true;
                     }
                     else { exact.Add(new PairToCheck { Target = i, Body = c }); pending = true; }
                 }
                 if (!found && !pending)
-                    rows.Add(new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level, ["clase"] = "libre" });
+                    rows.Add(new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level, ["class"] = "free" });
             }
             return rows;
         }
@@ -454,18 +454,18 @@ namespace Bimbridge.Engine.Geo
                     if (e.Volume > minVolume)
                         Add(t.Id, new Dictionary<string, object>
                         {
-                            ["id"] = t.Id, ["lvl"] = t.Level, ["clase"] = "choque", ["contra"] = label, ["vol"] = e.Volume, ["metodo"] = "booleana",
-                            ["vol_parcial"] = e.Issues != ExactIssue.None,
+                            ["id"] = t.Id, ["lvl"] = t.Level, ["class"] = "clash", ["against"] = label, ["vol"] = e.Volume, ["method"] = "boolean_op",
+                            ["partial_vol"] = e.Issues != ExactIssue.None,
                         });
                     else if (e.Issues != ExactIssue.None)
-                        Add(t.Id, new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level, ["clase"] = "no_evaluable", ["contra"] = label });
+                        Add(t.Id, new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level, ["class"] = "not_evaluable", ["against"] = label });
                 }
             var rows = new List<Dictionary<string, object>>(targets.Count);
             for (var i = 0; i < targets.Count; i++)
             {
                 var t = targets[i];
                 byId.TryGetValue(t.Id, out var list);
-                var clashes = list?.Where(r => (string)r["clase"] == "choque").ToList() ?? new List<Dictionary<string, object>>();
+                var clashes = list?.Where(r => (string)r["class"] == "clash").ToList() ?? new List<Dictionary<string, object>>();
                 Dictionary<string, object> row;
                 if (clashes.Count > 0)
                 {
@@ -476,11 +476,11 @@ namespace Bimbridge.Engine.Geo
                 }
                 else
                 {
-                    var bad = list?.FirstOrDefault(r => (string)r["clase"] == "no_evaluable");
-                    row = bad ?? new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level, ["clase"] = "libre" };
+                    var bad = list?.FirstOrDefault(r => (string)r["class"] == "not_evaluable");
+                    row = bad ?? new Dictionary<string, object> { ["id"] = t.Id, ["lvl"] = t.Level, ["class"] = "free" };
                 }
                 var observed = exactByTarget[i];
-                if (observed.Any()) row["cobertura"] = ClashCoverage(observed, bodies, minVolume);
+                if (observed.Any()) row["coverage"] = ClashCoverage(observed, bodies, minVolume);
                 rows.Add(row);
             }
             return rows;
@@ -501,17 +501,17 @@ namespace Bimbridge.Engine.Geo
                 if (samples.Count >= 8) continue;
                 var body = bodies[e.Body];
                 var states = new List<object>();
-                if (e.Issues.HasFlag(ExactIssue.NoSolid)) states.Add("sin_solido");
-                if (e.Issues.HasFlag(ExactIssue.Extraction)) states.Add("extraccion_fallida");
-                if (e.Issues.HasFlag(ExactIssue.Transform)) states.Add("transformacion_fallida");
-                if (e.Issues.HasFlag(ExactIssue.Boolean)) states.Add("booleana_fallida");
-                if (states.Count == 0) states.Add("booleana_completa");
-                samples.Add(new Dictionary<string, object> { ["elemento_id"] = body.Id, ["vinculo_id"] = body.LinkId, ["estados"] = states });
+                if (e.Issues.HasFlag(ExactIssue.NoSolid)) states.Add("no_solid");
+                if (e.Issues.HasFlag(ExactIssue.Extraction)) states.Add("extraction_failed");
+                if (e.Issues.HasFlag(ExactIssue.Transform)) states.Add("transformation_failed");
+                if (e.Issues.HasFlag(ExactIssue.Boolean)) states.Add("boolean_failed");
+                if (states.Count == 0) states.Add("boolean_complete");
+                samples.Add(new Dictionary<string, object> { ["element_id"] = body.Id, ["link_id"] = body.LinkId, ["statuses"] = states });
             }
             return new Dictionary<string, object>
             {
-                ["pares_exactos"] = total, ["sin_resolver"] = unresolved, ["volumenes_parciales"] = partial,
-                ["completa"] = unresolved + partial == 0, ["muestra"] = samples,
+                ["exact_pairs"] = total, ["unresolved"] = unresolved, ["partial_volumes"] = partial,
+                ["full"] = unresolved + partial == 0, ["sample"] = samples,
             };
         }
 

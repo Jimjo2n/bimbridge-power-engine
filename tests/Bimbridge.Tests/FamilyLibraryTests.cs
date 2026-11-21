@@ -18,18 +18,18 @@ namespace Bimbridge.Tests
         public void ReloadChecksNamedPortsEvenWhenTheirTotalHasNotChanged()
         {
             Dictionary<string, object> Port(string key, string system, string flow, double radius) =>
-                new Dictionary<string, object> { ["clave"] = key, ["sistema"] = system, ["flujo"] = flow, ["radio_mm"] = radius };
+                new Dictionary<string, object> { ["key"] = key, ["system"] = system, ["workflow"] = flow, ["radius_mm"] = radius };
             var source = new List<Dictionary<string, object>>
             {
-                Port("fria", "DomesticColdWater", "entrada", 6.5),
-                Port("caliente", "DomesticHotWater", "entrada", 6.5),
-                Port("desague", "Sanitary", "salida", 20),
+                Port("cold", "DomesticColdWater", "in", 6.5),
+                Port("hot", "DomesticHotWater", "in", 6.5),
+                Port("drain", "Sanitary", "out", 20),
             };
             var project = (List<object>)Json.Parse(Json.Write(source.AsEnumerable().Reverse().ToList()));
             Assert.Empty(FamilyPortAudit.Compare(source, project));
-            project[0] = Port("desague", "DomesticColdWater", "entrada", 25);
+            project[0] = Port("drain", "DomesticColdWater", "in", 25);
             Assert.Collection(FamilyPortAudit.Compare(source, project),
-                row => Assert.Contains("sistema", row), row => Assert.Contains("flujo", row), row => Assert.Contains("radius", row));
+                row => Assert.Contains("system", row), row => Assert.Contains("workflow", row), row => Assert.Contains("radius", row));
             Assert.Contains("no placed instance", Assert.Single(FamilyPortAudit.Compare(source, null)));
         }
 
@@ -57,7 +57,7 @@ namespace Bimbridge.Tests
             Rfa(Path.Combine(root, "Lighting"), "LTG_STRIP LIGHT", 2026);
             Rfa(Path.Combine(root, "Lighting"), "LTG_STRIP LIGHT.0003", 2024);                 // backup copy: not indexed
             Rfa(Path.Combine(root, "Electrical", "Panels"), "EL_PANELBOARD", null);
-            var cache = Path.Combine(AH.NewDir("famcache"), "indice.json");
+            var cache = Path.Combine(AH.NewDir("famcache"), "index.json");
             var lib = new FamilyLibrary(new[] { root }, cache);
             var r = lib.Refresh();
             Assert.Equal(3, r.added);

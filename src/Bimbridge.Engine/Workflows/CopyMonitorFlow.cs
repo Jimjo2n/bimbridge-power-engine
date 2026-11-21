@@ -47,7 +47,7 @@ namespace Bimbridge.Engine.Workflows
         private static CopyMonitorExpectations Parse(ReceiptStore.Baseline b, string key)
         {
             if (string.IsNullOrEmpty(b.Expectations))
-                throw new InvalidDataException("attempt " + key + " was started without frozen expectations (older version): start a new attempt with another clave=");
+                throw new InvalidDataException("attempt " + key + " was started without frozen expectations (older version): start a new attempt with another key=");
             return CopyMonitorExpectations.FromText(b.Expectations);
         }
     }

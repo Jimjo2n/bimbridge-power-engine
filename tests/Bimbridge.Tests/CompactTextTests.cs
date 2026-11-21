@@ -44,15 +44,15 @@ namespace Bimbridge.Tests
         {
             var commands = Command.SplitLines("""
                 # comment with bracket [
-                chk tabla_audit tabla="Anda > 1?" celdas_esperadas=[
-                  {"fila":0,"columna":0,"texto":"A;;B \"C\""}
+                chk schedule_audit schedule="Anda > 1?" expected_cells=[
+                  {"row":0,"column":0,"text":"A;;B \"C\""}
                 ] ;; q LF elev>=9
                 """);
             Assert.Equal(2, commands.Count);
             var check = Command.Parse(commands[0]);
-            Assert.Equal("Anda > 1?", check.Args["tabla"]);
-            var cell = (Dictionary<string, object>)Assert.Single((List<object>)check.Args["celdas_esperadas"]);
-            Assert.Equal("A;;B \"C\"", cell["texto"]);
+            Assert.Equal("Anda > 1?", check.Args["schedule"]);
+            var cell = (Dictionary<string, object>)Assert.Single((List<object>)check.Args["expected_cells"]);
+            Assert.Equal("A;;B \"C\"", cell["text"]);
             Assert.Equal("elev>=9", Assert.Single(Command.Parse(commands[1]).Where));
         }
     }

@@ -17,8 +17,8 @@ namespace Bimbridge.Engine
         /// <summary>Active levels: R read, P plan, W write, D document.</summary>
         public string Levels = "R";
         /// <summary>
-        /// General C# runner (exec): "auto" = query with R and run with W (like every other change); "consulta" = query only;
-        /// "apagado" = no exec. Decided by the user or IT in config.json; the AI cannot change it.
+        /// General C# runner (exec): "auto" = query with R and run with W (like every other change); "query" = query only;
+        /// "off" = no exec. Decided by the user or IT in config.json; the AI cannot change it.
         /// </summary>
         public string Runner = "auto";
         public int SubBatchSize = 200;
@@ -48,12 +48,12 @@ namespace Bimbridge.Engine
         /// <summary>"Block C# code injection". Default false: exec allowed for authorized local agents.</summary>
         public bool BlockDynamicCode;
         /// <summary>
-        /// Issue #3: operations that change something require a named agent (config "identidad_obligatoria", default true).
+        /// Issue #3: operations that change something require a named agent (config "identity_required", default true).
         /// false only for legacy integrations that IT decides to tolerate; every anonymous operation is flagged in the journal (sin_nombre_modo_heredado).
         /// </summary>
         public bool IdentityRequired = true;
         /// <summary>
-        /// AUD-13: explicit user authorization (config "historial_compartido": true) for an agent to see in the history the
+        /// AUD-13: explicit user authorization (config "shared_history": true) for an agent to see in the history the
         /// operations of OTHER sessions and agents. Default false: each agent sees only its own.
         /// </summary>
         public bool SharedHistory;
@@ -62,9 +62,9 @@ namespace Bimbridge.Engine
         /// person clicks "Check GitHub"; "no": disabled (corporate networks that do not allow it). There is never an automatic connection.
         /// </summary>
         public string OnlineUpdate = "manual";
-        /// <summary>owner/name repository the releases are read from (config "repositorio_actualizacion").</summary>
+        /// <summary>owner/name repository the releases are read from (config "update_repo").</summary>
         public string UpdateRepo;
-        /// <summary>Accept prereleases in the online update (config "actualizacion_prerelease", default false).</summary>
+        /// <summary>Accept prereleases in the online update (config "update_prerelease", default false).</summary>
         public bool UpdatePrerelease;
         private HashSet<string> _perms;
         public HashSet<string> EffectivePermissions => _perms ?? (_perms = Permissions.Effective(PermissionList, Levels));
@@ -75,7 +75,7 @@ namespace Bimbridge.Engine
         public bool AllowsDocOps => Allows('D') || Allows('W');
 
         public bool AllowsExec(bool execute) =>
-            Runner != "apagado" && (execute ? Runner == "auto" && Allows('W') : Allows('R'));
+            Runner != "off" && (execute ? Runner == "auto" && Allows('W') : Allows('R'));
 
         public static string DefaultPath
         {
@@ -94,11 +94,11 @@ namespace Bimbridge.Engine
             if (!File.Exists(path)) return c;
             try
             {
-                var o = Json.ParseObject(File.ReadAllText(path));
+                var o = LegacyAliases.NormalizeConfig(Json.ParseObject(File.ReadAllText(path)));
                 c.Enabled = Arg.GetBool(o, "enabled") ?? c.Enabled;
                 c.Levels = (Arg.GetString(o, "levels") ?? c.Levels).ToUpperInvariant();
                 c.Runner = (Arg.GetString(o, "runner") ?? c.Runner).Trim().ToLowerInvariant();
-                if (c.Runner != "auto" && c.Runner != "consulta" && c.Runner != "apagado") c.Runner = "auto";
+                if (c.Runner != "auto" && c.Runner != "query" && c.Runner != "off") c.Runner = "auto";
                 c.SubBatchSize = Clamp(Arg.GetLong(o, "sub_batch"), c.SubBatchSize, 1, 5000);
                 c.MainThreadBudgetMs = Clamp(Arg.GetLong(o, "main_thread_budget_ms"), c.MainThreadBudgetMs, 20, 5000);
                 c.PlanExpiryMinutes = Clamp(Arg.GetLong(o, "plan_expiry_min"), c.PlanExpiryMinutes, 1, 240);
@@ -106,31 +106,31 @@ namespace Bimbridge.Engine
                 c.BusyAfterMs = Clamp(Arg.GetLong(o, "busy_after_ms"), c.BusyAfterMs, 500, 120000);
                 c.HeartbeatTimeoutMs = Clamp(Arg.GetLong(o, "heartbeat_timeout_ms"), c.HeartbeatTimeoutMs, 5000, 600000);
                 c.JournalDays = Clamp(Arg.GetLong(o, "journal_days"), c.JournalDays, 1, 365);
-                c.UpdateFolders = Arg.GetStringList(o, "carpetas_actualizacion");
-                c.FamilyFolders = Arg.GetStringList(o, "carpetas_familias");
-                c.UpdateKeys = Arg.GetStringList(o, "claves_actualizacion");
-                c.PermissionList = Arg.GetStringList(o, "permisos");
-                c.DocumentFolders = Arg.GetStringList(o, "carpetas_documentos");
+                c.UpdateFolders = Arg.GetStringList(o, "update_folders");
+                c.FamilyFolders = Arg.GetStringList(o, "family_folders");
+                c.UpdateKeys = Arg.GetStringList(o, "update_keys");
+                c.PermissionList = Arg.GetStringList(o, "permissions");
+                c.DocumentFolders = Arg.GetStringList(o, "document_folders");
                 c.BlockDynamicCode = Arg.GetBool(o, DynamicCodePolicy.ConfigKey) ?? false;
-                c.IdentityRequired = Arg.GetBool(o, "identidad_obligatoria") ?? true;
-                c.SharedHistory = Arg.GetBool(o, "historial_compartido") ?? false;
-                var online = (Arg.GetString(o, "actualizacion_online") ?? "manual").Trim().ToLowerInvariant();
+                c.IdentityRequired = Arg.GetBool(o, "identity_required") ?? true;
+                c.SharedHistory = Arg.GetBool(o, "shared_history") ?? false;
+                var online = (Arg.GetString(o, "online_update") ?? "manual").Trim().ToLowerInvariant();
                 c.OnlineUpdate = online == "no" ? "no" : "manual";
-                c.UpdateRepo = Arg.GetString(o, "repositorio_actualizacion");
-                c.UpdatePrerelease = Arg.GetBool(o, "actualizacion_prerelease") ?? false;
-                // 0.9.0: "power_engine": { "python": "C:\\…\\python.exe", "worker_python": "…\\run_worker.py", "rust_worker": "…exe", "geometria": "auto" }
+                c.UpdateRepo = Arg.GetString(o, "update_repo");
+                c.UpdatePrerelease = Arg.GetBool(o, "update_prerelease") ?? false;
+                // 0.9.0: "power_engine": { "python": "C:\\…\\python.exe", "worker_python": "…\\run_worker.py", "rust_worker": "…exe", "geometry": "auto" }
                 if (o.TryGetValue("power_engine", out var po) && po is Dictionary<string, object> pe)
                 {
                     c.PythonExe = Arg.GetString(pe, "python");
                     c.PythonWorkerScript = Arg.GetString(pe, "worker_python");
                     c.RustWorkerExe = Arg.GetString(pe, "rust_worker");
-                    var g = (Arg.GetString(pe, "geometria") ?? "auto").Trim().ToLowerInvariant();
+                    var g = (Arg.GetString(pe, "geometry") ?? "auto").Trim().ToLowerInvariant();
                     c.Geometry = g == "csharp" || g == "rust_ffi" || g == "rust_ipc" ? g : "auto";
                 }
-                // 0.9.0: profile. "laboratorio": { "carpetas": [...], "actualizacion_sin_firma": false }; "codigo_autorizado": ["sha256[@clave]"]
-                var lab = o.TryGetValue("laboratorio", out var lo) ? lo as Dictionary<string, object> : null;
-                c.Profile = ProfilePolicy.Parse(Arg.GetString(o, "perfil"), lab == null ? null : Arg.GetStringList(lab, "carpetas"),
-                    lab != null && (Arg.GetBool(lab, "actualizacion_sin_firma") ?? false), Arg.GetStringList(o, "codigo_autorizado"));
+                // 0.9.0: profile. "lab": { "folders": [...], "unsigned_updates": false }; "authorized_code": ["sha256[@key]"]
+                var lab = o.TryGetValue("lab", out var lo) ? lo as Dictionary<string, object> : null;
+                c.Profile = ProfilePolicy.Parse(Arg.GetString(o, "profile"), lab == null ? null : Arg.GetStringList(lab, "folders"),
+                    lab != null && (Arg.GetBool(lab, "unsigned_updates") ?? false), Arg.GetStringList(o, "authorized_code"));
             }
             catch (Exception ex)
             {
@@ -157,7 +157,7 @@ namespace Bimbridge.Engine
             ["plan_expiry_min"] = PlanExpiryMinutes,
             ["queue_wait_min"] = QueueWaitMinutes,
             ["busy_after_ms"] = BusyAfterMs,
-            ["perfil"] = Profile.Name,
+            ["profile"] = Profile.Name,
             [DynamicCodePolicy.ConfigKey] = BlockDynamicCode,
         };
     }

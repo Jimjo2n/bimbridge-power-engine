@@ -22,7 +22,7 @@ namespace Bimbridge.Protocol
     /// </summary>
     public sealed class ProfilePolicy
     {
-        public const string Production = "produccion", Lab = "laboratorio";
+        public const string Production = "production", Lab = "lab";
 
         public string Name = Production;
         /// <summary>Local lab folders (LAB profile). Empty = no document is a lab document.</summary>
@@ -110,19 +110,19 @@ namespace Bimbridge.Protocol
                 if (at < 0 ? a == sha : a.Substring(0, at) == sha && a.Substring(at + 1) == key) return null;
             }
             return "codigo_no_autorizado: in the production profile dynamic code only runs if the user authorized its SHA-256 (" + sha.Substring(0, Math.Min(16, sha.Length)) +
-                   "…) for this document in config.json (codigo_autorizado). Use a typed operation or ask the user for the authorization; do not try another way.";
+                   "…) for this document in config.json (authorized_code). Use a typed operation or ask the user for the authorization; do not try another way.";
         }
 
         /// <summary>Unsigned update packages: lab only, and only if the user enabled it. null = accepted (with confirmation).</summary>
         public string DenyUnsignedUpdate() =>
             IsLab && LabUnsignedUpdates ? null
-            : IsLab ? "perfil_laboratorio: unsigned packages are disabled (laboratorio.actualizacion_sin_firma=false)"
+            : IsLab ? "lab_profile: unsigned packages are disabled (lab.unsigned_updates=false)"
             : "perfil_produccion: only packages signed by a trusted key are installed (cryptographic provenance required)";
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["perfil"] = Name, ["carpetas_laboratorio"] = LabFolders.Cast<object>().ToList(), ["actualizacion_sin_firma"] = LabUnsignedUpdates,
-            ["codigo_autorizado"] = (long)AuthorizedCode.Count,
+            ["profile"] = Name, ["lab_folders"] = LabFolders.Cast<object>().ToList(), ["unsigned_update"] = LabUnsignedUpdates,
+            ["authorized_code"] = (long)AuthorizedCode.Count,
         };
     }
 

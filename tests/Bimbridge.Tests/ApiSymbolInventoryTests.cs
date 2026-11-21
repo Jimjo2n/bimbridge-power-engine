@@ -38,11 +38,11 @@ namespace Bimbridge.Tests
         {
             var raw = Raw(year);
             using var sum = JsonDocument.Parse(File.ReadAllText(Path.Combine(Inv(), "revit-symbols-summary.json")));
-            var v = sum.RootElement.GetProperty("versiones").EnumerateArray().Single(x => x.GetProperty("revit").GetInt32() == year);
+            var v = sum.RootElement.GetProperty("versions").EnumerateArray().Single(x => x.GetProperty("revit").GetInt32() == year);
             using (var sha = SHA256.Create())
-                Assert.Equal(v.GetProperty("simbolos_sha256").GetString(), BitConverter.ToString(sha.ComputeHash(raw)).Replace("-", "").ToLowerInvariant());
+                Assert.Equal(v.GetProperty("symbols_sha256").GetString(), BitConverter.ToString(sha.ComputeHash(raw)).Replace("-", "").ToLowerInvariant());
             var lines = Encoding.UTF8.GetString(raw).Split('\n').Where(l => l.Length > 0).ToList();
-            Assert.Equal(v.GetProperty("simbolos").GetInt32(), lines.Count);
+            Assert.Equal(v.GetProperty("symbols").GetInt32(), lines.Count);
             Assert.Equal(lines.OrderBy(l => l, StringComparer.Ordinal), lines);
             Assert.Equal(lines.Count, lines.Select(l => string.Join("|", l.Split('|').Take(3))).Distinct().Count());
             Assert.Contains(lines, l => l.StartsWith("RevitAPI|M|Autodesk.Revit.DB.Wall::Create(Autodesk.Revit.DB.Document,Autodesk.Revit.DB.Curve,Autodesk.Revit.DB.ElementId,Autodesk.Revit.DB.ElementId,Double,Double,Boolean,Boolean)|ret=Autodesk.Revit.DB.Wall|static", StringComparison.Ordinal));

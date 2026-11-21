@@ -67,7 +67,7 @@ namespace Bimbridge.Engine.Tasks
                         return new StartResult
                         {
                             Error = "task " + draft.Id + " already exists with other content (different recipe, arguments or document: " + existing.ContentHash + " ≠ " + draft.ContentHash +
-                                    "). Use another id, or tarea reanudar " + draft.Id + " to continue the existing one as is.",
+                                    "). Use another id, or task resume " + draft.Id + " to continue the existing one as is.",
                             ErrorStatus = Status.Invalid,
                         };
                     var running = _running.ContainsKey(draft.Id);
@@ -91,7 +91,7 @@ namespace Bimbridge.Engine.Tasks
             {
                 if (_running.TryGetValue(id, out var r)) return new StartResult { Task = r.Task_, AlreadyRunning = true };
                 var t = _store.Load(id);
-                if (t == null) return new StartResult { Error = "task " + id + " does not exist (tarea lista)", ErrorStatus = Status.Invalid };
+                if (t == null) return new StartResult { Error = "task " + id + " does not exist (task list)", ErrorStatus = Status.Invalid };
                 if (t.State == TaskState.Applied)
                     return new StartResult { Task = t };
                 var elsewhere = HeldElsewhere(id);
@@ -113,7 +113,7 @@ namespace Bimbridge.Engine.Tasks
             var runner = new TaskRunner(_store, backend, t, "inst:" + _instance, _instance, Changed)
             {
                 BudgetMs = BudgetMs, Authority = Authority, Audit = Audit,
-                DocLeases = DocLeases ?? new TaskStore(_store.Root.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar) + "_documentos"),
+                DocLeases = DocLeases ?? new TaskStore(_store.Root.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar) + "_documents"),
             };
             if (Delay != null) runner.Delay = Delay;
             if (MaxWait.HasValue) runner.MaxWait = MaxWait.Value;
@@ -155,7 +155,7 @@ namespace Bimbridge.Engine.Tasks
         }
 
         /// <summary>
-        /// Cooperative cancellation: stays "cancelacion_solicitada" until the engine confirms it between batches.
+        /// Cooperative cancellation: stays "cancellation_requested" until the engine confirms it between batches.
         /// <paramref name="busy"/> says why it was not cancelled if another Revit holds it (the task is returned unchanged).
         /// </summary>
         public TaskRecord Cancel(string id, out string busy)
@@ -186,7 +186,7 @@ namespace Bimbridge.Engine.Tasks
             }
         }
 
-        /// <summary>Current state: the engine's if it runs here; otherwise the one on disk (with "interrumpida" if its engine died).</summary>
+        /// <summary>Current state: the engine's if it runs here; otherwise the one on disk (with "interrupted" if its engine died).</summary>
         public TaskRecord Get(string id, out UnitLog units)
         {
             lock (_lock)
@@ -202,7 +202,7 @@ namespace Bimbridge.Engine.Tasks
                 {
                     // Nobody is running it: the process that held it died or Revit was closed.
                     t.State = TaskState.Interrupted;
-                    t.Reason = "the engine that was running it is gone (Revit was closed or restarted); tarea reanudar verifies what is doubtful and continues";
+                    t.Reason = "the engine that was running it is gone (Revit was closed or restarted); task resume verifies what is doubtful and continues";
                 }
             }
             return t;
@@ -249,7 +249,7 @@ namespace Bimbridge.Engine.Tasks
         /// Reconciliation with explicit transitions (R05):
         /// - only DOUBTFUL units (en_curso, parcial, desconocida). A committed/skipped unit never goes back to pending this way
         ///   (extraordinary procedure: a new task the user decides on);
-        /// - "aplicada" requires evidence (nota); "not applied" causes it to run again, so it also requires the
+        /// - "applied" requires evidence (nota); "not applied" causes it to run again, so it also requires the
         ///   reconciliar_no_aplicada grant from a person for THIS task and document;
         /// - a finished task (aplicada, aplicada_con_diferencias, cancelada) is not reopened;
         /// - nothing is deleted: each decision is a new event with the previous state.
@@ -263,8 +263,8 @@ namespace Bimbridge.Engine.Tasks
                 if (elsewhere != null) return elsewhere;
                 var t = _store.Load(id);
                 if (t == null) return "task " + id + " does not exist";
-                if (TaskState.IsFinal(t.State)) return "transicion_ilegal: the task is " + t.State + " and is not reopened; start a new task if needed";
-                if (string.IsNullOrWhiteSpace(note)) return "evidencia_requerida: state in nota= what was checked in the model (ids, values) to decide";
+                if (TaskState.IsFinal(t.State)) return "illegal_transition: the task is " + t.State + " and is not reopened; start a new task if needed";
+                if (string.IsNullOrWhiteSpace(note)) return "evidence_required: state in note= what was checked in the model (ids, values) to decide";
                 var units = _store.LoadUnits(id);
                 var targets = keys != null && keys.Count > 0
                     ? keys.ToList()
@@ -273,13 +273,13 @@ namespace Bimbridge.Engine.Tasks
                 if (unknown.Count > 0) return "units that do not exist in the task: " + string.Join(", ", unknown.Take(10));
                 var illegal = targets.Where(k => !UnitState.NeedsReconcile(units.Get(k).State)).ToList();
                 if (illegal.Count > 0)
-                    return "transicion_ilegal: only doubtful units are reconciled (en_curso, parcial, desconocida); " +
+                    return "illegal_transition: only doubtful units are reconciled (running, partial, unknown); " +
                            string.Join(", ", illegal.Take(10).Select(k => k + "=" + units.Get(k).State)) +
                            (illegal.Any(k => UnitState.IsDone(units.Get(k).State)) ? ". A committed unit is not run again." : "");
                 if (!applied)
                 {
                     var why = (Authority == null ? "no authority configured" : Authority.Check(t, Capability.ReconcileNotApplied, DateTime.UtcNow));
-                    if (why != null) return "autorizacion_requerida: marking as not applied will make it run again; " + why;
+                    if (why != null) return "authorization_required: marking as not applied will make it run again; " + why;
                 }
                 foreach (var k in targets)
                 {
@@ -287,16 +287,16 @@ namespace Bimbridge.Engine.Tasks
                     if (applied) seq = ++t.ConfirmSeq;
                     _store.AppendUnitEvent(id, new Dictionary<string, object>
                     {
-                        ["ev"] = "reconciliada", ["clave"] = k, ["estado"] = applied ? UnitState.Committed : UnitState.Pending, ["seq"] = seq,
-                        ["antes"] = units.Get(k).State, ["quien"] = who, ["evidencia"] = note,
+                        ["ev"] = "reconciled", ["key"] = k, ["status"] = applied ? UnitState.Committed : UnitState.Pending, ["seq"] = seq,
+                        ["before"] = units.Get(k).State, ["who"] = who, ["evidence"] = note,
                         ["error"] = (applied ? "reconciled as applied" : "reconciled as not applied") + ": " + note + " (" + who + ")",
                     });
                 }
                 t.Decisions.Add(new Dictionary<string, object>
                 {
-                    ["t"] = TaskTime.Now(), ["texto"] = "reconciled " + targets.Count + " units as " + (applied ? "applied" : "not applied") + ": " + note, ["quien"] = who,
+                    ["t"] = TaskTime.Now(), ["text"] = "reconciled " + targets.Count + " units as " + (applied ? "applied" : "not applied") + ": " + note, ["who"] = who,
                 });
-                if (t.State == TaskState.Interrupted || t.State == TaskState.Partial) t.Reason = "reconciled; use tarea reanudar";
+                if (t.State == TaskState.Interrupted || t.State == TaskState.Partial) t.Reason = "reconciled; use task resume";
                 t.Rev++;
                 t.Summary = TaskSummary.Continuation(t, _store.LoadUnits(id));
                 _store.Save(t);
@@ -319,7 +319,7 @@ namespace Bimbridge.Engine.Tasks
                     t = _store.Load(id);
                 }
                 if (t == null) return "task " + id + " does not exist";
-                lock (t) t.Decisions.Add(new Dictionary<string, object> { ["t"] = TaskTime.Now(), ["texto"] = text, ["quien"] = who });
+                lock (t) t.Decisions.Add(new Dictionary<string, object> { ["t"] = TaskTime.Now(), ["text"] = text, ["who"] = who });
                 if (!_running.ContainsKey(id)) { t.Rev++; _store.Save(t); }
                 Changed(t);
                 return null;
@@ -377,7 +377,7 @@ namespace Bimbridge.Engine.Tasks
                     lock (t)
                     {
                         d.Key = newKey;
-                        t.Decisions.Add(new Dictionary<string, object> { ["t"] = TaskTime.Now(), ["texto"] = "the document was saved as " + newKey + " (formerly " + oldKey + "); the task continues in the new one", ["quien"] = "revit" });
+                        t.Decisions.Add(new Dictionary<string, object> { ["t"] = TaskTime.Now(), ["text"] = "the document was saved as " + newKey + " (formerly " + oldKey + "); the task continues in the new one", ["who"] = "revit" });
                     }
                     changed.Add(t);
                     n++;
@@ -387,7 +387,7 @@ namespace Bimbridge.Engine.Tasks
                     var d = t.Docs.FirstOrDefault(x => x.Key == oldKey);
                     if (d == null) continue;
                     d.Key = newKey;
-                    t.Decisions.Add(new Dictionary<string, object> { ["t"] = TaskTime.Now(), ["texto"] = "the document was saved as " + newKey + " (formerly " + oldKey + ")", ["quien"] = "revit" });
+                    t.Decisions.Add(new Dictionary<string, object> { ["t"] = TaskTime.Now(), ["text"] = "the document was saved as " + newKey + " (formerly " + oldKey + ")", ["who"] = "revit" });
                     t.Rev++;
                     _store.Save(t);
                     changed.Add(t);

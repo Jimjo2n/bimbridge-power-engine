@@ -17,21 +17,23 @@ namespace Bimbridge.Bridge
     {
         public const string Instructions =
             "Tools to read and, if the user enabled it, change the open Revit model. Start with revit_context and catalog. " +
-            "Use query with group_by or count for summaries and request rows only when needed; several reads at once with lote. " +
+            "Use query with group_by or count for summaries and request rows only when needed; several reads at once with batch. " +
             "Save results with save_as and reuse them with ids=$name instead of repeating ids. " +
-            "To see a view use capture (colorear=categorias tells lighting fixtures apart from receptacles and switches); to point elements out to the user, show. " +
+            "To see a view use capture (color_by=categories tells lighting fixtures apart from receptacles and switches); to point elements out to the user, show. " +
             "To change something: plan → commit (typed, one Undo), exec (C# against the Revit API) or fam/doc_op (families, connectors, save, sync, PDF). " +
-            "If the user authorized the task, apply without asking for confirmation per batch; otherwise show the diff before the commit. clave= avoids repeating a write. " +
-            "estado=retenido means the change is waiting in the Revit queue for the user to apply it: do not repeat it. " +
-            "If a response has 'estado', read 'aviso' and follow it. Details for any tool: guide.";
+            "If the user authorized the task, apply without asking for confirmation per batch; otherwise show the diff before the commit. key= avoids repeating a write. " +
+            "status=held means the change is waiting in the Revit queue for the user to apply it: do not repeat it. " +
+            "If a response has 'status', read 'warning' and follow it. Details for any tool: guide.";
 
         /// <summary>
         /// Profile: compact (default: 3 tools, one-line commands, compact text responses) or full
-        /// (14 tools with JSON). BIMBRIDGE_PROFILE=completo or the --completo argument.
+        /// (14 tools with JSON). BIMBRIDGE_PROFILE=complete or the --complete argument (the legacy switch is still accepted).
         /// </summary>
         public static bool Full =>
-            string.Equals(System.Environment.GetEnvironmentVariable("BIMBRIDGE_PROFILE"), "completo", System.StringComparison.OrdinalIgnoreCase)
-            || System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--completo") >= 0;
+            string.Equals(System.Environment.GetEnvironmentVariable("BIMBRIDGE_PROFILE"), "complete", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(Bimbridge.Protocol.LegacyAliases.Token(System.Environment.GetEnvironmentVariable("BIMBRIDGE_PROFILE")), "complete", System.StringComparison.OrdinalIgnoreCase)
+            || System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--complete") >= 0
+            || System.Array.IndexOf(System.Environment.GetCommandLineArgs(), Bimbridge.Protocol.LegacyAliases.FullProfileSwitch) >= 0;
 
         /// <summary>Bridge version (the assembly's, same as the installer's).</summary>
         public static readonly string Version = VersionOf(typeof(Program).Assembly);
@@ -69,7 +71,9 @@ namespace Bimbridge.Bridge
                     o.ServerInfo = new ModelContextProtocol.Protocol.Implementation { Name = "BIMBRIDGE - Power Engine", Version = Version };
                     o.ServerInstructions = full ? Instructions : CompactTools.Instructions;
                 })
-                .WithStdioServerTransport();
+                .WithStdioServerTransport()
+                // Legacy (0.9.3) tool argument names are renamed before binding. Remove after 0.9.5.
+                .WithRequestFilters(f => f.AddCallToolFilter(next => (ctx, ct) => { LegacyToolArgs.Normalize(ctx.Params); return next(ctx, ct); }));
             if (full) mcp.WithTools<RevitTools>(); else mcp.WithTools<CompactTools>().WithTools<PowerTools>();
 
             await builder.Build().RunAsync();

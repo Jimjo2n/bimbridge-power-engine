@@ -11,7 +11,7 @@ namespace Bimbridge.Tests
     /// <summary>alpha3 P1-C: ChainLog.Open validates in streaming mode with bounded memory, without losing corruption detection.</summary>
     public class ChainLogStreamingTests
     {
-        private static string NewPath() { var d = Path.Combine(Path.GetTempPath(), "bimbridge-chain-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(d); return Path.Combine(d, "diario.jsonl"); }
+        private static string NewPath() { var d = Path.Combine(Path.GetTempPath(), "bimbridge-chain-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(d); return Path.Combine(d, "journal.jsonl"); }
 
         [Fact]
         public void LargeJournal_StreamsWithBoundedMemory()
@@ -44,7 +44,7 @@ namespace Bimbridge.Tests
             var d1 = new List<Diagnostic>();
             var l1 = ChainLog.Open(path, true, _ => true, d1, "t");
             Assert.False(Diagnostic.AnyError(d1));
-            Assert.Contains(d1, d => d.Code == "t_linea_final_truncada");
+            Assert.Contains(d1, d => d.Code == "t_truncated_last_line");
             Assert.Equal(5, l1.LastSeq);
             Assert.EndsWith("\n", File.ReadAllText(path));
 
@@ -53,7 +53,7 @@ namespace Bimbridge.Tests
             File.WriteAllText(path, string.Join("\n", lines) + "\n");
             var d2 = new List<Diagnostic>(); var got = 0;
             ChainLog.Open(path, true, _ => { got++; return true; }, d2, "t");
-            Assert.Contains(d2, d => d.Code == "t_hash_invalido");
+            Assert.Contains(d2, d => d.Code == "t_invalid_hash");
             Assert.Equal(2, got);
         }
     }

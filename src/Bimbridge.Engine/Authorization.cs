@@ -30,18 +30,18 @@ namespace Bimbridge.Engine
     public static class Capability
     {
         /// <summary>Modify the model (recipe transactions).</summary>
-        public const string Modify = "revit_modificar";
-        public const string Save = "revit_guardar";
+        public const string Modify = "revit_modify";
+        public const string Save = "revit_save";
         public const string Sync = "revit_sync";
-        public const string Export = "revit_exportar";
-        public const string FileWrite = "archivo_escritura";
+        public const string Export = "revit_export";
+        public const string FileWrite = "write_file";
         /// <summary>Reconcile a doubtful unit as NOT applied (causes it to run again).</summary>
-        public const string ReconcileNotApplied = "reconciliar_no_aplicada";
+        public const string ReconcileNotApplied = "reconcile_not_applied";
         /// <summary>Autonomously run a recipe that is NOT one of the installed ones (user file, inline codigo=, saved script).
         /// The grant binds task + document, and the task binds the recipe's exact SHA-256 (content fingerprint): approving means approving THAT code.</summary>
-        public const string ExternalRecipe = "receta_externa";
+        public const string ExternalRecipe = "external_recipe";
         /// <summary>DLL references outside the trusted list.</summary>
-        public const string ExternalReference = "referencia_externa";
+        public const string ExternalReference = "external_reference";
 
         /// <summary>The only things that run without a grant: model reads and the task's own artifacts.</summary>
         public static readonly string[] LowRisk = { };
@@ -52,7 +52,7 @@ namespace Bimbridge.Engine
         {
             switch (barrier)
             {
-                case "guardar": return Save;
+                case "save": return Save;
                 case "sync": return Sync;
                 case "pdf": return Export;
                 default: return Export; // barriers declared by the recipe produce files outside the model
@@ -80,21 +80,21 @@ namespace Bimbridge.Engine
         {
             var d = new Dictionary<string, object>
             {
-                ["id"] = Id, ["tarea"] = Task, ["doc"] = DocKey, ["huella_doc"] = DocPrint ?? "",
-                ["capacidades"] = Capabilities.OrderBy(x => x, StringComparer.Ordinal).Cast<object>().ToList(),
-                ["ambito"] = Scope.Cast<object>().ToList(),
-                ["creada"] = Created, ["vence"] = Expires, ["aprobada_por"] = ApprovedBy, ["revocada"] = Revoked ?? "",
+                ["id"] = Id, ["task"] = Task, ["doc"] = DocKey, ["doc_fingerprint"] = DocPrint ?? "",
+                ["capabilities"] = Capabilities.OrderBy(x => x, StringComparer.Ordinal).Cast<object>().ToList(),
+                ["scope"] = Scope.Cast<object>().ToList(),
+                ["created"] = Created, ["expires"] = Expires, ["approved_by"] = ApprovedBy, ["revoked"] = Revoked ?? "",
             };
-            if (withSignature) d["firma"] = Signature;
+            if (withSignature) d["signature"] = Signature;
             return d;
         }
 
         public static Grant FromJson(Dictionary<string, object> o) => new Grant
         {
-            Id = Arg.GetString(o, "id"), Task = Arg.GetString(o, "tarea"), DocKey = Arg.GetString(o, "doc"), DocPrint = Arg.GetString(o, "huella_doc"),
-            Capabilities = Arg.GetStringList(o, "capacidades").ToList(), Scope = Arg.GetStringList(o, "ambito").ToList(),
-            Created = Arg.GetString(o, "creada"), Expires = Arg.GetString(o, "vence"), ApprovedBy = Arg.GetString(o, "aprobada_por"),
-            Revoked = string.IsNullOrEmpty(Arg.GetString(o, "revocada")) ? null : Arg.GetString(o, "revocada"), Signature = Arg.GetString(o, "firma"),
+            Id = Arg.GetString(o, "id"), Task = Arg.GetString(o, "task"), DocKey = Arg.GetString(o, "doc"), DocPrint = Arg.GetString(o, "doc_fingerprint"),
+            Capabilities = Arg.GetStringList(o, "capabilities").ToList(), Scope = Arg.GetStringList(o, "scope").ToList(),
+            Created = Arg.GetString(o, "created"), Expires = Arg.GetString(o, "expires"), ApprovedBy = Arg.GetString(o, "approved_by"),
+            Revoked = string.IsNullOrEmpty(Arg.GetString(o, "revoked")) ? null : Arg.GetString(o, "revoked"), Signature = Arg.GetString(o, "signature"),
         };
 
         public bool ValidAt(DateTime now) =>
@@ -108,20 +108,22 @@ namespace Bimbridge.Engine
         public List<string> Capabilities = new List<string>();
     }
 
-    /// <summary>Grant store (%LOCALAPPDATA%\Bimbridge\autorizaciones). Only <see cref="Approve"/>/<see cref="Revoke"/> write,
+    /// <summary>Grant store (%LOCALAPPDATA%\Bimbridge\authorizations). Only <see cref="Approve"/>/<see cref="Revoke"/> write,
     /// which the add-in calls from a Revit dialog answered by a person.</summary>
     public sealed class GrantStore
     {
         private readonly string _dir;
         private readonly byte[] _key;
+        private readonly string _requests;
         private readonly object _lock = new object();
 
         public GrantStore(string dir = null)
         {
-            _dir = dir ?? Home.Sub("autorizaciones");
+            _dir = dir ?? Home.Sub("authorizations");
             Directory.CreateDirectory(_dir);
-            Directory.CreateDirectory(Path.Combine(_dir, "solicitudes"));
-            _key = LoadOrCreateKey(Path.Combine(_dir, "clave.bin"));
+            _requests = LegacyAliases.ResolveExisting(_dir, Path.Combine(_dir, "requests"));
+            Directory.CreateDirectory(_requests);
+            _key = LoadOrCreateKey(LegacyAliases.ResolveExisting(_dir, Path.Combine(_dir, "key.bin")));
         }
 
         public string Dir => _dir;
@@ -231,10 +233,12 @@ namespace Bimbridge.Engine
             return key;
         }
 
-        private string Sign(Grant g)
+        private string Sign(Grant g) => Hmac(g.ToJson(withSignature: false));
+
+        private string Hmac(IDictionary<string, object> unsigned)
         {
             using (var h = new HMACSHA256(_key))
-                return BitConverter.ToString(h.ComputeHash(Encoding.UTF8.GetBytes(OpSemantics.Canonical(g.ToJson(withSignature: false))))).Replace("-", "").ToLowerInvariant();
+                return BitConverter.ToString(h.ComputeHash(Encoding.UTF8.GetBytes(OpSemantics.Canonical(unsigned)))).Replace("-", "").ToLowerInvariant();
         }
 
         private string GrantPath(string id) => Path.Combine(_dir, "c_" + id + ".json");
@@ -260,7 +264,7 @@ namespace Bimbridge.Engine
         {
             lock (_lock)
             {
-                var g = Load(GrantPath(grantId));
+                var g = Load(GrantPath(grantId), out _);
                 if (g == null) return false;
                 g.Revoked = now.ToString("o", CultureInfo.InvariantCulture);
                 g.Signature = Sign(g);
@@ -271,9 +275,24 @@ namespace Bimbridge.Engine
 
         public int RevokeTask(string task, DateTime now) => All().Where(g => g.Task == task && g.Revoked == null).Count(g => Revoke(g.Id, now));
 
-        private Grant Load(string path)
+        /// <summary>
+        /// Reads a grant. The signature is checked over the record AS STORED (grants signed by 0.9.3 and earlier carry legacy key names and
+        /// capability names); only then is it normalized to the current vocabulary.
+        /// </summary>
+        private Grant Load(string path, out bool validSignature)
         {
-            try { return Grant.FromJson(Json.ParseObject(File.ReadAllText(path))); }
+            validSignature = false;
+            try
+            {
+                var stored = Json.ParseObject(File.ReadAllText(path));
+                var sigKey = stored.Keys.FirstOrDefault(k => LegacyAliases.Token(k) == "signature");
+                var sig = sigKey == null ? null : Arg.GetString(stored, sigKey);
+                var unsigned = stored.Where(kv => kv.Key != sigKey).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+                validSignature = sig != null && FixedTimeEquals(sig, Hmac(unsigned));
+                var g = Grant.FromJson(LegacyAliases.NormalizeRecord(stored));
+                g.Capabilities = g.Capabilities.Select(LegacyAliases.Token).ToList();
+                return g;
+            }
             catch (Exception ex) when (ex is IOException || ex is FormatException || ex is UnauthorizedAccessException) { return null; }
         }
 
@@ -283,8 +302,8 @@ namespace Bimbridge.Engine
             var res = new List<Grant>();
             foreach (var f in Directory.GetFiles(_dir, "c_*.json"))
             {
-                var g = Load(f);
-                if (g != null && g.Signature != null && FixedTimeEquals(g.Signature, Sign(g))) res.Add(g);
+                var g = Load(f, out var valid);
+                if (g != null && valid) res.Add(g);
             }
             return res;
         }
@@ -328,10 +347,10 @@ namespace Bimbridge.Engine
                 Task = task, DocKey = docKey, DocPrint = docPrint, DocTitle = docTitle, Client = client, Objective = objective,
                 Created = now.ToString("o", CultureInfo.InvariantCulture), Capabilities = caps.Distinct().ToList(),
             };
-            Home.WriteAtomic(Path.Combine(_dir, "solicitudes", r.Id + ".json"), Json.Write(new Dictionary<string, object>
+            Home.WriteAtomic(Path.Combine(_requests, r.Id + ".json"), Json.Write(new Dictionary<string, object>
             {
-                ["id"] = r.Id, ["tarea"] = task, ["doc"] = docKey, ["huella_doc"] = docPrint ?? "", ["titulo"] = docTitle, ["cliente"] = client,
-                ["objetivo"] = objective, ["creada"] = r.Created, ["capacidades"] = r.Capabilities.Cast<object>().ToList(),
+                ["id"] = r.Id, ["task"] = task, ["doc"] = docKey, ["doc_fingerprint"] = docPrint ?? "", ["title"] = docTitle, ["client"] = client,
+                ["target"] = objective, ["created"] = r.Created, ["capabilities"] = r.Capabilities.Cast<object>().ToList(),
             }));
             return r;
         }
@@ -339,16 +358,16 @@ namespace Bimbridge.Engine
         public List<GrantRequest> PendingRequests()
         {
             var res = new List<GrantRequest>();
-            foreach (var f in Directory.GetFiles(Path.Combine(_dir, "solicitudes"), "*.json"))
+            foreach (var f in Directory.GetFiles(_requests, "*.json"))
             {
                 try
                 {
-                    var o = Json.ParseObject(File.ReadAllText(f));
+                    var o = LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(f)));
                     res.Add(new GrantRequest
                     {
-                        Id = Arg.GetString(o, "id"), Task = Arg.GetString(o, "tarea"), DocKey = Arg.GetString(o, "doc"), DocPrint = Arg.GetString(o, "huella_doc"),
-                        DocTitle = Arg.GetString(o, "titulo"), Client = Arg.GetString(o, "cliente"), Objective = Arg.GetString(o, "objetivo"),
-                        Created = Arg.GetString(o, "creada"), Capabilities = Arg.GetStringList(o, "capacidades").ToList(),
+                        Id = Arg.GetString(o, "id"), Task = Arg.GetString(o, "task"), DocKey = Arg.GetString(o, "doc"), DocPrint = Arg.GetString(o, "doc_fingerprint"),
+                        DocTitle = Arg.GetString(o, "title"), Client = Arg.GetString(o, "client"), Objective = Arg.GetString(o, "target"),
+                        Created = Arg.GetString(o, "created"), Capabilities = Arg.GetStringList(o, "capabilities").Select(LegacyAliases.Token).ToList(),
                     });
                 }
                 catch (Exception ex) when (ex is IOException || ex is FormatException) { }
@@ -358,7 +377,7 @@ namespace Bimbridge.Engine
 
         public void CloseRequest(string id)
         {
-            try { File.Delete(Path.Combine(_dir, "solicitudes", id + ".json")); } catch (IOException) { }
+            try { File.Delete(Path.Combine(_requests, id + ".json")); } catch (IOException) { }
         }
     }
 

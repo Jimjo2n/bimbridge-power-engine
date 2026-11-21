@@ -91,7 +91,7 @@ namespace Bimbridge.Tests
             Assert.Equal(SnapshotLookup.Ok, store.Get(id, "s1", "d1", out _));
             Assert.Equal(SnapshotLookup.Unknown, store.Get(id, "s2", null, out _));          // another session: nothing is revealed
             Assert.Equal(SnapshotLookup.OtherDocument, store.Get(id, "s1", "d2", out _));    // another document
-            Assert.Equal(SnapshotLookup.Unknown, store.Get("qnoexiste", "s1", null, out _));
+            Assert.Equal(SnapshotLookup.Unknown, store.Get("qdoesnotexist", "s1", null, out _));
 
             rev = 8;                                                                          // the model changed
             Assert.Equal(SnapshotLookup.Stale, store.Get(id, "s1", null, out _));
@@ -248,8 +248,8 @@ namespace Bimbridge.Tests
         }
 
         [Theory]
-        [InlineData("documento")]
-        [InlineData("sesion")]
+        [InlineData("document")]
+        [InlineData("session")]
         public void Get_RevalidatesAfterLiveRev_ConcurrentDropIsNeverServed(string drop)
         {
             // AUD-02: LiveRev is evaluated outside the lock. A barrier stops it there while another thread discards the snapshot:
@@ -269,12 +269,12 @@ namespace Bimbridge.Tests
                 var reader = new System.Threading.Thread(() => result = store.Get(id, "s1", "d1", out served));
                 reader.Start();
                 Assert.True(inLiveRev.Wait(10000));
-                if (drop == "documento") store.DropDocument("d1"); else store.DropSession("s1");
+                if (drop == "document") store.DropDocument("d1"); else store.DropSession("s1");
                 release.Set();
                 Assert.True(reader.Join(10000));
                 Assert.NotEqual(SnapshotLookup.Ok, result);
                 Assert.Null(served);
-                Assert.Equal(drop == "documento" ? SnapshotLookup.Evicted : SnapshotLookup.Unknown, result);
+                Assert.Equal(drop == "document" ? SnapshotLookup.Evicted : SnapshotLookup.Unknown, result);
                 block = false;
                 Assert.Equal(0, store.Count);
                 Assert.Equal(0, store.EstimatedBytes);

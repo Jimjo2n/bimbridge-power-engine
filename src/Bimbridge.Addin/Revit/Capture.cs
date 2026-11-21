@@ -42,7 +42,7 @@ namespace Bimbridge.Addin.Revit
         public readonly Dictionary<string, object> Info = new Dictionary<string, object>();
         private readonly List<string> _notes = new List<string>();
 
-        public static string Folder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bimbridge", "capturas");
+        public static string Folder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bimbridge", "captures");
 
         // Palette meant to tell apart what is most often confused on electrical plans (fixtures vs. receptacles vs. switches).
         private static readonly Dictionary<BuiltInCategory, (byte r, byte g, byte b, string name)> Palette = new Dictionary<BuiltInCategory, (byte, byte, byte, string)>
@@ -74,12 +74,12 @@ namespace Bimbridge.Addin.Revit
 
         public static readonly Dictionary<string, (byte r, byte g, byte b)> Named = new Dictionary<string, (byte, byte, byte)>(StringComparer.OrdinalIgnoreCase)
         {
-            ["rojo"] = (230, 0, 0), ["verde"] = (0, 170, 0), ["azul"] = (0, 90, 255), ["naranja"] = (255, 140, 0),
-            ["magenta"] = (230, 0, 230), ["cian"] = (0, 190, 210), ["amarillo"] = (240, 200, 0), ["violeta"] = (128, 0, 255),
-            ["negro"] = (0, 0, 0), ["rosa"] = (255, 0, 128), ["marron"] = (140, 90, 40), ["marrón"] = (140, 90, 40), ["gris"] = (110, 110, 110),
+            ["red"] = (230, 0, 0), ["green"] = (0, 170, 0), ["blue"] = (0, 90, 255), ["orange"] = (255, 140, 0),
+            ["magenta"] = (230, 0, 230), ["cyan"] = (0, 190, 210), ["yellow"] = (240, 200, 0), ["violet"] = (128, 0, 255),
+            ["black"] = (0, 0, 0), ["pink"] = (255, 0, 128), ["brown"] = (140, 90, 40), ["gray"] = (110, 110, 110),
         };
 
-        public static readonly string[] DefaultGroupColors = { "rojo", "azul", "verde", "magenta", "naranja", "cian" };
+        public static readonly string[] DefaultGroupColors = { "red", "blue", "green", "magenta", "orange", "cyan" };
 
         public bool Run(UIApplication app, DocumentTracker tracker)
         {
@@ -90,16 +90,16 @@ namespace Bimbridge.Addin.Revit
             Rev = tracker.For(doc)?.Rev ?? 0;
 
             var view = ViewId.HasValue ? doc.GetElement(Ids.ToId(ViewId.Value)) as View : uidoc.ActiveView;
-            if (view == null) { Error = "view " + ViewId + " does not exist in this document (catalog que=vistas)"; return true; }
+            if (view == null) { Error = "view " + ViewId + " does not exist in this document (catalog kind=views)"; return true; }
             if (view.IsTemplate) { Error = "'" + view.Name + "' is a view template: capture a view that uses it"; return true; }
             bool printable;
             try { printable = view.CanBePrinted; } catch (Exception) { printable = false; }
             if (!printable) { Error = "'" + view.Name + "' cannot be exported as an image (type " + view.ViewType + ")"; return true; }
 
-            Info["vista"] = new Dictionary<string, object>
+            Info["view"] = new Dictionary<string, object>
             {
-                ["id"] = Ids.ToLong(view.Id), ["nombre"] = view.Name, ["tipo"] = CatalogRunner.ViewTypeName(view.ViewType),
-                ["escala"] = SafeScale(view),
+                ["id"] = Ids.ToLong(view.Id), ["name"] = view.Name, ["type"] = CatalogRunner.ViewTypeName(view.ViewType),
+                ["scale"] = SafeScale(view),
             };
 
             // Visible content (own model only; links are not counted): helps read the image without guessing.
@@ -120,7 +120,7 @@ namespace Bimbridge.Addin.Revit
                     }
                 }
                 catch (Exception) { }
-                Info["contenido"] = visible.OrderByDescending(kv => kv.Value.Count).Take(15)
+                Info["content"] = visible.OrderByDescending(kv => kv.Value.Count).Take(15)
                     .ToDictionary(kv => CatalogRunner.BicName(catOf[kv.Key]), kv => (object)(long)kv.Value.Count);
                 LinkContent(doc, view);
             }
@@ -165,7 +165,7 @@ namespace Bimbridge.Addin.Revit
                             if (tg.HasStarted() && !tg.HasEnded()) tg.RollBack();
                         }
                     }
-                    Info["temporal"] = "highlighting/framing applied only for the image and rolled back (the model did not change)";
+                    Info["temporary"] = "highlighting/framing applied only for the image and rolled back (the model did not change)";
                 }
                 else
                 {
@@ -194,11 +194,11 @@ namespace Bimbridge.Addin.Revit
                 Prune(dir, 60);
             }
 
-            Info["archivo"] = File;
+            Info["file"] = File;
             Info["ms"] = total.ElapsedMilliseconds;
             Info["export_ms"] = exportMs;
-            if (prepMs > 0) Info["preparar_ms"] = prepMs;
-            if (_notes.Count > 0) Info["notas"] = _notes.Cast<object>().ToList();
+            if (prepMs > 0) Info["prepare_ms"] = prepMs;
+            if (_notes.Count > 0) Info["notes"] = _notes.Cast<object>().ToList();
             return true;
         }
 
@@ -234,7 +234,7 @@ namespace Bimbridge.Addin.Revit
                 if (colon > 0) name = name.Substring(0, colon);
                 res[name] = counts.OrderByDescending(k => k.Value).Take(8).ToDictionary(k => k.Key, k => (object)k.Value);
             }
-            if (res.Count > 0) Info["contenido_vinculos"] = res;
+            if (res.Count > 0) Info["links_content"] = res;
 #else
             _notes.Add("Revit 2022 cannot count what is visible of links in a view (2023+ can)");
 #endif
@@ -297,7 +297,7 @@ namespace Bimbridge.Addin.Revit
                     }
                     legend[CatalogRunner.BicName(cat)] = col.name + " (" + kv.Value.Count + ")";
                 }
-                Info["leyenda"] = legend;
+                Info["legend"] = legend;
                 if (applied >= 30000) _notes.Add("more than 30000 visible elements: the first 30000 were colored by category");
                 _notes.Add("category colors apply to the own model; links look as usual");
             }
@@ -318,12 +318,12 @@ namespace Bimbridge.Addin.Revit
                         try { view.SetElementOverrides(eid, ogs); ok++; } catch (Exception) { hidden++; }
                     }
                     var visibleCount = g.Ids.Count(inView.Contains);
-                    var d = new Dictionary<string, object> { ["color"] = g.ColorName, ["elementos"] = ok, ["visibles_en_vista"] = (long)visibleCount };
-                    if (missing > 0) d["no_existen"] = missing;
-                    if (hidden > 0) d["sin_sobrescritura"] = hidden;
+                    var d = new Dictionary<string, object> { ["color"] = g.ColorName, ["elements"] = ok, ["visible_in_view"] = (long)visibleCount };
+                    if (missing > 0) d["missing"] = missing;
+                    if (hidden > 0) d["no_overwrite"] = hidden;
                     res[g.Label] = d;
                 }
-                Info["resaltado"] = res;
+                Info["highlighted"] = res;
             }
 
             if (FrameIds != null && FrameIds.Count > 0) Frame(doc, view);
@@ -384,7 +384,7 @@ namespace Bimbridge.Addin.Revit
                 if (v3.IsPerspective) { _notes.Add("framing: perspective view, captured in full"); return; }
                 v3.SetSectionBox(new BoundingBoxXYZ { Min = min, Max = max });
                 v3.IsSectionBoxActive = true;
-                Info["encuadre"] = used + " elements (temporary section box)";
+                Info["framing"] = used + " elements (temporary section box)";
                 return;
             }
             if (!(view is ViewPlan) && !(view is ViewSection))
@@ -407,7 +407,7 @@ namespace Bimbridge.Addin.Revit
             }
             view.CropBox = new BoundingBoxXYZ { Transform = cb.Transform, Min = new XYZ(x0, y0, cb.Min.Z), Max = new XYZ(x1, y1, cb.Max.Z) };
             view.CropBoxActive = true;
-            Info["encuadre"] = used + " elements (temporary view crop)";
+            Info["framing"] = used + " elements (temporary view crop)";
         }
 
         private void Export(Document doc, View view, string tmp)

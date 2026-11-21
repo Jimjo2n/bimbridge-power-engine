@@ -34,13 +34,13 @@ namespace Bimbridge.Bridge
 
             var ctx = await Run(a, "A", Wire.OpContext, new Dictionary<string, object>());
             if (ctx.State != Status.Ok) return 2;
-            Console.WriteLine("session A: " + (a.Hello != null && a.Hello.TryGetValue("sesion", out var s) ? s : "?"));
+            Console.WriteLine("session A: " + (a.Hello != null && a.Hello.TryGetValue("session", out var s) ? s : "?"));
 
             var q1 = Run(a, "A", Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "LightingFixtures", ["group_by"] = "lvl" });
             var q2 = Run(b, "B", Wire.OpCheck, new Dictionary<string, object> { ["name"] = "lighting_audit" });
             var q3 = Run(b, "B", Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "LightingFixtures,LightingDevices,ElectricalFixtures", ["group_by"] = "cat", });
             await Task.WhenAll(q1, q2, q3);
-            Console.WriteLine("session B: " + (b.Hello != null && b.Hello.TryGetValue("sesion", out var s2) ? s2 : "?"));
+            Console.WriteLine("session B: " + (b.Hello != null && b.Hello.TryGetValue("session", out var s2) ? s2 : "?"));
             Console.WriteLine(ok ? "PROBE OK" : "PROBE WITH ERRORS");
             a.Dispose(); b.Dispose();
             return ok ? 0 : 1;
@@ -49,7 +49,7 @@ namespace Bimbridge.Bridge
         /// <summary>
         /// Bimbridge.Bridge.exe --probe-write : write test on the practice model.
         ///  1) Live: changes Comments of ONE lighting fixture to "BIMBRIDGE test hh:mm:ss" (plan → commit) and verifies it.
-        ///  2) Hold: plans restoring the original value and commits → it must end up "retenido" without touching the model.
+        ///  2) Hold: plans restoring the original value and commits → it must end up "held" without touching the model.
         ///  3) Free-form code: must be rejected as invalid.
         /// Leaves the restore plan in the queue for the user to apply with the Queue button. Never saves or syncs.
         /// </summary>
@@ -58,7 +58,7 @@ namespace Bimbridge.Bridge
             var c = new RevitConnection { ClientName = "probe-write" };
             var t = TimeSpan.FromSeconds(120);
             var home = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bimbridge");
-            var holdFile = Path.Combine(home, "retener.on");
+            var holdFile = LegacyAliases.ResolveExisting(home, Path.Combine(home, "hold.on"));
             var holdBefore = File.Exists(holdFile);
             var fails = 0;
 
@@ -90,7 +90,7 @@ namespace Bimbridge.Bridge
             {
                 var ctx = await Call("0", Wire.OpContext, new Dictionary<string, object>());
                 if (ctx.State != Status.Ok) return 2;
-                var lv = c.Hello != null && c.Hello.TryGetValue("niveles", out var n) ? Convert.ToString(n) : "";
+                var lv = c.Hello != null && c.Hello.TryGetValue("levels", out var n) ? Convert.ToString(n) : "";
                 if (lv.IndexOf('P') < 0 || lv.IndexOf('W') < 0)
                 {
                     Console.WriteLine("Levels '" + lv + "': P or W missing. Install with -Niveles RPW and restart Revit.");
@@ -125,7 +125,7 @@ namespace Bimbridge.Bridge
                 Expect(c2.State == Status.Held, "commit with Hold stays in the queue");
                 Expect(CommentsOf(await Call("2", Wire.OpQuery, Get())) == test, "the model has NOT changed yet");
                 var j2 = await Call("2", Wire.OpJob, new Dictionary<string, object> { ["plan_id"] = p2Id });
-                Expect(j2.State == Status.Held, "job reports retenido");
+                Expect(j2.State == Status.Held, "job reports held");
 
                 // 3) Free-form code: does not exist
                 var bad = await Call("3", Wire.OpPlan, new Dictionary<string, object>

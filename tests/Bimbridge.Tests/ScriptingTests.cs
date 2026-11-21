@@ -66,7 +66,7 @@ namespace Bimbridge.Tests
         private static (byte[] dll, string[] diags) Compile(string code, int year)
         {
             var w = ScriptSource.Wrap(code, "S" + Guid.NewGuid().ToString("N"));
-            var dll = Compiler.Compile(w.Source, References(year), "prueba_" + year, out var diags, out _, out _);
+            var dll = Compiler.Compile(w.Source, References(year), "test_" + year, out var diags, out _, out _);
             return (dll, diags);
         }
 
@@ -96,13 +96,13 @@ namespace Bimbridge.Tests
         {
             var cases = new Dictionary<string, string>
             {
-                ["proceso"] = "System.Diagnostics.Process.Start(\"cmd.exe\"); return 1;",
-                ["red"] = "var c = new System.Net.Http.HttpClient(); return c;",
-                ["reflexion"] = "var t = System.Type.GetType(\"X\"); return System.Activator.CreateInstance(t);",
-                ["archivo_escritura"] = "System.IO.File.WriteAllText(\"c:/x.txt\", \"a\"); return 1;",
+                ["process"] = "System.Diagnostics.Process.Start(\"cmd.exe\"); return 1;",
+                ["network"] = "var c = new System.Net.Http.HttpClient(); return c;",
+                ["reflection"] = "var t = System.Type.GetType(\"X\"); return System.Activator.CreateInstance(t);",
+                ["write_file"] = "System.IO.File.WriteAllText(\"c:/x.txt\", \"a\"); return 1;",
                 ["revit_sync"] = "doc.SynchronizeWithCentral(new TransactWithCentralOptions(), new SynchronizeWithCentralOptions()); return 1;",
-                ["revit_cerrar"] = "doc.Close(false); return 1;",
-                ["salida_proceso"] = "System.Environment.Exit(0); return 1;",
+                ["revit_close"] = "doc.Close(false); return 1;",
+                ["process_output"] = "System.Environment.Exit(0); return 1;",
             };
             foreach (var kv in cases)
             {
@@ -112,8 +112,8 @@ namespace Bimbridge.Tests
                 Assert.Empty(Bimbridge.Engine.CapabilityPolicy.Denied(Bimbridge.Engine.ExecutionProfile.TrustedInteractive, caps));
             }
             var w = Caps("System.IO.File.WriteAllText(\"c:/x.txt\", \"a\"); return 1;", year);
-            Assert.Empty(Bimbridge.Engine.CapabilityPolicy.Denied(Bimbridge.Engine.ExecutionProfile.RestrictedAutonomous, w, new[] { "archivo_escritura" }));
-            Assert.NotEmpty(Bimbridge.Engine.CapabilityPolicy.Denied(Bimbridge.Engine.ExecutionProfile.RestrictedAutonomous, Caps("System.Diagnostics.Process.Start(\"x\"); return 1;", year), new[] { "proceso" }));
+            Assert.Empty(Bimbridge.Engine.CapabilityPolicy.Denied(Bimbridge.Engine.ExecutionProfile.RestrictedAutonomous, w, new[] { "write_file" }));
+            Assert.NotEmpty(Bimbridge.Engine.CapabilityPolicy.Denied(Bimbridge.Engine.ExecutionProfile.RestrictedAutonomous, Caps("System.Diagnostics.Process.Start(\"x\"); return 1;", year), new[] { "process" }));
             Assert.Empty(Caps("return new FilteredElementCollector(doc).GetElementCount();", year));
         }
 
@@ -195,10 +195,10 @@ namespace Bimbridge.Tests
         public void Wrap_HoistsUsingsAfterComments_AndDetectsForms()
         {
             var w = ScriptSource.Wrap("// nota\nusing System.Text.RegularExpressions;\nreturn Regex.IsMatch(\"a\", \"a\");", "X");
-            Assert.Equal("cuerpo", w.Kind);
+            Assert.Equal("body", w.Kind);
             Assert.Contains("using System.Text.RegularExpressions;", w.HoistedUsings);
-            Assert.Equal("expresión", ScriptSource.Wrap("doc.Title", "X").Kind);
-            Assert.Equal("clase", ScriptSource.Wrap("public static class A { public static object Run(Bimbridge.Addin.Scripting.ScriptContext ctx) => 1; }", "X").Kind);
+            Assert.Equal("expression", ScriptSource.Wrap("doc.Title", "X").Kind);
+            Assert.Equal("class", ScriptSource.Wrap("public static class A { public static object Run(Bimbridge.Addin.Scripting.ScriptContext ctx) => 1; }", "X").Kind);
         }
     }
 }

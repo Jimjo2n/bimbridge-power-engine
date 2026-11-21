@@ -114,9 +114,9 @@ namespace Bimbridge.Engine
             lock (_lock)
                 return new Dictionary<string, object>
                 {
-                    ["en_curso"] = (long)_running, ["en_cola"] = (long)_queue.Count, ["max_en_curso"] = (long)MaxRunning, ["max_por_agente"] = (long)MaxPerOwner,
-                    ["max_en_cola"] = (long)MaxQueued, ["iniciadas"] = _started, ["rechazadas_por_cola_llena"] = _rejected, ["canceladas_en_cola"] = _cancelledQueued,
-                    ["cola_maxima_vista"] = _maxQueuedSeen, ["agentes_en_curso"] = (long)_runningByOwner.Count,
+                    ["running"] = (long)_running, ["queued"] = (long)_queue.Count, ["max_running"] = (long)MaxRunning, ["max_per_agent"] = (long)MaxPerOwner,
+                    ["max_queued"] = (long)MaxQueued, ["started_items"] = _started, ["rejected_queue_full"] = _rejected, ["cancelled_in_queue"] = _cancelledQueued,
+                    ["max_queue_seen"] = _maxQueuedSeen, ["running_agents"] = (long)_runningByOwner.Count,
                 };
         }
     }

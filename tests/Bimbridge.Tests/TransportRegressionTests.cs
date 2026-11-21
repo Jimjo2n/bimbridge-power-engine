@@ -69,10 +69,10 @@ namespace Bimbridge.Tests
             if (supportsReceipt)
             {
                 var data = Assert.IsType<Dictionary<string, object>>(call.Data);
-                var receipt = Assert.IsType<Dictionary<string, object>>(data["recibo"]);
-                Assert.Equal(sent.AttemptId, receipt["intento_id"]);
+                var receipt = Assert.IsType<Dictionary<string, object>>(data["receipt"]);
+                Assert.Equal(sent.AttemptId, receipt["attempt_id"]);
                 Assert.True(Guid.TryParseExact(sent.AttemptId, "N", out _));
-                Assert.Equal(true, receipt["envio_confirmado"]);
+                Assert.Equal(true, receipt["send_confirmed"]);
             }
             else Assert.Null(sent.AttemptId);
         }
@@ -91,7 +91,7 @@ namespace Bimbridge.Tests
             {
                 new Dictionary<string, object>
                 {
-                    ["op"] = "place", [SourceBinding.OpField] = SourceBinding.Token("pdf", "fixture", "sha", "1", "registro", "lote", 1),
+                    ["op"] = "place", [SourceBinding.OpField] = SourceBinding.Token("pdf", "fixture", "sha", "1", "record", "batch", 1),
                 },
             });
             var journal = Journal();
@@ -115,7 +115,7 @@ namespace Bimbridge.Tests
                 Assert.Equal(Wire.OpCommit, sent.Op);
                 Assert.Equal(source.Key, sent.Args[Wire.KeyArg]);
                 Assert.Equal(OperationJournal.BeginKind.New, journal.Begin(source.Key, doc, Wire.OpCommit, source.Hash, null,
-                    "primera", OperationJournal.ReconcileMode.None, model, "generation", sent.AttemptId, agent, plan).Kind);
+                    "first", OperationJournal.ReconcileMode.None, model, "generation", sent.AttemptId, agent, plan).Kind);
                 if (queued) journal.LinkJob(source.Key, doc, "cola-1");
                 mutations++;
                 journal.Complete(source.Key, doc, Status.Ok, new Dictionary<string, object> { ["id"] = 771L });
@@ -125,40 +125,40 @@ namespace Bimbridge.Tests
                 var query = await Read();
                 Assert.Equal(Wire.OpJob, query.Op);
                 var reopened = new OperationJournal(journal.Path_);
-                var receipt = reopened.FindReceipt(Arg.GetString(query.Args, "intento_id"), "segunda", agent, doc, model);
+                var receipt = reopened.FindReceipt(Arg.GetString(query.Args, "attempt_id"), "second", agent, doc, model);
                 await Reply(query, receipt);
                 var retry = await Read();
                 Assert.Equal(Wire.OpCommit, retry.Op);
                 Assert.Equal(source.Key, retry.Args[Wire.KeyArg]);
-                var replay = reopened.Begin(source.Key, doc, Wire.OpCommit, source.Hash, null, "segunda");
+                var replay = reopened.Begin(source.Key, doc, Wire.OpCommit, source.Hash, null, "second");
                 Assert.Equal(OperationJournal.BeginKind.Completed, replay.Kind);
-                await Reply(retry, new Dictionary<string, object> { ["repeticion"] = true });
+                await Reply(retry, new Dictionary<string, object> { ["repetition"] = true });
             }
             var peer = Peer();
             var commit = new Dictionary<string, object> { ["plan_id"] = plan, [Wire.KeyArg] = source.Key };
             var lost = await bridge.CallAsync(Wire.OpCommit, commit, TimeSpan.FromSeconds(5), deadline.Token);
             Assert.Equal(Status.Unknown, lost.State);
             var data = Assert.IsType<Dictionary<string, object>>(lost.Data);
-            var intent = Assert.IsType<Dictionary<string, object>>(data["recibo"])["intento_id"];
-            var recovered = await bridge.CallAsync(Wire.OpJob, new Dictionary<string, object> { ["intento_id"] = intent },
+            var intent = Assert.IsType<Dictionary<string, object>>(data["receipt"])["attempt_id"];
+            var recovered = await bridge.CallAsync(Wire.OpJob, new Dictionary<string, object> { ["attempt_id"] = intent },
                 TimeSpan.FromSeconds(5), deadline.Token);
             var saved = Assert.IsType<Dictionary<string, object>>(recovered.Data);
-            Assert.Equal(Status.Ok, saved["estado"]);
-            Assert.Equal(intent, saved["intento_id"]);
+            Assert.Equal(Status.Ok, saved["status"]);
+            Assert.Equal(intent, saved["attempt_id"]);
             Assert.Equal(queued ? "cola-1" : null, saved["job_id"]);
             var replayed = await bridge.CallAsync(Wire.OpCommit, commit, TimeSpan.FromSeconds(5), deadline.Token);
-            Assert.Equal(true, Assert.IsType<Dictionary<string, object>>(replayed.Data)["repeticion"]);
+            Assert.Equal(true, Assert.IsType<Dictionary<string, object>>(replayed.Data)["repetition"]);
             await peer;
             Assert.Equal(1, mutations);
         }
 
         [Theory]
-        [InlineData("escribir")]
+        [InlineData("write")]
         [InlineData(" ejecutar ")]
         public void AcceptedWriteModeMustNeverBeClassifiedAsRead(string mode)
         {
             Assert.True(RevitConnection.IsWriteOp(Wire.OpExec,
-                new Dictionary<string, object> { ["modo"] = mode }));
+                new Dictionary<string, object> { ["mode"] = mode }));
         }
 
         [Fact]
@@ -188,7 +188,7 @@ namespace Bimbridge.Tests
             var journal = Journal();
             journal.Begin("key", "document", Wire.OpExec, "hash", null, "session");
             // tx=ninguna can commit transaction 1 and fail transaction 2; handler records Error.
-            journal.Complete("key", "document", Status.Error, new Dictionary<string, object> { ["tx"] = "ninguna" });
+            journal.Complete("key", "document", Status.Error, new Dictionary<string, object> { ["tx"] = "none" });
             Assert.Equal(OperationJournal.BeginKind.Interrupted,
                 journal.Begin("key", "document", Wire.OpExec, "hash", null, "session2").Kind);
         }
@@ -200,7 +200,7 @@ namespace Bimbridge.Tests
             request.Args["plan_id"] = "P-1";
             var read = Request.FromJson(Json.Write(request));
             Assert.Equal(request.AttemptId, read.AttemptId);
-            Assert.False(read.Args.ContainsKey("intento_id"));
+            Assert.False(read.Args.ContainsKey("attempt_id"));
             Assert.Equal(OperationJournal.HashArgs(request.Op, request.Args),
                 OperationJournal.HashArgs(read.Op, read.Args));
             Assert.Null(Request.FromJson("{\"id\":1,\"op\":\"commit\",\"args\":{}}").AttemptId);
@@ -211,15 +211,15 @@ namespace Bimbridge.Tests
         {
             var journal = Journal();
             var attempt = Guid.NewGuid().ToString("N");
-            journal.Begin("key", "doc", Wire.OpCommit, "hash", "tarea", "S1", OperationJournal.ReconcileMode.None,
+            journal.Begin("key", "doc", Wire.OpCommit, "hash", "task", "S1", OperationJournal.ReconcileMode.None,
                 "model", "opening", attempt, "agent1", "P-1");
-            Assert.Equal(Status.InProgress, journal.FindReceipt(attempt, "S1", null, "doc", "model")["estado"]);
+            Assert.Equal(Status.InProgress, journal.FindReceipt(attempt, "S1", null, "doc", "model")["status"]);
             var restarted = new OperationJournal(journal.Path_);
-            Assert.Equal(Status.Unknown, restarted.FindReceipt(attempt, "S1", null, "doc", "model")["estado"]);
+            Assert.Equal(Status.Unknown, restarted.FindReceipt(attempt, "S1", null, "doc", "model")["status"]);
             journal.LinkJob("key", "doc", "J-1");
             journal.Complete("key", "doc", Status.CompletedWithDifferences, null);
             var receipt = restarted.FindReceipt(attempt, "S2", "agent1", "doc", "model");
-            Assert.Equal(Status.CompletedWithDifferences, receipt["estado"]);
+            Assert.Equal(Status.CompletedWithDifferences, receipt["status"]);
             Assert.Equal("P-1", receipt["plan_id"]);
             Assert.Equal("J-1", receipt["job_id"]);
             Assert.Null(restarted.FindReceipt(attempt, "S2", "agent2", "doc", "model"));
@@ -235,14 +235,14 @@ namespace Bimbridge.Tests
             var attempt = Guid.NewGuid().ToString("N");
             var intent = audit.Intent("session1", "commit", "document", new Dictionary<string, object>
             {
-                ["intento_id"] = attempt, ["plan_id"] = "P-1", ["huella_doc"] = "model", ["agente"] = "agent",
+                ["attempt_id"] = attempt, ["plan_id"] = "P-1", ["doc_fingerprint"] = "model", ["agent"] = "agent",
             });
-            Assert.Equal(Status.Unknown, AuditLog.FindCommitReceipt(path, attempt, "session1", null, "document", "model")["estado"]);
+            Assert.Equal(Status.Unknown, AuditLog.FindCommitReceipt(path, attempt, "session1", null, "document", "model")["status"]);
             audit.Outcome("session1", "commit", intent, PlanStatus.Applied,
-                new Dictionary<string, object> { ["estado_recibo"] = Status.CompletedWithDifferences });
+                new Dictionary<string, object> { ["receipt_status"] = Status.CompletedWithDifferences });
             var receipt = AuditLog.FindCommitReceipt(path, attempt, "session2", "agent", "document", "model");
             Assert.Equal("P-1", receipt["plan_id"]);
-            Assert.Equal(Status.CompletedWithDifferences, receipt["estado"]);
+            Assert.Equal(Status.CompletedWithDifferences, receipt["status"]);
             Assert.Null(AuditLog.FindCommitReceipt(path, attempt, "session2", null, "document", "model"));
             Assert.Null(AuditLog.FindCommitReceipt(path, attempt, "session1", null, "document", "replaced"));
         }
@@ -256,7 +256,7 @@ namespace Bimbridge.Tests
                 Data = new Dictionary<string, object>
                 {
                     ["rows"] = new List<object> { new string('é', 600000) + "🚧" },
-                    ["cursor"] = "cursor-1", ["recibo"] = new Dictionary<string, object> { ["plan_id"] = "P-1" },
+                    ["cursor"] = "cursor-1", ["receipt"] = new Dictionary<string, object> { ["plan_id"] = "P-1" },
                 },
             };
             var expected = Json.Write(response);
@@ -267,12 +267,12 @@ namespace Bimbridge.Tests
             Assert.Equal(response.Warning, summary.Warning);
             var data = Assert.IsType<Dictionary<string, object>>(summary.Data);
             Assert.Equal("cursor-1", data["cursor"]);
-            Assert.True(data.ContainsKey("recibo"));
+            Assert.True(data.ContainsKey("receipt"));
             Assert.Equal("r123", data["res"]);
             Assert.Equal(expected, detail.Replace("\n", ""));
             var failed = Response.FromJson(PipeHost.FitResponse(response, true, _ => throw new IOException("out of space")));
             Assert.Equal(response.State, failed.State);
-            Assert.Contains("out of space", (string)Assert.IsType<Dictionary<string, object>>(failed.Data)["aviso_resultado"]);
+            Assert.Contains("out of space", (string)Assert.IsType<Dictionary<string, object>>(failed.Data)["result_warning"]);
             Assert.Equal(expected, PipeHost.FitResponse(response, false, _ => throw new InvalidOperationException()));
         }
 
@@ -281,12 +281,12 @@ namespace Bimbridge.Tests
         {
             var data = new Dictionary<string, object>
             {
-                ["estado"] = "con_diferencias",
-                ["detalle"] = string.Concat(System.Linq.Enumerable.Repeat("Plano 🚧\n", 2500)),
+                ["status"] = "with_differences",
+                ["detail"] = string.Concat(System.Linq.Enumerable.Repeat("Plano 🚧\n", 2500)),
             };
             var expected = Json.Write(data);
             var summary = Json.ParseObject(ResultStore.RenderPowerResult(data, 1200));
-            Assert.Equal(data["estado"], summary["estado"]);
+            Assert.Equal(data["status"], summary["status"]);
             var id = (string)summary["res"];
             try
             {

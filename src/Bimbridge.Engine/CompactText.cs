@@ -19,7 +19,7 @@ namespace Bimbridge.Engine
     /// </summary>
     public static class CompactText
     {
-        private static readonly string[] First = { "estado", "aviso" };
+        private static readonly string[] First = { "status", "warning" };
 
         public static string Write(object value)
         {

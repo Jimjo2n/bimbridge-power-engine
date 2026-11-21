@@ -30,11 +30,11 @@ namespace Bimbridge.Engine
         private static bool _cleaned;
         public static bool WriteFiles = true;
 
-        public static string Folder => _folder ?? (_folder = Home.Sub("metricas"));
+        public static string Folder => _folder ?? (_folder = Home.Sub("metrics"));
 
         public static void Record(string client, string tool, string op, long charsIn, long charsOut, long ms, string status)
         {
-            var error = status != null && status != "ok" && status != "completado_con_diferencias";
+            var error = status != null && status != "ok" && status != "completed_with_differences";
             lock (Lock)
             {
                 if (!ByTool.TryGetValue(tool, out var r)) ByTool[tool] = r = new Row();
@@ -51,15 +51,15 @@ namespace Bimbridge.Engine
                 if (!_cleaned)
                 {
                     _cleaned = true;
-                    foreach (var f in Directory.GetFiles(Folder, "puente-*.jsonl"))
+                    foreach (var f in Directory.GetFiles(Folder, "bridge-*.jsonl"))
                         if (File.GetLastWriteTimeUtc(f) < DateTime.UtcNow.AddDays(-14)) File.Delete(f);
                 }
                 var line = Json.Write(new Dictionary<string, object>
                 {
-                    ["t"] = Home.Now(), ["cliente"] = client, ["herramienta"] = tool, ["op"] = op,
-                    ["chars_entrada"] = charsIn, ["chars_salida"] = charsOut, ["ms"] = ms, ["estado"] = status,
+                    ["t"] = Home.Now(), ["client"] = client, ["tool_name"] = tool, ["op"] = op,
+                    ["chars_in"] = charsIn, ["chars_out"] = charsOut, ["ms"] = ms, ["status"] = status,
                 }) + "\n";
-                File.AppendAllText(Path.Combine(Folder, "puente-" + DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture) + ".jsonl"), line);
+                File.AppendAllText(Path.Combine(Folder, "bridge-" + DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture) + ".jsonl"), line);
             }
             catch (Exception) { /* metrics never break a call */ }
         }
@@ -74,13 +74,13 @@ namespace Bimbridge.Engine
                     .ToList();
                 return new Dictionary<string, object>
                 {
-                    ["cols"] = new List<object> { "herramienta", "llamadas", "chars_entrada", "chars_salida", "ms_medio", "errores" },
+                    ["cols"] = new List<object> { "tool_name", "calls", "chars_in", "chars_out", "mean_ms", "errors" },
                     ["rows"] = rows,
-                    ["llamadas"] = ByTool.Values.Sum(r => r.Calls),
+                    ["calls"] = ByTool.Values.Sum(r => r.Calls),
                     ["chars_total"] = ByTool.Values.Sum(r => r.CharsIn + r.CharsOut),
-                    ["tokens_estimados"] = TokenEstimate.FromChars(ByTool.Values.Sum(r => r.CharsIn + r.CharsOut)),
-                    ["tokens_metodo"] = TokenEstimate.Method,
-                    ["nota"] = "characters exchanged with the agent; the client reports the real tokens",
+                    ["estimated_tokens"] = TokenEstimate.FromChars(ByTool.Values.Sum(r => r.CharsIn + r.CharsOut)),
+                    ["tokens_method"] = TokenEstimate.Method,
+                    ["note"] = "characters exchanged with the agent; the client reports the real tokens",
                 };
             }
         }

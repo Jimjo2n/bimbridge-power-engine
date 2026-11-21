@@ -17,21 +17,21 @@ namespace BimBridge.PowerEngine
     ///
     /// Request: { "pe": 1, "id": "&lt;correlation&gt;", "job": "...", "args": {...}, "limits": {...}, "paths": [...] }
     /// Response: { "pe": 1, "id": "&lt;same&gt;", "code": "OK|...", "result": {...}, "error": "...", "telemetry": {...} }
-    /// Handshake: job "hola" with { "pe_min", "pe_max" } → { "motor", "version", "pe", "capacidades": [...] }.
+    /// Handshake: job "hello" with { "pe_min", "pe_max" } → { "engine", "version", "pe", "capabilities": [...] }.
     /// </summary>
     public static class PowerEngineContracts
     {
         public const int ProtocolVersion = 1;
         public const int MinSupported = 1;
-        public const string Hello = "hola";
-        public const string Shutdown = "salir";
+        public const string Hello = "hello";
+        public const string Shutdown = "exit";
 
         /// <summary>Result codes. Any other code is treated as ERROR_MOTOR.</summary>
         public static class Codes
         {
-            public const string Ok = "OK", Invalid = "INVALIDO", Unsupported = "NO_SOPORTADO", Timeout = "TIEMPO_AGOTADO", Cancelled = "CANCELADO",
-                TooLarge = "DEMASIADO_GRANDE", PathDenied = "RUTA_DENEGADA", NoContent = "SIN_CONTENIDO", EngineError = "ERROR_MOTOR",
-                Unavailable = "NO_DISPONIBLE", Incompatible = "VERSION_INCOMPATIBLE", MemoryLimit = "LIMITE_MEMORIA";
+            public const string Ok = "OK", Invalid = "INVALID", Unsupported = "NOT_SUPPORTED", Timeout = "TIMED_OUT", Cancelled = "CANCELLED",
+                TooLarge = "TOO_LARGE", PathDenied = "PATH_DENIED", NoContent = "NO_CONTENT", EngineError = "ENGINE_ERROR",
+                Unavailable = "UNAVAILABLE", Incompatible = "VERSION_INCOMPATIBLE", MemoryLimit = "MEMORY_LIMIT";
             public static readonly string[] All = { Ok, Invalid, Unsupported, Timeout, Cancelled, TooLarge, PathDenied, NoContent, EngineError, Unavailable, Incompatible, MemoryLimit };
         }
 
@@ -76,10 +76,10 @@ namespace BimBridge.PowerEngine
 
             public Dictionary<string, object> ToJson() => new Dictionary<string, object>
             {
-                ["power_engine.motor"] = Engine,
+                ["power_engine.engine"] = Engine,
                 ["power_engine.total_ms"] = Math.Round(TotalMs, 3), ["power_engine.motor_ms"] = Math.Round(EngineMs, 3),
                 ["power_engine.serializacion_ms"] = Math.Round(SerializeMs, 3), ["power_engine.ipc_ms"] = Math.Round(IpcMs, 3),
-                ["power_engine.bytes_entrada"] = BytesIn, ["power_engine.bytes_salida"] = BytesOut, ["power_engine.memoria_pico_kb"] = PeakMemoryKb,
+                ["power_engine.bytes_entrada"] = BytesIn, ["power_engine.bytes_salida"] = BytesOut, ["power_engine.peak_memory_kb"] = PeakMemoryKb,
             };
         }
 
@@ -94,7 +94,7 @@ namespace BimBridge.PowerEngine
 
             public Dictionary<string, object> ToJson()
             {
-                var d = new Dictionary<string, object> { ["pe"] = (long)ProtocolVersion, ["id"] = Id, ["codigo"] = Code, ["resultado"] = Result, ["telemetria"] = Telemetry.ToJson() };
+                var d = new Dictionary<string, object> { ["pe"] = (long)ProtocolVersion, ["id"] = Id, ["code"] = Code, ["result"] = Result, ["telemetry"] = Telemetry.ToJson() };
                 if (Error != null) d["error"] = Error;
                 return d;
             }
@@ -119,8 +119,8 @@ namespace BimBridge.PowerEngine
             if (o.TryGetValue("result", out var res) && res is Dictionary<string, object> rd) r.Result = rd;
             if (o.TryGetValue("telemetry", out var t) && t is Dictionary<string, object> td)
             {
-                r.Telemetry.EngineMs = ToD(td, "motor_ms");
-                r.Telemetry.PeakMemoryKb = (long)ToD(td, "memoria_pico_kb");
+                r.Telemetry.EngineMs = ToD(td, "engine_ms");
+                r.Telemetry.PeakMemoryKb = (long)ToD(td, "peak_memory_kb");
             }
             if (!r.Ok && string.IsNullOrEmpty(r.Error)) r.Error = "the engine returned " + code + " without explanation";
             return r;
@@ -138,8 +138,8 @@ namespace BimBridge.PowerEngine
 
             public static HelloInfo From(Response r) => new HelloInfo
             {
-                Engine = Arg.GetString(r.Result, "motor"), Version = Arg.GetString(r.Result, "version"),
-                Protocol = (int)(Arg.GetLong(r.Result, "pe") ?? 0), Capabilities = Arg.GetStringList(r.Result, "capacidades") ?? new List<string>(),
+                Engine = Arg.GetString(r.Result, "engine"), Version = Arg.GetString(r.Result, "version"),
+                Protocol = (int)(Arg.GetLong(r.Result, "pe") ?? 0), Capabilities = Arg.GetStringList(r.Result, "capabilities") ?? new List<string>(),
             };
 
             /// <summary>The agreed contract is within the range we support.</summary>

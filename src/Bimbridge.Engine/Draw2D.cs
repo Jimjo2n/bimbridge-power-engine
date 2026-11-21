@@ -206,13 +206,13 @@ namespace Bimbridge.Engine
         {
             switch (mode)
             {
-                case "izquierda": return new P(reference - min.X, 0);
-                case "derecha": return new P(reference - max.X, 0);
-                case "centro_x": return new P(reference - (min.X + max.X) / 2, 0);
-                case "abajo": return new P(0, reference - min.Y);
-                case "arriba": return new P(0, reference - max.Y);
-                case "centro_y": return new P(0, reference - (min.Y + max.Y) / 2);
-                default: throw new ArgumentException("alinear: izquierda, derecha, centro_x, arriba, abajo or centro_y");
+                case "left": return new P(reference - min.X, 0);
+                case "right": return new P(reference - max.X, 0);
+                case "center_x": return new P(reference - (min.X + max.X) / 2, 0);
+                case "down": return new P(0, reference - min.Y);
+                case "up": return new P(0, reference - max.Y);
+                case "center_y": return new P(0, reference - (min.Y + max.Y) / 2);
+                default: throw new ArgumentException("alinear: left, right, center_x, up, down or center_y");
             }
         }
 

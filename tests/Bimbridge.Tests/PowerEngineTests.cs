@@ -135,7 +135,7 @@ namespace Bimbridge.Tests
             Assert.Throws<ArgumentException>(() => GeometryKernels.Duplicates(bad, 2, 0.1));
             Assert.Throws<ArgumentException>(() => RustGeometryEngine.Duplicates(bad, 2, 0.1));
             using (var ipc = new PowerEngineDispatcher(PowerEngineEnv.Options("rust_ipc")))
-                Assert.Contains("INVALIDO", Assert.Throws<InvalidOperationException>(() => ipc.Duplicates(bad, 2, 0.1)).Message);
+                Assert.Contains("INVALID", Assert.Throws<InvalidOperationException>(() => ipc.Duplicates(bad, 2, 0.1)).Message);
             Assert.Throws<ArgumentException>(() => RustGeometryEngine.Transform3(new double[3], new double[11]));
             Assert.Throws<ArgumentException>(() => RustGeometryEngine.Nearest(new double[] { 0, 0 }, new double[] { 1, 1 }, 2, -1));
         }
@@ -214,7 +214,7 @@ namespace Bimbridge.Tests
             Assert.InRange(worker.LastStartError.Length, 1, 2300);
         }
         private static string F(string n) => Path.Combine(Fx, n);
-        private static Dictionary<string, object> A(string path) => new Dictionary<string, object> { ["ruta"] = path };
+        private static Dictionary<string, object> A(string path) => new Dictionary<string, object> { ["path"] = path };
 
         [Fact]
         public void Python_Handshake_AndSymbols_ThroughTheCore()
@@ -223,11 +223,11 @@ namespace Bimbridge.Tests
             {
                 var r = d.Document("pdf_symbols", A(F("plan_vectorial.pdf")), new[] { Fx });
                 Assert.True(r.Ok, r.Code + " " + r.Error);
-                var page = (Dictionary<string, object>)((List<object>)r.Result["paginas"])[0];
-                Assert.Equal(74, ((List<object>)page["candidatos"]).Count);   // 72 + 2 near-duplicates
+                var page = (Dictionary<string, object>)((List<object>)r.Result["pages"])[0];
+                Assert.Equal(74, ((List<object>)page["candidates"]).Count);   // 72 + 2 near-duplicates
                 Assert.Equal(EnginePython, r.Telemetry.Engine);
                 Assert.True(r.Telemetry.EngineMs > 0 && r.Telemetry.BytesOut > 0);
-                Assert.Equal(true, d.Status()["python"] is Dictionary<string, object> py && (bool)py["disponible"]);
+                Assert.Equal(true, d.Status()["python"] is Dictionary<string, object> py && (bool)py["available"]);
             }
         }
 
@@ -297,7 +297,7 @@ namespace Bimbridge.Tests
                 var net = d.Document("docx_extract", A(F("especificacion.docx")), new[] { Fx }, preferDotNet: true);
                 Assert.True(py.Ok && net.Ok);
                 Assert.Equal(EnginePython, py.Telemetry.Engine); Assert.Equal(EngineCSharp, net.Telemetry.Engine);
-                foreach (var k in new[] { "sha256", "bloques", "parrafos", "tablas", "sospechosos", "truncado" })
+                foreach (var k in new[] { "sha256", "blocks", "paragraphs", "tables", "suspects", "truncated" })
                     Assert.Equal(Json.Write(py.Result[k]), Json.Write(net.Result[k]));
             }
         }
@@ -336,11 +336,11 @@ namespace Bimbridge.Tests
         [Fact]
         public void Search_ReturnsBriefEntries_DescribeReturnsDetail()
         {
-            var hits = PowerEngineCapabilityRegistry.Search("luminaria pdf");
+            var hits = PowerEngineCapabilityRegistry.Search("fixture pdf");
             Assert.Equal("pdf.symbols", hits[0].Id);
             var d = PowerEngineCapabilityRegistry.Describe("pdf.symbols").Full();
-            Assert.Equal(CapabilityStates.Available, d["estado"]);
-            Assert.NotNull(d["motor"]);
+            Assert.Equal(CapabilityStates.Available, d["status"]);
+            Assert.NotNull(d["engine"]);
             Assert.Null(PowerEngineCapabilityRegistry.Describe("no.existe"));
         }
 
@@ -362,7 +362,7 @@ namespace Bimbridge.Tests
         public void Wire_ExistingOpsAvailable_LabExecExperimental()
         {
             Assert.Equal(CapabilityStates.Available, PowerEngineCapabilityRegistry.StateOfWire(Wire.OpQuery, new Dictionary<string, object>()));
-            Assert.Equal(CapabilityStates.Experimental, PowerEngineCapabilityRegistry.StateOfWire(Wire.OpExec, new Dictionary<string, object> { ["accion"] = "laboratorio" }));
+            Assert.Equal(CapabilityStates.Experimental, PowerEngineCapabilityRegistry.StateOfWire(Wire.OpExec, new Dictionary<string, object> { ["action"] = "lab" }));
         }
     }
 }

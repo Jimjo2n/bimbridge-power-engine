@@ -42,7 +42,7 @@ namespace Bimbridge.Addin.Revit
         public long ElementsRead;
 
         /// <param name="levels">Filter fixtures by level (empty = all).</param>
-        /// <param name="views">null = no per-view count; "rcp" = ceiling plans with fixture tags; "rcp_todos" = all
+        /// <param name="views">null = no per-view count; "rcp" = ceiling plans with fixture tags; "rcp_all" = all
         /// ceiling plans; or comma-separated ids. With <paramref name="levels"/> only the views of those levels.</param>
         /// <param name="exact">true = fixtures actually visible (regenerates each view; at most LightingAudit.MaxExactViews).
         /// false = estimate by associated level, without regenerating anything.</param>
@@ -134,8 +134,8 @@ namespace Bimbridge.Addin.Revit
                 }
                 if (_viewIds.Count > LightingAudit.MaxExactViews)
                 {
-                    Error = "exacto=true regenerates each view in Revit (about 2 s per view) and there are " + _viewIds.Count +
-                            " here; maximum " + LightingAudit.MaxExactViews + ". Narrow with lvl= or views=<ids>, or use the by-level mode (without exacto).";
+                    Error = "exact=true regenerates each view in Revit (about 2 s per view) and there are " + _viewIds.Count +
+                            " here; maximum " + LightingAudit.MaxExactViews + ". Narrow with lvl= or views=<ids>, or use the by-level mode (without exact).";
                     return true;
                 }
                 if (sw.ElapsedMilliseconds >= deadline) return false;
@@ -178,7 +178,7 @@ namespace Bimbridge.Addin.Revit
 
         private List<ElementId> ResolveViews(Document doc)
         {
-            var all = string.Equals(_viewsArg, "rcp_todos", StringComparison.OrdinalIgnoreCase);
+            var all = string.Equals(_viewsArg, "rcp_all", StringComparison.OrdinalIgnoreCase);
             if (all || string.Equals(_viewsArg, "rcp", StringComparison.OrdinalIgnoreCase))
             {
                 // Previously "rcp" meant ALL ceiling plans (261 in SAMPLE PROJECT: layout, alarm, dimensions…) counted
@@ -195,7 +195,7 @@ namespace Bimbridge.Addin.Revit
             var list = new List<ElementId>();
             foreach (var part in _viewsArg.Split(','))
             {
-                if (!long.TryParse(part.Trim(), out var id)) { Error = "views: use rcp, rcp_todos or comma-separated view ids"; return null; }
+                if (!long.TryParse(part.Trim(), out var id)) { Error = "views: use rcp, rcp_all or comma-separated view ids"; return null; }
                 if (!(doc.GetElement(Ids.ToId(id)) is View)) { Error = "views: " + id + " is not a view of the active model"; return null; }
                 list.Add(Ids.ToId(id));
             }

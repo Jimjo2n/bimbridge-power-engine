@@ -35,7 +35,7 @@ namespace BimBridge.PowerEngine
     public sealed class Calibration
     {
         public Dictionary<string, int> RustFfiFrom = new Dictionary<string, int>(StringComparer.Ordinal);
-        public string Source = "por_defecto";
+        public string Source = "default";
 
         public static Calibration Default() => new Calibration
         {
@@ -43,25 +43,25 @@ namespace BimBridge.PowerEngine
             {
                 // measured 2026-11-04 (power-engine calibrar, 3 campaigns of 5–15 rounds, Linux x64 4-CPU container): Rust FFI wins from
                 // n=100 in nearest/match/duplicates/segment_contacts (×2.5–×11); transform3 and components do not win at every size → C#.
-                // On the target PC, recalibrate with "power-engine calibrar --salida power_engine\calibracion.json".
+                // On the target PC, recalibrate with "power-engine calibrate --out power_engine\calibration.json".
                 ["transform3"] = int.MaxValue, ["nearest"] = 100, ["match"] = 100, ["duplicates"] = 100,
                 ["segment_contacts"] = 100, ["components"] = int.MaxValue,
             },
-            Source = "por_defecto (Power Engine 0.9.0 benchmark, Linux x64 4 CPU; recalibrate on the machine)",
+            Source = "default (Power Engine 0.9.0 benchmark, Linux x64 4 CPU; recalibrate on the machine)",
         };
 
         public int For(string job) => RustFfiFrom.TryGetValue(job, out var v) ? v : int.MaxValue;
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["fuente"] = Source, ["rust_ffi_desde"] = RustFfiFrom.ToDictionary(k => k.Key, k => (object)(long)k.Value),
+            ["source"] = Source, ["rust_ffi_from"] = RustFfiFrom.ToDictionary(k => k.Key, k => (object)(long)k.Value),
         };
 
         public static Calibration FromJson(Dictionary<string, object> o)
         {
             var c = Default();
-            c.Source = Arg.GetString(o, "fuente") ?? "archivo";
-            if (o.TryGetValue("rust_ffi_desde", out var r) && r is Dictionary<string, object> rd)
+            c.Source = Arg.GetString(o, "source") ?? "file";
+            if (o.TryGetValue("rust_ffi_from", out var r) && r is Dictionary<string, object> rd)
                 foreach (var kv in rd) c.RustFfiFrom[kv.Key] = (int)Math.Min(int.MaxValue, Convert.ToInt64(kv.Value, CultureInfo.InvariantCulture));
             return c;
         }
@@ -146,22 +146,22 @@ namespace BimBridge.PowerEngine
         public (int[] Index, double[] Dist) Nearest(double[] q, double[] r, int dim, double maxDist, CancellationToken ct = default(CancellationToken)) =>
             Run("nearest", q.Length / dim + r.Length / dim, () => GeometryKernels.Nearest(q, r, dim, maxDist, ct), () => RustGeometryEngine.Nearest(q, r, dim, maxDist, ct), () =>
             {
-                var res = Ipc("nearest", new Dictionary<string, object> { ["dim"] = (long)dim, ["max_dist"] = maxDist, ["consulta"] = Box(q), ["referencia"] = Box(r) }, ct);
-                return (Ints(res, "indice"), Doubles(res, "distancia"));
+                var res = Ipc("nearest", new Dictionary<string, object> { ["dim"] = (long)dim, ["max_dist"] = maxDist, ["query"] = Box(q), ["reference"] = Box(r) }, ct);
+                return (Ints(res, "index"), Doubles(res, "distance"));
             });
 
         public int[] Match(double[] e, double[] o, int dim, double tol, CancellationToken ct = default(CancellationToken)) =>
             Run("match", e.Length / dim + o.Length / dim, () => GeometryKernels.Match(e, o, dim, tol, ct), () => RustGeometryEngine.Match(e, o, dim, tol, ct),
-                () => Ints(Ipc("match", new Dictionary<string, object> { ["dim"] = (long)dim, ["tol"] = tol, ["esperados"] = Box(e), ["observados"] = Box(o) }, ct), "pareja"));
+                () => Ints(Ipc("match", new Dictionary<string, object> { ["dim"] = (long)dim, ["tol"] = tol, ["expected_items"] = Box(e), ["observed_items"] = Box(o) }, ct), "pair"));
 
         public int[] Duplicates(double[] p, int dim, double tol, CancellationToken ct = default(CancellationToken)) =>
             Run("duplicates", p.Length / dim, () => GeometryKernels.Duplicates(p, dim, tol, ct), () => RustGeometryEngine.Duplicates(p, dim, tol, ct),
-                () => Ints(Ipc("duplicates", new Dictionary<string, object> { ["dim"] = (long)dim, ["tol"] = tol, ["puntos"] = Box(p) }, ct), "grupo"));
+                () => Ints(Ipc("duplicates", new Dictionary<string, object> { ["dim"] = (long)dim, ["tol"] = tol, ["points"] = Box(p) }, ct), "group"));
 
         public List<(int I, int J, int Kind)> SegmentContacts(double[] s, double eps = 1e-7, CancellationToken ct = default(CancellationToken)) =>
             Run("segment_contacts", s.Length / 4, () => GeometryKernels.SegmentContacts(s, eps, ct), () => RustGeometryEngine.SegmentContacts(s, eps, ct), () =>
             {
-                var f = Ints(Ipc("segment_contacts", new Dictionary<string, object> { ["segmentos"] = Box(s), ["eps"] = eps }, ct), "contactos");
+                var f = Ints(Ipc("segment_contacts", new Dictionary<string, object> { ["segments_list"] = Box(s), ["eps"] = eps }, ct), "contacts");
                 var l = new List<(int, int, int)>(f.Length / 3);
                 for (var k = 0; k + 2 < f.Length; k += 3) l.Add((f[k], f[k + 1], f[k + 2]));
                 return l;
@@ -170,8 +170,8 @@ namespace BimBridge.PowerEngine
         public (int[] Component, int[] Degree) Components(int nodes, int[] edges) =>
             Run("components", nodes + edges.Length / 2, () => GeometryKernels.Components(nodes, edges), () => RustGeometryEngine.Components(nodes, edges), () =>
             {
-                var res = Ipc("components", new Dictionary<string, object> { ["nodos"] = (long)nodes, ["aristas"] = edges.Select(x => (object)(long)x).ToList() }, CancellationToken.None);
-                return (Ints(res, "componente"), Ints(res, "grado"));
+                var res = Ipc("components", new Dictionary<string, object> { ["nodes"] = (long)nodes, ["edges"] = edges.Select(x => (object)(long)x).ToList() }, CancellationToken.None);
+                return (Ints(res, "component"), Ints(res, "degree"));
             });
 
         // ---------------- IPC ----------------
@@ -211,7 +211,7 @@ namespace BimBridge.PowerEngine
         public Response Document(string job, Dictionary<string, object> args, IEnumerable<string> authorized, Limits limits = null, CancellationToken ct = default(CancellationToken), bool preferDotNet = false)
         {
             var paths = (authorized ?? Enumerable.Empty<string>()).Select(Path.GetFullPath).ToList();
-            var file = Arg.GetString(args, "ruta");
+            var file = Arg.GetString(args, "path");
             if (file != null && !PathAllowed(Path.GetFullPath(file), paths))
                 return Response.Fail(NewId(), Codes.PathDenied, "path not authorized for this job: " + file);
             var sw = Stopwatch.StartNew();
@@ -248,23 +248,23 @@ namespace BimBridge.PowerEngine
         {
             var d = new Dictionary<string, object>
             {
-                ["csharp"] = new Dictionary<string, object> { ["disponible"] = true },
-                ["rust_ffi"] = new Dictionary<string, object> { ["disponible"] = RustFfiAvailable, ["motivo"] = RustFfiAvailable ? null : (Options.DisableRustFfi ? "disabled" : RustGeometryEngine.Unavailable), ["version"] = RustFfiAvailable ? RustGeometryEngine.Version : null },
+                ["csharp"] = new Dictionary<string, object> { ["available"] = true },
+                ["rust_ffi"] = new Dictionary<string, object> { ["available"] = RustFfiAvailable, ["reason"] = RustFfiAvailable ? null : (Options.DisableRustFfi ? "disabled" : RustGeometryEngine.Unavailable), ["version"] = RustFfiAvailable ? RustGeometryEngine.Version : null },
             };
             d["rust_ipc"] = Probe(RustIpcConfigured ? RustIpc() : null, "not configured");
             d["python"] = Probe(PythonConfigured ? Python() : null, "not configured");
-            d["calibracion"] = Options.Calibration.ToJson();
+            d["calibration"] = Options.Calibration.ToJson();
             return d;
         }
 
         private static Dictionary<string, object> Probe(WorkerClient w, string missing)
         {
-            if (w == null) return new Dictionary<string, object> { ["disponible"] = false, ["motivo"] = missing };
+            if (w == null) return new Dictionary<string, object> { ["available"] = false, ["reason"] = missing };
             var ok = w.EnsureStarted();
             return new Dictionary<string, object>
             {
-                ["disponible"] = ok, ["motivo"] = ok ? null : w.LastStartError, ["version"] = w.Info?.Version, ["pe"] = (long)(w.Info?.Protocol ?? 0),
-                ["capacidades"] = (w.Info?.Capabilities ?? new List<string>()).Cast<object>().ToList(),
+                ["available"] = ok, ["reason"] = ok ? null : w.LastStartError, ["version"] = w.Info?.Version, ["pe"] = (long)(w.Info?.Protocol ?? 0),
+                ["capabilities"] = (w.Info?.Capabilities ?? new List<string>()).Cast<object>().ToList(),
             };
         }
 
@@ -274,7 +274,7 @@ namespace BimBridge.PowerEngine
             lock (_lock)
                 return _stats.OrderBy(k => k.Key, StringComparer.Ordinal).ToDictionary(k => "power_engine." + k.Key, k => (object)new Dictionary<string, object>
                 {
-                    ["llamadas"] = k.Value.Calls, ["ms"] = Math.Round(k.Value.Ms, 3), ["elementos"] = k.Value.Items,
+                    ["calls"] = k.Value.Calls, ["ms"] = Math.Round(k.Value.Ms, 3), ["elements"] = k.Value.Items,
                 });
         }
 

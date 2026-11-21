@@ -15,13 +15,13 @@ namespace Bimbridge.Addin.Revit
     {
         private async Task<Response> GroupAuditCheck(Request request, CancellationToken ct)
         {
-            var id = Arg.GetLong(request.Args, "grupo");
+            var id = Arg.GetLong(request.Args, "group");
             if (!id.HasValue || id <= 0) return Response.Fail(request.Id, Status.Invalid, "give the ID of the current group");
             List<object> previous = null;
-            if (request.Args.TryGetValue("anterior", out var raw))
+            if (request.Args.TryGetValue("previous", out var raw))
             {
                 previous = raw as List<object>;
-                if (previous == null) return Response.Fail(request.Id, Status.Invalid, "anterior requires the miembros list from the previous check");
+                if (previous == null) return Response.Fail(request.Id, Status.Invalid, "previous requires the members list from the previous check");
             }
             Dictionary<string, object> data = null;
             string error = null;
@@ -39,11 +39,11 @@ namespace Bimbridge.Addin.Revit
                     .Select(e => (object)new Dictionary<string, object>
                     {
                         ["id"] = Ids.ToLong(e.Id), ["uid"] = e.UniqueId,
-                        ["firma"] = e.Location == null && e.get_BoundingBox(null) == null ? null : Bim.Groups.Signature(group, e),
+                        ["signature"] = e.Location == null && e.get_BoundingBox(null) == null ? null : Bim.Groups.Signature(group, e),
                     }).ToList();
                 data = Bim.Groups.Inspect(group);
-                data["instantanea_miembros"] = snapshot;
-                data["nivel_id"] = Ids.ToLong(group.get_Parameter(BuiltInParameter.GROUP_LEVEL)?.AsElementId());
+                data["members_snapshot"] = snapshot;
+                data["level_id"] = Ids.ToLong(group.get_Parameter(BuiltInParameter.GROUP_LEVEL)?.AsElementId());
                 data["workset_id"] = (long)group.WorksetId.IntegerValue;
                 revision = _tracker.For(doc)?.Rev ?? 0;
                 return true;
@@ -55,9 +55,9 @@ namespace Bimbridge.Addin.Revit
             {
                 try
                 {
-                    var map = GroupMemberMap.Compare(previous, (List<object>)data["instantanea_miembros"]);
-                    data["reconciliacion"] = map;
-                    if (!(bool)map["completo"]) status = Status.CompletedWithDifferences;
+                    var map = GroupMemberMap.Compare(previous, (List<object>)data["members_snapshot"]);
+                    data["reconciliation"] = map;
+                    if (!(bool)map["complete"]) status = Status.CompletedWithDifferences;
                 }
                 catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalid, ex.Message); }
             }

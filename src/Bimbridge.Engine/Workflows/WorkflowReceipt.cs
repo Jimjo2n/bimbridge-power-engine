@@ -40,20 +40,20 @@ namespace Bimbridge.Engine.Workflows
     public static class EvidenceKind
     {
         public const string PreflightPassed = "preflight_ok";
-        public const string PostCommandAccepted = "postcommand_aceptado";
-        public const string CommandActive = "comando_activo";           // the add-in observes the native mode (e.g. command / UI event)
-        public const string LinkSelected = "vinculo_seleccionado";
-        public const string MappingDialog = "dialogo_mapeo";
-        public const string CopyStarted = "copia_iniciada";
-        public const string CopyObserved = "copia_observada";           // new elements appeared in the host
-        public const string FinishObserved = "finalizar_observado";
-        public const string VerificationPassed = "verificacion_ok";
-        public const string VerificationFailed = "verificacion_fallida";
-        public const string SaveConfirmed = "guardado_confirmado";       // reread after saving (not just the save command)
-        public const string Cancelled = "cancelado";
-        public const string Uncertain = "incierto";                      // disconnection, modal dialog, restart, timeout
-        public const string NoUiExecutor = "sin_ejecutor_ui";
-        public const string Reconciled = "reconciliado";
+        public const string PostCommandAccepted = "postcommand_accepted";
+        public const string CommandActive = "active_command";           // the add-in observes the native mode (e.g. command / UI event)
+        public const string LinkSelected = "selected_link";
+        public const string MappingDialog = "mapping_dialog";
+        public const string CopyStarted = "copy_started";
+        public const string CopyObserved = "copy_observed";           // new elements appeared in the host
+        public const string FinishObserved = "finish_observed";
+        public const string VerificationPassed = "verification_ok";
+        public const string VerificationFailed = "verification_failed";
+        public const string SaveConfirmed = "save_confirmed";       // reread after saving (not just the save command)
+        public const string Cancelled = "cancelled";
+        public const string Uncertain = "uncertain";                      // disconnection, modal dialog, restart, timeout
+        public const string NoUiExecutor = "no_ui_executor";
+        public const string Reconciled = "reconciled";
 
         public static readonly string[] All =
         {
@@ -72,17 +72,17 @@ namespace Bimbridge.Engine.Workflows
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["tipo"] = Kind, ["nivel"] = Level.ToString(), ["fuente"] = Source, ["detalle"] = Detail ?? "",
-            ["en"] = AtUtc.ToString("o", CultureInfo.InvariantCulture),
+            ["type"] = Kind, ["level"] = Level.ToString(), ["source"] = Source, ["detail"] = Detail ?? "",
+            ["in"] = AtUtc.ToString("o", CultureInfo.InvariantCulture),
         };
 
         public static Evidence FromJson(Dictionary<string, object> d) => new Evidence
         {
-            Kind = Arg.GetString(d, "tipo"),
-            Level = (ProofLevel)Enum.Parse(typeof(ProofLevel), Arg.GetString(d, "nivel") ?? "observed"),
-            Source = Arg.GetString(d, "fuente"),
-            Detail = Arg.GetString(d, "detalle"),
-            AtUtc = DateTime.Parse(Arg.GetString(d, "en"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+            Kind = Arg.GetString(d, "type"),
+            Level = (ProofLevel)Enum.Parse(typeof(ProofLevel), Arg.GetString(d, "level") ?? "observed"),
+            Source = Arg.GetString(d, "source"),
+            Detail = Arg.GetString(d, "detail"),
+            AtUtc = DateTime.Parse(Arg.GetString(d, "in"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
         };
     }
 
@@ -96,14 +96,14 @@ namespace Bimbridge.Engine.Workflows
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
             ["agent_id"] = AgentId, ["session_id"] = SessionId, ["request_id"] = RequestId, ["trace_id"] = TraceId, ["job_id"] = JobId,
-            ["documento"] = DocumentIdentity, ["vinculo"] = LinkIdentity, ["revit"] = RevitVersion, ["revit_build"] = RevitBuild, ["build"] = ProductBuild,
+            ["document"] = DocumentIdentity, ["link"] = LinkIdentity, ["revit"] = RevitVersion, ["revit_build"] = RevitBuild, ["build"] = ProductBuild,
         };
 
         public static WorkflowCorrelation FromJson(Dictionary<string, object> d) => new WorkflowCorrelation
         {
             AgentId = Arg.GetString(d, "agent_id"), SessionId = Arg.GetString(d, "session_id"), RequestId = Arg.GetString(d, "request_id"),
-            TraceId = Arg.GetString(d, "trace_id"), JobId = Arg.GetString(d, "job_id"), DocumentIdentity = Arg.GetString(d, "documento"),
-            LinkIdentity = Arg.GetString(d, "vinculo"), RevitVersion = Arg.GetString(d, "revit"), RevitBuild = Arg.GetString(d, "revit_build"),
+            TraceId = Arg.GetString(d, "trace_id"), JobId = Arg.GetString(d, "job_id"), DocumentIdentity = Arg.GetString(d, "document"),
+            LinkIdentity = Arg.GetString(d, "link"), RevitVersion = Arg.GetString(d, "revit"), RevitBuild = Arg.GetString(d, "revit_build"),
             ProductBuild = Arg.GetString(d, "build"),
         };
     }
@@ -142,30 +142,30 @@ namespace Bimbridge.Engine.Workflows
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["esquema"] = Schema, ["flujo"] = Workflow, ["clave_intento"] = AttemptKey, ["estado"] = State.ToString(),
-            ["prueba"] = Proof.ToString(), ["puede_tener_efectos"] = MayHaveEffects, ["correlacion"] = Correlation.ToJson(),
-            ["creado"] = CreatedUtc.ToString("o", CultureInfo.InvariantCulture), ["nota"] = Note ?? "",
-            ["historial"] = History.Select(h => (object)new Dictionary<string, object> { ["de"] = h.From.ToString(), ["a"] = h.To.ToString(), ["evidencia"] = h.Evidence.ToJson() }).ToList(),
+            ["schema"] = Schema, ["workflow"] = Workflow, ["attempt_key"] = AttemptKey, ["status"] = State.ToString(),
+            ["test"] = Proof.ToString(), ["may_have_effects"] = MayHaveEffects, ["correlation"] = Correlation.ToJson(),
+            ["created"] = CreatedUtc.ToString("o", CultureInfo.InvariantCulture), ["note"] = Note ?? "",
+            ["history"] = History.Select(h => (object)new Dictionary<string, object> { ["de"] = h.From.ToString(), ["a"] = h.To.ToString(), ["evidence"] = h.Evidence.ToJson() }).ToList(),
         };
 
         public static WorkflowReceipt FromJson(Dictionary<string, object> d)
         {
-            if (Arg.GetString(d, "esquema") != Schema) throw new InvalidDataException("receipt with unknown schema");
+            if (Arg.GetString(d, "schema") != Schema) throw new InvalidDataException("receipt with unknown schema");
             var r = new WorkflowReceipt
             {
-                Workflow = Arg.GetString(d, "flujo"),
-                AttemptKey = Arg.GetString(d, "clave_intento"),
-                State = (WorkflowState)Enum.Parse(typeof(WorkflowState), Arg.GetString(d, "estado")),
-                Correlation = WorkflowCorrelation.FromJson((Dictionary<string, object>)d["correlacion"]),
-                CreatedUtc = DateTime.Parse(Arg.GetString(d, "creado"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                Note = Arg.GetString(d, "nota"),
+                Workflow = Arg.GetString(d, "workflow"),
+                AttemptKey = Arg.GetString(d, "attempt_key"),
+                State = (WorkflowState)Enum.Parse(typeof(WorkflowState), Arg.GetString(d, "status")),
+                Correlation = WorkflowCorrelation.FromJson((Dictionary<string, object>)d["correlation"]),
+                CreatedUtc = DateTime.Parse(Arg.GetString(d, "created"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                Note = Arg.GetString(d, "note"),
             };
-            foreach (Dictionary<string, object> h in (List<object>)d["historial"])
+            foreach (Dictionary<string, object> h in (List<object>)d["history"])
                 r.History.Add(new WorkflowStep
                 {
                     From = (WorkflowState)Enum.Parse(typeof(WorkflowState), Arg.GetString(h, "de")),
                     To = (WorkflowState)Enum.Parse(typeof(WorkflowState), Arg.GetString(h, "a")),
-                    Evidence = Evidence.FromJson((Dictionary<string, object>)h["evidencia"]),
+                    Evidence = Evidence.FromJson((Dictionary<string, object>)h["evidence"]),
                 });
             return r;
         }
@@ -265,11 +265,11 @@ namespace Bimbridge.Engine.Workflows
             return null;
         }
 
-        /// <summary>A reconciliation declares the observed state ("detalle" = state name). It can never jump to saved or verified without its own evidence.</summary>
+        /// <summary>A reconciliation declares the observed state ("detail" = state name). It can never jump to saved or verified without its own evidence.</summary>
         private static WorkflowState? ReconciledState(string detail, WorkflowReceipt r, out string refusal)
         {
             refusal = null;
-            if (!Enum.TryParse(detail ?? "", out WorkflowState s)) { refusal = "reconciliado: detalle must be the observed state"; return null; }
+            if (!Enum.TryParse(detail ?? "", out WorkflowState s)) { refusal = "reconciled: detail must be the observed state"; return null; }
             if (s == WorkflowState.save_confirmed || s == WorkflowState.verification_passed || s == WorkflowState.reconciliation_required)
             { refusal = "a reconciliation cannot declare " + s + ": supply the verification or the save as its own evidence"; return null; }
             if (s == WorkflowState.preflight && r.MayHaveEffects) { refusal = "a copy may already have happened: no return to preflight; reconcile to finished or awaiting_finish"; return null; }
@@ -315,7 +315,7 @@ namespace Bimbridge.Engine.Workflows
         public WorkflowReceipt Load(string key)
         {
             var p = PathFor(key);
-            return File.Exists(p) ? WorkflowReceipt.FromJson(Json.ParseObject(File.ReadAllText(p, Encoding.UTF8))) : null;
+            return File.Exists(p) ? WorkflowReceipt.FromJson(LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(p, Encoding.UTF8)))) : null;
         }
 
         /// <summary>Maximum wait for an attempt's lock (another process writing the same receipt).</summary>
@@ -414,9 +414,9 @@ namespace Bimbridge.Engine.Workflows
                 b.Sha256 = Baseline.Hash(key, documentIdentity, linkIdentity, list, expectations);
                 var json = Json.Write(new Dictionary<string, object>
                 {
-                    ["esquema"] = Baseline.Schema, ["clave_intento"] = key, ["documento"] = documentIdentity, ["vinculo"] = linkIdentity,
-                    ["ids"] = list.Cast<object>().ToList(), ["sha256"] = b.Sha256, ["creado"] = b.CreatedUtc.ToString("o", CultureInfo.InvariantCulture),
-                    ["expectativas"] = expectations,
+                    ["schema"] = Baseline.Schema, ["attempt_key"] = key, ["document"] = documentIdentity, ["link"] = linkIdentity,
+                    ["ids"] = list.Cast<object>().ToList(), ["sha256"] = b.Sha256, ["created"] = b.CreatedUtc.ToString("o", CultureInfo.InvariantCulture),
+                    ["expectations"] = expectations,
                 });
                 var p = BaselinePath(key);
                 var tmp = p + ".tmp";
@@ -444,13 +444,13 @@ namespace Bimbridge.Engine.Workflows
             try
             {
                 var d = Json.ParseObject(File.ReadAllText(p, Encoding.UTF8));
-                if (Arg.GetString(d, "esquema") != Baseline.Schema) throw new InvalidDataException("baseline inventory with unknown schema");
+                if (Arg.GetString(d, "schema") != Baseline.Schema) throw new InvalidDataException("baseline inventory with unknown schema");
                 var b = new Baseline
                 {
-                    AttemptKey = Arg.GetString(d, "clave_intento"), DocumentIdentity = Arg.GetString(d, "documento"), LinkIdentity = Arg.GetString(d, "vinculo"),
+                    AttemptKey = Arg.GetString(d, "attempt_key"), DocumentIdentity = Arg.GetString(d, "document"), LinkIdentity = Arg.GetString(d, "link"),
                     Sha256 = Arg.GetString(d, "sha256"), Ids = ((List<object>)d["ids"]).Select(x => Convert.ToInt64(x, CultureInfo.InvariantCulture)).ToList(),
-                    CreatedUtc = DateTime.Parse(Arg.GetString(d, "creado"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                    Expectations = Arg.GetString(d, "expectativas"),
+                    CreatedUtc = DateTime.Parse(Arg.GetString(d, "created"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                    Expectations = Arg.GetString(d, "expectations"),
                 };
                 if (b.AttemptKey != key || b.Sha256 != Baseline.Hash(key, b.DocumentIdentity, b.LinkIdentity, b.Ids, b.Expectations))
                     throw new InvalidDataException("the baseline inventory of attempt " + key + " does not match its fingerprint (tampered or damaged)");
@@ -479,7 +479,7 @@ namespace Bimbridge.Engine.Workflows
             foreach (var f in Directory.GetFiles(_dir, "*.json"))
             {
                 WorkflowReceipt r;
-                try { r = WorkflowReceipt.FromJson(Json.ParseObject(File.ReadAllText(f, Encoding.UTF8))); }
+                try { r = WorkflowReceipt.FromJson(LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(f, Encoding.UTF8)))); }
                 catch (Exception ex) when (ex is InvalidDataException || ex is FormatException || ex is ArgumentException || ex is InvalidCastException || ex is KeyNotFoundException || ex is InvalidOperationException)
                 {
                     unreadable.Add(Path.GetFileNameWithoutExtension(f) + ": " + ex.GetType().Name);

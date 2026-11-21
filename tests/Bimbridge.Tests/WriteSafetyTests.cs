@@ -32,9 +32,9 @@ namespace Bimbridge.Tests
         public void BlockJson_HasCodeOnlyWhenBlocked()
         {
             var b = new DocWriteBlock { DocKey = Doc };
-            Assert.Null(b.ToJson()["codigo"]);
+            Assert.Null(b.ToJson()["code"]);
             b.Plans.Add("P-1");
-            Assert.Equal(DocWriteBlock.Code, b.ToJson()["codigo"]);
+            Assert.Equal(DocWriteBlock.Code, b.ToJson()["code"]);
         }
 
         [Fact]
@@ -110,10 +110,10 @@ namespace Bimbridge.Tests
             var p = NewPlan();
             s.Add(p);
             GroupAbort.PreserveInterrupted(p, "x");
-            s.WriteFile = (_, __) => throw new UnauthorizedAccessException("denegado");
-            Assert.False(s.Finish(p, Status.Unknown, "incierto"));
+            s.WriteFile = (_, __) => throw new UnauthorizedAccessException("denied");
+            Assert.False(s.Finish(p, Status.Unknown, "uncertain"));
             Assert.Contains("it is not durable", p.StorageWarning);
-            Assert.True(p.Describe(0).ContainsKey("almacenamiento"));
+            Assert.True(p.Describe(0).ContainsKey("storage"));
             Assert.True(s.CheckWritable(Doc).Blocked);
         }
 
@@ -173,7 +173,7 @@ namespace Bimbridge.Tests
             var s = Store();
             s.LockWait = TimeSpan.FromMilliseconds(100);
             Directory.CreateDirectory(s.DocDir(Doc));
-            using (new FileStream(Path.Combine(s.DocDir(Doc), ".bloqueo"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+            using (new FileStream(Path.Combine(s.DocDir(Doc), ".lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
                 Assert.Throws<PlanStoreException>(() => s.BeginWrite(NewPlan()));
         }
 
@@ -207,7 +207,7 @@ namespace Bimbridge.Tests
             var again = Store();
             again.LoadPersisted(Doc);
             Assert.Equal(new long[] { 100, 101 }, again.Get(p.Id).Created.ToArray());
-            Assert.Equal(2, ((List<object>)again.Get(p.Id).Reconciliation["ids_creados"]).Count);
+            Assert.Equal(2, ((List<object>)again.Get(p.Id).Reconciliation["created_ids"]).Count);
         }
 
         // ---- Verdict ----
@@ -243,7 +243,7 @@ namespace Bimbridge.Tests
         public void Evaluate_CreationsWithLostIds_IsNotVerifiable()
         {
             var p = NewPlan();
-            p.Entries.Add(new PlanEntry { Op = "place", Key = "nuevo", OpIndex = 1 });
+            p.Entries.Add(new PlanEntry { Op = "place", Key = "new", OpIndex = 1 });
             p.AppliedBatches = 1;
             Assert.False(Eval(p, "a").Verified);
         }
@@ -273,7 +273,7 @@ namespace Bimbridge.Tests
             var p = NewPlan();
             s.Add(p);
             s.BeginWrite(p);
-            s.Finish(p, Status.Unknown, "incierto");
+            s.Finish(p, Status.Unknown, "uncertain");
             return p;
         }
 
@@ -286,7 +286,7 @@ namespace Bimbridge.Tests
             Assert.True(s.CheckWritable(Doc).Blocked);
             var again = Store();
             again.LoadPersisted(Doc);
-            Assert.Single((List<object>)again.Get(p.Id).Reconciliation["intentos"]);
+            Assert.Single((List<object>)again.Get(p.Id).Reconciliation["attempts"]);
         }
 
         [Fact]
@@ -298,10 +298,10 @@ namespace Bimbridge.Tests
             Assert.False(s.CheckWritable(Doc).Blocked);
             Assert.Equal(PlanStatus.Reconciled, p.Status);
             Assert.True(p.IsFinal);
-            var archived = Directory.GetFiles(Path.Combine(s.DocDir(Doc), "reconciliados"));
+            var archived = Directory.GetFiles(Path.Combine(s.DocDir(Doc), "reconciled"));
             Assert.Single(archived);
             var o = Json.ParseObject(File.ReadAllText(archived[0]));
-            Assert.Equal("s1", ((Dictionary<string, object>)o["registro"])["autor"]);
+            Assert.Equal("s1", ((Dictionary<string, object>)o["record"])["author"]);
             Assert.Equal("P-1", ((Dictionary<string, object>)o["plan"])["id"]);
             Assert.False(Store().CheckWritable(Doc).Blocked);
         }
@@ -327,7 +327,7 @@ namespace Bimbridge.Tests
             Assert.Throws<ArgumentException>(() => s.QuarantineCorrupt(s.DocDir(Doc), "..\\P-9.json", "operator", "m"));
             s.QuarantineCorrupt(s.DocDir(Doc), "P-9.json", "operator", "revisé el modelo");
             Assert.False(s.CheckWritable(Doc).Blocked);
-            Assert.Equal(2, Directory.GetFiles(Path.Combine(s.DocDir(Doc), "cuarentena")).Length);
+            Assert.Equal(2, Directory.GetFiles(Path.Combine(s.DocDir(Doc), "quarantine")).Length);
         }
 
         // ---- Trial ----
@@ -382,10 +382,10 @@ namespace Bimbridge.Tests
         [Fact]
         public void CodexRestore_OnlyTouchesOurSection()
         {
-            var saved = "model = \"viejo\"\n\n[mcp_servers.bimbridge]\ncommand = \"viejo.exe\"\nstartup_timeout_sec = 9\n";
-            var current = "model = \"nuevo\"\n\n[otra]\nx = 1\n\n[mcp_servers.bimbridge]\ncommand = \"nuevo.exe\"\n";
+            var saved = "model = \"old\"\n\n[mcp_servers.bimbridge]\ncommand = \"viejo.exe\"\nstartup_timeout_sec = 9\n";
+            var current = "model = \"new\"\n\n[otra]\nx = 1\n\n[mcp_servers.bimbridge]\ncommand = \"nuevo.exe\"\n";
             var r = SetupCore.ReplaceTomlSection(current, saved, SetupCore.CodexSection);
-            Assert.Contains("model = \"nuevo\"", r);
+            Assert.Contains("model = \"new\"", r);
             Assert.Contains("[otra]", r);
             Assert.Contains("viejo.exe", r);
             Assert.Contains("startup_timeout_sec = 9", r);

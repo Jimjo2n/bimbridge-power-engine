@@ -30,7 +30,7 @@ namespace Bimbridge.Bridge
         private long _nextId;
         private Timer _heartbeat;
 
-        public string ClientName { get; set; } = "cliente";
+        public string ClientName { get; set; } = "client";
         /// <summary>Version the MCP client declared in clientInfo.</summary>
         public string ClientVersion { get; set; }
         /// <summary>
@@ -39,7 +39,7 @@ namespace Bimbridge.Bridge
         /// </summary>
         public string AgentName { get; set; } = Environment.GetEnvironmentVariable("BIMBRIDGE_AGENT");
         /// <summary>configuracion (environment variable) or registro (ctx agente=…, repeated on reconnect).</summary>
-        public string AgentSource { get; set; } = "configuracion";
+        public string AgentSource { get; set; } = "configuration";
         public string Conversation { get; set; } = Environment.GetEnvironmentVariable("BIMBRIDGE_CONVERSATION");
         public string Model { get; set; } = Environment.GetEnvironmentVariable("BIMBRIDGE_MODEL");
         public Dictionary<string, object> Hello { get; private set; }
@@ -111,7 +111,7 @@ namespace Bimbridge.Bridge
             if (OpSemantics.Classify(op, args, out var invalid) == OpSemantics.Kind.Invalid)
                 return Response.Fail(0, Status.Invalid, invalid);
             var write = IsWriteOp(op, args);
-            var receiptQuery = op == Wire.OpJob && !string.IsNullOrEmpty(Arg.GetString(args, "intento_id"));
+            var receiptQuery = op == Wire.OpJob && !string.IsNullOrEmpty(Arg.GetString(args, "attempt_id"));
             var connectError = await EnsureConnectedAsync(ct, allowRetarget: !write && !receiptQuery).ConfigureAwait(false);
             if (connectError != null) return connectError;
             bool supportsReceipt;
@@ -144,11 +144,11 @@ namespace Bimbridge.Bridge
                 if (req.AttemptId != null)
                     response.Data = new Dictionary<string, object>
                     {
-                        ["recibo"] = new Dictionary<string, object>
+                        ["receipt"] = new Dictionary<string, object>
                         {
-                            ["intento_id"] = req.AttemptId, ["estado"] = Status.Unknown, ["pid"] = pid,
+                            ["attempt_id"] = req.AttemptId, ["status"] = Status.Unknown, ["pid"] = pid,
                             ["doc"] = Arg.GetString(req.Args, "doc"), ["plan_id"] = Arg.GetString(req.Args, "plan_id"),
-                            ["envio_confirmado"] = sent,
+                            ["send_confirmed"] = sent,
                         },
                     };
                 return response;
@@ -203,7 +203,7 @@ namespace Bimbridge.Bridge
                         if (!allowRetarget || same.Count != 1)
                             return Response.Fail(0, Status.TargetUnavailable,
                                 "The selected Revit (" + PinnedVersion + ", pid " + PreferredPid + ") is no longer open. Not redirecting to another one" +
-                                (allowRetarget ? "" : " for writing") + ". Open: " + openList +". Pick one with ctx instancia=<pid or version> and re-read before changing anything.");
+                                (allowRetarget ? "" : " for writing") + ". Open: " + openList +". Pick one with ctx instance=<pid or version> and re-read before changing anything.");
                         RetargetNotice = "Revit " + PinnedVersion + " (pid " + PreferredPid + ") closed; this read ran on the other open Revit " + PinnedVersion + " (pid " + same[0].Pid + "). " +
                                          "Previous dN handles, sets and plans are not valid here.";
                         PreferredPid = same[0].Pid;
@@ -246,10 +246,10 @@ namespace Bimbridge.Bridge
                             [Wire.LargeResultFeature] = true,
                             ["client"] = ClientName,
                             ["client_version"] = ClientVersion,
-                            ["agente"] = AgentName,
-                            ["agente_fuente"] = string.IsNullOrWhiteSpace(AgentName) ? null : AgentSource,
-                            ["conversacion"] = Conversation,
-                            ["modelo"] = Model,
+                            ["agent"] = AgentName,
+                            ["agent_source"] = string.IsNullOrWhiteSpace(AgentName) ? null : AgentSource,
+                            ["conversation"] = Conversation,
+                            ["model"] = Model,
                             ["pid"] = (long)Environment.ProcessId,
                         },
                     };

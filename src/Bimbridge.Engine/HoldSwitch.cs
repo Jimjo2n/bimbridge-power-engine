@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 using System;
 using System.IO;
+using Bimbridge.Protocol;
 
 namespace Bimbridge.Engine
 {
     /// <summary>
     /// Switch stored as a file: if the file exists, it is on. Survives restarts
     /// and can be inspected or changed without opening Revit. Re-read at most once per second.
-    ///   retener.on  → the AI's commits stay in the queue until "Apply queue".
-    ///   pausado.on  → the add-in rejects every AI request ("Pause AI").
+    ///   hold.on    → the AI's commits stay in the queue until "Apply queue".
+    ///   paused.on  → the add-in rejects every AI request ("Pause AI").
     /// </summary>
     public class FlagFile
     {
@@ -22,7 +23,7 @@ namespace Bimbridge.Engine
 
         public FlagFile(string home, string fileName)
         {
-            _file = Path.Combine(home, fileName);
+            _file = LegacyAliases.ResolveExisting(home, Path.Combine(home, fileName));   // a flag set by 0.9.3 keeps its legacy name until migrated
             Refresh();
         }
 
@@ -76,12 +77,12 @@ namespace Bimbridge.Engine
     /// <summary>Ribbon "Hold" button.</summary>
     public sealed class HoldSwitch : FlagFile
     {
-        public HoldSwitch(string home) : base(home, "retener.on") { }
+        public HoldSwitch(string home) : base(home, "hold.on") { }
     }
 
     /// <summary>Ribbon "Pause AI" button.</summary>
     public sealed class PauseSwitch : FlagFile
     {
-        public PauseSwitch(string home) : base(home, "pausado.on") { }
+        public PauseSwitch(string home) : base(home, "paused.on") { }
     }
 }

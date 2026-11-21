@@ -152,9 +152,9 @@ namespace Bimbridge.Addin.Ui
                 if (res == TaskDialogResult.Yes)
                 {
                     var grant = g.Approve(r.Task, r.DocKey, r.DocPrint, r.Capabilities, TimeSpan.FromHours(8), who, DateTime.UtcNow);
-                    TryAudit(who, "concesion", "aprobada", new Dictionary<string, object> { ["concesion"] = grant.Id, ["tarea"] = r.Task, ["doc"] = r.DocKey, ["capacidades"] = r.Capabilities.Cast<object>().ToList() });
+                    TryAudit(who, "lease", "approved", new Dictionary<string, object> { ["lease"] = grant.Id, ["task"] = r.Task, ["doc"] = r.DocKey, ["capabilities"] = r.Capabilities.Cast<object>().ToList() });
                 }
-                else TryAudit(who, "concesion", "rechazada", new Dictionary<string, object> { ["tarea"] = r.Task, ["capacidades"] = r.Capabilities.Cast<object>().ToList() });
+                else TryAudit(who, "lease", "rejected", new Dictionary<string, object> { ["task"] = r.Task, ["capabilities"] = r.Capabilities.Cast<object>().ToList() });
                 g.CloseRequest(r.Id);
             }
             if (pending.Count == 0)
@@ -171,7 +171,7 @@ namespace Bimbridge.Addin.Ui
                 if (td.Show() == TaskDialogResult.CommandLink1)
                 {
                     foreach (var x in live) g.Revoke(x.Id, DateTime.UtcNow);
-                    TryAudit(who, "concesion", "revocadas", new Dictionary<string, object> { ["n"] = (long)live.Count });
+                    TryAudit(who, "lease", "revoked_items", new Dictionary<string, object> { ["n"] = (long)live.Count });
                 }
             }
             Runtime.MarkDirty();

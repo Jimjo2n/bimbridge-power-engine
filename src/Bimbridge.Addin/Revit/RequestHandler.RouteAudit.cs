@@ -22,14 +22,14 @@ namespace Bimbridge.Addin.Revit
             try
             {
                 route = RouteIds(request.Args, "ids");
-                stubs = RouteIds(request.Args, "stubs_externos");
-                decks = RouteGeometryIds(request.Args, "losas");
-                obstacles = RouteGeometryIds(request.Args, "obstaculos");
+                stubs = RouteIds(request.Args, "external_stubs");
+                decks = RouteGeometryIds(request.Args, "slabs");
+                obstacles = RouteGeometryIds(request.Args, "obstacles");
                 if (route.Count == 0 || route.Count > 200 || decks.Count == 0 || decks.Count > 32 || obstacles.Count > 100 ||
                     stubs.Except(route).Any() || obstacles.Any(x => x.Link == 0 && route.Contains(x.Id)))
                     throw new QueryException("specify the segments and slabs in scope, without overlapping them with obstacles. Stubs must belong to the route");
-                start = ReadRoutePoint(request.Args, "inicio");
-                end = ReadRoutePoint(request.Args, "fin");
+                start = ReadRoutePoint(request.Args, "start");
+                end = ReadRoutePoint(request.Args, "end");
             }
             catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalid, ex.Message); }
 
@@ -52,12 +52,12 @@ namespace Bimbridge.Addin.Revit
                     try
                     {
                         var topology = ConduitRouteScope.Capture(doc, route, start, end);
-                        foreach (var port in ((List<object>)topology["extremos"]).OfType<Dictionary<string, object>>())
+                        foreach (var port in ((List<object>)topology["ends"]).OfType<Dictionary<string, object>>())
                             expectedContacts.Add(Arg.GetLong(port, "id").Value);
                     }
                     catch (QueryException ex)
                     {
-                        findings.Add(new Dictionary<string, object> { ["tipo"] = "continuidad_fisica", ["motivo"] = ex.Message });
+                        findings.Add(new Dictionary<string, object> { ["type"] = "physical_continuity", ["reason"] = ex.Message });
                         fails = true;
                     }
                 }
@@ -90,43 +90,43 @@ namespace Bimbridge.Addin.Revit
                 var id = route[cursor++];
                 void Add(string kind, string detail, bool failure = true, long? other = null, long? link = null, double? volume = null)
                 {
-                    var item = new Dictionary<string, object> { ["tipo"] = kind, ["elemento"] = id, ["motivo"] = detail };
-                    if (other.HasValue) { item["otro_id"] = other.Value; item["vinculo_id"] = link; }
-                    if (volume.HasValue) item["volumen_ft3"] = volume.Value;
+                    var item = new Dictionary<string, object> { ["type"] = kind, ["element"] = id, ["reason"] = detail };
+                    if (other.HasValue) { item["other_id"] = other.Value; item["link_id"] = link; }
+                    if (volume.HasValue) item["volume_ft3"] = volume.Value;
                     if (failure) { fails = true; findings.Add(item); }
                     else if (sample.Count < 50) sample.Add(item);
                 }
                 var target = Solids((id, 0));
-                if (target == null) Add("no_evaluable", "the element has no intact solid geometry");
+                if (target == null) Add("not_evaluable", "the element has no intact solid geometry");
                 else
                 {
                     var deckSolids = decks.Select(Solids).ToList();
-                    if (stubs.Contains(id)) Add("stub_externo", "exempt from containment by route scope", failure: false);
-                    else if (deckSolids.Any(s => s == null)) Add("contencion_no_evaluable", "solids missing for one or more slabs");
+                    if (stubs.Contains(id)) Add("external_stub", "exempt from containment by route scope", failure: false);
+                    else if (deckSolids.Any(s => s == null)) Add("containment_not_evaluable", "solids missing for one or more slabs");
                     else
                     {
                         try
                         {
                             var outside = target.Sum(body => OutsideVolume(body, deckSolids.SelectMany(s => s)));
-                            if (outside > RouteVolumeTolerance) Add("fuera_de_losa", "body volume outside the given slabs", volume: outside);
+                            if (outside > RouteVolumeTolerance) Add("off_slab", "body volume outside the given slabs", volume: outside);
                         }
-                        catch (Autodesk.Revit.Exceptions.InvalidOperationException ex) { Add("contencion_no_evaluable", ex.Message); }
+                        catch (Autodesk.Revit.Exceptions.InvalidOperationException ex) { Add("containment_not_evaluable", ex.Message); }
                     }
                     foreach (var obstacle in obstacles)
                     {
                         var other = Solids(obstacle);
-                        if (other == null) { Add("choque_no_evaluable", "obstacle solids missing", other: obstacle.Id, link: obstacle.Link); continue; }
+                        if (other == null) { Add("clash_not_evaluable", "obstacle solids missing", other: obstacle.Id, link: obstacle.Link); continue; }
                         try
                         {
                             var interference = target.Sum(a => other.Sum(b => IntersectionVolume(a, b)));
                             if (interference <= RouteVolumeTolerance)
-                                Add("candidato_descartado", "solid intersection without significant volume", false, obstacle.Id, obstacle.Link);
+                                Add("discarded_candidate", "solid intersection without significant volume", false, obstacle.Id, obstacle.Link);
                             else
-                                Add("choque_real", obstacle.Link == 0 && expectedContacts.Contains(obstacle.Id)
+                                Add("real_clash", obstacle.Link == 0 && expectedContacts.Contains(obstacle.Id)
                                     ? "overlap with a connected terminal; check that the volume is limited to the intended joint" : "solid intersection",
                                     true, obstacle.Id, obstacle.Link, interference);
                         }
-                        catch (Autodesk.Revit.Exceptions.InvalidOperationException ex) { Add("choque_no_evaluable", ex.Message, other: obstacle.Id, link: obstacle.Link); }
+                        catch (Autodesk.Revit.Exceptions.InvalidOperationException ex) { Add("clash_not_evaluable", ex.Message, other: obstacle.Id, link: obstacle.Link); }
                     }
                 }
                 return cursor == route.Count;
@@ -138,8 +138,8 @@ namespace Bimbridge.Addin.Revit
                 Id = request.Id, Rev = revision, State = fails ? Status.CompletedWithDifferences : Status.Ok,
                 Data = new Dictionary<string, object>
                 {
-                    ["ruta"] = Arg.GetString(request.Args, "ruta"), ["nivel"] = Arg.GetString(request.Args, "nivel"),
-                    ["elementos_revisados"] = (long)cursor, ["hallazgos"] = findings, ["muestra_sin_incidencia"] = sample,
+                    ["path"] = Arg.GetString(request.Args, "path"), ["level"] = Arg.GetString(request.Args, "level"),
+                    ["elements_reviewed"] = (long)cursor, ["findings"] = findings, ["sample_without_incident"] = sample,
                 },
             };
         }
@@ -172,7 +172,7 @@ namespace Bimbridge.Addin.Revit
         private static XYZ ReadRoutePoint(Dictionary<string, object> args, string key)
         {
             if (!args.TryGetValue(key, out var value)) throw new QueryException("specify the route " + key);
-            var p = OpCatalog.Point(value, "ruta " + key);
+            var p = OpCatalog.Point(value, "path " + key);
             if (p.Length != 3) throw new QueryException(key + " requires XYZ in internal feet");
             return new XYZ(p[0], p[1], p[2]);
         }
@@ -184,10 +184,10 @@ namespace Bimbridge.Addin.Revit
         private static List<(long Id, long Link)> RouteGeometryIds(Dictionary<string, object> args, string key)
         {
             if (!args.TryGetValue(key, out var value)) return new List<(long, long)>();
-            if (!(value is List<object> list)) throw new QueryException(key + " requires a list of {id,vinculo?}");
+            if (!(value is List<object> list)) throw new QueryException(key + " requires a list of {id,link?}");
             return list.Select(x => x is Dictionary<string, object> item && Arg.GetLong(item, "id") is long id && id > 0 &&
-                (!item.ContainsKey("vinculo") || (Arg.GetLong(item, "vinculo") is long link && link > 0))
-                ? (id, Arg.GetLong(item, "vinculo") ?? 0L) : throw new QueryException("invalid geometric reference in " + key)).Distinct().ToList();
+                (!item.ContainsKey("link") || (Arg.GetLong(item, "link") is long link && link > 0))
+                ? (id, Arg.GetLong(item, "link") ?? 0L) : throw new QueryException("invalid geometric reference in " + key)).Distinct().ToList();
         }
     }
 }

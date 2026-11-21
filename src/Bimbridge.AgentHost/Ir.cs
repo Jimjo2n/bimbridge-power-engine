@@ -19,18 +19,18 @@ namespace Bimbridge.AgentHost
     public static class IrSchema
     {
         public const int Version = 2;
-        public static readonly string[] CoordinateSystems = { "interno_revit", "proyecto", "compartidas" };
+        public static readonly string[] CoordinateSystems = { "revit_internal", "project", "shared_items" };
         public static readonly string[] LengthUnits = { "mm", "m", "ft", "in" };
         /// <summary>Fields only the system may set. If they appear in the JSON, the plan is rejected.</summary>
-        public static readonly string[] SystemOnlyOpFields = { "autorizacion", "estado", "postcondiciones", "idempotencia", "intento", "resultado" };
-        public static readonly string[] SystemOnlyPlanFields = { "autorizacion", "estado", "hash" };
+        public static readonly string[] SystemOnlyOpFields = { "authorization", "status", "postconditions", "idempotency", "attempt", "result" };
+        public static readonly string[] SystemOnlyPlanFields = { "authorization", "status", "hash" };
     }
 
     /// <summary>Technical source document declared by the plan (e.g. a specifications PDF), identified by its SHA-256.</summary>
     public sealed class SourceDoc
     {
         public string Id, Name, Sha256;
-        public Dictionary<string, object> ToJson() => new Dictionary<string, object> { ["id"] = Id, ["nombre"] = Name, ["sha256"] = Sha256 };
+        public Dictionary<string, object> ToJson() => new Dictionary<string, object> { ["id"] = Id, ["name"] = Name, ["sha256"] = Sha256 };
     }
 
     /// <summary>Traceability of an operation back to the requirement that produced it.</summary>
@@ -42,18 +42,18 @@ namespace Bimbridge.AgentHost
 
         public Dictionary<string, object> ToJson()
         {
-            var d = new Dictionary<string, object> { ["fuente"] = SourceId };
-            if (Page != null) d["pagina"] = Page.Value;
-            if (Section != null) d["seccion"] = Section;
-            if (Requirement != null) d["requisito"] = Requirement;
-            if (Quote != null) d["cita"] = Quote;
+            var d = new Dictionary<string, object> { ["source"] = SourceId };
+            if (Page != null) d["page"] = Page.Value;
+            if (Section != null) d["section"] = Section;
+            if (Requirement != null) d["requirement"] = Requirement;
+            if (Quote != null) d["quote"] = Quote;
             return d;
         }
 
         public static SourceRef FromJson(Dictionary<string, object> o) => o == null ? null : new SourceRef
         {
-            SourceId = Arg.GetString(o, "fuente"), Page = Arg.GetLong(o, "pagina"), Section = Arg.GetString(o, "seccion"),
-            Requirement = Arg.GetString(o, "requisito"), Quote = Arg.GetString(o, "cita"),
+            SourceId = Arg.GetString(o, "source"), Page = Arg.GetLong(o, "page"), Section = Arg.GetString(o, "section"),
+            Requirement = Arg.GetString(o, "requirement"), Quote = Arg.GetString(o, "quote"),
         };
     }
 
@@ -77,25 +77,25 @@ namespace Bimbridge.AgentHost
         {
             var d = new Dictionary<string, object>
             {
-                ["id"] = Id, ["operacion"] = Operation, ["alcance"] = Scope, ["parametros"] = Params,
-                ["depende_de"] = DependsOn.Cast<object>().ToList(), ["precondiciones"] = Preconditions.Cast<object>().ToList(),
-                ["resultado_esperado"] = Expected, ["permitir_vacio"] = AllowEmpty,
+                ["id"] = Id, ["operation"] = Operation, ["scope"] = Scope, ["parameters"] = Params,
+                ["depends_on"] = DependsOn.Cast<object>().ToList(), ["preconditions"] = Preconditions.Cast<object>().ToList(),
+                ["expected_result"] = Expected, ["allow_empty"] = AllowEmpty,
             };
-            if (Retries != null) d["reintentos"] = Retries.Value;
-            if (Source != null) d["fuente"] = Source.ToJson();
+            if (Retries != null) d["retries"] = Retries.Value;
+            if (Source != null) d["source"] = Source.ToJson();
             return d;
         }
 
         public static OpDraft FromJson(Dictionary<string, object> o)
         {
-            var op = new OpDraft { Id = Arg.GetString(o, "id"), Operation = Arg.GetString(o, "operacion"), Retries = Arg.GetLong(o, "reintentos") };
-            if (o.TryGetValue("alcance", out var s) && s is Dictionary<string, object> sd) op.Scope = sd;
-            if (o.TryGetValue("parametros", out var p) && p is Dictionary<string, object> pd) op.Params = pd;
-            if (o.TryGetValue("resultado_esperado", out var e) && e is Dictionary<string, object> ed) op.Expected = ed;
-            if (o.TryGetValue("depende_de", out var dep) && dep is List<object> dl) op.DependsOn = dl.Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)).ToList();
-            if (o.TryGetValue("precondiciones", out var pre) && pre is List<object> pl) op.Preconditions = pl.OfType<Dictionary<string, object>>().ToList();
-            if (o.TryGetValue("fuente", out var f) && f is Dictionary<string, object> fd) op.Source = SourceRef.FromJson(fd);
-            op.AllowEmpty = Arg.GetBool(o, "permitir_vacio") ?? false;
+            var op = new OpDraft { Id = Arg.GetString(o, "id"), Operation = Arg.GetString(o, "operation"), Retries = Arg.GetLong(o, "retries") };
+            if (o.TryGetValue("scope", out var s) && s is Dictionary<string, object> sd) op.Scope = sd;
+            if (o.TryGetValue("parameters", out var p) && p is Dictionary<string, object> pd) op.Params = pd;
+            if (o.TryGetValue("expected_result", out var e) && e is Dictionary<string, object> ed) op.Expected = ed;
+            if (o.TryGetValue("depends_on", out var dep) && dep is List<object> dl) op.DependsOn = dl.Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)).ToList();
+            if (o.TryGetValue("preconditions", out var pre) && pre is List<object> pl) op.Preconditions = pl.OfType<Dictionary<string, object>>().ToList();
+            if (o.TryGetValue("source", out var f) && f is Dictionary<string, object> fd) op.Source = SourceRef.FromJson(fd);
+            op.AllowEmpty = Arg.GetBool(o, "allow_empty") ?? false;
             foreach (var k in IrSchema.SystemOnlyOpFields) if (o.ContainsKey(k)) op.Forbidden.Add(k);
             return op;
         }
@@ -139,12 +139,12 @@ namespace Bimbridge.AgentHost
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["ir"] = (long)Ir, ["objetivo"] = Objective,
-            ["documento"] = new Dictionary<string, object> { ["clave"] = DocKey, ["huella"] = DocPrint },
-            ["unidades"] = new Dictionary<string, object> { ["longitud"] = LengthUnit },
-            ["coordenadas"] = Coordinates,
-            ["fuentes"] = Sources.Select(s => (object)s.ToJson()).ToList(),
-            ["operaciones"] = Ops.Select(x => (object)x.ToJson()).ToList(),
+            ["ir"] = (long)Ir, ["target"] = Objective,
+            ["document"] = new Dictionary<string, object> { ["key"] = DocKey, ["fingerprint"] = DocPrint },
+            ["units"] = new Dictionary<string, object> { ["length"] = LengthUnit },
+            ["coordinates"] = Coordinates,
+            ["sources"] = Sources.Select(s => (object)s.ToJson()).ToList(),
+            ["operations"] = Ops.Select(x => (object)x.ToJson()).ToList(),
         };
 
         public static PlanDraft Parse(string json) => FromJson(Json.ParseObject(json));
@@ -153,14 +153,14 @@ namespace Bimbridge.AgentHost
         {
             var plan = new PlanDraft
             {
-                Ir = (int)(Arg.GetLong(o, "ir") ?? 0), Objective = Arg.GetString(o, "objetivo"), Coordinates = Arg.GetString(o, "coordenadas"),
+                Ir = (int)(Arg.GetLong(o, "ir") ?? 0), Objective = Arg.GetString(o, "target"), Coordinates = Arg.GetString(o, "coordinates"),
             };
-            if (o.TryGetValue("documento", out var d) && d is Dictionary<string, object> doc) { plan.DocKey = Arg.GetString(doc, "clave"); plan.DocPrint = Arg.GetString(doc, "huella"); }
-            if (o.TryGetValue("unidades", out var u) && u is Dictionary<string, object> ud) plan.LengthUnit = Arg.GetString(ud, "longitud");
-            if (o.TryGetValue("fuentes", out var fs) && fs is List<object> fl)
+            if (o.TryGetValue("document", out var d) && d is Dictionary<string, object> doc) { plan.DocKey = Arg.GetString(doc, "key"); plan.DocPrint = Arg.GetString(doc, "fingerprint"); }
+            if (o.TryGetValue("units", out var u) && u is Dictionary<string, object> ud) plan.LengthUnit = Arg.GetString(ud, "length");
+            if (o.TryGetValue("sources", out var fs) && fs is List<object> fl)
                 foreach (var x in fl.OfType<Dictionary<string, object>>())
-                    plan.Sources.Add(new SourceDoc { Id = Arg.GetString(x, "id"), Name = Arg.GetString(x, "nombre"), Sha256 = Arg.GetString(x, "sha256") });
-            if (o.TryGetValue("operaciones", out var ops) && ops is List<object> list)
+                    plan.Sources.Add(new SourceDoc { Id = Arg.GetString(x, "id"), Name = Arg.GetString(x, "name"), Sha256 = Arg.GetString(x, "sha256") });
+            if (o.TryGetValue("operations", out var ops) && ops is List<object> list)
                 foreach (var x in list.OfType<Dictionary<string, object>>()) plan.Ops.Add(OpDraft.FromJson(x));
             foreach (var k in IrSchema.SystemOnlyPlanFields) if (o.ContainsKey(k)) plan.Forbidden.Add(k);
             return plan;
@@ -177,13 +177,13 @@ namespace Bimbridge.AgentHost
         public static string OpId(string docKey, string docPrint, IDictionary<string, object> scope, string operation, IDictionary<string, object> parameters, string sourceIdentity) =>
             "op-" + Home.Sha256Hex(OpSemantics.Canonical(new Dictionary<string, object>
             {
-                ["doc"] = docKey ?? "", ["huella"] = docPrint ?? "", ["alcance"] = scope ?? new Dictionary<string, object>(), ["operacion"] = operation ?? "",
-                ["parametros"] = parameters ?? new Dictionary<string, object>(), ["fuente"] = sourceIdentity ?? "",
+                ["doc"] = docKey ?? "", ["fingerprint"] = docPrint ?? "", ["scope"] = scope ?? new Dictionary<string, object>(), ["operation"] = operation ?? "",
+                ["parameters"] = parameters ?? new Dictionary<string, object>(), ["source"] = sourceIdentity ?? "",
             }), 20);
 
         /// <summary>Semantic key: the same without the source. Two operations in the same plan with the same key are a duplicate.</summary>
         public static string SemanticKey(IDictionary<string, object> scope, string operation, IDictionary<string, object> parameters) =>
-            Home.Sha256Hex(OpSemantics.Canonical(new Dictionary<string, object> { ["alcance"] = scope, ["operacion"] = operation, ["parametros"] = parameters }), 20);
+            Home.Sha256Hex(OpSemantics.Canonical(new Dictionary<string, object> { ["scope"] = scope, ["operation"] = operation, ["parameters"] = parameters }), 20);
 
         /// <summary>Read-only deep copy (dictionaries and lists).</summary>
         public static object Freeze(object v)

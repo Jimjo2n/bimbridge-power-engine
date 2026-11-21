@@ -15,32 +15,32 @@ namespace Bimbridge.Engine.Geo
     {
         /// <summary>Length columns (feet) converted with units=mm.</summary>
         public static readonly HashSet<string> LengthCols = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        { "z", "ztop", "zbot", "x", "y", "dist", "dist_xy", "dz", "offset", "bajo", "alto", "elev", "cara_x", "cara_y", "cara_z" };
+        { "z", "ztop", "zbot", "x", "y", "dist", "dist_xy", "dz", "offset", "low", "high", "elev", "face_x", "face_y", "face_z" };
 
         /// <summary>Severity order: what must be fixed first.</summary>
         private static readonly string[] Severity =
         {
-            MountClass.Embedded, "penetra", "choque", MountClass.Floating, "separada", "distinto", "sobrante", "fuera", "ajena", "sin_cuarto",
-            ViewBand.Above, ViewBand.Below, "cerca", "en_region", MountClass.NoSurface, MountClass.NoBody, "sin_muro", "no_evaluable",
-            MountClass.Ok, "toca", "igual", "dentro", "unico", "con_cuarto", "libre",
+            MountClass.Embedded, "penetrates", "clash", MountClass.Floating, "separated", "different", "leftover", "outside", "foreign", "no_room",
+            ViewBand.Above, ViewBand.Below, "near", "in_region", MountClass.NoSurface, MountClass.NoBody, "no_wall", "not_evaluable",
+            MountClass.Ok, "touches", "equal", "inside", "unique", "with_room", "free",
         };
 
         public const double CubicCmPerCubicFoot = 28316.846592;
 
         public static readonly HashSet<string> OkClasses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        { MountClass.Ok, "toca", "igual", "dentro", "unico", "con_cuarto", "libre" };
+        { MountClass.Ok, "touches", "equal", "inside", "unique", "with_room", "free" };
 
         public static Dictionary<string, object> Build(GeoSpec spec, IList<Dictionary<string, object>> rows, IList<string> cols,
             string classField, IDictionary<string, string> setNames, out Dictionary<string, long[]> sets)
         {
             sets = new Dictionary<string, long[]>(StringComparer.OrdinalIgnoreCase);
-            var d = new Dictionary<string, object> { ["receta"] = spec.Recipe, ["total"] = (long)rows.Count };
+            var d = new Dictionary<string, object> { ["recipe"] = spec.Recipe, ["total"] = (long)rows.Count };
 
             if (classField != null)
             {
                 var byClass = rows.GroupBy(r => Str(r, classField) ?? "?")
                     .OrderBy(g => Rank(g.Key)).ToDictionary(g => g.Key, g => (object)(long)g.Count());
-                d["por_clase"] = byClass;
+                d["by_class"] = byClass;
                 if (rows.Any(r => r.ContainsKey("lvl")))
                 {
                     var byLevel = new Dictionary<string, object>();
@@ -50,7 +50,7 @@ namespace Bimbridge.Engine.Geo
                             .ToDictionary(x => x.Key, x => (object)(long)x.Count());
                         if (counts.Count > 1 || !OkClasses.Contains(counts.Keys.First())) byLevel[g.Key] = counts;
                     }
-                    if (byLevel.Count > 0 && byLevel.Count <= 40) d["por_nivel"] = byLevel;
+                    if (byLevel.Count > 0 && byLevel.Count <= 40) d["by_level"] = byLevel;
                 }
                 if (setNames != null)
                 {
@@ -71,9 +71,9 @@ namespace Bimbridge.Engine.Geo
                 if (only.Length == 0)
                 {
                     var problems = rows.Where(r => !OkClasses.Contains(Str(r, classField) ?? "")).ToList();
-                    if (problems.Count > 0) { shown = problems; d["tabla"] = "problems only (" + problems.Count + "); use solo=todos to see everything"; }
+                    if (problems.Count > 0) { shown = problems; d["schedule"] = "problems only (" + problems.Count + "); use only=all to see everything"; }
                 }
-                else if (!string.Equals(only, "todos", StringComparison.OrdinalIgnoreCase))
+                else if (!string.Equals(only, "all", StringComparison.OrdinalIgnoreCase))
                 {
                     shown = rows.Where(r => string.Equals(Str(r, classField), only, StringComparison.OrdinalIgnoreCase));
                 }
@@ -88,27 +88,27 @@ namespace Bimbridge.Engine.Geo
                 var arr = new object[cols.Count];
                 for (var i = 0; i < arr.Length; i++) arr[i] = Convert(r, cols[i], spec.Millimeters);
                 outRows.Add(arr);
-                if (r.TryGetValue("cobertura", out var fact))
+                if (r.TryGetValue("coverage", out var fact))
                     coverage.Add(new Dictionary<string, object>
                     {
-                        ["id"] = r["id"], ["exacta"] = fact,
-                        ["vol_parcial"] = r.TryGetValue("vol_parcial", out var partial) ? partial : null,
+                        ["id"] = r["id"], ["exact"] = fact,
+                        ["partial_vol"] = r.TryGetValue("partial_vol", out var partial) ? partial : null,
                     });
             }
             d["cols"] = cols.Select(c => (object)Header(c, spec.Millimeters)).ToList();
             d["rows"] = outRows;
-            if (coverage.Count > 0) d["cobertura"] = coverage;
+            if (coverage.Count > 0) d["coverage"] = coverage;
             if (pages > 1) { d["page"] = (long)spec.Page; d["pages"] = (long)pages; }
-            d["unidades"] = spec.Millimeters ? "mm" : "feet (clearances in inches)";
-            if (sets.Count > 0) d["conjuntos_guardados"] = sets.Keys.Cast<object>().ToList();
+            d["units"] = spec.Millimeters ? "mm" : "feet (clearances in inches)";
+            if (sets.Count > 0) d["saved_sets"] = sets.Keys.Cast<object>().ToList();
             return d;
         }
 
         private static string Header(string c, bool mm)
         {
-            if (c == "gap") return mm ? "holgura_mm" : "holgura_in";
-            if (c == "gap_max") return mm ? "holgura_max_mm" : "holgura_max_in";
-            if (c == "prof") return mm ? "prof_mm" : "prof_in";
+            if (c == "gap") return mm ? "clearance_mm" : "clearance_in";
+            if (c == "gap_max") return mm ? "max_clearance_mm" : "max_clearance_in";
+            if (c == "prof") return mm ? "depth_mm" : "depth_in";
             if (c == "vol") return mm ? "vol_cm3" : "vol_ft3";
             return c;
         }

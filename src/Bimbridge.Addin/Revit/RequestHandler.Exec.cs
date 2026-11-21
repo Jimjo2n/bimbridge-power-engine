@@ -91,25 +91,25 @@ namespace Bimbridge.Addin.Revit
         {
             source = null;
             error = null;
-            var code = Arg.GetString(a, "codigo") ?? Arg.GetString(a, "code");
-            var name = Arg.GetString(a, "nombre");
-            var file = Arg.GetString(a, "archivo");
+            var code = Arg.GetString(a, "code") ?? Arg.GetString(a, "code");
+            var name = Arg.GetString(a, "name");
+            var file = Arg.GetString(a, "file");
             try
             {
-                if (code != null) { source = "codigo"; return code; }
+                if (code != null) { source = "code"; return code; }
                 if (name != null)
                 {
                     var p = ScriptSource.PathOf(name);
-                    if (!File.Exists(p)) { error = "there is no saved script '" + name + "' (exec accion=lista)"; return null; }
-                    source = "nombre:" + name;
+                    if (!File.Exists(p)) { error = "there is no saved script '" + name + "' (exec action=list)"; return null; }
+                    source = "nombre:" + name;   // recipe source identity stored in task records (task fingerprint): kept verbatim
                     return File.ReadAllText(p);
                 }
                 if (file != null)
                 {
                     file = Environment.ExpandEnvironmentVariables(file.Trim().Trim('"'));
-                    if (!Path.IsPathRooted(file)) { error = "archivo= needs a full path (e.g. %USERPROFILE%\\Documents\\x.cs), not relative to the Revit folder"; return null; }
-                    if (!file.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)) { error = "archivo= must be a .cs file"; return null; }
-                    if (!File.Exists(file)) { error = "archivo= does not exist: " + file; return null; }
+                    if (!Path.IsPathRooted(file)) { error = "file= needs a full path (e.g. %USERPROFILE%\\Documents\\x.cs), not relative to the Revit folder"; return null; }
+                    if (!file.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)) { error = "file= must be a .cs file"; return null; }
+                    if (!File.Exists(file)) { error = "file= does not exist: " + file; return null; }
                     source = "archivo:" + Path.GetFullPath(file);
                     return File.ReadAllText(file);
                 }
@@ -120,7 +120,7 @@ namespace Bimbridge.Addin.Revit
             return null;
         }
 
-        private const string ResolvedCodeArg = "_codigo_resuelto";
+        private const string ResolvedCodeArg = "_resolved_code";
 
         /// <summary>
         /// Writes with clave=…: the intent is recorded (durably) first and the result when the job really finishes (H02):
@@ -136,9 +136,9 @@ namespace Bimbridge.Addin.Revit
             if (kind == OpSemantics.Kind.Invalid) return Response.Fail(request.Id, Status.Invalid, invalid);
             var key = Arg.GetString(request.Args, Wire.KeyArg);
             // alpha3: a trial is always rolled back; recording it with clave= would leave it as "already applied" in the journal.
-            if (!string.IsNullOrWhiteSpace(key) && ((request.Op == Wire.OpCommit && string.Equals((Arg.GetString(request.Args, "modo") ?? "").Trim(), "ensayo", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(key) && ((request.Op == Wire.OpCommit && string.Equals((Arg.GetString(request.Args, "mode") ?? "").Trim(), "trial", StringComparison.OrdinalIgnoreCase))
                                                    || (request.Op == Wire.OpExec && OpSemantics.ExecMode(request.Args, out _) == OpSemantics.ModeTrial)))
-                return Response.Fail(request.Id, Status.Invalid, "clave= is for persistent changes; a trial is rolled back and is not recorded as applied. Remove clave= (correlation goes in summary or tarea).");
+                return Response.Fail(request.Id, Status.Invalid, "key= is for persistent changes; a trial is rolled back and is not recorded as applied. Remove key= (correlation goes in summary or task).");
             if (kind != OpSemantics.Kind.Write || request.Op == Wire.OpTask) return await GuardDocLock(session, request, kind, run).ConfigureAwait(false);
 
             // AUD-19: a plan that comes from a source (operations with origen=) ALWAYS enters the journal with the key and fingerprint
@@ -152,12 +152,12 @@ namespace Bimbridge.Addin.Revit
                     try
                     {
                         if (SourceBinding.Resolve(rawOps as List<object>) != null)
-                            return Response.Fail(request.Id, Status.Invalid, "commit ops= with operations from a source (origen=): use plan and then commit plan_id=…; that way the batch is protected against repeats. Nothing was applied.");
+                            return Response.Fail(request.Id, Status.Invalid, "commit ops= with operations from a source (origin=): use plan and then commit plan_id=…; that way the batch is protected against repeats. Nothing was applied.");
                     }
                     catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalid, ex.Message); }
                 }
                 var boundPlan = string.IsNullOrEmpty(pid) ? null : _plans.Get(pid);
-                var isTrial = string.Equals((Arg.GetString(request.Args, "modo") ?? "").Trim(), "ensayo", StringComparison.OrdinalIgnoreCase);
+                var isTrial = string.Equals((Arg.GetString(request.Args, "mode") ?? "").Trim(), "trial", StringComparison.OrdinalIgnoreCase);
                 if (boundPlan?.BoundKey != null && !isTrial)
                 {
                     var bound = new SourceBinding.Bound { Token = boundPlan.BoundToken, Key = boundPlan.BoundKey, Hash = boundPlan.BoundHash };
@@ -177,28 +177,30 @@ namespace Bimbridge.Addin.Revit
             if (string.IsNullOrWhiteSpace(key)) return await GuardDocLock(session, request, kind, run).ConfigureAwait(false);
             if (_ops == null)
                 return Response.Fail(request.Id, Status.JournalUnavailable,
-                    "Nothing was applied: the operation journal is not available (" + _opsError + "), so clave=" + key + " cannot guarantee it is not repeated. " +
-                    "Fix the MCP data folder or, if the user accepts it, repeat without clave= (no idempotency).");
+                    "Nothing was applied: the operation journal is not available (" + _opsError + "), so key=" + key + " cannot guarantee it is not repeated. " +
+                    "Fix the MCP data folder or, if the user accepts it, repeat without key= (no idempotency).");
             var target = DocTarget.Ambient.Value;
+            // Fixed journal identity of writes without a target document (stored in 0.9.3 journals): kept verbatim, like the "archivo:" key prefix.
             var docKey = target?.Key ?? "(sin documento)";
             OperationJournal.ReconcileMode mode;
-            try { mode = OperationJournal.ParseReconcile(request.Args.TryGetValue("reconciliar", out var rv) ? rv : null); }
+            try { mode = OperationJournal.ParseReconcile(request.Args.TryGetValue("reconcile", out var rv) ? rv : null); }
             catch (ArgumentException ex) { return Response.Fail(request.Id, Status.Invalid, ex.Message); }
             var argsForHash = new Dictionary<string, object>(request.Args);
             argsForHash.Remove(ResolvedCodeArg);
             // Plan bound to a source: the fingerprint is the batch content's, not the plan_id's (a new plan with the same batch is the same operation).
             var hash = boundHash ?? OperationJournal.HashArgs(request.Op, argsForHash, resolved);
+            var legacyHash = boundHash != null ? null : OperationJournal.LegacyHashArgs(request.Op, argsForHash, resolved);
             var task = Arg.GetString(request.Args, Wire.TaskArg);
             OperationJournal.BeginResult b;
             var attempt = Guid.TryParseExact(request.AttemptId, "N", out _) ? request.AttemptId : null;
             try
             {
                 b = _ops.Begin(key, docKey, request.Op, hash, task, session.Id, mode, target?.Print, target?.Generation,
-                    attempt, Correlation.Current?.AgentId, Arg.GetString(request.Args, "plan_id"));
+                    attempt, Correlation.Current?.AgentId, Arg.GetString(request.Args, "plan_id"), legacyHash);
             }
             catch (JournalUnavailableException ex)
             {
-                return Response.Fail(request.Id, Status.JournalUnavailable, "Nothing was applied: " + ex.Message + ". Without a journal, clave= cannot prevent repeats.");
+                return Response.Fail(request.Id, Status.JournalUnavailable, "Nothing was applied: " + ex.Message + ". Without a journal, key= cannot prevent repeats.");
             }
             switch (b.Kind)
             {
@@ -208,22 +210,22 @@ namespace Bimbridge.Addin.Revit
                         Id = request.Id, State = b.Previous.State ?? Status.Ok,
                         Data = new Dictionary<string, object>
                         {
-                            ["ya_aplicado"] = true, ["clave"] = key, ["cuando"] = b.Previous.Finished, ["intentos"] = (long)b.Previous.Attempts.Count,
-                            ["resultado_original"] = b.Previous.Result,
+                            ["already_applied"] = true, ["key"] = key, ["when"] = b.Previous.Finished, ["attempts"] = (long)b.Previous.Attempts.Count,
+                            ["original_result"] = b.Previous.Result,
                         },
-                        Warning = "This operation (clave " + key + ") was already applied in this document; it was not repeated.",
+                        Warning = "This operation (key " + key + ") was already applied in this document; it was not repeated.",
                     };
                 case OperationJournal.BeginKind.Running:
                 {
                     var jid = _ops.RunningJob(key, docKey);
                     var job = string.IsNullOrEmpty(jid) ? null : _jobs.Get(jid);
                     if (job != null) return await AwaitJob(request, job, CancellationToken.None).ConfigureAwait(false);
-                    return Response.Fail(request.Id, Status.InProgress, "the operation with clave " + key + " is running now in this Revit; wait and query its status instead of repeating it");
+                    return Response.Fail(request.Id, Status.InProgress, "the operation with key " + key + " is running now in this Revit; wait and query its status instead of repeating it");
                 }
                 case OperationJournal.BeginKind.Mismatch:
                     return Response.Fail(request.Id, Status.Invalid,
-                        "clave " + key + " was already used for a different operation in this document (fingerprint " + b.Previous.Hash + " ≠ " + hash + "); " +
-                        "a key identifies a single operation, also when reconciling. Use another clave.");
+                        "key " + key + " was already used for a different operation in this document (fingerprint " + b.Previous.Hash + " ≠ " + hash + "); " +
+                        "a key identifies a single operation, also when reconciling. Use another key.");
                 case OperationJournal.BeginKind.DocumentReplaced:
                     return Response.Fail(request.Id, Status.Conflict,
                         "there is now ANOTHER model at " + docKey + " (fingerprint " + target?.Print + "; operation " + key + " was recorded with " + b.Previous.DocPrint + "). " +
@@ -232,9 +234,9 @@ namespace Bimbridge.Addin.Revit
                     return new Response
                     {
                         Id = request.Id, State = Status.Interrupted,
-                        Data = new Dictionary<string, object> { ["clave"] = key, ["registrada_en"] = b.OtherDoc, ["estado_alli"] = b.Previous.State ?? "no final" },
+                        Data = new Dictionary<string, object> { ["key"] = key, ["recorded_in"] = b.OtherDoc, ["status_there"] = b.Previous.State ?? "no final" },
                         Warning = "This model looks like a copy of " + b.OtherDoc + ", where operation " + key + " is already recorded. Read the model: if it already contains the change, " +
-                                "repeat with reconciliar=aplicado; otherwise with reconciliar=no_aplicado.",
+                                "repeat with reconcile=applied; otherwise with reconcile=not_applied.",
                     };
                 case OperationJournal.BeginKind.Interrupted:
                     return new Response
@@ -242,12 +244,12 @@ namespace Bimbridge.Addin.Revit
                         Id = request.Id, State = Status.Interrupted,
                         Data = new Dictionary<string, object>
                         {
-                            ["clave"] = key, ["empezo"] = b.Previous.Started, ["op"] = b.Previous.Op, ["estado_anterior"] = b.Previous.State ?? "no final",
-                            ["intentos"] = (long)b.Previous.Attempts.Count, ["resultado_anterior"] = b.Previous.Result,
+                            ["key"] = key, ["started"] = b.Previous.Started, ["op"] = b.Previous.Op, ["previous_status"] = b.Previous.State ?? "no final",
+                            ["attempts"] = (long)b.Previous.Attempts.Count, ["previous_result"] = b.Previous.Result,
                         },
                         Warning = "This operation started (" + b.Previous.Started + ") and its outcome was " + (b.Previous.State ?? "unknown (Revit may have closed or the connection dropped)") +
-                                ": it may have been partly applied. Read the model and repeat the SAME command with reconciliar=no_aplicado (nothing remained: it is applied again) " +
-                                "or reconciliar=aplicado (already there: it is marked done without repeating).",
+                                ": it may have been partly applied. Read the model and repeat the SAME command with reconcile=not_applied (nothing remained: it is applied again) " +
+                                "or reconcile=applied (already there: it is marked done without repeating).",
                     };
             }
 
@@ -266,10 +268,10 @@ namespace Bimbridge.Addin.Revit
                 AddWriteReceipt(session, attempt, resp);
                 return resp;
             }
-            try { _ops.Complete(key, docKey, resp.State, resp.Data as Dictionary<string, object> ?? (resp.Warning != null ? new Dictionary<string, object> { ["aviso"] = resp.Warning } : null)); }
+            try { _ops.Complete(key, docKey, resp.State, resp.Data as Dictionary<string, object> ?? (resp.Warning != null ? new Dictionary<string, object> { ["warning"] = resp.Warning } : null)); }
             catch (JournalUnavailableException ex)
             {
-                resp.Warning = (resp.Warning == null ? "" : resp.Warning + " ") + "WARNING: the journal did not record the outcome (" + ex.Message + "); if you repeat clave=" + key + " you will be asked to reconcile.";
+                resp.Warning = (resp.Warning == null ? "" : resp.Warning + " ") + "WARNING: the journal did not record the outcome (" + ex.Message + "); if you repeat key=" + key + " you will be asked to reconcile.";
             }
             AddWriteReceipt(session, attempt, resp);
             return resp;
@@ -283,7 +285,7 @@ namespace Bimbridge.Addin.Revit
             {
                 var agent = Correlation.Current?.AgentId;
                 receipt = _ops?.FindReceipt(attempt, session.Id, agent, target?.Key, target?.Print);
-                if (receipt == null || Arg.GetString(receipt, "estado") == Status.Held)
+                if (receipt == null || Arg.GetString(receipt, "status") == Status.Held)
                     receipt = AuditLog.FindCommitReceipt(Ui.Runtime.Audit?.Path_, attempt, session.Id, agent, target?.Key, target?.Print) ?? receipt;
                 if (receipt == null && target?.Print != null)
                 {
@@ -302,8 +304,8 @@ namespace Bimbridge.Addin.Revit
                     "There is no queryable evidence for this attempt in the given document and session. Pin the document and verify the model before repeating.");
             return new Response
             {
-                Id = requestId, State = Arg.GetString(receipt, "estado"),
-                Data = new Dictionary<string, object> { ["recibo"] = receipt },
+                Id = requestId, State = Arg.GetString(receipt, "status"),
+                Data = new Dictionary<string, object> { ["receipt"] = receipt },
             };
         }
 
@@ -313,7 +315,7 @@ namespace Bimbridge.Addin.Revit
             if (ReadWriteReceipt(session, response.Id, attempt).Data is Dictionary<string, object> receipt)
             {
                 if (response.Data == null) response.Data = receipt;
-                else if (response.Data is Dictionary<string, object> data) data["recibo"] = receipt["recibo"];
+                else if (response.Data is Dictionary<string, object> data) data["receipt"] = receipt["receipt"];
             }
         }
 
@@ -335,7 +337,7 @@ namespace Bimbridge.Addin.Revit
             {
                 // Start or resume writes; cancel, note and reconcile on a task must remain available while the document is locked.
                 var verb = OpSemantics.TaskVerb(request.Args);
-                if (verb == "iniciar" || verb == "reanudar")
+                if (verb == "start" || verb == "resume")
                 {
                     var taskBlock = WriteBarrier(request.Id, DeclaredDocs(request));
                     if (taskBlock != null) return taskBlock;
@@ -354,13 +356,13 @@ namespace Bimbridge.Addin.Revit
                 var h = Locks.HeldByOther(d, session.Id);
                 if (h != null && !IsOwnTask(request, h))
                     return Response.Fail(request.Id, Status.DocumentBusy,
-                        "Not applied: the document is held by " + h.Describe() + ". Wait for it to finish (tarea estado) or ask the user to cancel it.");
+                        "Not applied: the document is held by " + h.Describe() + ". Wait for it to finish (task status) or ask the user to cancel it.");
             }
             // Save, sync, export and close are barriers: while they run nobody else writes to that document.
-            if (request.Op == Wire.OpDoc || (request.Op == Wire.OpFam && (OpSemantics.FamVerb(request.Args) == "cargar" || OpSemantics.FamVerb(request.Args) == "cargar_archivo")))
+            if (request.Op == Wire.OpDoc || (request.Op == Wire.OpFam && (OpSemantics.FamVerb(request.Args) == "load" || OpSemantics.FamVerb(request.Args) == "load_file")))
             {
-                var owner = "barrera:" + session.Id + ":" + request.Id;
-                var blocking = await Locks.AcquireAsync(docs, owner, "barrera", request.Op + " " + Arg.GetString(request.Args, "accion"), TimeSpan.FromSeconds(5), CancellationToken.None).ConfigureAwait(false);
+                var owner = "barrera:" + session.Id + ":" + request.Id;   // lock owner identity shared with 0.9.3 processes: kept verbatim
+                var blocking = await Locks.AcquireAsync(docs, owner, "barrier", request.Op + " " + Arg.GetString(request.Args, "action"), TimeSpan.FromSeconds(5), CancellationToken.None).ConfigureAwait(false);
                 if (blocking != null) return Response.Fail(request.Id, Status.DocumentBusy, "Not applied: the document is held by " + blocking.Describe() + ".");
                 var resp = await run().ConfigureAwait(false);
                 if (resp.State == Status.InProgress && resp.Data is Dictionary<string, object> pd && Arg.GetString(pd, "job_id") is string jid && _jobs.Get(jid) is Job j)
@@ -375,7 +377,7 @@ namespace Bimbridge.Addin.Revit
         private static bool IsOwnTask(Request request, DocLocks.Holder h)
         {
             var task = Arg.GetString(request.Args, Wire.TaskArg);
-            return task != null && h.Kind == "tarea" && h.Detail == task;
+            return task != null && h.Kind == "task" && h.Detail == task;
         }
 
         /// <summary>Documents a write touches: the target and, for multi-document scripts, those in docs=d1,d2 (durable keys).</summary>
@@ -421,10 +423,10 @@ namespace Bimbridge.Addin.Revit
                 Id = request.Id,
                 Data = new Dictionary<string, object>
                 {
-                    ["instancia"] = DocRegistry.Instance.InstanceId,
-                    ["cols"] = new List<object> { "doc", "titulo", "tipo", "activo", "modificado", "solo_lectura", "worksharing", "ruta", "categoria_familia", "rev" },
+                    ["instance"] = DocRegistry.Instance.InstanceId,
+                    ["cols"] = new List<object> { "doc", "title", "type", "active", "modified", "read_only", "worksharing", "path", "family_category", "rev" },
                     ["rows"] = rows,
-                    ["uso"] = "doc=dN on any command pins that document even if the user switches tabs",
+                    ["usage"] = "doc=dN on any command pins that document even if the user switches tabs",
                 },
             };
         }
@@ -445,18 +447,18 @@ namespace Bimbridge.Addin.Revit
             var mode = OpSemantics.ExecMode(a, out var modeError);
             if (mode == null) return Response.Fail(request.Id, Status.Invalid, modeError);
             var tx = (Arg.GetString(a, "tx") ?? "auto").Trim().ToLowerInvariant();
-            if (tx != "auto" && tx != "grupo" && tx != "ninguna") return Response.Fail(request.Id, Status.Invalid, "tx must be auto, grupo or ninguna");
-            if (mode != OpSemantics.ModeRun && tx != "auto") return Response.Fail(request.Id, Status.Invalid, "tx=grupo/ninguna only with modo=ejecutar");
+            if (tx != "auto" && tx != "group" && tx != "none") return Response.Fail(request.Id, Status.Invalid, "tx must be auto, group or none");
+            if (mode != OpSemantics.ModeRun && tx != "auto") return Response.Fail(request.Id, Status.Invalid, "tx=group/none only with mode=run");
             var run = mode == OpSemantics.ModeRun;
             var trial = mode == OpSemantics.ModeTrial;
             // alpha3: a trial modifies the model while it runs (even though it is rolled back): it requires the same W level as writing.
-            if (trial && !_config.AllowsExec(true) && !(_config.Runner == "consulta" && _config.Allows('W')))
-                return Response.Fail(request.Id, Status.Rejected, "ensayo changes the model temporarily and requires level W (levels " + _config.Levels +
-                    "). The user decides this in the MCP configuration. To only read use modo=consulta; to test a typed write, commit modo=ensayo.");
+            if (trial && !_config.AllowsExec(true) && !(_config.Runner == "query" && _config.Allows('W')))
+                return Response.Fail(request.Id, Status.Rejected, "trial changes the model temporarily and requires level W (levels " + _config.Levels +
+                    "). The user decides this in the MCP configuration. To only read use mode=query; to test a typed write, commit mode=trial.");
             if (!trial && !_config.AllowsExec(run))
             {
-                var why = _config.Runner == "apagado" ? "the C# runner is turned off in this Revit's configuration (runner=apagado)"
-                    : run && _config.Runner == "consulta" ? "in this Revit the runner only accepts queries (runner=consulta)"
+                var why = _config.Runner == "off" ? "the C# runner is turned off in this Revit's configuration (runner=off)"
+                    : run && _config.Runner == "query" ? "in this Revit the runner only accepts queries (runner=query)"
                     : "this Revit does not have changes enabled through this connector (levels " + _config.Levels + ")";
                 return Response.Fail(request.Id, Status.Rejected, why + ". The user decides this in the MCP configuration; tell them. If the user authorized another tool for this, you may use it.");
             }
@@ -468,7 +470,7 @@ namespace Bimbridge.Addin.Revit
             // Code: inline, saved by name or a .cs file (already resolved by the journal if clave= was given)
             string codeError = null;
             var code = Arg.GetString(a, ResolvedCodeArg) ?? ResolveCode(a, out _, out codeError);
-            if (code == null) return Response.Fail(request.Id, Status.Invalid, codeError ?? "missing the code (codigo=…), nombre= of a saved script or archivo=path.cs");
+            if (code == null) return Response.Fail(request.Id, Status.Invalid, codeError ?? "missing the code (code=…), name= of a saved script or file=path.cs");
             if (string.IsNullOrWhiteSpace(code)) return Response.Fail(request.Id, Status.Invalid, "the code is empty");
             // Consolidated review: a single control. Without «Block C# code injection», exec runs for the authorized local agent
             // (user pipe + config.json level), with no per-script authorization. With the block, every exec is rejected before compiling.
@@ -476,13 +478,13 @@ namespace Bimbridge.Addin.Revit
             if (blocked != null)
             {
                 var bf = Response.Fail(request.Id, Status.Rejected, blocked);
-                bf.Data = new Dictionary<string, object> { ["codigo"] = DynamicCodePolicy.BlockedCode };
+                bf.Data = new Dictionary<string, object> { ["code"] = DynamicCodePolicy.BlockedCode };
                 return bf;
             }
-            var name = Arg.GetString(a, "nombre");
+            var name = Arg.GetString(a, "name");
             try
             {
-                var saveAs = Arg.GetString(a, "guardar");
+                var saveAs = Arg.GetString(a, "save");
                 if (saveAs != null)
                 {
                     Directory.CreateDirectory(ScriptSource.ScriptsFolder);
@@ -509,12 +511,12 @@ namespace Bimbridge.Addin.Revit
                 return Response.Fail(request.Id, ScriptHost.LoadError != null && compiled.Item2 == ScriptHost.LoadError ? Status.NotSupported : Status.Invalid, compiled.Item2);
             var script = compiled.Item1;
             if (script.Run == null)
-                return Response.Fail(request.Id, Status.Invalid, "that code is a recipe (a class that inherits from Recipe): start it with tarea iniciar, not with exec");
+                return Response.Fail(request.Id, Status.Invalid, "that code is a recipe (a class that inherits from Recipe): start it with task start, not with exec");
             var gate = CapabilityPolicy.ExecDecision(run, trusted, script.Capabilities, out var profile);
             if (gate != null) return Response.Fail(request.Id, Status.Rejected, gate);
             var auditErr = AuditScript(session, code, script.Key, mode, tx, profile, script, refs, out var execIntent);
             if (auditErr != null && mode != OpSemantics.ModeQuery)
-                return Response.Fail(request.Id, Status.Error, "auditoria_no_disponible (" + auditErr + "): for safety, code that writes is not run without a durable record");
+                return Response.Fail(request.Id, Status.Error, "audit_unavailable (" + auditErr + "): for safety, code that writes is not run without a durable record");
 
             var job = _jobs.Create(session.Id, "exec " + mode);
             job.Task = Arg.GetString(a, Wire.TaskArg);
@@ -525,7 +527,7 @@ namespace Bimbridge.Addin.Revit
                 var sw = Stopwatch.StartNew();
                 Dictionary<string, object> data = null;
                 string fail = null, failStatus = Status.Error;
-                var failures = new FailureLog { DeleteWarnings = !(Arg.GetString(a, "avisos") == "dejar") };
+                var failures = new FailureLog { DeleteWarnings = !(Arg.GetString(a, "warnings") == "leave") };
                 var revBefore = new Dictionary<string, long>();
                 var txStates = new Dictionary<string, object>();
                 List<string> serErrors = null;
@@ -548,7 +550,7 @@ namespace Bimbridge.Addin.Revit
                         return false;
                     }
                     ctxObj = new ScriptContext(app, doc, userArgs, mode, tx, job.Cts.Token, session.Sets, doc != null ? DocRegistry.Instance.IdOf(doc) : null);
-                    var txName = DocumentTracker.TransactionPrefix + (run ? " exec " + (name ?? script.Key.Substring(0, 8)) : " temporal exec");
+                    var txName = DocumentTracker.TransactionPrefix + (run ? " exec " + (name ?? script.Key.Substring(0, 8)) : " temporary exec");
                     TransactionGroup group = null;
                     Transaction t = null;
                     var committed = false;
@@ -560,10 +562,10 @@ namespace Bimbridge.Addin.Revit
                         // P0 (Codex): exec ensayo always rolls back its group → refused up front if the document has unsaved changes.
                         if (trial && doc != null)
                         {
-                            var refuse = Engine.TrialGuard.Refuse(doc.IsModified, "exec modo=ensayo");
+                            var refuse = Engine.TrialGuard.Refuse(doc.IsModified, "exec mode=trial");
                             if (refuse != null) { fail = refuse; failStatus = Status.Rejected; return true; }
                         }
-                        if (doc != null && (trial || (run && tx == "grupo")))
+                        if (doc != null && (trial || (run && tx == "group")))
                         {
                             group = new TransactionGroup(doc, txName);
                             var gs = group.Start();
@@ -600,9 +602,9 @@ namespace Bimbridge.Addin.Revit
                         {
                             throw new ResultException("the script finished, but its result could not be converted: " + ex.GetType().Name + ": " + ex.Message, ex);
                         }
-                        data = new Dictionary<string, object> { ["resultado"] = json };
-                        if (trunc) data["resultado_recortado"] = "cut at " + ResultSerializer.MaxItems + " items or depth " + ResultSerializer.MaxDepth + "; return a summary or paginate";
-                        if (serErrors != null && serErrors.Count > 0) data["errores_resultado"] = serErrors.Cast<object>().ToList();
+                        data = new Dictionary<string, object> { ["result"] = json };
+                        if (trunc) data["truncated_result"] = "cut at " + ResultSerializer.MaxItems + " items or depth " + ResultSerializer.MaxDepth + "; return a summary or paginate";
+                        if (serErrors != null && serErrors.Count > 0) data["result_errors"] = serErrors.Cast<object>().ToList();
 
                         // 2) Commit (or roll back in consulta) checking each status.
                         if (t != null)
@@ -610,7 +612,7 @@ namespace Bimbridge.Addin.Revit
                             if (!run)
                             {
                                 var rs = t.RollBack();
-                                txStates["transaccion"] = rs.ToString();
+                                txStates["transaction"] = rs.ToString();
                                 if (rs != TransactionStatus.RolledBack) { fail = "the trial could not be rolled back (" + rs + ")"; failStatus = Status.Unknown; }
                             }
                             else
@@ -634,7 +636,7 @@ namespace Bimbridge.Addin.Revit
                             if (!run || fail != null)
                             {
                                 var gr = group.RollBack();
-                                txStates["grupo"] = gr.ToString();
+                                txStates["group"] = gr.ToString();
                                 if (gr != TransactionStatus.RolledBack && fail == null) { fail = "the group could not be rolled back (" + gr + ")"; failStatus = Status.Unknown; }
                             }
                             else
@@ -645,7 +647,7 @@ namespace Bimbridge.Addin.Revit
                                 else { fail = "the group was left in status " + ga; failStatus = AnyChange() ? Status.Unknown : Status.RolledBack; }
                             }
                         }
-                        if (run && tx == "ninguna") committed = AnyChange();
+                        if (run && tx == "none") committed = AnyChange();
                     }
                     catch (Exception ex)
                     {
@@ -661,9 +663,9 @@ namespace Bimbridge.Addin.Revit
                             fail = what + ". Nothing was left applied (it was rolled back and Revit recorded no changes): it can be fixed and repeated.";
                             failStatus = Status.RolledBack;
                         }
-                        else if (tx == "ninguna" || !rolled)
+                        else if (tx == "none" || !rolled)
                         {
-                            fail = what + ". WARNING: there are committed changes in the model (" + (tx == "ninguna" ? "the script's own transactions" : "the rollback was not confirmed") +
+                            fail = what + ". WARNING: there are committed changes in the model (" + (tx == "none" ? "the script's own transactions" : "the rollback was not confirmed") +
                                    "): review the model and reconcile before repeating.";
                             failStatus = Status.Partial;
                         }
@@ -682,20 +684,20 @@ namespace Bimbridge.Addin.Revit
                     return true;
                 }, highPriority: mode == OpSemantics.ModeQuery, busyAfter: Busy, ct: job.Cts.Token).ConfigureAwait(false);
 
-                if (!r.Ok) { AuditExecOutcome(session, execIntent, "no_ejecutado"); FailJob(job, r, write: run); return; }
-                var auditGap = AuditExecOutcome(session, execIntent, fail == null ? (run ? "confirmado" : trial ? "ensayo_revertido" : "consulta") : failStatus);
+                if (!r.Ok) { AuditExecOutcome(session, execIntent, "not_run"); FailJob(job, r, write: run); return; }
+                var auditGap = AuditExecOutcome(session, execIntent, fail == null ? (run ? "committed" : trial ? "trial_reverted" : "query") : failStatus);
                 var extra = new Dictionary<string, object>
                 {
-                    ["modo"] = mode, ["tx"] = tx, ["forma"] = script.Kind,
-                    ["compilar_ms"] = script.FromCache ? 0L : script.CompileMs, ["cache"] = script.FromCache,
+                    ["mode"] = mode, ["tx"] = tx, ["shape"] = script.Kind,
+                    ["compile_ms"] = script.FromCache ? 0L : script.CompileMs, ["cache"] = script.FromCache,
                     ["total_ms"] = sw.ElapsedMilliseconds,
                 };
-                if (txStates.Count > 0) extra["tx_estado"] = txStates;   // LITERAL Revit status (RolledBack…)
+                if (txStates.Count > 0) extra["tx_status"] = txStates;   // LITERAL Revit status (RolledBack…)
                 if (target != null) extra["doc"] = target.Id;
                 if (script.ExtraRefs != null) extra["refs"] = script.ExtraRefs;
                 if (ctxObj != null && ctxObj.LogLines.Count > 0) extra["log"] = ctxObj.LogLines.Cast<object>().ToList();
-                if (failures.Items.Count > 0) extra["avisos_revit"] = failures.Items.Select(i => (object)i.ToJson()).ToList();
-                if (script.Diagnostics != null && script.Diagnostics.Length > 0) extra["compilador"] = script.Diagnostics.Cast<object>().ToList();
+                if (failures.Items.Count > 0) extra["revit_warnings"] = failures.Items.Select(i => (object)i.ToJson()).ToList();
+                if (script.Diagnostics != null && script.Diagnostics.Length > 0) extra["compiler"] = script.Diagnostics.Cast<object>().ToList();
                 // What really changed (according to Revit events), per document — also in consulta (what was NOT rolled back).
                 var changed = new List<object>();
                 try
@@ -710,27 +712,27 @@ namespace Bimbridge.Addin.Revit
                             var before = revBefore.TryGetValue(id, out var rb) ? rb : 0;
                             if (reg == null || reg.Rev == before) continue;
                             var ids = reg.ChangedSince(before, out var deleted);
-                            changed.Add(new Dictionary<string, object> { ["doc"] = id, ["titulo"] = d.Title, ["elementos"] = (long)ids.Count, ["borrados"] = (long)(deleted?.Count ?? 0) });
+                            changed.Add(new Dictionary<string, object> { ["doc"] = id, ["title"] = d.Title, ["elements"] = (long)ids.Count, ["deleted_items"] = (long)(deleted?.Count ?? 0) });
                             if (ids.Count > 0 && id == target?.Id) { try { session.Sets.Save("$exec_cambiados", ids, id, d.Title); } catch (Exception) { } }
                         }
                         return true;
                     }, highPriority: true, busyAfter: Busy, ct: CancellationToken.None).ConfigureAwait(false);
                 }
-                catch (Exception ex) { extra["cambios_error"] = ex.Message; }
-                if (run) extra["cambios"] = changed.Count == 0 ? (object)"ninguno" : changed;
+                catch (Exception ex) { extra["error_changes"] = ex.Message; }
+                if (run) extra["changes"] = changed.Count == 0 ? (object)"none" : changed;
                 else if (changed.Count > 0)
                 {
-                    extra["efectos_no_revertidos"] = changed;
-                    extra["aviso_consulta"] = "consulta rolls back only its transaction in the target document; the script committed changes in other documents and those remain applied";
+                    extra["unreverted_effects"] = changed;
+                    extra["query_warning"] = "query rolls back only its transaction in the target document; the script committed changes in other documents and those remain applied";
                 }
                 if (auditGap != null)
                 {
                     // rc3: real result but incomplete audit: never "ok" (nor rolled back if it was committed).
-                    extra["auditoria"] = AuditGate.Incomplete;
-                    extra["reconciliar_intencion"] = execIntent;
+                    extra["audit"] = AuditGate.Incomplete;
+                    extra["reconcile_intent"] = execIntent;
                     if (fail == null && run)
                     {
-                        extra["aplicado"] = true;
+                        extra["applied"] = true;
                         if (data != null) foreach (var kv in extra) data[kv.Key] = kv.Value;
                         job.Result = data ?? extra;
                         _jobs.Fail(job, Status.AppliedResultError, auditGap);
@@ -746,7 +748,7 @@ namespace Bimbridge.Addin.Revit
                 if (data == null)
                 {
                     // Committed but without a result (should not happen: the result is materialized first). Never reported as rolled back.
-                    extra["aplicado"] = true;
+                    extra["applied"] = true;
                     job.Result = extra;
                     _jobs.Fail(job, Status.AppliedResultError, "the changes were committed, but there is no result to return");
                     return;
@@ -800,7 +802,7 @@ namespace Bimbridge.Addin.Revit
             string path = null;
             try
             {
-                var dir = Path.Combine(ScriptSource.ScriptsFolder, "historial");
+                var dir = LegacyAliases.ResolveExisting(ScriptSource.ScriptsFolder, Path.Combine(ScriptSource.ScriptsFolder, "history"));
                 Directory.CreateDirectory(dir);
                 path = Path.Combine(dir, key.Substring(0, 16) + ".cs");
                 if (!File.Exists(path)) File.WriteAllText(path, code);
@@ -808,16 +810,16 @@ namespace Bimbridge.Addin.Revit
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { path = null; }
             var extra = new Dictionary<string, object>
             {
-                ["modo"] = mode, ["tx"] = tx, ["perfil"] = profile.ToString(), ["huella"] = key.Substring(0, 16), ["sha256"] = Home.Sha256Hex(code), ["archivo"] = path,
-                ["capacidades_usadas"] = (script.Capabilities ?? new string[0]).Cast<object>().ToList(),
+                ["mode"] = mode, ["tx"] = tx, ["profile"] = profile.ToString(), ["fingerprint"] = key.Substring(0, 16), ["sha256"] = Home.Sha256Hex(code), ["file"] = path,
+                ["capabilities_used"] = (script.Capabilities ?? new string[0]).Cast<object>().ToList(),
                 ["refs"] = (refs ?? new List<string>()).Select(r => (object)(r + " sha256=" + SafeSha(r))).ToList(),
-                ["inicio"] = code.Length > 200 ? code.Substring(0, 200) + "…" : code,
+                ["start"] = code.Length > 200 ? code.Substring(0, 200) + "…" : code,
             };
-            Ui.Runtime.Journal?.Log(session.Id, "exec_codigo", mode, 0, extra);
+            Ui.Runtime.Journal?.Log(session.Id, "exec_code", mode, 0, extra);
             try
             {
                 if (Ui.Runtime.Audit == null) return "audit not initialized";
-                intent = Ui.Runtime.Audit.Intent(session.Id, "exec_codigo", DocTarget.Ambient.Value?.Key ?? "", extra);
+                intent = Ui.Runtime.Audit.Intent(session.Id, "exec_code", DocTarget.Ambient.Value?.Key ?? "", extra);
                 return null;
             }
             catch (JournalUnavailableException ex) { return ex.Message; }
@@ -832,7 +834,7 @@ namespace Bimbridge.Addin.Revit
         private static string AuditExecOutcome(Session session, string intent, string status)
         {
             if (intent == null) return null;
-            try { Ui.Runtime.Audit?.Outcome(session.Id, "exec_codigo", intent, status); return null; }
+            try { Ui.Runtime.Audit?.Outcome(session.Id, "exec_code", intent, status); return null; }
             catch (JournalUnavailableException ex)
             {
                 var msg = AuditGate.Incomplete + ": the script finished (" + status + "; if it committed, the changes WERE applied), but its outcome was not recorded in the audit (" +
@@ -857,9 +859,9 @@ namespace Bimbridge.Addin.Revit
                 Id = request.Id,
                 Data = new Dictionary<string, object>
                 {
-                    ["cols"] = new List<object> { "nombre", "bytes", "modificado" }, ["rows"] = rows, ["carpeta"] = ScriptSource.ScriptsFolder,
-                    ["compilador"] = ScriptHost.Present ? "present" : "roslyn folder missing",
-                    ["en_cache"] = (long)ScriptHost.CachedCount,
+                    ["cols"] = new List<object> { "name", "bytes", "modified" }, ["rows"] = rows, ["folder"] = ScriptSource.ScriptsFolder,
+                    ["compiler"] = ScriptHost.Present ? "present" : "roslyn folder missing",
+                    ["cached"] = (long)ScriptHost.CachedCount,
                 },
             };
         }
@@ -867,23 +869,23 @@ namespace Bimbridge.Addin.Revit
         // ---------------- fam ----------------
 
         private FamilyLibrary _library;
-        private FamilyLibrary Library => _library ?? (_library = new FamilyLibrary(_config.FamilyFolders, System.IO.Path.Combine(Home.Root, "familias", "indice.json")));
+        private FamilyLibrary Library => _library ?? (_library = new FamilyLibrary(_config.FamilyFolders, Home.Resolve(System.IO.Path.Combine(Home.Root, "families", "index.json"))));
 
         /// <summary>fam buscar q=… [carpeta=…] [top=10]: candidates from the authorized library, compatibility and whether already loaded.</summary>
         private Dictionary<string, object> FamilySearch(UIApplication app, Document doc, IDictionary<string, object> a)
         {
-            var q = Arg.GetString(a, "q") ?? throw new OpFail(Status.Invalid, "fam buscar: missing q (words of the name, e.g. q=\"downlight round\")");
+            var q = Arg.GetString(a, "q") ?? throw new OpFail(Status.Invalid, "fam search: missing q (words of the name, e.g. q=\"downlight round\")");
             var loaded = new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>().Select(f => f.Name).ToList();
             var ver = int.TryParse(app.Application.VersionNumber, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : 9999;
-            var hits = Library.Search(q, ver, loaded, Arg.GetString(a, "carpeta"), (int)(Arg.GetLong(a, "top") ?? 10));
+            var hits = Library.Search(q, ver, loaded, Arg.GetString(a, "folder"), (int)(Arg.GetLong(a, "top") ?? 10));
             return new Dictionary<string, object>
             {
-                ["indexadas"] = (long)Library.Count, ["revit_destino"] = (long)ver,
-                ["candidatos"] = hits.Select(h =>
+                ["indexed"] = (long)Library.Count, ["target_revit"] = (long)ver,
+                ["candidates"] = hits.Select(h =>
                 {
                     var d = h.Entry.ToJson();
-                    d["ruta"] = h.Entry.Path; d["compatible"] = h.Compatible; d["ya_cargada"] = h.Loaded; d["puntos"] = Math.Round(h.Score, 2);
-                    if (h.Why != null) d["motivo"] = h.Why;
+                    d["path"] = h.Entry.Path; d["compatible"] = h.Compatible; d["already_loaded"] = h.Loaded; d["points"] = Math.Round(h.Score, 2);
+                    if (h.Why != null) d["reason"] = h.Why;
                     return (object)d;
                 }).ToList(),
             };
@@ -892,18 +894,18 @@ namespace Bimbridge.Addin.Revit
         /// <summary>fam cargar_archivo ruta=… [sobrescribir=no|valores]: loads into the project an RFA from the authorized library (unchanged since indexing).</summary>
         private Dictionary<string, object> FamilyLoadFile(Document doc, IDictionary<string, object> a)
         {
-            FamilyOps.RequireProject(doc, "fam cargar_archivo");
-            var e = Library.ResolveForLoad(Arg.GetString(a, "ruta"), out var err) ?? throw new OpFail(Status.Rejected, "fam cargar_archivo: " + err);
+            FamilyOps.RequireProject(doc, "fam load_file");
+            var e = Library.ResolveForLoad(Arg.GetString(a, "path"), out var err) ?? throw new OpFail(Status.Rejected, "fam load_file: " + err);
             var ver = int.TryParse(doc.Application.VersionNumber, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : 9999;
             if (e.RevitVersion.HasValue && e.RevitVersion.Value > ver) throw new OpFail(Status.Rejected, "the family is from Revit " + e.RevitVersion + " and this one is " + ver);
-            var mode = (Arg.GetString(a, "sobrescribir") ?? "no").Trim().ToLowerInvariant();
-            if (mode != "no" && mode != "valores") throw new OpFail(Status.Invalid, "sobrescribir=no or valores");
+            var mode = (Arg.GetString(a, "overwrite") ?? "no").Trim().ToLowerInvariant();
+            if (mode != "no" && mode != "values") throw new OpFail(Status.Invalid, "overwrite=no or values");
             var existed = new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>().FirstOrDefault(f => string.Equals(f.Name, e.Name, StringComparison.OrdinalIgnoreCase));
             Family fam = null;
-            using (var t = new Transaction(doc, DocumentTracker.TransactionPrefix + " fam cargar_archivo " + e.Name))
+            using (var t = new Transaction(doc, DocumentTracker.TransactionPrefix + " fam load_file " + e.Name))
             {
                 t.Start();
-                var ok = doc.LoadFamily(e.Path, new FamilyOps.LoadOptions(mode == "valores"), out fam);
+                var ok = doc.LoadFamily(e.Path, new FamilyOps.LoadOptions(mode == "values"), out fam);
                 if (!ok && existed == null) { t.RollBack(); throw new OpFail(Status.Error, "Revit did not load the family"); }
                 if (t.Commit() != TransactionStatus.Committed) throw new OpFail(Status.Error, "the load transaction was not committed");
             }
@@ -911,26 +913,26 @@ namespace Bimbridge.Addin.Revit
             var types = fam.GetFamilySymbolIds().Select(id => doc.GetElement(id)?.Name).Where(n => n != null).OrderBy(n => n).ToList();
             return new Dictionary<string, object>
             {
-                ["familia"] = fam.Name, ["id"] = Ids.ToLong(fam.Id), ["ya_existia"] = existed != null, ["tipos"] = types.Cast<object>().ToList(),
-                ["sha256"] = e.Sha256, ["ruta"] = e.Path, ["revit_archivo"] = e.RevitVersion.HasValue ? (object)(long)e.RevitVersion.Value : "unknown",
+                ["family"] = fam.Name, ["id"] = Ids.ToLong(fam.Id), ["already_existed"] = existed != null, ["types"] = types.Cast<object>().ToList(),
+                ["sha256"] = e.Sha256, ["path"] = e.Path, ["revit_file"] = e.RevitVersion.HasValue ? (object)(long)e.RevitVersion.Value : "unknown",
             };
         }
 
-        private static string FamVerb(IDictionary<string, object> a) => (Arg.GetString(a, "accion") ?? "info").Trim().ToLowerInvariant();
+        private static string FamVerb(IDictionary<string, object> a) => (Arg.GetString(a, "action") ?? "info").Trim().ToLowerInvariant();
 
         private async Task<Response> Fam(Session session, Request request, CancellationToken ct)
         {
             var a = request.Args;
             var verb = FamVerb(a);
             var write = OpSemantics.FamWrites.Contains(verb);
-            if (!write && verb != "info" && verb != "caras" && verb != "buscar")
-                return Response.Fail(request.Id, Status.Invalid, "fam: info, caras, buscar, abrir, conector, param, cargar or cargar_archivo");
+            if (!write && verb != "info" && verb != "faces" && verb != "search")
+                return Response.Fail(request.Id, Status.Invalid, "fam: info, faces, search, open, connector, param, load or load_file");
             // 0.8.0: the library index is refreshed OFF the Revit thread (disk only), before asking for a turn.
-            if (verb == "buscar" || verb == "cargar_archivo")
+            if (verb == "search" || verb == "load_file")
             {
                 if (Library.Roots.Count == 0)
-                    return Response.Fail(request.Id, Status.NeedsUser, "there are no authorized family folders: the user must add them in the configuration (carpetas_familias)");
-                if (Library.Count == 0 || Arg.GetBool(a, "refrescar") == true) await Task.Run(() => Library.Refresh(), ct).ConfigureAwait(false);
+                    return Response.Fail(request.Id, Status.NeedsUser, "there are no authorized family folders: the user must add them in the configuration (family_folders)");
+                if (Library.Count == 0 || Arg.GetBool(a, "refresh") == true) await Task.Run(() => Library.Refresh(), ct).ConfigureAwait(false);
             }
             if (write)
             {
@@ -955,20 +957,20 @@ namespace Bimbridge.Addin.Revit
                     switch (verb)
                     {
                         case "info": data = FamilyOps.Info(app, doc, a); break;
-                        case "caras": data = FamilyOps.FacesInfo(doc, a); break;
-                        case "buscar": data = FamilySearch(app, doc, a); break;
-                        case "cargar_archivo":
+                        case "faces": data = FamilyOps.FacesInfo(doc, a); break;
+                        case "search": data = FamilySearch(app, doc, a); break;
+                        case "load_file":
                             data = FamilyLoadFile(doc, a);
-                            changes.Add("family " + data["familia"] + " loaded from the library");
+                            changes.Add("family " + data["family"] + " loaded from the library");
                             break;
-                        case "abrir": data = FamilyOps.Open(app, doc, a); break;
-                        case "cargar":
+                        case "open": data = FamilyOps.Open(app, doc, a); break;
+                        case "load":
                             data = FamilyOps.Load(app, doc, a, diffs);
-                            changes.Add("family loaded into " + data["cargada_en"]);
+                            changes.Add("family loaded into " + data["loaded_in"]);
                             break;
-                        case "conector":
+                        case "connector":
                         case "param":
-                            var q = verb == "conector" ? FamilyOps.ConnectorRequest.Parse(a) : null;
+                            var q = verb == "connector" ? FamilyOps.ConnectorRequest.Parse(a) : null;
                             FamilyOps.RequireFamily(doc, "fam " + verb);
                             _tracker.CurrentWriter = session.Id;
                             using (var t = new Transaction(doc, DocumentTracker.TransactionPrefix + " fam " + verb + (q != null ? " " + q.Key : "")))
@@ -977,7 +979,7 @@ namespace Bimbridge.Addin.Revit
                                 t.Start();
                                 try
                                 {
-                                    data = verb == "conector" ? FamilyOps.UpsertConnector(doc, q, changes, diffs, pending) : FamilyOps.Param(doc, a, changes, diffs);
+                                    data = verb == "connector" ? FamilyOps.UpsertConnector(doc, q, changes, diffs, pending) : FamilyOps.Param(doc, a, changes, diffs);
                                 }
                                 catch (Exception)
                                 {
@@ -1004,16 +1006,16 @@ namespace Bimbridge.Addin.Revit
             if (fail != null)
             {
                 var d = new Dictionary<string, object>();
-                if (failures.Items.Count > 0) d["avisos_revit"] = failures.Items.Select(i => (object)i.ToJson()).ToList();
+                if (failures.Items.Count > 0) d["revit_warnings"] = failures.Items.Select(i => (object)i.ToJson()).ToList();
                 return new Response { Id = request.Id, State = failStatus, Warning = fail, Data = d.Count > 0 ? d : null };
             }
             if (write)
             {
-                data["cambios"] = changes.Count == 0 ? (object)"none (it was already as requested)" : changes.Cast<object>().ToList();
-                if (pending.Count > 0) data["pendiente"] = pending.Cast<object>().ToList();
-                if (failures.Items.Count > 0) data["avisos_revit"] = failures.Items.Select(i => (object)i.ToJson()).ToList();
+                data["changes"] = changes.Count == 0 ? (object)"none (it was already as requested)" : changes.Cast<object>().ToList();
+                if (pending.Count > 0) data["pending"] = pending.Cast<object>().ToList();
+                if (failures.Items.Count > 0) data["revit_warnings"] = failures.Items.Select(i => (object)i.ToJson()).ToList();
             }
-            if (diffs.Count > 0) data["diferencias"] = diffs.Cast<object>().ToList();
+            if (diffs.Count > 0) data["differences"] = diffs.Cast<object>().ToList();
             data["ms"] = sw.ElapsedMilliseconds;
             return new Response
             {
@@ -1029,10 +1031,10 @@ namespace Bimbridge.Addin.Revit
         private async Task<Response> DocOp(Session session, Request request, CancellationToken ct)
         {
             var a = request.Args;
-            var verb = (Arg.GetString(a, "accion") ?? "").Trim().ToLowerInvariant();
-            if (verb == "guardar_como") { verb = "guardar"; if (Arg.GetString(a, "como") == null) return Response.Fail(request.Id, Status.Invalid, "guardar_como needs como=path"); }
-            if (verb != "guardar" && verb != "sync" && verb != "sincronizar" && verb != "pdf" && verb != "ifc" && verb != "tabla_csv" && verb != "cerrar" && verb != "verificar_disco")
-                return Response.Fail(request.Id, Status.Invalid, "doc: guardar, guardar_como, sync, pdf, ifc, tabla_csv, cerrar or verificar_disco");
+            var verb = (Arg.GetString(a, "action") ?? "").Trim().ToLowerInvariant();
+            if (verb == "save_as") { verb = "save"; if (Arg.GetString(a, "as") == null) return Response.Fail(request.Id, Status.Invalid, "save_as needs as=path"); }
+            if (verb != "save" && verb != "sync" && verb != "sync" && verb != "pdf" && verb != "ifc" && verb != "schedule_csv" && verb != "close" && verb != "verify_disk")
+                return Response.Fail(request.Id, Status.Invalid, "doc: save, save_as, sync, pdf, ifc, schedule_csv, close or verify_disk");
             if (!_config.AllowsDocOps)
                 return Response.Fail(request.Id, Status.Rejected, "this Revit does not have save, sync or export enabled through this connector (levels " + _config.Levels + "). Tell the user.");
             var diffs = new List<string>();
@@ -1054,13 +1056,13 @@ namespace Bimbridge.Addin.Revit
                     {
                         switch (verb)
                         {
-                            case "guardar": data = DocOps.Save(app, doc, a, pend, diffs); break;
-                            case "sync": case "sincronizar": data = DocOps.Sync(doc, a, diffs, _tracker); break;
+                            case "save": data = DocOps.Save(app, doc, a, pend, diffs); break;
+                            case "sync":  data = DocOps.Sync(doc, a, diffs, _tracker); break;
                             case "pdf": data = DocOps.Pdf(doc, a, session.Sets, DocRegistry.Instance.IdOf(doc), pend, diffs); break;
                             case "ifc": data = ExportOps.Ifc(doc, a, pend, diffs); break;
-                            case "tabla_csv": data = ExportOps.ScheduleCsv(doc, a, pend, diffs); break;
-                            case "cerrar": data = DocOps.Close(app, doc, a); break;
-                            case "verificar_disco": data = DocOps.VerifyOnDisk(app, doc, a); break;
+                            case "schedule_csv": data = ExportOps.ScheduleCsv(doc, a, pend, diffs); break;
+                            case "close": data = DocOps.Close(app, doc, a); break;
+                            case "verify_disk": data = DocOps.VerifyOnDisk(app, doc, a); break;
                         }
                     }
                     catch (OpFail ex) { fail = ex.Message; failStatus = ex.State; }
@@ -1072,17 +1074,17 @@ namespace Bimbridge.Addin.Revit
                 if (pend.Files.Count > 0)
                 {
                     job.Phase = "verifying files";
-                    var expected = data.TryGetValue("n_hojas", out var nh) && nh is long l ? (int)l : 0;
-                    data["archivos"] = DocOps.VerifyFiles(pend, expected, diffs);
+                    var expected = data.TryGetValue("n_sheets", out var nh) && nh is long l ? (int)l : 0;
+                    data["files"] = DocOps.VerifyFiles(pend, expected, diffs);
                 }
-                if (diffs.Count > 0) data["diferencias"] = diffs.Cast<object>().ToList();
+                if (diffs.Count > 0) data["differences"] = diffs.Cast<object>().ToList();
                 data["ms"] = sw.ElapsedMilliseconds;
                 _jobs.Complete(job, data);
             }
             // 0.9.1 (Block I): document operations go through the scheduler: fair sharing between agents and only one at a time
             // per document. Nothing has been touched while queued: a full queue or cancellation while queued ends as a rejection (retryable).
             var owner = Correlation.Current?.AgentId ?? session.Id;
-            var exclusive = "doc:" + (TargetId ?? "activo");
+            var exclusive = "doc:" + (TargetId ?? "active");
             _jobs.Run(job, async () =>
             {
                 var started = false;

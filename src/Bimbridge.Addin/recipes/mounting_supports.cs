@@ -13,9 +13,9 @@ public class MountingSupports : Recipe
 
     public override IEnumerable<Unit> Units(ScriptContext ctx)
     {
-        var cat = (BuiltInCategory)Enum.Parse(typeof(BuiltInCategory), A(ctx, "categoria", "OST_LightingFixtures"));
-        var level = A(ctx, "nivel", null);
-        var batch = int.Parse(A(ctx, "lote", "50"));
+        var cat = (BuiltInCategory)Enum.Parse(typeof(BuiltInCategory), A(ctx, "category", "OST_LightingFixtures"));
+        var level = A(ctx, "level", null);
+        var batch = int.Parse(A(ctx, "batch", "50"));
         var els = new FilteredElementCollector(ctx.Doc).OfCategory(cat).WhereElementIsNotElementType()
             .Where(e => level == null || (ctx.Doc.GetElement(e.LevelId) as Level)?.Name == level)
             .OrderBy(e => e.UniqueId, StringComparer.Ordinal).ToList();
@@ -23,7 +23,7 @@ public class MountingSupports : Recipe
         {
             var part = els.Skip(i).Take(batch).ToList();
             // Stable key: first and last UniqueId of the chunk (same model → same keys).
-            yield return new Unit("tramo:" + part[0].UniqueId + ".." + part[part.Count - 1].UniqueId,
+            yield return new Unit("segment:" + part[0].UniqueId + ".." + part[part.Count - 1].UniqueId,
                 new Dictionary<string, object> { ["uids"] = part.Select(e => (object)e.UniqueId).ToList() }, part.Select(e => ctx.Long(e.Id)));
         }
     }
@@ -33,7 +33,7 @@ public class MountingSupports : Recipe
         var view = Bim.Mounting.View3D(ctx.Doc);
         var tol = double.Parse(A(ctx, "tol_mm", "3"), System.Globalization.CultureInfo.InvariantCulture);
         var max = double.Parse(A(ctx, "max_mm", "3000"), System.Globalization.CultureInfo.InvariantCulture);
-        var dir = A(ctx, "direccion", "arriba");
+        var dir = A(ctx, "direction", "up");
         var counts = new Dictionary<string, int>();
         foreach (var uid in (IEnumerable<object>)u.D("uids"))
         {
@@ -41,9 +41,9 @@ public class MountingSupports : Recipe
             var e = ctx.Doc.GetElement(Convert.ToString(uid));
             if (e == null) continue;
             var r = Bim.Mounting.Support(e, view, dir, max, tol);
-            var cls = Convert.ToString(r["clase"]);
+            var cls = Convert.ToString(r["class"]);
             counts[cls] = counts.TryGetValue(cls, out var n) ? n + 1 : 1;
-            if (cls != "al_ras") ctx.Exception(cls, r);
+            if (cls != "flush") ctx.Exception(cls, r);
         }
         return counts;
     }

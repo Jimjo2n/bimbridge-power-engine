@@ -101,8 +101,8 @@ namespace Bimbridge.AgentHost
         Observation Observe(ValidatedOp op, ExecContext ctx);
         /// <summary>Postconditions against the current model state. Never modifies the model.</summary>
         PostcheckResult CheckPostconditions(ValidatedOp op, ExecContext ctx);
-        /// <summary>alpha3: "simulado", "ensayo" (temporary real write, always rolled back) or "persistente".</summary>
-        string WriteMode => "simulado";
+        /// <summary>alpha3: "simulated", "trial" (temporary real write, always rolled back) or "persistent".</summary>
+        string WriteMode => "simulated";
     }
 
     /// <summary>alpha3: the backend cannot know whether its write was committed (timeout, connection lost midway). The executor does not repeat it:

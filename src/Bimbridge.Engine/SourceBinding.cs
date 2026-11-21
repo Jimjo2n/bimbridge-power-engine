@@ -21,7 +21,7 @@ namespace Bimbridge.Engine
     /// </summary>
     public static class SourceBinding
     {
-        public const string OpField = "origen";
+        public const string OpField = "origin";
         public const string TokenPrefix = "src1:";
 
         /// <summary>Origin token: fingerprint of (source type and id, file SHA-256, revision, geometric registration, plan fingerprint, batch).</summary>
@@ -77,7 +77,7 @@ namespace Bimbridge.Engine
             if (bound == null) return true;
             if (!string.IsNullOrWhiteSpace(givenKey) && !string.Equals(givenKey.Trim(), bound.Key, StringComparison.Ordinal))
             {
-                error = "this plan comes from a source and its idempotency key is " + bound.Key + "; no other clave= is accepted (" + givenKey + "). Omit clave= or use the bound one.";
+                error = "this plan comes from a source and its idempotency key is " + bound.Key + "; no other key= is accepted (" + givenKey + "). Omit key= or use the bound one.";
                 return false;
             }
             key = bound.Key; hash = bound.Hash;

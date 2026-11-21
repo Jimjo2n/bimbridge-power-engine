@@ -12,11 +12,11 @@ namespace Bimbridge.Tests
         public void CommitAndPostconditions_AreSeparate()
         {
             Assert.Equal(PlanVerification.NotVerified, PlanVerification.Postconditions(null));
-            Assert.Equal(PlanVerification.Met, PlanVerification.Postconditions(new Dictionary<string, object> { ["releidos"] = 3L, ["como_se_planifico"] = 3L }));
-            Assert.Equal(PlanVerification.Differences, PlanVerification.Postconditions(new Dictionary<string, object> { ["releidos"] = 3L, ["como_se_planifico"] = 2L, ["distintos"] = 1L }));
-            var creation = new Dictionary<string, object> { ["verificacion_creacion"] = new Dictionary<string, object> { ["revisados"] = 2L, ["como_se_pidio"] = 1L, ["problemas"] = new List<object> { "x" } } };
+            Assert.Equal(PlanVerification.Met, PlanVerification.Postconditions(new Dictionary<string, object> { ["reread"] = 3L, ["as_planned"] = 3L }));
+            Assert.Equal(PlanVerification.Differences, PlanVerification.Postconditions(new Dictionary<string, object> { ["reread"] = 3L, ["as_planned"] = 2L, ["different_items"] = 1L }));
+            var creation = new Dictionary<string, object> { ["creation_verification"] = new Dictionary<string, object> { ["reviewed"] = 2L, ["as_requested"] = 1L, ["problems"] = new List<object> { "x" } } };
             Assert.Equal(PlanVerification.Differences, PlanVerification.Postconditions(creation));
-            var allGood = new Dictionary<string, object> { ["verificacion_creacion"] = new Dictionary<string, object> { ["revisados"] = 2L, ["como_se_pidio"] = 2L } };
+            var allGood = new Dictionary<string, object> { ["creation_verification"] = new Dictionary<string, object> { ["reviewed"] = 2L, ["as_requested"] = 2L } };
             Assert.Equal(PlanVerification.Met, PlanVerification.Postconditions(allGood));
         }
     }

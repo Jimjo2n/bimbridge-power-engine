@@ -21,7 +21,7 @@ internal static class Program
         // Probe only: separates exclusion (what is tested) from the maximum lock wait under extreme load.
         var lockMs = Environment.GetEnvironmentVariable("BIMBRIDGE_PROBE_LOCK_TIMEOUT_MS");
         if (lockMs != null) TaskStore.LeaseLockTimeout = TimeSpan.FromMilliseconds(double.Parse(lockMs, CultureInfo.InvariantCulture));
-        var store = a[3] == "audit" || a[3] == "clave" ? null : new TaskStore(a[0]);
+        var store = a[3] == "audit" || a[3] == "key" ? null : new TaskStore(a[0]);
         var id = a[1]; var owner = a[2];
         try
         {
@@ -39,7 +39,7 @@ internal static class Program
                     var log = new Bimbridge.Engine.AuditLog(a[0]);
                     while (DateTime.UtcNow < startA) Thread.SpinWait(100);
                     var n = int.Parse(a[1], CultureInfo.InvariantCulture);
-                    try { for (var i = 0; i < n; i++) log.Append(owner, "prueba", "ok"); }
+                    try { for (var i = 0; i < n; i++) log.Append(owner, "test", "ok"); }
                     catch (Bimbridge.Engine.JournalUnavailableException)
                     {
                         // Probe diagnostics: counters before propagating the failure (the exit code is still non-zero).
@@ -50,12 +50,12 @@ internal static class Program
                     Console.WriteLine("APPENDED " + n);
                     if (Environment.GetEnvironmentVariable("BIMBRIDGE_PROBE_PROFILE") == "1") Console.Error.WriteLine("PROFILE " + Bimbridge.Engine.AuditProfile.Report() + " " + Bimbridge.Engine.AuditProfile.BatchReport() + " " + Bimbridge.Engine.AuditProfile.PhaseReport());
                     return 0;
-                case "clave":
+                case "key":
                     // a[0]=grants folder; a[4]=start. Creates the store at the same time as other processes and approves its own grant.
                     var startK = new DateTime(long.Parse(a[4], CultureInfo.InvariantCulture), DateTimeKind.Utc);
                     while (DateTime.UtcNow < startK) Thread.SpinWait(100);
                     var gs = new Bimbridge.Engine.GrantStore(a[0]);
-                    var g = gs.Approve("t" + Environment.ProcessId, "doc", "P", new[] { Bimbridge.Engine.Capability.Modify }, TimeSpan.FromHours(1), "sonda", DateTime.UtcNow);
+                    var g = gs.Approve("t" + Environment.ProcessId, "doc", "P", new[] { Bimbridge.Engine.Capability.Modify }, TimeSpan.FromHours(1), "probe", DateTime.UtcNow);
                     Console.WriteLine("GRANT " + g.Task);
                     return 0;
                 case "validate":

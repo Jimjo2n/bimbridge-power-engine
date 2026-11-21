@@ -37,24 +37,24 @@ namespace BimBridge.PowerEngine.Workflows
                     var vs = variants[k].Key.Length == 0 ? new string[0] : variants[k].Key.Split(';');
                     deviations.Add(new Dictionary<string, object>
                     {
-                        ["instancias"] = variants[k].Select(g => (object)g.Id).ToList(),
-                        ["faltan"] = MultisetMinus(refSig, vs).Cast<object>().ToList(),
-                        ["sobran"] = MultisetMinus(vs, refSig).Cast<object>().ToList(),
+                        ["instances"] = variants[k].Select(g => (object)g.Id).ToList(),
+                        ["missing_items"] = MultisetMinus(refSig, vs).Cast<object>().ToList(),
+                        ["extra_items"] = MultisetMinus(vs, refSig).Cast<object>().ToList(),
                     });
                 }
                 types.Add(new Dictionary<string, object>
                 {
-                    ["tipo_grupo"] = t.Key, ["instancias"] = (long)t.Count(), ["variantes"] = (long)variants.Count,
-                    ["referencia"] = new Dictionary<string, object> { ["instancias"] = (long)variants[0].Count(), ["miembros"] = (long)refSig.Length },
-                    ["desviaciones"] = deviations,
-                    ["espejadas"] = t.Where(g => g.Mirrored).Select(g => (object)g.Id).ToList(),
-                    ["por_nivel"] = t.GroupBy(g => g.Level ?? "?").OrderBy(l => l.Key, StringComparer.Ordinal).ToDictionary(l => l.Key, l => (object)(long)l.Count()),
+                    ["group_type"] = t.Key, ["instances"] = (long)t.Count(), ["variants"] = (long)variants.Count,
+                    ["reference"] = new Dictionary<string, object> { ["instances"] = (long)variants[0].Count(), ["members"] = (long)refSig.Length },
+                    ["deviations"] = deviations,
+                    ["mirrored"] = t.Where(g => g.Mirrored).Select(g => (object)g.Id).ToList(),
+                    ["by_level"] = t.GroupBy(g => g.Level ?? "?").OrderBy(l => l.Key, StringComparer.Ordinal).ToDictionary(l => l.Key, l => (object)(long)l.Count()),
                 });
             }
             return new Dictionary<string, object>
             {
-                ["grupos"] = (long)groups.Count, ["tipos"] = types,
-                ["nota"] = "The majority variant is the reference; which one is correct is not decided: deviations are escalated.",
+                ["groups"] = (long)groups.Count, ["types"] = types,
+                ["note"] = "The majority variant is the reference; which one is correct is not decided: deviations are escalated.",
             };
         }
 

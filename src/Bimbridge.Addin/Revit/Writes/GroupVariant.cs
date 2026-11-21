@@ -15,10 +15,10 @@ namespace Bimbridge.Addin.Revit.Writes
         internal static Dictionary<string, object> Plan(BuildContext ctx, long id, Dictionary<string, object> args)
         {
             var group = CurrentGroup(ctx.Doc, id);
-            var name = Arg.GetString(args, "nombre").Trim();
-            if (!ctx.NewNames.Add("grupo:" + name) || NameExists(ctx.Doc, name))
+            var name = Arg.GetString(args, "name").Trim();
+            if (!ctx.NewNames.Add("group:" + name) || NameExists(ctx.Doc, name))
                 throw new QueryException("a variant already exists with the name " + name);
-            var rules = new Dictionary<string, object>((Dictionary<string, object>)args["reglas"], StringComparer.OrdinalIgnoreCase);
+            var rules = new Dictionary<string, object>((Dictionary<string, object>)args["rules"], StringComparer.OrdinalIgnoreCase);
             var snapshot = Snapshot(group);
             var changes = new Dictionary<string, object>();
             foreach (var element in group.GetMemberIds().Select(ctx.Doc.GetElement))
@@ -35,17 +35,17 @@ namespace Bimbridge.Addin.Revit.Writes
             if (changes.Count == 0) throw new QueryException("the group has no lighting fixtures matching the replacement rules");
             return new Dictionary<string, object>
             {
-                ["grupo"] = id, ["nombre"] = name, ["cambios"] = changes, ["miembros"] = snapshot,
-                ["huella"] = Fingerprint(group, snapshot), ["ws"] = (long)group.WorksetId.IntegerValue,
+                ["group"] = id, ["name"] = name, ["changes"] = changes, ["members"] = snapshot,
+                ["fingerprint"] = Fingerprint(group, snapshot), ["ws"] = (long)group.WorksetId.IntegerValue,
             };
         }
 
         internal static Group Validate(Document doc, Dictionary<string, object> target)
         {
-            var group = CurrentGroup(doc, WriteKit.L(target, "grupo"));
-            if (Fingerprint(group, Snapshot(group)) != WriteKit.S(target, "huella"))
+            var group = CurrentGroup(doc, WriteKit.L(target, "group"));
+            if (Fingerprint(group, Snapshot(group)) != WriteKit.S(target, "fingerprint"))
                 throw new QueryException("the source group changed after planning");
-            if (NameExists(doc, WriteKit.S(target, "nombre"))) throw new QueryException("the variant name is already taken");
+            if (NameExists(doc, WriteKit.S(target, "name"))) throw new QueryException("the variant name is already taken");
             return group;
         }
 
@@ -53,8 +53,8 @@ namespace Bimbridge.Addin.Revit.Writes
         {
             var original = Validate(doc, target);
             var sourceWorkset = original.WorksetId.IntegerValue;
-            var members = ((Dictionary<string, object>)target["miembros"]);
-            var changed = (Dictionary<string, object>)target["cambios"];
+            var members = ((Dictionary<string, object>)target["members"]);
+            var changed = (Dictionary<string, object>)target["changes"];
             var ids = original.UngroupMembers().ToList();
             var byId = ids.ToDictionary(id => Ids.ToLong(id).ToString(CultureInfo.InvariantCulture));
             if (!new HashSet<string>(byId.Keys).SetEquals(members.Keys))
@@ -69,7 +69,7 @@ namespace Bimbridge.Addin.Revit.Writes
                     throw new InvalidOperationException("the change would recreate " + item.Key + "; review its references before replacing it");
             }
             var variant = doc.Create.NewGroup(ids) ?? throw new InvalidOperationException("Revit did not rebuild the group");
-            variant.GroupType.Name = WriteKit.S(target, "nombre");
+            variant.GroupType.Name = WriteKit.S(target, "name");
             if (doc.IsWorkshared && variant.WorksetId.IntegerValue != sourceWorkset)
             {
                 var parameter = variant.get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM);
@@ -83,11 +83,11 @@ namespace Bimbridge.Addin.Revit.Writes
 
         internal static bool Matches(Group group, Dictionary<string, object> target)
         {
-            if (group == null || group.GroupType.Name != WriteKit.S(target, "nombre") ||
+            if (group == null || group.GroupType.Name != WriteKit.S(target, "name") ||
                 (group.Document.IsWorkshared && group.WorksetId.IntegerValue != WriteKit.L(target, "ws"))) return false;
             var current = Snapshot(group);
-            var old = (Dictionary<string, object>)target["miembros"];
-            var changed = (Dictionary<string, object>)target["cambios"];
+            var old = (Dictionary<string, object>)target["members"];
+            var changed = (Dictionary<string, object>)target["changes"];
             return GroupMemberMap.MatchesVariant(old, current, changed);
         }
 
@@ -115,18 +115,18 @@ namespace Bimbridge.Addin.Revit.Writes
                 {
                     var state = new Dictionary<string, object>
                     {
-                        ["uid"] = element.UniqueId, ["tipo"] = Ids.ToLong(element.GetTypeId()), ["workset"] = (long)element.WorksetId.IntegerValue,
-                        ["pos"] = WriteKit.Loc(element), ["rot"] = WriteKit.Rot(element), ["nivel"] = Ids.ToLong(element.LevelId),
+                        ["uid"] = element.UniqueId, ["type"] = Ids.ToLong(element.GetTypeId()), ["workset"] = (long)element.WorksetId.IntegerValue,
+                        ["pos"] = WriteKit.Loc(element), ["rot"] = WriteKit.Rot(element), ["level"] = Ids.ToLong(element.LevelId),
                     };
                     if (element is FamilyInstance family)
                     {
-                        state["anfitrion"] = Ids.ToLong(family.Host?.Id);
-                        state["mano"] = family.HandFlipped;
-                        state["frente"] = family.FacingFlipped;
-                        state["espejo"] = family.Mirrored;
+                        state["host"] = Ids.ToLong(family.Host?.Id);
+                        state["hand"] = family.HandFlipped;
+                        state["facing"] = family.FacingFlipped;
+                        state["mirrored"] = family.Mirrored;
                     }
                     if (element.Location is LocationCurve curve)
-                        state["extremos"] = new object[] { WriteKit.Xyz(curve.Curve.GetEndPoint(0)), WriteKit.Xyz(curve.Curve.GetEndPoint(1)) };
+                        state["ends"] = new object[] { WriteKit.Xyz(curve.Curve.GetEndPoint(0)), WriteKit.Xyz(curve.Curve.GetEndPoint(1)) };
                     return (object)state;
                 });
         }

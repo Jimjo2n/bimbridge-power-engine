@@ -80,12 +80,12 @@ namespace Bimbridge.AgentHost
                     }
                     if (stopped) break;
                     line.Write(buf, start, n - start);
-                    if (line.Length > MaxLineBytes) { diags.Add(Diagnostic.Error(label + "_linea_demasiado_larga", "after seq " + seq + ": more than " + MaxLineBytes + " bytes without a newline")); stopped = true; }
+                    if (line.Length > MaxLineBytes) { diags.Add(Diagnostic.Error(label + "_line_too_long", "after seq " + seq + ": more than " + MaxLineBytes + " bytes without a newline")); stopped = true; }
                     pos += n;
                 }
             }
             if (!stopped && line.Length > 0)
-                diags.Add(Diagnostic.Warn(label + "_linea_final_truncada", line.Length + " uncommitted bytes after seq " + seq + (repairTornTail ? "; trimmed" : "")));
+                diags.Add(Diagnostic.Warn(label + "_truncated_last_line", line.Length + " uncommitted bytes after seq " + seq + (repairTornTail ? "; trimmed" : "")));
             if (goodEnd < fileLen && repairTornTail && !Diagnostic.AnyError(diags))
                 using (var fs = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.Read)) { fs.SetLength(goodEnd); fs.Flush(true); }
             log.LastSeq = seq; log.LastHash = prev; log._length = goodEnd;
@@ -95,15 +95,16 @@ namespace Bimbridge.AgentHost
             {
                 Dictionary<string, object> rec = null;
                 try { rec = Json.ParseObject(Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length)); } catch (FormatException) { }
-                if (rec == null) { diags.Add(Diagnostic.Error(label + "_linea_ilegible", "after seq " + seq + (isLast ? " (last line, complete but unreadable)" : ""))); return false; }
+                if (rec == null) { diags.Add(Diagnostic.Error(label + "_unreadable_line", "after seq " + seq + (isLast ? " (last line, complete but unreadable)" : ""))); return false; }
                 var s = Arg.GetLong(rec, "seq");
                 var h = Arg.GetString(rec, "h");
                 var p = Arg.GetString(rec, "prev");
-                if (s != seq + 1) { diags.Add(Diagnostic.Error(label + "_seq_no_consecutiva", "expected " + (seq + 1) + ", read " + (s?.ToString() ?? "nothing"))); return false; }
-                if (p != prev) { diags.Add(Diagnostic.Error(label + "_cadena_rota", "seq " + s + ": prev does not match")); return false; }
-                if (h == null || h != HashOf(rec)) { diags.Add(Diagnostic.Error(label + "_hash_invalido", "seq " + s + ": content altered")); return false; }
+                if (s != seq + 1) { diags.Add(Diagnostic.Error(label + "_seq_not_consecutive", "expected " + (seq + 1) + ", read " + (s?.ToString() ?? "nothing"))); return false; }
+                if (p != prev) { diags.Add(Diagnostic.Error(label + "_broken_chain", "seq " + s + ": prev does not match")); return false; }
+                if (h == null || h != HashOf(rec)) { diags.Add(Diagnostic.Error(label + "_invalid_hash", "seq " + s + ": content altered")); return false; }
                 seq = s.Value; prev = h;
-                return onRecord(rec);
+                // Verified over the record as stored (legacy key names included); only then normalized to the current vocabulary.
+                return onRecord(LegacyAliases.NormalizeRecord(rec));
             }
         }
 

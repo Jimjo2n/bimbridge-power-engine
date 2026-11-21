@@ -96,10 +96,10 @@ internal static class Program
             foreach (var s in Surfaces) surfaces[s] = HasSurface(apiMd, s) || HasSurface(uiMd, s);
             var doc = new Dictionary<string, object>
             {
-                ["revit"] = year, ["paquete_referencia"] = ver,
-                ["metodo"] = "System.Reflection.Metadata over reference assemblies; without loading or running Revit",
+                ["revit"] = year, ["reference_package"] = ver,
+                ["method"] = "System.Reflection.Metadata over reference assemblies; without loading or running Revit",
                 ["postable_command"] = postable, ["built_in_category"] = categories, ["built_in_parameter_total"] = parameters.Count,
-                ["view_type"] = viewTypes, ["superficies"] = surfaces,
+                ["view_type"] = viewTypes, ["surfaces"] = surfaces,
             };
             perVersion[year] = doc;
             File.WriteAllText(Path.Combine(outDir, "revit-api-" + year + ".json"), JsonSerializer.Serialize(doc, new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
@@ -112,16 +112,16 @@ internal static class Program
         {
             var a = perVersion[years[i - 1]]; var b = perVersion[years[i]];
             List<string> L(Dictionary<string, object> d, string k) => (List<string>)d[k];
-            var sa = (SortedDictionary<string, bool>)a["superficies"]; var sb = (SortedDictionary<string, bool>)b["superficies"];
+            var sa = (SortedDictionary<string, bool>)a["surfaces"]; var sb = (SortedDictionary<string, bool>)b["surfaces"];
             diff.Add(new Dictionary<string, object>
             {
                 ["de"] = years[i - 1], ["a"] = years[i],
-                ["postable_command_nuevos"] = L(b, "postable_command").Except(L(a, "postable_command")).ToList(),
-                ["postable_command_retirados"] = L(a, "postable_command").Except(L(b, "postable_command")).ToList(),
-                ["built_in_category_nuevas"] = L(b, "built_in_category").Except(L(a, "built_in_category")).ToList(),
-                ["built_in_category_retiradas"] = L(a, "built_in_category").Except(L(b, "built_in_category")).ToList(),
-                ["superficies_aparecen"] = sb.Where(kv => kv.Value && !sa[kv.Key]).Select(kv => kv.Key).ToList(),
-                ["superficies_desaparecen"] = sa.Where(kv => kv.Value && !sb[kv.Key]).Select(kv => kv.Key).ToList(),
+                ["postable_command_new"] = L(b, "postable_command").Except(L(a, "postable_command")).ToList(),
+                ["postable_command_removed"] = L(a, "postable_command").Except(L(b, "postable_command")).ToList(),
+                ["built_in_category_new"] = L(b, "built_in_category").Except(L(a, "built_in_category")).ToList(),
+                ["built_in_category_removed"] = L(a, "built_in_category").Except(L(b, "built_in_category")).ToList(),
+                ["surfaces_appear"] = sb.Where(kv => kv.Value && !sa[kv.Key]).Select(kv => kv.Key).ToList(),
+                ["surfaces_disappear"] = sa.Where(kv => kv.Value && !sb[kv.Key]).Select(kv => kv.Key).ToList(),
             });
         }
         File.WriteAllText(Path.Combine(outDir, "revit-api-diff.json"), JsonSerializer.Serialize(diff, new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
@@ -248,17 +248,17 @@ internal static class Program
                 map[p[0] + "|" + p[1] + "|" + p[2]] = l;
             }
             per[year] = map;
-            var byKind = lines.GroupBy(l => l.Split('|')[1]).ToDictionary(g => g.Key switch { "T" => "tipos", "C" => "constructores", "M" => "metodos", "P" => "propiedades", "F" => "campos", "E" => "eventos", _ => g.Key }, g => (object)g.Count());
+            var byKind = lines.GroupBy(l => l.Split('|')[1]).ToDictionary(g => g.Key switch { "T" => "tipos", "C" => "constructors", "M" => "methods", "P" => "properties", "F" => "campos", "E" => "events", _ => g.Key }, g => (object)g.Count());
             var types = lines.Where(l => l.Split('|')[1] == "T").Select(l => l.Split('|')).ToList();
             summary.Add(new Dictionary<string, object>
             {
-                ["revit"] = year, ["paquete_referencia"] = ver,
+                ["revit"] = year, ["reference_package"] = ver,
                 ["revitapi_sha256"] = Symbols.Sha256(File.ReadAllBytes(api)), ["revitapiui_sha256"] = Symbols.Sha256(File.ReadAllBytes(ui)),
-                ["simbolos"] = lines.Count, ["simbolos_sha256"] = sha, ["por_clase"] = byKind,
-                ["tipos_por_tipo"] = types.GroupBy(p => p[3]).ToDictionary(g => g.Key, g => (object)g.Count()),
-                ["obsoletos"] = lines.Count(l => l.Contains("|obsolete")),
-                ["metodos_estaticos"] = lines.Count(l => l.Split('|')[1] == "M" && l.Contains("|static")),
-                ["espacios_de_nombres"] = types.Select(p => { var n = p[2].Split('+')[0]; var d = n.LastIndexOf('.'); return d > 0 ? n.Substring(0, d) : ""; })
+                ["symbols"] = lines.Count, ["symbols_sha256"] = sha, ["by_class"] = byKind,
+                ["types_by_kind"] = types.GroupBy(p => p[3]).ToDictionary(g => g.Key, g => (object)g.Count()),
+                ["obsolete"] = lines.Count(l => l.Contains("|obsolete")),
+                ["static_methods"] = lines.Count(l => l.Split('|')[1] == "M" && l.Contains("|static")),
+                ["namespaces"] = types.Select(p => { var n = p[2].Split('+')[0]; var d = n.LastIndexOf('.'); return d > 0 ? n.Substring(0, d) : ""; })
                                               .GroupBy(n => n).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => (object)g.Count()),
             });
             Console.WriteLine(year + ": " + lines.Count + " symbols (" + string.Join(", ", byKind.Select(kv => kv.Key + " " + kv.Value)) + ")");
@@ -275,18 +275,18 @@ internal static class Program
             diffs.Add(new Dictionary<string, object>
             {
                 ["de"] = years[i - 1], ["a"] = years[i],
-                ["introducidos"] = added.Count, ["retirados"] = removed.Count, ["modificados"] = changed.Count, ["obsoletos_nuevos"] = newlyObsolete.Count,
-                ["lista_introducidos"] = added, ["lista_retirados"] = removed,
-                ["lista_modificados"] = changed.Select(k => (object)new Dictionary<string, object> { ["antes"] = a[k], ["despues"] = b[k] }).ToList(),
+                ["introduced"] = added.Count, ["removed"] = removed.Count, ["modified"] = changed.Count, ["new_obsolete"] = newlyObsolete.Count,
+                ["introduced_list"] = added, ["removed_list"] = removed,
+                ["modified_list"] = changed.Select(k => (object)new Dictionary<string, object> { ["before"] = a[k], ["after"] = b[k] }).ToList(),
             });
             Console.WriteLine(years[i - 1] + "→" + years[i] + ": +" + added.Count + " −" + removed.Count + " ~" + changed.Count + " newly obsolete " + newlyObsolete.Count);
         }
         var o = new JsonSerializerOptions { WriteIndented = true };
         File.WriteAllText(Path.Combine(outDir, "revit-symbols-summary.json"), JsonSerializer.Serialize(new Dictionary<string, object>
         {
-            ["metodo"] = "System.Reflection.Metadata over Nice3point reference assemblies; without loading or running Revit. Technical presence: implies no semantics, preconditions or transactions.",
-            ["formato_listado"] = "Assembly|Kind|Symbol|attributes (T type, C constructor, M method, P property, F field, E event)",
-            ["versiones"] = summary,
+            ["method"] = "System.Reflection.Metadata over Nice3point reference assemblies; without loading or running Revit. Technical presence: implies no semantics, preconditions or transactions.",
+            ["listing_format"] = "Assembly|Kind|Symbol|attributes (T type, C constructor, M method, P property, F field, E event)",
+            ["versions"] = summary,
         }, o), new UTF8Encoding(false));
         using (var gzOut = File.Create(Path.Combine(outDir, "revit-symbols-diff.json.gz")))
         using (var gz = new System.IO.Compression.GZipStream(gzOut, System.IO.Compression.CompressionLevel.SmallestSize))

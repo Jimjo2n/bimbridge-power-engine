@@ -401,7 +401,7 @@ namespace Bimbridge.Setup
 
         private static RadioButton Option(Panel parent, string title, string text, bool selected)
         {
-            var r = Theme.Choice(new RadioButton { GroupName = "niveles", IsChecked = selected }, title, text);
+            var r = Theme.Choice(new RadioButton { GroupName = "levels", IsChecked = selected }, title, text);
             parent.Children.Add(r);
             return r;
         }

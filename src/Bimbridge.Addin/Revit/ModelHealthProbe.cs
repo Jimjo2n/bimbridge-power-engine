@@ -238,7 +238,7 @@ namespace Bimbridge.Addin.Revit
         {
             var d = new Dictionary<string, object>();
             void T(string k, int total, int max) { if (total > max) d[k] = "checked " + max + " of " + total; }
-            T("avisos", WarningsTotal, MaxWarnings); T("elementos", ElementsTotal, MaxElements); T("laminas", SheetsTotal, MaxSheets); T("vistas", ViewsTotal, MaxViews);
+            T("warnings", WarningsTotal, MaxWarnings); T("elements", ElementsTotal, MaxElements); T("sheets", SheetsTotal, MaxSheets); T("views", ViewsTotal, MaxViews);
             return d;
         }
     }

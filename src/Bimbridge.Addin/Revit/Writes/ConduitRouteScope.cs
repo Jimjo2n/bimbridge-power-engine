@@ -63,15 +63,15 @@ namespace Bimbridge.Addin.Revit.Writes
                 throw new QueryException("the route ends must match the two original ends within 1 mm");
             return new Dictionary<string, object>
             {
-                ["huella"] = Home.Sha256Hex(OpSemantics.Canonical(snapshot)),
-                ["extremos"] = new List<object> { boundaries[first].External, boundaries[1 - first].External },
+                ["fingerprint"] = Home.Sha256Hex(OpSemantics.Canonical(snapshot)),
+                ["ends"] = new List<object> { boundaries[first].External, boundaries[1 - first].External },
             };
         }
 
         internal static Dictionary<string, object> Terminal(Document doc, Dictionary<string, object> input, XYZ target, bool mustBeFree)
         {
             var owner = doc.GetElement(Ids.ToId(Arg.GetLong(input, "id").Value));
-            var port = Manager(owner)?.Lookup((int)Arg.GetLong(input, "conector").Value);
+            var port = Manager(owner)?.Lookup((int)Arg.GetLong(input, "connector").Value);
             if (port == null || port.ConnectorType != ConnectorType.End || !Close(port.Origin, target))
                 throw new QueryException("the specified connector is not an end at the expected position");
             if (mustBeFree && port.IsConnected) throw new QueryException("the terminal connector is already taken");
@@ -84,7 +84,7 @@ namespace Bimbridge.Addin.Revit.Writes
             if (OpSemantics.Canonical(current) != OpSemantics.Canonical(saved))
                 throw new QueryException("the terminal connector changed");
             var owner = doc.GetElement(Ids.ToId(Arg.GetLong(saved, "id").Value));
-            return Manager(owner).Lookup((int)Arg.GetLong(saved, "conector").Value);
+            return Manager(owner).Lookup((int)Arg.GetLong(saved, "connector").Value);
         }
 
         internal static List<Connector> PhysicalReferences(Connector port) => port.AllRefs.Cast<Connector>()
@@ -99,9 +99,9 @@ namespace Bimbridge.Addin.Revit.Writes
             var direction = c.CoordinateSystem.BasisZ;
             return new Dictionary<string, object>
             {
-                ["id"] = Ids.ToLong(c.Owner.Id), ["uid"] = c.Owner.UniqueId, ["conector"] = (long)c.Id,
+                ["id"] = Ids.ToLong(c.Owner.Id), ["uid"] = c.Owner.UniqueId, ["connector"] = (long)c.Id,
                 ["pos"] = WriteKit.List(point.X, point.Y, point.Z), ["dir"] = WriteKit.List(direction.X, direction.Y, direction.Z),
-                ["dominio"] = c.Domain.ToString(), ["forma"] = c.Shape.ToString(), ["radio"] = c.Shape == ConnectorProfileType.Round ? (object)c.Radius : null,
+                ["domain"] = c.Domain.ToString(), ["shape"] = c.Shape.ToString(), ["radius"] = c.Shape == ConnectorProfileType.Round ? (object)c.Radius : null,
             };
         }
 

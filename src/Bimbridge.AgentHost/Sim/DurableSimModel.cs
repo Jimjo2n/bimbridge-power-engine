@@ -42,8 +42,8 @@ namespace Bimbridge.AgentHost
         private DurableSimModel(string dir) { _dir = dir; }
 
         public string Dir => _dir;
-        private string SnapshotPath => Path.Combine(_dir, "modelo.json");
-        private string WalPath(long gen) => Path.Combine(_dir, "modelo." + gen.ToString(CultureInfo.InvariantCulture) + ".wal");
+        private string SnapshotPath => LegacyAliases.ResolveExisting(_dir, Path.Combine(_dir, "model.json"));
+        private string WalPath(long gen) => Path.Combine(_dir, "model." + gen.ToString(CultureInfo.InvariantCulture) + ".wal");
 
         public sealed class ModelCorruptException : IOException { public ModelCorruptException(string m) : base(m) { } }
         public sealed class StaleFencingException : InvalidOperationException { public StaleFencingException(string m) : base(m) { } }
@@ -52,7 +52,7 @@ namespace Bimbridge.AgentHost
         public static DurableSimModel Create(string dir, string docKey, string docPrint, IEnumerable<string> elements, Dictionary<string, object> config = null)
         {
             Directory.CreateDirectory(dir);
-            if (File.Exists(Path.Combine(dir, "modelo.json"))) throw new IOException("a model already exists in " + dir);
+            if (File.Exists(LegacyAliases.ResolveExisting(dir, Path.Combine(dir, "model.json")))) throw new IOException("a model already exists in " + dir);
             var m = new DurableSimModel(dir) { DocKey = docKey, DocPrint = docPrint, Config = config ?? new Dictionary<string, object>(StringComparer.Ordinal) };
             long next = 1000;
             foreach (var spec in elements)
@@ -69,7 +69,7 @@ namespace Bimbridge.AgentHost
                     var id = next++;
                     m._cat[id] = cat;
                     m._params[id] = new Dictionary<string, object>(StringComparer.Ordinal);
-                    if (level != null) m._params[id]["nivel"] = level;
+                    if (level != null) m._params[id]["level"] = level;
                 }
             }
             m._gen = 1;
@@ -88,29 +88,29 @@ namespace Bimbridge.AgentHost
 
         private void Load()
         {
-            if (!File.Exists(SnapshotPath)) throw new ModelCorruptException("no modelo.json in " + _dir);
+            if (!File.Exists(SnapshotPath)) throw new ModelCorruptException("no model.json in " + _dir);
             Dictionary<string, object> s;
             try { s = Json.ParseObject(File.ReadAllText(SnapshotPath)); }
-            catch (FormatException ex) { throw new ModelCorruptException("modelo.json unreadable: " + ex.Message); }
-            if (Arg.GetLong(s, "esquema") != SchemaVersion) throw new ModelCorruptException("unsupported model schema: " + Arg.GetString(s, "esquema"));
-            var seal = Arg.GetString(s, "sello");
-            var body = new Dictionary<string, object>(s, StringComparer.Ordinal); body.Remove("sello");
-            if (seal != Home.Sha256Hex(OpSemantics.Canonical(body), 32)) throw new ModelCorruptException("modelo.json tampered with (seal)");
-            DocKey = Arg.GetString(s, "clave"); DocPrint = Arg.GetString(s, "huella");
+            catch (FormatException ex) { throw new ModelCorruptException("model.json unreadable: " + ex.Message); }
+            if (Arg.GetLong(s, "schema") != SchemaVersion) throw new ModelCorruptException("unsupported model schema: " + Arg.GetString(s, "schema"));
+            var seal = Arg.GetString(s, "seal");
+            var body = new Dictionary<string, object>(s, StringComparer.Ordinal); body.Remove("seal");
+            if (seal != Home.Sha256Hex(OpSemantics.Canonical(body), 32)) throw new ModelCorruptException("model.json tampered with (seal)");
+            DocKey = Arg.GetString(s, "key"); DocPrint = Arg.GetString(s, "fingerprint");
             _gen = Arg.GetLong(s, "gen") ?? 1;
             if (s.TryGetValue("config", out var c) && c is Dictionary<string, object> cd) Config = cd;
-            foreach (var e in ((List<object>)s["elementos"]).Cast<List<object>>())
+            foreach (var e in ((List<object>)s["elements"]).Cast<List<object>>())
             {
                 var id = Convert.ToInt64(e[0], CultureInfo.InvariantCulture);
                 _cat[id] = (string)e[1];
                 _params[id] = new Dictionary<string, object>((Dictionary<string, object>)e[2], StringComparer.Ordinal);
             }
-            if (s.TryGetValue("tx_por_op", out var t) && t is Dictionary<string, object> td) foreach (var kv in td) _compactedTx[kv.Key] = Convert.ToInt64(kv.Value, CultureInfo.InvariantCulture);
+            if (s.TryGetValue("tx_per_op", out var t) && t is Dictionary<string, object> td) foreach (var kv in td) _compactedTx[kv.Key] = Convert.ToInt64(kv.Value, CultureInfo.InvariantCulture);
             if (s.TryGetValue("fencing", out var f) && f is Dictionary<string, object> fd) foreach (var kv in fd) _maxFencing[kv.Key] = Convert.ToInt64(kv.Value, CultureInfo.InvariantCulture);
 
             // leftovers from earlier generations (compaction interrupted after writing the snapshot): ignored and deleted
-            foreach (var w in Directory.GetFiles(_dir, "modelo.*.wal"))
-                if (w != WalPath(_gen)) { OpenDiagnostics.Add(Diagnostic.Info("wal_antiguo_descartado", Path.GetFileName(w))); try { File.Delete(w); } catch (IOException) { } }
+            foreach (var w in Directory.GetFiles(_dir, "model.*.wal"))
+                if (w != WalPath(_gen)) { OpenDiagnostics.Add(Diagnostic.Info("old_wal_discarded", Path.GetFileName(w))); try { File.Delete(w); } catch (IOException) { } }
             foreach (var tmp in Directory.GetFiles(_dir, "*.tmp-*")) { try { File.Delete(tmp); } catch (IOException) { } }
 
             // alpha3 (P1-C): validate everything before applying anything. 1st pass only validates (bounded memory); 2nd applies in streaming.
@@ -124,7 +124,7 @@ namespace Bimbridge.AgentHost
 
         private void ApplyRecord(Dictionary<string, object> r)
         {
-            if (r.TryGetValue("cambios", out var ch) && ch is IEnumerable<object> list)
+            if (r.TryGetValue("changes", out var ch) && ch is IEnumerable<object> list)
                 foreach (var x in list.Cast<IList<object>>())
                 {
                     var id = Convert.ToInt64(x[0], CultureInfo.InvariantCulture);
@@ -132,7 +132,7 @@ namespace Bimbridge.AgentHost
                     var p = (string)x[1];
                     if (x[3] == null) _params[id].Remove(p); else _params[id][p] = x[3];
                 }
-            if (r.TryGetValue("nuevos", out var nu) && nu is IEnumerable<object> nl)
+            if (r.TryGetValue("new_items", out var nu) && nu is IEnumerable<object> nl)
                 foreach (var x in nl.Cast<IList<object>>())
                 {
                     var id = Convert.ToInt64(x[0], CultureInfo.InvariantCulture);
@@ -149,13 +149,13 @@ namespace Bimbridge.AgentHost
         {
             var body = new Dictionary<string, object>
             {
-                ["esquema"] = (long)SchemaVersion, ["clave"] = DocKey, ["huella"] = DocPrint, ["gen"] = _gen,
-                ["elementos"] = _cat.Select(kv => (object)new List<object> { kv.Key, kv.Value, new Dictionary<string, object>(_params[kv.Key], StringComparer.Ordinal) }).ToList(),
-                ["tx_por_op"] = _compactedTx.ToDictionary(kv => kv.Key, kv => (object)kv.Value, StringComparer.Ordinal),
+                ["schema"] = (long)SchemaVersion, ["key"] = DocKey, ["fingerprint"] = DocPrint, ["gen"] = _gen,
+                ["elements"] = _cat.Select(kv => (object)new List<object> { kv.Key, kv.Value, new Dictionary<string, object>(_params[kv.Key], StringComparer.Ordinal) }).ToList(),
+                ["tx_per_op"] = _compactedTx.ToDictionary(kv => kv.Key, kv => (object)kv.Value, StringComparer.Ordinal),
                 ["fencing"] = _maxFencing.ToDictionary(kv => kv.Key, kv => (object)kv.Value, StringComparer.Ordinal),
                 ["config"] = Config,
             };
-            body["sello"] = Home.Sha256Hex(OpSemantics.Canonical(body), 32);
+            body["seal"] = Home.Sha256Hex(OpSemantics.Canonical(body), 32);
             Home.WriteAtomic(SnapshotPath, Json.Write(body));
         }
 
@@ -187,12 +187,12 @@ namespace Bimbridge.AgentHost
             lock (_lock)
             {
                 string cat = null, lvl = null;
-                if (scope != null && scope.TryGetValue("categoria", out var c)) cat = Convert.ToString(c, CultureInfo.InvariantCulture);
-                if (scope != null && scope.TryGetValue("nivel", out var l)) lvl = Convert.ToString(l, CultureInfo.InvariantCulture);
+                if (scope != null && scope.TryGetValue("category", out var c)) cat = Convert.ToString(c, CultureInfo.InvariantCulture);
+                if (scope != null && scope.TryGetValue("level", out var l)) lvl = Convert.ToString(l, CultureInfo.InvariantCulture);
                 HashSet<long> ids = null;   // rc1: alcance.ids in the simulator too
                 if (scope != null && scope.TryGetValue("ids", out var iv) && iv is System.Collections.IEnumerable ie && !(iv is string))
                     ids = new HashSet<long>(ie.Cast<object>().Select(x => Convert.ToInt64(x, CultureInfo.InvariantCulture)));
-                return _cat.Where(kv => (ids == null || ids.Contains(kv.Key)) && (cat == null || kv.Value == cat) && (lvl == null || (_params[kv.Key].TryGetValue("nivel", out var v) && Convert.ToString(v, CultureInfo.InvariantCulture) == lvl)))
+                return _cat.Where(kv => (ids == null || ids.Contains(kv.Key)) && (cat == null || kv.Value == cat) && (lvl == null || (_params[kv.Key].TryGetValue("level", out var v) && Convert.ToString(v, CultureInfo.InvariantCulture) == lvl)))
                            .Select(kv => kv.Key).ToList();
             }
         }
@@ -235,8 +235,8 @@ namespace Bimbridge.AgentHost
                 var rec = new Dictionary<string, object>
                 {
                     ["tx"] = "tx-" + _gen.ToString(CultureInfo.InvariantCulture) + "-" + (_wal.LastSeq + 1).ToString(CultureInfo.InvariantCulture),
-                    ["op"] = op, ["plan"] = plan, ["f"] = fencing, ["obj"] = (long)targets, ["objs_h"] = targetsHash, ["origen"] = origin,
-                    ["cambios"] = changes.Select(c => (object)c.ToList()).ToList(),
+                    ["op"] = op, ["plan"] = plan, ["f"] = fencing, ["obj"] = (long)targets, ["objs_h"] = targetsHash, ["origin"] = origin,
+                    ["changes"] = changes.Select(c => (object)c.ToList()).ToList(),
                 };
                 var written = _wal.Append(rec);
                 ApplyRecord(written);
@@ -252,10 +252,10 @@ namespace Bimbridge.AgentHost
                 var rec = new Dictionary<string, object>
                 {
                     ["tx"] = "tx-" + _gen.ToString(CultureInfo.InvariantCulture) + "-" + (_wal.LastSeq + 1).ToString(CultureInfo.InvariantCulture),
-                    ["op"] = null, ["plan"] = null, ["origen"] = "externo",
-                    ["cambios"] = changes.Select(c => (object)c.ToList()).ToList(),
+                    ["op"] = null, ["plan"] = null, ["origin"] = "external",
+                    ["changes"] = changes.Select(c => (object)c.ToList()).ToList(),
                 };
-                if (newElements != null) rec["nuevos"] = newElements.Select(c => (object)c.ToList()).ToList();
+                if (newElements != null) rec["new_items"] = newElements.Select(c => (object)c.ToList()).ToList();
                 var written = _wal.Append(rec);
                 ApplyRecord(written);
                 return (string)written["tx"];

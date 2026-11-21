@@ -16,19 +16,19 @@ namespace Bimbridge.Addin.Revit
 
         internal static Dictionary<string, object> ValidatePreset(object value)
         {
-            if (!(value is Dictionary<string, object> preset)) throw new QueryException("preset_pdf requires a JSON object");
+            if (!(value is Dictionary<string, object> preset)) throw new QueryException("pdf_preset requires a JSON object");
             foreach (var item in preset)
             {
                 var valid = item.Key switch
                 {
-                    "papel" => item.Value is string name && Enum.TryParse(name, true, out ExportPaperFormat format) &&
+                    "paper" => item.Value is string name && Enum.TryParse(name, true, out ExportPaperFormat format) &&
                         Enum.IsDefined(typeof(ExportPaperFormat), format) && !int.TryParse(name, out _),
-                    "zoom" => item.Value is string zoom && (zoom == "100" || zoom == "ajustar"),
-                    "color" => item.Value is string color && (color == "color" || color == "gris"),
-                    "combinar" or "raster" or "ocultar_etiquetas_sin_ref" => item.Value is bool,
+                    "zoom" => item.Value is string zoom && (zoom == "100" || zoom == "adjust"),
+                    "color" => item.Value is string color && (color == "color" || color == "gray"),
+                    "combine" or "raster" or "hide_unreferenced_tags" => item.Value is bool,
                     _ => false,
                 };
-                if (!valid) throw new QueryException("preset_pdf: invalid option or value for " + item.Key);
+                if (!valid) throw new QueryException("pdf_preset: invalid option or value for " + item.Key);
             }
             return preset;
         }

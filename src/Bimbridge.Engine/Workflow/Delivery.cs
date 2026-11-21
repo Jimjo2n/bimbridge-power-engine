@@ -14,10 +14,10 @@ namespace Bimbridge.Engine.Workflow
     /// </summary>
     public static class DeliveryStages
     {
-        public const string PlanGenerated = "plan_generado", PlanValidated = "plan_validado", PlanAuthorized = "plan_autorizado",
-            OperationRun = "operacion_ejecutada", CommitConfirmed = "commit_confirmado", StateObserved = "estado_observado",
-            Saved = "cambios_guardados", Synced = "modelo_sincronizado", SheetSetPersisted = "set_laminas_persistido",
-            Exported = "archivo_exportado", ArtifactVerified = "artefacto_verificado", DeliveryConfirmed = "entrega_confirmada";
+        public const string PlanGenerated = "plan_generated", PlanValidated = "plan_validated", PlanAuthorized = "plan_authorized",
+            OperationRun = "operation_executed", CommitConfirmed = "commit_confirmed", StateObserved = "observed_status",
+            Saved = "changes_saved", Synced = "model_synced", SheetSetPersisted = "sheet_set_persisted",
+            Exported = "file_exported", ArtifactVerified = "artifact_verified", DeliveryConfirmed = "delivery_confirmed";
 
         /// <summary>Canonical order. Guardado/Sincronizado/Set are optional depending on the delivery (see <see cref="DeliveryTrack.Required"/>).</summary>
         public static readonly string[] Order =
@@ -27,9 +27,9 @@ namespace Bimbridge.Engine.Workflow
         };
 
         /// <summary>
-        /// 0.9.0 (P0): critical milestones. Their receipt requires the model revision and provenance: "origen" (which operation or person
-        /// produced it) and "evidencia" = COMPROBADO (observed by BIMBRIDGE). A REPORTED result never closes a critical milestone,
-        /// except the delivery confirmation, which is a statement by a person ("origen" = "usuario:…").
+        /// 0.9.0 (P0): critical milestones. Their receipt requires the model revision and provenance: "origin" (which operation or person
+        /// produced it) and "evidence" = VERIFIED (observed by BIMBRIDGE). A REPORTED result never closes a critical milestone,
+        /// except the delivery confirmation, which is a statement by a person ("origin" = "usuario:…").
         /// </summary>
         public static readonly HashSet<string> Critical = new HashSet<string>
         {
@@ -40,17 +40,17 @@ namespace Bimbridge.Engine.Workflow
         public static readonly Dictionary<string, string[]> ReceiptFields = new Dictionary<string, string[]>
         {
             [PlanGenerated] = new[] { "plan_id" },
-            [PlanValidated] = new[] { "plan_id", "validador" },
-            [PlanAuthorized] = new[] { "plan_id", "autoriza" },
+            [PlanValidated] = new[] { "plan_id", "validator" },
+            [PlanAuthorized] = new[] { "plan_id", "authorizes" },
             [OperationRun] = new[] { "plan_id" },
             [CommitConfirmed] = new[] { "plan_id", "rev" },
-            [StateObserved] = new[] { "rev", "lectura" },
-            [Saved] = new[] { "huella_disco" },
-            [Synced] = new[] { "central", "huella_central" },
-            [SheetSetPersisted] = new[] { "set", "laminas" },
-            [Exported] = new[] { "archivo", "sha256" },
-            [ArtifactVerified] = new[] { "archivo", "sha256", "paginas" },
-            [DeliveryConfirmed] = new[] { "confirma" },
+            [StateObserved] = new[] { "rev", "read" },
+            [Saved] = new[] { "disk_fingerprint" },
+            [Synced] = new[] { "central", "central_fingerprint" },
+            [SheetSetPersisted] = new[] { "set", "sheets" },
+            [Exported] = new[] { "file", "sha256" },
+            [ArtifactVerified] = new[] { "file", "sha256", "pages" },
+            [DeliveryConfirmed] = new[] { "confirms" },
         };
     }
 
@@ -64,13 +64,13 @@ namespace Bimbridge.Engine.Workflow
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["hito"] = Stage, ["documento"] = DocKey, ["revision"] = Revision, ["en"] = At, ["datos"] = Data,
+            ["milestone"] = Stage, ["document"] = DocKey, ["revision"] = Revision, ["in"] = At, ["data"] = Data,
         };
 
         public static DeliveryReceipt FromJson(Dictionary<string, object> d) => new DeliveryReceipt
         {
-            Stage = Arg.GetString(d, "hito"), DocKey = Arg.GetString(d, "documento"), Revision = Arg.GetString(d, "revision"), At = Arg.GetString(d, "en"),
-            Data = d.TryGetValue("datos", out var x) && x is Dictionary<string, object> dd ? dd : new Dictionary<string, object>(),
+            Stage = Arg.GetString(d, "milestone"), DocKey = Arg.GetString(d, "document"), Revision = Arg.GetString(d, "revision"), At = Arg.GetString(d, "in"),
+            Data = d.TryGetValue("data", out var x) && x is Dictionary<string, object> dd ? dd : new Dictionary<string, object>(),
         };
     }
 
@@ -107,22 +107,22 @@ namespace Bimbridge.Engine.Workflow
             if (DeliveryStages.Critical.Contains(r.Stage))
             {
                 if (string.IsNullOrWhiteSpace(r.Revision)) return r.Stage + ": critical milestone without a model revision; it is unknown which state it refers to";
-                var origin = Arg.GetString(r.Data, "origen");
-                if (string.IsNullOrWhiteSpace(origin)) return r.Stage + ": provenance is missing (origen: operation or person that produced it)";
-                var ev = Arg.GetString(r.Data, "evidencia");
+                var origin = Arg.GetString(r.Data, "origin");
+                if (string.IsNullOrWhiteSpace(origin)) return r.Stage + ": provenance is missing (origin: operation or person that produced it)";
+                var ev = Arg.GetString(r.Data, "evidence");
                 if (r.Stage == DeliveryStages.DeliveryConfirmed)
                 {
-                    if (!origin.StartsWith("usuario:", StringComparison.OrdinalIgnoreCase)) return r.Stage + ": the delivery confirmation is given by a person (origen=usuario:…), not the agent";
+                    if (!origin.StartsWith("usuario:", StringComparison.OrdinalIgnoreCase)) return r.Stage + ": the delivery confirmation is given by a person (origin=user:…), not the agent";
                 }
                 else if (ev != Confidence.Verified)
-                    return r.Stage + ": the evidence is " + (ev ?? "(not stated)") + "; a critical milestone requires COMPROBADO (observed by BIMBRIDGE), not a reported result";
+                    return r.Stage + ": the evidence is " + (ev ?? "(not stated)") + "; a critical milestone requires VERIFIED (observed by BIMBRIDGE), not a reported result";
             }
             // 0.9.0: the exported artifact and its verification must be from the SAME revision (not merely not earlier)
             if (r.Stage == DeliveryStages.ArtifactVerified)
             {
                 var exp0 = Receipts.FirstOrDefault(x => x.Stage == DeliveryStages.Exported);
                 if (exp0 != null && exp0.Revision != null && !string.Equals(exp0.Revision, r.Revision, StringComparison.Ordinal))
-                    return "artefacto_verificado: revision " + r.Revision + " was verified but revision " + exp0.Revision + " was exported";
+                    return "artifact_verified: revision " + r.Revision + " was verified but revision " + exp0.Revision + " was exported";
             }
             // the revision cannot go backwards: a PDF from a revision earlier than the commit does not count
             var lastRev = Receipts.LastOrDefault(x => x.Revision != null)?.Revision;
@@ -132,12 +132,12 @@ namespace Bimbridge.Engine.Workflow
             {
                 var exp = Receipts.FirstOrDefault(x => x.Stage == DeliveryStages.Exported);
                 if (exp != null && !string.Equals(Arg.GetString(exp.Data, "sha256"), Arg.GetString(r.Data, "sha256"), StringComparison.OrdinalIgnoreCase))
-                    return "artefacto_verificado: the verified file is not the exported one (different sha256)";
+                    return "artifact_verified: the verified file is not the exported one (different sha256)";
                 var set = Receipts.FirstOrDefault(x => x.Stage == DeliveryStages.SheetSetPersisted);
-                var expected = set == null ? null : Arg.GetLong(set.Data, "laminas");
-                var pages = Arg.GetLong(r.Data, "paginas");
+                var expected = set == null ? null : Arg.GetLong(set.Data, "sheets");
+                var pages = Arg.GetLong(r.Data, "pages");
                 if (expected.HasValue && pages.HasValue && expected.Value != pages.Value)
-                    return "artefacto_verificado: the PDF has " + pages + " pages and the set " + expected + " sheets";
+                    return "artifact_verified: the PDF has " + pages + " pages and the set " + expected + " sheets";
             }
             r.At = r.At ?? DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
             Receipts.Add(r);
@@ -152,8 +152,8 @@ namespace Bimbridge.Engine.Workflow
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["id"] = Id, ["documento"] = DocKey, ["hitos"] = Required.Cast<object>().ToList(), ["actual"] = Current, ["siguiente"] = Next,
-            ["completa"] = Complete, ["recibos"] = Receipts.Select(r => (object)r.ToJson()).ToList(),
+            ["id"] = Id, ["document"] = DocKey, ["milestones"] = Required.Cast<object>().ToList(), ["current"] = Current, ["next"] = Next,
+            ["full"] = Complete, ["receipts"] = Receipts.Select(r => (object)r.ToJson()).ToList(),
         };
     }
 }

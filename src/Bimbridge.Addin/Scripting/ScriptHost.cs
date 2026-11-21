@@ -317,7 +317,7 @@ namespace Bimbridge.Addin.Scripting
             }
             if (run == null && recipe == null)
             {
-                error = wrapped.Kind == "receta"
+                error = wrapped.Kind == "recipe"
                     ? "compiled, but there is no public non-abstract class inheriting from Recipe"
                     : "compiled, but no class has 'public static object Run(ScriptContext ctx)'";
                 return null;

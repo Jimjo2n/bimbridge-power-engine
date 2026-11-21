@@ -37,14 +37,14 @@ namespace Bimbridge.Addin.Revit.Writes
             }
             return new Dictionary<string, object>
             {
-                ["id"] = Ids.ToLong(element.Id), ["uid"] = element.UniqueId, ["vista_id"] = Ids.ToLong(element.OwnerViewId),
-                ["tipo_id"] = Ids.ToLong(element.GetTypeId()),
-                ["referencias"] = refs.Select(r => new Dictionary<string, object>
+                ["id"] = Ids.ToLong(element.Id), ["uid"] = element.UniqueId, ["view_id"] = Ids.ToLong(element.OwnerViewId),
+                ["type_id"] = Ids.ToLong(element.GetTypeId()),
+                ["references"] = refs.Select(r => new Dictionary<string, object>
                 {
-                    ["id"] = Ids.ToLong(r.ElementId), ["vinculado_id"] = Ids.ToLong(r.LinkedElementId),
-                    ["estable"] = r.ConvertToStableRepresentation(element.Document),
+                    ["id"] = Ids.ToLong(r.ElementId), ["linked_id"] = Ids.ToLong(r.LinkedElementId),
+                    ["stable"] = r.ConvertToStableRepresentation(element.Document),
                 }).ToList(),
-                ["presentacion"] = presentation,
+                ["presentation"] = presentation,
             };
         }
 
@@ -53,20 +53,20 @@ namespace Bimbridge.Addin.Revit.Writes
         internal static List<Reference> ResolveTargets(Document doc, Element original, Dictionary<string, object> data)
         {
             var existing = References(original);
-            if (original is IndependentTag && data.ContainsKey("destino"))
+            if (original is IndependentTag && data.ContainsKey("target"))
             {
                 if (existing.Count != 1 || existing[0].LinkedElementId != ElementId.InvalidElementId)
                     throw new QueryException("only a tag with a single local reference can be repaired");
-                var target = doc.GetElement(Ids.ToId(WriteKit.L(data, "destino")));
+                var target = doc.GetElement(Ids.ToId(WriteKit.L(data, "target")));
                 if (target == null || target.Id == existing[0].ElementId)
                     throw new QueryException("the target element must exist and differ from the tagged one");
                 return new List<Reference> { new Reference(target) };
             }
-            if (!(original is Dimension dim) || !data.ContainsKey("refs_estables"))
-                throw new QueryException("a tag requires destino and a dimension requires refs_estables");
+            if (!(original is Dimension dim) || !data.ContainsKey("stable_refs"))
+                throw new QueryException("a tag requires target and a dimension requires stable_refs");
             if (dim.IsLocked || dim.Segments.Cast<DimensionSegment>().Any(s => s.IsLocked))
                 throw new QueryException("release the dimension's constraints before repairing its references");
-            var supplied = Arg.GetStringList(data, "refs_estables");
+            var supplied = Arg.GetStringList(data, "stable_refs");
             if (supplied.Count != existing.Count)
                 throw new QueryException("the dimension requires one target reference per previous reference, in the same order");
             var references = new List<Reference>();

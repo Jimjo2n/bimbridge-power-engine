@@ -13,7 +13,7 @@ namespace Bimbridge.Tests
     {
         private static Job Finish(JobStore store, Func<Job, Func<Task>> body)
         {
-            var j = store.Create("s1", "prueba");
+            var j = store.Create("s1", "test");
             store.Run(j, body(j));
             Assert.True(j.Work.Wait(TimeSpan.FromSeconds(10)), "the supervisor did not finish");
             return j;
@@ -51,7 +51,7 @@ namespace Bimbridge.Tests
         {
             var store = new JobStore();
             var calls = 0;
-            var j = store.Create("s1", "prueba");
+            var j = store.Create("s1", "test");
             store.WhenFinal(j, _ => Interlocked.Increment(ref calls));
             store.Run(j, async () => { await Task.Yield(); store.Complete(j, new System.Collections.Generic.Dictionary<string, object> { ["n"] = 1L }); });
             Assert.True(j.Work.Wait(TimeSpan.FromSeconds(10)));

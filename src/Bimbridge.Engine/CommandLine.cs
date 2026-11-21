@@ -80,7 +80,7 @@ namespace Bimbridge.Engine
             {
                 try { return Bimbridge.Protocol.Json.Parse(v); } catch (Exception) { /* plain text as is */ }
             }
-            if (v == "true" || v == "sí" || v == "si") return true;
+            if (v == "true" || v == "yes" || v == "yes") return true;
             if (v == "false" || v == "no") return false;
             if (key != "ids" && key != "lvl" && key != "type" && key != "name" && key != "value"
                 && long.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out var l)) return l;

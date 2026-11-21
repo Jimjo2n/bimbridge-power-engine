@@ -42,9 +42,9 @@ namespace Bimbridge.Addin.Scripting
         /// <summary>Data as a dictionary (if passed that way) to read with D("field").</summary>
         public object D(string field) => Data is IDictionary<string, object> d && d.TryGetValue(field, out var v) ? v : null;
 
-        public static Unit Save(string key = "guardar") => new Unit(key) { BarrierAction = "guardar", BarrierArgs = new Dictionary<string, object>() };
+        public static Unit Save(string key = "save") => new Unit(key) { BarrierAction = "save", BarrierArgs = new Dictionary<string, object>() };
         public static Unit Sync(string key = "sync", string comment = null) =>
-            new Unit(key) { BarrierAction = "sync", BarrierArgs = new Dictionary<string, object> { ["comentario"] = comment } };
+            new Unit(key) { BarrierAction = "sync", BarrierArgs = new Dictionary<string, object> { ["comment"] = comment } };
         public static Unit Pdf(string key, Dictionary<string, object> options) => new Unit(key) { BarrierAction = "pdf", BarrierArgs = options ?? new Dictionary<string, object>() };
         public static Unit Barrier(string key, string action, Dictionary<string, object> args = null) =>
             new Unit(key) { BarrierAction = action, BarrierArgs = args ?? new Dictionary<string, object>() };
@@ -64,7 +64,7 @@ namespace Bimbridge.Addin.Scripting
     /// - <see cref="Run"/>: applies ONE unit; with PerUnit the engine opens and commits the transaction and the result is materialized
     ///   before committing;
     /// - <see cref="Verify"/>: after a crash, was it applied? By default the engine checks whether the created elements exist (UniqueId);
-    /// - <see cref="Postcondition"/>: final read-only QC; return a dictionary with "desviaciones" (list) to flag differences.
+    /// - <see cref="Postcondition"/>: final read-only QC; return a dictionary with "deviations" (list) to flag differences.
     /// Registered by file (recipes\name.cs) or sent as code; no MCP tool per recipe is needed.
     /// </summary>
     public abstract class Recipe
