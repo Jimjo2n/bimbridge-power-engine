@@ -82,13 +82,13 @@ namespace Bimbridge.Tests
                         if (spent + _m.MsPerUnit > budgetMs && outs.Count > 0) break; // visit budget
                         if (task.Preflight?.Invoke() is string pf) { _m.PreflightRefusals.Add(pf); break; } // last safe point (R06)
                         spent += _m.MsPerUnit;
-                        if (_m.ConflictUnits.Contains(u.Key)) { outs.Add(new UnitOutcome { Key = u.Key, State = UnitState.Conflicto, Error = "another user changed the element", Ms = _m.MsPerUnit }); continue; }
-                        if (_m.FailUnits.Contains(u.Key)) { outs.Add(new UnitOutcome { Key = u.Key, State = UnitState.Revertida, Error = "Revit rejected the change", Ms = _m.MsPerUnit }); continue; }
+                        if (_m.ConflictUnits.Contains(u.Key)) { outs.Add(new UnitOutcome { Key = u.Key, State = UnitState.Conflict, Error = "another user changed the element", Ms = _m.MsPerUnit }); continue; }
+                        if (_m.FailUnits.Contains(u.Key)) { outs.Add(new UnitOutcome { Key = u.Key, State = UnitState.RolledBack, Error = "Revit rejected the change", Ms = _m.MsPerUnit }); continue; }
                         if (_m.Live.ContainsKey(u.Key)) _m.Duplicates++;
                         var uid = "uid-" + u.Key + "-" + (++_m.Count);
                         _m.Live[u.Key] = uid;
                         if (_m.CrashAfterCommitAt == u.Key) { _m.CrashAfterCommitAt = null; throw new CrashException(); }
-                        var o = new UnitOutcome { Key = u.Key, State = UnitState.Confirmada, Ms = _m.MsPerUnit, Changed = 1 };
+                        var o = new UnitOutcome { Key = u.Key, State = UnitState.Committed, Ms = _m.MsPerUnit, Changed = 1 };
                         o.Created.Add(new object[] { (long)_m.Count, uid });
                         outs.Add(o);
                     }
@@ -101,7 +101,7 @@ namespace Bimbridge.Tests
                 lock (_m.Lock)
                 {
                     _m.Barriers++;
-                    var o = new UnitOutcome { Key = barrier.Key, State = UnitState.Confirmada, Ms = 50 };
+                    var o = new UnitOutcome { Key = barrier.Key, State = UnitState.Committed, Ms = 50 };
                     if (barrier.Barrier == "guardar")
                     {
                         _m.Saved = new Dictionary<string, string>(_m.Live);
@@ -117,8 +117,8 @@ namespace Bimbridge.Tests
             {
                 lock (_m.Lock)
                 {
-                    var outs = units.Select(u => _m.Unverifiable.Contains(u.Key) ? UnitOutcome.Of(u.Key, UnitState.Desconocida, "cannot be checked")
-                        : _m.Live.ContainsKey(u.Key) ? UnitOutcome.Of(u.Key, UnitState.Confirmada) : UnitOutcome.Of(u.Key, UnitState.Pendiente, "not in the model")).ToList();
+                    var outs = units.Select(u => _m.Unverifiable.Contains(u.Key) ? UnitOutcome.Of(u.Key, UnitState.Unknown, "cannot be checked")
+                        : _m.Live.ContainsKey(u.Key) ? UnitOutcome.Of(u.Key, UnitState.Committed) : UnitOutcome.Of(u.Key, UnitState.Pending, "not in the model")).ToList();
                     return Task.FromResult(BackendResult<List<UnitOutcome>>.Ok(outs));
                 }
             }
@@ -193,7 +193,7 @@ namespace Bimbridge.Tests
             mgr.Start(Draft("robo", 200), "// fake", "prueba");
             var t = await RunToEnd(mgr, "robo");
             // The task belongs to B (valid lease): the old runner does not write its "interrumpida" over B's tarea.json.
-            Assert.Equal(TaskState.Ejecutando, t.State);
+            Assert.Equal(TaskState.Running, t.State);
             Assert.Equal(3, m.Visits); // no batch after the takeover
             Assert.Equal(0, m.Duplicates);
         }
@@ -206,14 +206,14 @@ namespace Bimbridge.Tests
             mgr.Start(Draft("t1000", 1000), "receta", "claude");
             var t = await RunToEnd(mgr, "t1000");
             mgr.Get("t1000", out var units);
-            Assert.True(t.State == TaskState.Aplicada, t.Reason);
-            Assert.Equal(TaskState.Aplicada, t.State);
+            Assert.True(t.State == TaskState.Applied, t.Reason);
+            Assert.Equal(TaskState.Applied, t.State);
             Assert.Equal(1000, m.Live.Count);
             Assert.Equal(0, m.Duplicates);
             Assert.True(m.Visits > 5, "must yield the thread between visits: " + m.Visits);
             Assert.True(m.Visits < 200, "the batch must grow with the measurement: " + m.Visits);
             Assert.True(t.Metric("checkpoints") >= m.Visits);
-            Assert.Equal(1000, units.Units.Values.Count(u => u.State == UnitState.Confirmada));
+            Assert.Equal(1000, units.Units.Values.Count(u => u.State == UnitState.Committed));
             Assert.Contains("1000/1000", t.Summary);
         }
 
@@ -259,15 +259,15 @@ namespace Bimbridge.Tests
             mgr.Start(Draft("crash", 1000), "receta", "claude");
             var t = await RunToEnd(mgr, "crash");
             mgr.Get("crash", out var units);
-            Assert.Equal(TaskState.Interrumpida, t.State);
-            Assert.Equal(UnitState.EnCurso, units.Get("u0500").State); // the commit happened, the "end" was not written
+            Assert.Equal(TaskState.Interrupted, t.State);
+            Assert.Equal(UnitState.InProgress, units.Get("u0500").State); // the commit happened, the "end" was not written
 
             // Another process / another client (Codex) resumes by id, without the previous session.
             var mgr2 = Manager(root, m, "B");
             var r = mgr2.Resume("crash", "codex", null);
             Assert.Null(r.Error);
             t = await RunToEnd(mgr2, "crash");
-            Assert.Equal(TaskState.Aplicada, t.State);
+            Assert.Equal(TaskState.Applied, t.State);
             Assert.Equal(1000, m.Live.Count);
             Assert.Equal(0, m.Duplicates);
             Assert.True(t.Metric("verificadas") >= 1);
@@ -282,7 +282,7 @@ namespace Bimbridge.Tests
             var mgr = Manager(root, m);
             mgr.Start(Draft("reinicio", 1000, new Dictionary<string, object> { ["guardar_cada"] = 300L }), "receta", "claude");
             var t = await RunToEnd(mgr, "reinicio");
-            Assert.Equal(TaskState.Interrumpida, t.State);
+            Assert.Equal(TaskState.Interrupted, t.State);
             Assert.NotNull(t.LastPersist);
             var savedSeq = t.LastPersist.Seq;
             Assert.True(savedSeq >= 300 && savedSeq < 450);
@@ -292,7 +292,7 @@ namespace Bimbridge.Tests
             var mgr2 = Manager(root, m, "B");
             mgr2.Resume("reinicio", "claude", null);
             t = await RunToEnd(mgr2, "reinicio");
-            Assert.Equal(TaskState.Aplicada, t.State);
+            Assert.Equal(TaskState.Applied, t.State);
             Assert.Equal(1000, m.Live.Count);
             Assert.Equal(0, m.Duplicates);
             Assert.Equal(1L, t.Metric("reaperturas"));
@@ -312,7 +312,7 @@ namespace Bimbridge.Tests
             var mgr2 = Manager(root, m, "B");
             mgr2.Resume("trasguardar", "claude", null);
             var t = await RunToEnd(mgr2, "trasguardar");
-            Assert.Equal(TaskState.Aplicada, t.State);
+            Assert.Equal(TaskState.Applied, t.State);
             Assert.Equal(600, m.Live.Count);
             Assert.Equal(0, m.Duplicates);
         }
@@ -328,11 +328,11 @@ namespace Bimbridge.Tests
             mgr.Start(draft, "receta", "claude");
             var t = await RunToEnd(mgr, "cancel");
             mgr.Get("cancel", out var units);
-            Assert.Equal(TaskState.Cancelada, t.State);
-            var confirmed = units.Units.Values.Count(u => u.State == UnitState.Confirmada);
+            Assert.Equal(TaskState.Cancelled, t.State);
+            var confirmed = units.Units.Values.Count(u => u.State == UnitState.Committed);
             Assert.True(confirmed > 0 && confirmed < 1000);
             Assert.Equal(confirmed, m.Live.Count); // what is committed is exactly what is in the model
-            Assert.Contains("sigue aplicado", t.Reason);
+            Assert.Contains("stays applied", t.Reason);
         }
 
         [Fact]
@@ -342,14 +342,14 @@ namespace Bimbridge.Tests
             var mgr = Manager(TempRoot(), m);
             mgr.Start(Draft("barrera", 10, new Dictionary<string, object> { ["en_error"] = "continuar" }, new Dictionary<string, object> { ["barrera_en"] = 6L }), "receta", "claude");
             var t = await RunToEnd(mgr, "barrera");
-            Assert.Equal(TaskState.Parcial, t.State);
-            Assert.Contains("barrera pdf no se ejecuta", t.Reason);
+            Assert.Equal(TaskState.Partial, t.State);
+            Assert.Contains("barrier pdf does not run", t.Reason);
             Assert.Equal(0, m.Barriers);
             // With the fault fixed, resume retries the rolled-back unit and now exports, with the artifact recorded.
             m.FailUnits.Clear();
             mgr.Resume("barrera", "claude", null);
             t = await RunToEnd(mgr, "barrera");
-            Assert.Equal(TaskState.Aplicada, t.State);
+            Assert.Equal(TaskState.Applied, t.State);
             Assert.Equal(1, m.Barriers);
             Assert.Single(t.Artifacts);
             Assert.Equal(6L, t.Artifacts[0]["unidades_en_modelo"]);
@@ -367,7 +367,7 @@ namespace Bimbridge.Tests
             };
             mgr.Start(Draft("pausa", 300, new Dictionary<string, object> { ["lote_max"] = 10L }), "receta", "claude");
             var t = await RunToEnd(mgr, "pausa");
-            Assert.Equal(TaskState.Aplicada, t.State);
+            Assert.Equal(TaskState.Applied, t.State);
             Assert.Equal(300, m.Live.Count);
             Assert.Equal(0, m.Duplicates);
             Assert.True(t.Metric("esperas") >= 1);
@@ -380,7 +380,7 @@ namespace Bimbridge.Tests
             var mgr = Manager(TempRoot(), m);
             mgr.Start(Draft("conflictos", 10), "receta", "claude");
             var t = await RunToEnd(mgr, "conflictos");
-            Assert.Equal(TaskState.AplicadaConDiferencias, t.State);
+            Assert.Equal(TaskState.AppliedWithDifferences, t.State);
             Assert.Equal(8, m.Live.Count);
             var status = TaskSummary.Status(t, mgr.Store.LoadUnits("conflictos"), true);
             Assert.Equal(2, ((List<object>)status["desviaciones"]).Count);
@@ -396,14 +396,14 @@ namespace Bimbridge.Tests
             await RunToEnd(mgr, "reconc");
             mgr.Resume("reconc", "claude", null);
             var t = await RunToEnd(mgr, "reconc");
-            Assert.Equal(TaskState.Interrumpida, t.State);
+            Assert.Equal(TaskState.Interrupted, t.State);
             Assert.Contains("reconciliar", t.Reason);
             Assert.Null(mgr.Reconcile("reconc", new List<string> { "u0005" }, applied: true, note: "comprobado en el modelo", who: "claude"));
             mgr.Resume("reconc", "claude", null);
             t = await RunToEnd(mgr, "reconc");
-            Assert.Equal(TaskState.Aplicada, t.State);
+            Assert.Equal(TaskState.Applied, t.State);
             Assert.Equal(0, m.Duplicates);
-            Assert.Contains(t.Decisions, d => ((string)d["texto"]).Contains("reconciliadas 1"));
+            Assert.Contains(t.Decisions, d => ((string)d["texto"]).Contains("reconciled 1"));
         }
 
         [Fact]
@@ -441,8 +441,8 @@ namespace Bimbridge.Tests
             };
             mgr.Start(Draft("roto", 100, new Dictionary<string, object> { ["lote_max"] = 5L }), "receta", "claude");
             var t = await RunToEnd(mgr, "roto");
-            Assert.Equal(TaskState.Parcial, t.State);
-            Assert.Contains("registro de unidades no se pudo escribir", t.Reason);
+            Assert.Equal(TaskState.Partial, t.State);
+            Assert.Contains("unit log could not be written", t.Reason);
         }
 
         [Fact]

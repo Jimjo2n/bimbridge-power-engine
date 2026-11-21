@@ -16,12 +16,12 @@ namespace Bimbridge.Addin.Revit
         private async Task<Response> GroupAuditCheck(Request request, CancellationToken ct)
         {
             var id = Arg.GetLong(request.Args, "grupo");
-            if (!id.HasValue || id <= 0) return Response.Fail(request.Id, Status.Invalido, "give the ID of the current group");
+            if (!id.HasValue || id <= 0) return Response.Fail(request.Id, Status.Invalid, "give the ID of the current group");
             List<object> previous = null;
             if (request.Args.TryGetValue("anterior", out var raw))
             {
                 previous = raw as List<object>;
-                if (previous == null) return Response.Fail(request.Id, Status.Invalido, "anterior requires the miembros list from the previous check");
+                if (previous == null) return Response.Fail(request.Id, Status.Invalid, "anterior requires the miembros list from the previous check");
             }
             Dictionary<string, object> data = null;
             string error = null;
@@ -39,9 +39,9 @@ namespace Bimbridge.Addin.Revit
                     .Select(e => (object)new Dictionary<string, object>
                     {
                         ["id"] = Ids.ToLong(e.Id), ["uid"] = e.UniqueId,
-                        ["firma"] = e.Location == null && e.get_BoundingBox(null) == null ? null : Bim.Grupos.Firma(group, e),
+                        ["firma"] = e.Location == null && e.get_BoundingBox(null) == null ? null : Bim.Groups.Signature(group, e),
                     }).ToList();
-                data = Bim.Grupos.Inspeccionar(group);
+                data = Bim.Groups.Inspect(group);
                 data["instantanea_miembros"] = snapshot;
                 data["nivel_id"] = Ids.ToLong(group.get_Parameter(BuiltInParameter.GROUP_LEVEL)?.AsElementId());
                 data["workset_id"] = (long)group.WorksetId.IntegerValue;
@@ -49,7 +49,7 @@ namespace Bimbridge.Addin.Revit
                 return true;
             }, highPriority: false, busyAfter: System.TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!work.Ok) return FromWork(request.Id, work);
-            if (error != null) return Response.Fail(request.Id, Status.Invalido, error);
+            if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
             var status = Status.Ok;
             if (previous != null)
             {
@@ -57,11 +57,11 @@ namespace Bimbridge.Addin.Revit
                 {
                     var map = GroupMemberMap.Compare(previous, (List<object>)data["instantanea_miembros"]);
                     data["reconciliacion"] = map;
-                    if (!(bool)map["completo"]) status = Status.ConDiferencias;
+                    if (!(bool)map["completo"]) status = Status.CompletedWithDifferences;
                 }
-                catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
+                catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalid, ex.Message); }
             }
-            return new Response { Id = request.Id, Rev = revision, Datos = data, Estado = status };
+            return new Response { Id = request.Id, Rev = revision, Data = data, State = status };
         }
     }
 }

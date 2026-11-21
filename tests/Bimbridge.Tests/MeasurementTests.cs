@@ -54,8 +54,8 @@ namespace Bimbridge.Tests
             res["lease_renovar"] = Stats(Time(300, () => store.RenewLease("t", "A", l.Fencing, TimeSpan.FromHours(1), DateTime.UtcNow)));
 
             var g = new GrantStore(Path.Combine(root, "aut"));
-            for (var i = 0; i < 10; i++) g.Approve("t" + i, "doc", null, new[] { Capability.Modificar }, TimeSpan.FromHours(1), "p", DateTime.UtcNow);
-            res["concesion_comprobar_10"] = Stats(Time(300, () => g.Check("t5", "doc", null, Capability.Modificar, DateTime.UtcNow)));
+            for (var i = 0; i < 10; i++) g.Approve("t" + i, "doc", null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "p", DateTime.UtcNow);
+            res["concesion_comprobar_10"] = Stats(Time(300, () => g.Check("t5", "doc", null, Capability.Modify, DateTime.UtcNow)));
 
             var outp = Environment.GetEnvironmentVariable("BIMBRIDGE_MEASURE_OUT");
             if (!string.IsNullOrEmpty(outp)) File.WriteAllText(Path.Combine(outp, "medicion_sobrecostes.json"), Json.Write(res));
@@ -144,7 +144,7 @@ namespace Bimbridge.Tests
                 if (safety)
                 {
                     var g = new GrantStore(Path.Combine(root, "aut"));
-                    g.Approve("ov", "archivo:c:\\practica.rvt", null, new[] { Capability.Modificar }, TimeSpan.FromHours(1), "p", DateTime.UtcNow);
+                    g.Approve("ov", "archivo:c:\\practica.rvt", null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "p", DateTime.UtcNow);
                     auth = new GrantAuthority(g);
                     audit = new AuditLog(Path.Combine(root, "aud", "a.jsonl"));
                 }
@@ -159,9 +159,9 @@ namespace Bimbridge.Tests
                 var sw = Stopwatch.StartNew();
                 mgr.Start(draft, "// r", "p");
                 await mgr.Completion("ov");
-                var el = sw.Elapsed.TotalMilliseconds;
-                Assert.Equal(TaskState.Aplicada, mgr.Get("ov", out _).State);
-                return el;
+                var elapsed = sw.Elapsed.TotalMilliseconds;
+                Assert.Equal(TaskState.Applied, mgr.Get("ov", out _).State);
+                return elapsed;
             }
             await RunOnce(false); await RunOnce(true); // warm up
             var off = new List<double>(); var on = new List<double>();

@@ -58,7 +58,7 @@ namespace Bimbridge.Addin.Revit
         {
             var doc = DocTarget.Resolve(app, out var docError);
             if (doc == null) { Error = docError; return true; }
-            if (doc.IsFamilyDocument) { Error = Status.NoSoportado + ": lighting_audit checks projects; the target " + DocTarget.Current?.Describe() + " is a family. Use fam info or exec"; return true; }
+            if (doc.IsFamilyDocument) { Error = Status.NotSupported + ": lighting_audit checks projects; the target " + DocTarget.Current?.Describe() + " is a family. Use fam info or exec"; return true; }
             var deadline = sw.ElapsedMilliseconds + budgetMs;
             if (_readInventory && _phase != 0 && (tracker.For(doc)?.Rev ?? 0) != Rev)
             {
@@ -89,7 +89,7 @@ namespace Bimbridge.Addin.Revit
                         Workset = ws == null ? null : (wsNames.TryGetValue(e.WorksetId.IntegerValue, out var wn) ? wn : wsNames[e.WorksetId.IntegerValue] = ws.GetWorkset(e.WorksetId)?.Name),
                         Type = fi?.Symbol != null ? fi.Symbol.FamilyName + ": " + fi.Symbol.Name : e.Name,
                     });
-                    if (_readInventory && Bim.Manifiesto.Observe(doc, e) is ManifestQc.Actual actual)
+                    if (_readInventory && Bim.Manifest.Observe(doc, e) is ManifestQc.Actual actual)
                         Inventory.Add(actual);
                 }
                 _phase = 1;

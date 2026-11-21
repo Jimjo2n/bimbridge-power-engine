@@ -53,14 +53,14 @@ namespace Bimbridge.Addin.Revit
         private async Task<Response> Catalog(Request request, CancellationToken ct)
         {
             var runner = new CatalogRunner(request.Args);
-            if (runner.Error != null) return Response.Fail(request.Id, Status.Invalido, runner.Error);
+            if (runner.Error != null) return Response.Fail(request.Id, Status.Invalid, runner.Error);
             var sw = Stopwatch.StartNew();
             var r = await RunMain((app, watch, budget) => runner.Step(app, watch, budget, _tracker), highPriority: true, busyAfter: Busy, ct: ct).ConfigureAwait(false);
             if (!r.Ok) return FromWork(request.Id, r);
-            if (runner.Error != null) return Response.Fail(request.Id, Status.Invalido, runner.Error);
-            var datos = runner.Finish();
-            datos["ms"] = sw.ElapsedMilliseconds;
-            return new Response { Id = request.Id, Rev = runner.Rev, Datos = datos };
+            if (runner.Error != null) return Response.Fail(request.Id, Status.Invalid, runner.Error);
+            var data = runner.Finish();
+            data["ms"] = sw.ElapsedMilliseconds;
+            return new Response { Id = request.Id, Rev = runner.Rev, Data = data };
         }
 
         // ---------------- params (get f=*) ----------------
@@ -70,16 +70,16 @@ namespace Bimbridge.Addin.Revit
         private async Task<Response> Params(Session session, Request request, CancellationToken ct)
         {
             var ids = ResolveIds(session, request.Args, "ids", out var err);
-            if (err != null) return Response.Fail(request.Id, Status.Invalido, err);
-            if (ids.Count == 0) return Response.Fail(request.Id, Status.Invalido, "ids: specify up to " + MaxParamElements + " elements");
+            if (err != null) return Response.Fail(request.Id, Status.Invalid, err);
+            if (ids.Count == 0) return Response.Fail(request.Id, Status.Invalid, "ids: specify up to " + MaxParamElements + " elements");
             var omitted = Math.Max(0, ids.Count - MaxParamElements);
             if (omitted > 0) ids = ids.Take(MaxParamElements).ToList();
-            var buscar = Arg.GetString(request.Args, "buscar");
+            var search = Arg.GetString(request.Args, "buscar");
             var withType = Arg.GetBool(request.Args, "tipo") ?? true;
             var mm = string.Equals(Arg.GetString(request.Args, "units"), "mm", StringComparison.OrdinalIgnoreCase);
             var full = Arg.GetBool(request.Args, "full") ?? false;
 
-            bool Wanted(string name) => string.IsNullOrWhiteSpace(buscar) || name.IndexOf(buscar.Trim(), StringComparison.OrdinalIgnoreCase) >= 0;
+            bool Wanted(string name) => string.IsNullOrWhiteSpace(search) || name.IndexOf(search.Trim(), StringComparison.OrdinalIgnoreCase) >= 0;
 
             var elems = new List<Dictionary<string, object>>();
             var inst = new List<Dictionary<string, object>>();
@@ -143,7 +143,7 @@ namespace Bimbridge.Addin.Revit
             if (!r.Ok) return FromWork(request.Id, r);
 
             // What all elements share goes once in "comunes" (with 10 fixtures of the same type, ~70% less text).
-            var datos = new Dictionary<string, object>();
+            var data = new Dictionary<string, object>();
             if (inst.Count >= 2)
             {
                 var common = new Dictionary<string, object>(StringComparer.Ordinal);
@@ -152,20 +152,20 @@ namespace Bimbridge.Addin.Revit
                     if (inst.All(d => d.TryGetValue(kv.Key, out var v) && Equals(Norm(v), Norm(kv.Value)))) common[kv.Key] = kv.Value;
                 }
                 foreach (var d in inst) foreach (var k in common.Keys) d.Remove(k);
-                if (common.Count > 0) datos["comunes"] = common;
+                if (common.Count > 0) data["comunes"] = common;
             }
             for (var i = 0; i < elems.Count; i++) elems[i]["params"] = inst[i];
-            datos["elementos"] = elems.Cast<object>().ToList();
-            if (types.Count > 0) datos["tipos"] = types;
-            if (readOnly.Count > 0) datos["solo_lectura"] = readOnly.Cast<object>().ToList();
-            if (readOnlyType.Count > 0) datos["solo_lectura_tipo"] = readOnlyType.Cast<object>().ToList();
-            if (empty.Count > 0) datos["vacios"] = empty.Cast<object>().ToList();
-            if (paramsDocError != null) return Response.Fail(request.Id, paramsDocError.StartsWith(Status.DestinoNoDisponible) ? Status.DestinoNoDisponible : Status.Invalido, paramsDocError);
-            if (missing.Count > 0) datos["no_existen"] = missing;
-            if (omitted > 0) datos["aviso_limite"] = "showing " + MaxParamElements + " elements; " + omitted + " omitted (use query f=… for many)";
-            datos["unidades"] = mm ? "lengths in mm" : "lengths in decimal feet";
-            datos["ms"] = sw.ElapsedMilliseconds;
-            return new Response { Id = request.Id, Rev = rev, Datos = datos };
+            data["elementos"] = elems.Cast<object>().ToList();
+            if (types.Count > 0) data["tipos"] = types;
+            if (readOnly.Count > 0) data["solo_lectura"] = readOnly.Cast<object>().ToList();
+            if (readOnlyType.Count > 0) data["solo_lectura_tipo"] = readOnlyType.Cast<object>().ToList();
+            if (empty.Count > 0) data["vacios"] = empty.Cast<object>().ToList();
+            if (paramsDocError != null) return Response.Fail(request.Id, paramsDocError.StartsWith(Status.TargetUnavailable) ? Status.TargetUnavailable : Status.Invalid, paramsDocError);
+            if (missing.Count > 0) data["no_existen"] = missing;
+            if (omitted > 0) data["aviso_limite"] = "showing " + MaxParamElements + " elements; " + omitted + " omitted (use query f=… for many)";
+            data["unidades"] = mm ? "lengths in mm" : "lengths in decimal feet";
+            data["ms"] = sw.ElapsedMilliseconds;
+            return new Response { Id = request.Id, Rev = rev, Data = data };
         }
 
         private static object Norm(object v) => v is double d ? (object)Math.Round(d, 6) : v;
@@ -175,13 +175,13 @@ namespace Bimbridge.Addin.Revit
         private async Task<Response> Show(Session session, Request request, CancellationToken ct)
         {
             var ids = ResolveIds(session, request.Args, "ids", out var err);
-            if (err != null) return Response.Fail(request.Id, Status.Invalido, err);
+            if (err != null) return Response.Fail(request.Id, Status.Invalid, err);
             var viewArg = Arg.GetLong(request.Args, "vista") ?? Arg.GetLong(request.Args, "view");
             var select = Arg.GetBool(request.Args, "seleccionar") ?? true;
             var zoom = Arg.GetBool(request.Args, "zoom") ?? true;
-            if (ids.Count == 0 && !viewArg.HasValue) return Response.Fail(request.Id, Status.Invalido, "specify ids (or $set) and/or vista");
+            if (ids.Count == 0 && !viewArg.HasValue) return Response.Fail(request.Id, Status.Invalid, "specify ids (or $set) and/or vista");
 
-            var datos = new Dictionary<string, object>();
+            var data = new Dictionary<string, object>();
             string error = null;
             long rev = 0;
 
@@ -200,7 +200,7 @@ namespace Bimbridge.Addin.Revit
                     return true;
                 }, highPriority: true, busyAfter: Busy, ct: ct).ConfigureAwait(false);
                 if (!r1.Ok) return FromWork(request.Id, r1);
-                if (error != null) return Response.Fail(request.Id, Status.Invalido, error);
+                if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
                 if (changed)
                 {
                     var active = false;
@@ -214,7 +214,7 @@ namespace Bimbridge.Addin.Revit
                         }, highPriority: true, busyAfter: Busy, ct: ct).ConfigureAwait(false);
                         if (!probe.Ok) break;
                     }
-                    if (!active) datos["aviso_vista"] = "Revit has not switched views yet (a dialog open?); the selection was made anyway";
+                    if (!active) data["aviso_vista"] = "Revit has not switched views yet (a dialog open?); the selection was made anyway";
                 }
             }
 
@@ -226,7 +226,7 @@ namespace Bimbridge.Addin.Revit
                 if (doc == null) { error = uiError ?? "There is no active document in Revit."; return true; }
                 rev = _tracker.For(doc)?.Rev ?? 0;
                 var view = uidoc.ActiveView;
-                datos["vista"] = new Dictionary<string, object> { ["id"] = Ids.ToLong(view.Id), ["nombre"] = view.Name };
+                data["vista"] = new Dictionary<string, object> { ["id"] = Ids.ToLong(view.Id), ["nombre"] = view.Name };
                 var existing = new List<ElementId>();
                 var missing = new List<object>();
                 foreach (var id in ids)
@@ -234,22 +234,22 @@ namespace Bimbridge.Addin.Revit
                     var eid = Ids.ToId(id);
                     if (doc.GetElement(eid) != null) existing.Add(eid); else missing.Add(id);
                 }
-                if (missing.Count > 0) datos["no_existen"] = missing.Take(10).ToList();
+                if (missing.Count > 0) data["no_existen"] = missing.Take(10).ToList();
                 if (select && existing.Count > 0)
                 {
                     uidoc.Selection.SetElementIds(existing);
-                    datos["seleccionados"] = (long)existing.Count;
+                    data["seleccionados"] = (long)existing.Count;
                 }
                 if (!zoom || existing.Count == 0) return true;
 
                 var inView = new List<ElementId>();
                 try { inView = new FilteredElementCollector(doc, view.Id).WherePasses(new ElementIdSetFilter(existing)).ToElementIds().ToList(); }
                 catch (Exception) { }
-                datos["visibles_en_vista"] = (long)inView.Count;
+                data["visibles_en_vista"] = (long)inView.Count;
                 if (inView.Count == 0)
                 {
-                    datos["sugerencia_vistas"] = ViewsShowing(doc, existing);
-                    datos["aviso"] = "none is visible in the active view: use show with vista=<id> from the suggested ones";
+                    data["sugerencia_vistas"] = ViewsShowing(doc, existing);
+                    data["aviso"] = "none is visible in the active view: use show with vista=<id> from the suggested ones";
                     return true;
                 }
                 XYZ min = null, max = null;
@@ -270,13 +270,13 @@ namespace Bimbridge.Addin.Revit
                     var size = max - min;
                     var pad = Math.Max(4.0, 0.15 * Math.Max(size.X, size.Y));
                     ui.ZoomAndCenterRectangle(new XYZ(min.X - pad, min.Y - pad, min.Z), new XYZ(max.X + pad, max.Y + pad, max.Z));
-                    datos["encuadrados"] = (long)inView.Count;
+                    data["encuadrados"] = (long)inView.Count;
                 }
                 return true;
             }, highPriority: true, busyAfter: Busy, ct: ct).ConfigureAwait(false);
             if (!r.Ok) return FromWork(request.Id, r);
-            if (error != null) return Response.Fail(request.Id, Status.Invalido, error);
-            return new Response { Id = request.Id, Rev = rev, Datos = datos };
+            if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
+            return new Response { Id = request.Id, Rev = rev, Data = data };
         }
 
         /// <summary>Floor plans and ceiling plans (non-template) of those elements' level: candidates where they would be visible.</summary>
@@ -310,12 +310,12 @@ namespace Bimbridge.Addin.Revit
             var px = Arg.GetLong(request.Args, "px");
             if (px.HasValue)
             {
-                if (px < 400 || px > 2400) return Response.Fail(request.Id, Status.Invalido, "px between 400 and 2400 (default 1400; the AI sees up to ~1568)");
+                if (px < 400 || px > 2400) return Response.Fail(request.Id, Status.Invalid, "px between 400 and 2400 (default 1400; the AI sees up to ~1568)");
                 cap.Px = (int)px.Value;
             }
             var color = (Arg.GetString(request.Args, "colorear") ?? "").Trim().ToLowerInvariant();
             if (color == "categorias" || color == "categorías" || color == "true" || color == "si" || color == "sí") cap.ColorByCategory = true;
-            else if (color.Length > 0 && color != "no" && color != "false") return Response.Fail(request.Id, Status.Invalido, "colorear: categorias (or nothing)");
+            else if (color.Length > 0 && color != "no" && color != "false") return Response.Fail(request.Id, Status.Invalid, "colorear: categorias (or nothing)");
 
             // resaltar: "$a" | "1,2,3" | "$a=rojo;$b=azul;123,456=#00AAFF"
             var spec = Arg.GetString(request.Args, "resaltar");
@@ -323,7 +323,7 @@ namespace Bimbridge.Addin.Revit
             if (!string.IsNullOrWhiteSpace(spec))
             {
                 var parts = spec.Split(';').Select(p => p.Trim()).Where(p => p.Length > 0).ToList();
-                if (parts.Count > 6) return Response.Fail(request.Id, Status.Invalido, "resaltar accepts up to 6 groups separated by ;");
+                if (parts.Count > 6) return Response.Fail(request.Id, Status.Invalid, "resaltar accepts up to 6 groups separated by ;");
                 for (var i = 0; i < parts.Count; i++)
                 {
                     var p = parts[i];
@@ -332,10 +332,10 @@ namespace Bimbridge.Addin.Revit
                     if (eq > 0) { idsText = p.Substring(0, eq).Trim(); colorText = p.Substring(eq + 1).Trim(); }
                     var g = new Capture.Group { Label = idsText.Length > 40 ? idsText.Substring(0, 40) + "…" : idsText };
                     g.Ids = ResolveIds(session, new Dictionary<string, object> { ["ids"] = idsText }, "ids", out var err);
-                    if (err != null) return Response.Fail(request.Id, Status.Invalido, "resaltar: " + err);
+                    if (err != null) return Response.Fail(request.Id, Status.Invalid, "resaltar: " + err);
                     var cname = colorText ?? (cap.ColorByCategory && i == 0 ? "magenta" : Capture.DefaultGroupColors[i % Capture.DefaultGroupColors.Length]);
                     if (!Capture.TryNamedColor(cname, out var c, out var shown))
-                        return Response.Fail(request.Id, Status.Invalido, "resaltar: color '" + cname + "' (use rojo, azul, verde, magenta, naranja, cian, amarillo, violeta, negro or #RRGGBB)");
+                        return Response.Fail(request.Id, Status.Invalid, "resaltar: color '" + cname + "' (use rojo, azul, verde, magenta, naranja, cian, amarillo, violeta, negro or #RRGGBB)");
                     g.Color = c; g.ColorName = shown;
                     cap.Groups.Add(g);
                 }
@@ -348,15 +348,15 @@ namespace Bimbridge.Addin.Revit
                 else
                 {
                     cap.FrameIds = ResolveIds(session, new Dictionary<string, object> { ["ids"] = frame }, "ids", out var err);
-                    if (err != null) return Response.Fail(request.Id, Status.Invalido, "encuadre: " + err);
+                    if (err != null) return Response.Fail(request.Id, Status.Invalid, "encuadre: " + err);
                 }
             }
 
             var r = await RunMain((app, watch, budget) => cap.Run(app, _tracker), highPriority: true, busyAfter: Busy, ct: ct).ConfigureAwait(false);
             if (!r.Ok) return FromWork(request.Id, r);
-            if (cap.Error != null) return Response.Fail(request.Id, Status.Invalido, cap.Error);
+            if (cap.Error != null) return Response.Fail(request.Id, Status.Invalid, cap.Error);
             cap.Info["mime"] = cap.Mime;
-            return new Response { Id = request.Id, Rev = cap.Rev, Datos = cap.Info };
+            return new Response { Id = request.Id, Rev = cap.Rev, Data = cap.Info };
         }
     }
 }

@@ -31,9 +31,9 @@ namespace Bimbridge.Tests
         {
             var dir = TempRoot();
             var s1 = new GrantStore(dir);
-            s1.Approve("t", DocKey, "P", new[] { Capability.Modificar }, TimeSpan.FromHours(1), "operator", Now);
+            s1.Approve("t", DocKey, "P", new[] { Capability.Modify }, TimeSpan.FromHours(1), "operator", Now);
             var s2 = new GrantStore(dir); // Revit restart
-            Assert.Null(s2.Check("t", DocKey, "P", Capability.Modificar, Now));
+            Assert.Null(s2.Check("t", DocKey, "P", Capability.Modify, Now));
             Assert.Single(s2.All());
         }
 
@@ -43,20 +43,20 @@ namespace Bimbridge.Tests
             var dir = TempRoot();
             var a = new GrantStore(dir);
             var b = new GrantStore(dir);
-            a.Approve("t", DocKey, "P", new[] { Capability.Modificar }, TimeSpan.FromHours(1), "operator", Now);
-            b.Approve("t2", DocKey, "P", new[] { Capability.Modificar }, TimeSpan.FromHours(1), "operator", Now);
-            Assert.Null(b.Check("t", DocKey, "P", Capability.Modificar, Now));
-            Assert.Null(a.Check("t2", DocKey, "P", Capability.Modificar, Now));
+            a.Approve("t", DocKey, "P", new[] { Capability.Modify }, TimeSpan.FromHours(1), "operator", Now);
+            b.Approve("t2", DocKey, "P", new[] { Capability.Modify }, TimeSpan.FromHours(1), "operator", Now);
+            Assert.Null(b.Check("t", DocKey, "P", Capability.Modify, Now));
+            Assert.Null(a.Check("t2", DocKey, "P", Capability.Modify, Now));
         }
 
         [Fact] // REPRO
         public void Key_RevocationAfterRestart_IsEffective()
         {
             var dir = TempRoot();
-            var g = new GrantStore(dir).Approve("t", DocKey, "P", new[] { Capability.Modificar }, TimeSpan.FromHours(1), "operator", Now);
+            var g = new GrantStore(dir).Approve("t", DocKey, "P", new[] { Capability.Modify }, TimeSpan.FromHours(1), "operator", Now);
             Assert.True(new GrantStore(dir).Revoke(g.Id, Now));
             var s3 = new GrantStore(dir);
-            Assert.Contains("revocada", s3.Check("t", DocKey, "P", Capability.Modificar, Now.AddSeconds(1)));
+            Assert.Contains("revoked", s3.Check("t", DocKey, "P", Capability.Modify, Now.AddSeconds(1)));
         }
 
         [Fact]
@@ -64,12 +64,12 @@ namespace Bimbridge.Tests
         {
             var dir = TempRoot();
             var s1 = new GrantStore(dir);
-            s1.Approve("t", DocKey, "P", new[] { Capability.Modificar }, TimeSpan.FromHours(1), "operator", Now);
+            s1.Approve("t", DocKey, "P", new[] { Capability.Modify }, TimeSpan.FromHours(1), "operator", Now);
             // rc2 wrote only the key's Base64, without a header: it is rewritten that way with the same key.
             var path = Path.Combine(dir, "clave.bin");
             var b64 = File.ReadAllLines(path).Last(l => l.Trim().Length > 0 && l != GrantStore.KeyHeader).Trim();
             File.WriteAllText(path, b64);
-            Assert.Null(new GrantStore(dir).Check("t", DocKey, "P", Capability.Modificar, Now));
+            Assert.Null(new GrantStore(dir).Check("t", DocKey, "P", Capability.Modify, Now));
         }
 
         [Fact]
@@ -100,10 +100,10 @@ namespace Bimbridge.Tests
         public void Key_MissingWithExistingGrants_IsRefused_NoNewKey()
         {
             var dir = TempRoot();
-            new GrantStore(dir).Approve("t", DocKey, "P", new[] { Capability.Modificar }, TimeSpan.FromHours(1), "operator", Now);
+            new GrantStore(dir).Approve("t", DocKey, "P", new[] { Capability.Modify }, TimeSpan.FromHours(1), "operator", Now);
             File.Delete(Path.Combine(dir, "clave.bin"));
             var ex = Assert.Throws<GrantStore.GrantKeyException>(() => new GrantStore(dir));
-            Assert.Contains("concesiones firmadas", ex.Message);
+            Assert.Contains("grants signed with it", ex.Message);
             Assert.False(File.Exists(Path.Combine(dir, "clave.bin")));
         }
 
@@ -128,8 +128,8 @@ namespace Bimbridge.Tests
                     threads.ForEach(t => t.Join());
                 }
                 Assert.True(errors.All(e => e == null), "round " + round + ": " + string.Join(" | ", errors.Where(e => e != null).Select(e => e.GetType().Name + ": " + e.Message)));
-                stores[0].Approve("t", DocKey, "P", new[] { Capability.Modificar }, TimeSpan.FromHours(1), "operator", Now);
-                Assert.All(stores, s => Assert.Null(s.Check("t", DocKey, "P", Capability.Modificar, Now)));
+                stores[0].Approve("t", DocKey, "P", new[] { Capability.Modify }, TimeSpan.FromHours(1), "operator", Now);
+                Assert.All(stores, s => Assert.Null(s.Check("t", DocKey, "P", Capability.Modify, Now)));
                 Assert.Empty(Directory.GetFiles(dir, "clave.bin.tmp-*"));
             }
         }
@@ -141,7 +141,7 @@ namespace Bimbridge.Tests
         {
             var dir = TempRoot();
             var first = new GrantStore(dir);
-            first.Approve("t", DocKey, "P", new[] { Capability.Modificar }, TimeSpan.FromHours(1), "operator", Now);
+            first.Approve("t", DocKey, "P", new[] { Capability.Modify }, TimeSpan.FromHours(1), "operator", Now);
             var keyPath = Path.Combine(dir, "clave.bin");
             using (var held = new ManualResetEventSlim(false))
             {
@@ -153,7 +153,7 @@ namespace Bimbridge.Tests
                 held.Wait();
                 var again = new GrantStore(dir);   // opened while the other handle does not share
                 holder.Join();
-                Assert.Null(again.Check("t", DocKey, "P", Capability.Modificar, Now));
+                Assert.Null(again.Check("t", DocKey, "P", Capability.Modify, Now));
             }
         }
 
@@ -202,7 +202,7 @@ namespace Bimbridge.Tests
             // All grants signed by different processes validate with the single key left on disk.
             var s = new GrantStore(dir);
             Assert.Equal(6, s.All().Count);
-            Assert.All(tasks, t => Assert.Null(s.Check(t, "doc", "P", Capability.Modificar, DateTime.UtcNow)));
+            Assert.All(tasks, t => Assert.Null(s.Check(t, "doc", "P", Capability.Modify, DateTime.UtcNow)));
         }
 
         // =========================== P1-5 document fingerprint ===========================
@@ -211,19 +211,19 @@ namespace Bimbridge.Tests
         public void Print_MissingCurrentPrint_DoesNotWidenAGrantBoundToAPrint()
         {
             var g = new GrantStore(TempRoot());
-            g.Approve("t", DocKey, "P1", new[] { Capability.Modificar }, TimeSpan.FromHours(1), "operator", Now);
-            Assert.Contains("huella", g.Check("t", DocKey, null, Capability.Modificar, Now));
-            Assert.Contains("otra identidad", g.Check("t", DocKey, "P2", Capability.Modificar, Now)); // replaced at the same path
-            Assert.Null(g.Check("t", DocKey, "P1", Capability.Modificar, Now));
+            g.Approve("t", DocKey, "P1", new[] { Capability.Modify }, TimeSpan.FromHours(1), "operator", Now);
+            Assert.Contains("fingerprint", g.Check("t", DocKey, null, Capability.Modify, Now));
+            Assert.Contains("another identity", g.Check("t", DocKey, "P2", Capability.Modify, Now)); // replaced at the same path
+            Assert.Null(g.Check("t", DocKey, "P1", Capability.Modify, Now));
         }
 
         [Fact] // REPRO (grant without fingerprint)
         public void Print_GrantWithoutPrint_DoesNotCoverADocumentThatHasOne()
         {
             var g = new GrantStore(TempRoot());
-            g.Approve("t", DocKey, null, new[] { Capability.Modificar }, TimeSpan.FromHours(1), "operator", Now);
-            Assert.NotNull(g.Check("t", DocKey, "P1", Capability.Modificar, Now));
-            Assert.Null(g.Check("t", DocKey, null, Capability.Modificar, Now)); // same identity (none) as when approved
+            g.Approve("t", DocKey, null, new[] { Capability.Modify }, TimeSpan.FromHours(1), "operator", Now);
+            Assert.NotNull(g.Check("t", DocKey, "P1", Capability.Modify, Now));
+            Assert.Null(g.Check("t", DocKey, null, Capability.Modify, Now)); // same identity (none) as when approved
         }
 
         // =========================== P0-2 recipe boundary ===========================
@@ -235,16 +235,16 @@ namespace Bimbridge.Tests
             public static FakeModel Model;
             public FakeRecipe() { Events.Add("constructor"); Ctor(); }
             protected virtual void Ctor() { }
-            public virtual void Preparar() { Events.Add("preparar"); }
-            public virtual IEnumerable<string> Unidades(int n) { for (var i = 1; i <= n; i++) { Events.Add("movenext"); yield return "u" + i.ToString("D4"); } }
-            public void Ejecutar(string key) { Events.Add("ejecutar"); lock (Model.Lock) { Model.Live[key] = "x"; WriteRev++; } }
+            public virtual void Prepare() { Events.Add("preparar"); }
+            public virtual IEnumerable<string> Units(int n) { for (var i = 1; i <= n; i++) { Events.Add("movenext"); yield return "u" + i.ToString("D4"); } }
+            public void Run(string key) { Events.Add("ejecutar"); lock (Model.Lock) { Model.Live[key] = "x"; WriteRev++; } }
             public static long WriteRev;
         }
         public sealed class CtorWrites : FakeRecipe { protected override void Ctor() { WriteRev++; Events.Add("efecto_constructor"); } }
-        public sealed class PrepareWrites : FakeRecipe { public override void Preparar() { base.Preparar(); WriteRev++; } }
+        public sealed class PrepareWrites : FakeRecipe { public override void Prepare() { base.Prepare(); WriteRev++; } }
         public sealed class MoveNextWrites : FakeRecipe
         {
-            public override IEnumerable<string> Unidades(int n) { Events.Add("movenext"); WriteRev++; yield return "u0001"; }
+            public override IEnumerable<string> Units(int n) { Events.Add("movenext"); WriteRev++; yield return "u0001"; }
         }
 
         /// <summary>Backend that reproduces the add-in flow (RevitTaskBackend): compile (here: nothing) -> instantiate, Prepare, enumerate and
@@ -269,15 +269,15 @@ namespace Bimbridge.Tests
                 _task = task;
                 var why = _r == null ? _gate.Create(_factory, out _r) : null;
                 if (why != null) return Task.FromResult(BackendResult<List<UnitRef>>.Fail(why));
-                why = _gate.Run(RecipeGate.Phase.Preparar, () => _r.Preparar());
+                why = _gate.Run(RecipeGate.Phase.Prepare, () => _r.Prepare());
                 if (why != null) return Task.FromResult(BackendResult<List<UnitRef>>.Fail(why));
                 IEnumerator<string> e = null;
-                why = _gate.Run(RecipeGate.Phase.Enumerar, () => e = _r.Unidades((int)(Bimbridge.Protocol.Arg.GetLong(task.Args, "n") ?? 3)).GetEnumerator());
+                why = _gate.Run(RecipeGate.Phase.Enumerate, () => e = _r.Units((int)(Bimbridge.Protocol.Arg.GetLong(task.Args, "n") ?? 3)).GetEnumerator());
                 var list = new List<UnitRef>();
                 while (why == null)
                 {
                     var more = false;
-                    why = _gate.Run(RecipeGate.Phase.Enumerar, () => more = e.MoveNext());
+                    why = _gate.Run(RecipeGate.Phase.Enumerate, () => more = e.MoveNext());
                     if (why != null || !more) break;
                     list.Add(new UnitRef { Key = e.Current });
                 }
@@ -290,9 +290,9 @@ namespace Bimbridge.Tests
                 var outs = new List<UnitOutcome>();
                 foreach (var u in units)
                 {
-                    var why = _gate.Run(RecipeGate.Phase.Ejecutar, () => _r.Ejecutar(u.Key));
+                    var why = _gate.Run(RecipeGate.Phase.Run, () => _r.Run(u.Key));
                     if (why != null) break;
-                    var o = new UnitOutcome { Key = u.Key, State = UnitState.Confirmada, Changed = 1 };
+                    var o = new UnitOutcome { Key = u.Key, State = UnitState.Committed, Changed = 1 };
                     o.Created.Add(new object[] { 1L, "uid-" + u.Key });
                     outs.Add(o);
                 }
@@ -300,9 +300,9 @@ namespace Bimbridge.Tests
             }
 
             public Task<BackendResult<UnitOutcome>> RunBarrierAsync(TaskRecord task, UnitRef barrier, CancellationToken ct) =>
-                Task.FromResult(BackendResult<UnitOutcome>.Ok(new UnitOutcome { Key = barrier.Key, State = UnitState.Confirmada }));
+                Task.FromResult(BackendResult<UnitOutcome>.Ok(new UnitOutcome { Key = barrier.Key, State = UnitState.Committed }));
             public Task<BackendResult<List<UnitOutcome>>> VerifyAsync(TaskRecord task, IReadOnlyList<UnitRecord> units, bool reopened, CancellationToken ct) =>
-                Task.FromResult(BackendResult<List<UnitOutcome>>.Ok(units.Select(u => new UnitOutcome { Key = u.Key, State = UnitState.Confirmada }).ToList()));
+                Task.FromResult(BackendResult<List<UnitOutcome>>.Ok(units.Select(u => new UnitOutcome { Key = u.Key, State = UnitState.Committed }).ToList()));
             public Task<BackendResult<Dictionary<string, object>>> PostconditionAsync(TaskRecord task, CancellationToken ct) =>
                 Task.FromResult(BackendResult<Dictionary<string, object>>.Ok(new Dictionary<string, object>()));
         }
@@ -333,7 +333,7 @@ namespace Bimbridge.Tests
                 Id = "r" + Guid.NewGuid().ToString("N").Substring(0, 6), Objective = "x", RecipeName = "fake", RecipeVersion = "1", RecipeHash = "h", ContentHash = Guid.NewGuid().ToString("N"),
                 Args = new Dictionary<string, object> { ["n"] = (long)n },
                 Docs = new List<TaskDoc> { new TaskDoc { Key = DocKey, Title = "p", Generation = "inst#1" } },
-                Policy = new Dictionary<string, object> { ["requiere"] = new List<object> { Capability.Modificar } },
+                Policy = new Dictionary<string, object> { ["requiere"] = new List<object> { Capability.Modify } },
             };
             mgr.Start(draft, "// receta", "p");
             await mgr.Completion(draft.Id);
@@ -345,7 +345,7 @@ namespace Bimbridge.Tests
         {
             lock (RecipeLock) { FakeRecipe.Events = new List<string>(); FakeRecipe.WriteRev = 0; }
             var t = await RunRecipe(() => new CtorWrites(), DenyWritesAuthority.Instance);
-            Assert.Equal(TaskState.Interrumpida, t.State);
+            Assert.Equal(TaskState.Interrupted, t.State);
             Assert.Contains("autorizacion_requerida", t.Reason);
             Assert.DoesNotContain("constructor", FakeRecipe.Events);
             Assert.Equal(0, FakeRecipe.WriteRev);
@@ -357,7 +357,7 @@ namespace Bimbridge.Tests
             lock (RecipeLock) { FakeRecipe.Events = new List<string>(); FakeRecipe.WriteRev = 0; }
             var auth = new RecordingAuthority { AllowFirst = 1 }; // passes the engine's initial check; revoked right after
             var t = await RunRecipe(() => new FakeRecipe(), auth);
-            Assert.NotEqual(TaskState.Aplicada, t.State);
+            Assert.NotEqual(TaskState.Applied, t.State);
             Assert.Contains("autorizacion_requerida", t.Reason);
             Assert.DoesNotContain("constructor", FakeRecipe.Events);
             Assert.DoesNotContain("preparar", FakeRecipe.Events);
@@ -368,7 +368,7 @@ namespace Bimbridge.Tests
         {
             lock (RecipeLock) { FakeRecipe.Events = new List<string>(); FakeRecipe.WriteRev = 0; }
             var t = await RunRecipe(() => new CtorWrites(), new RecordingAuthority());
-            Assert.Equal(TaskState.Parcial, t.State);
+            Assert.Equal(TaskState.Partial, t.State);
             Assert.Contains("escritura_en_fase_de_lectura", t.Reason);
             Assert.Contains("constructor", t.Reason);
             Assert.DoesNotContain("preparar", FakeRecipe.Events);
@@ -380,7 +380,7 @@ namespace Bimbridge.Tests
         {
             lock (RecipeLock) { FakeRecipe.Events = new List<string>(); FakeRecipe.WriteRev = 0; }
             var t = await RunRecipe(() => new PrepareWrites(), new RecordingAuthority());
-            Assert.Equal(TaskState.Parcial, t.State);
+            Assert.Equal(TaskState.Partial, t.State);
             Assert.Contains("'preparar'", t.Reason);
             Assert.DoesNotContain("ejecutar", FakeRecipe.Events);
         }
@@ -390,7 +390,7 @@ namespace Bimbridge.Tests
         {
             lock (RecipeLock) { FakeRecipe.Events = new List<string>(); FakeRecipe.WriteRev = 0; }
             var t = await RunRecipe(() => new MoveNextWrites(), new RecordingAuthority());
-            Assert.Equal(TaskState.Parcial, t.State);
+            Assert.Equal(TaskState.Partial, t.State);
             Assert.Contains("'enumerar'", t.Reason);
             Assert.DoesNotContain("ejecutar", FakeRecipe.Events);
         }
@@ -400,7 +400,7 @@ namespace Bimbridge.Tests
         {
             lock (RecipeLock) { FakeRecipe.Events = new List<string>(); FakeRecipe.WriteRev = 0; }
             var t = await RunRecipe(() => new FakeRecipe(), new RecordingAuthority(), n: 4);
-            Assert.Equal(TaskState.Aplicada, t.State);
+            Assert.Equal(TaskState.Applied, t.State);
             Assert.Equal(4, FakeRecipe.Model.Live.Count);
             var ev = FakeRecipe.Events;
             Assert.Equal("autoridad", ev[0]);
@@ -432,21 +432,24 @@ namespace Bimbridge.Tests
         [Fact]
         public void Metadata_IsReadFromSource_ConservativeWhenNotConstant()
         {
-            Assert.Equal("Lectura", RecipeMetadata.Constant("class R : Receta { public override PoliticaTx Transaccion => PoliticaTx.Lectura; }", "Transaccion"));
-            Assert.Equal("3", RecipeMetadata.Constant("class R : Receta { public override string Version { get { return \"3\"; } } }", "Version"));
+            Assert.Equal("ReadOnly", RecipeMetadata.Constant("class R : Recipe { public override TxPolicy Transaction => TxPolicy.ReadOnly; }", "Transaction"));
+            Assert.Equal("3", RecipeMetadata.Constant("class R : Recipe { public override string Version { get { return \"3\"; } } }", "Version"));
             // commented out or computed -> null (the caller assumes it writes)
-            Assert.Null(RecipeMetadata.Constant("class R : Receta { // public override PoliticaTx Transaccion => PoliticaTx.Lectura;\n }", "Transaccion"));
-            Assert.Null(RecipeMetadata.Constant("class R : Receta { public override PoliticaTx Transaccion => X ? PoliticaTx.Lectura : PoliticaTx.PorUnidad; }", "Transaccion"));
-            Assert.Null(RecipeMetadata.Constant("class Otra { public PoliticaTx Transaccion => PoliticaTx.Lectura; }", "Transaccion"));
+            Assert.Null(RecipeMetadata.Constant("class R : Recipe { // public override TxPolicy Transaction => TxPolicy.ReadOnly;\n }", "Transaction"));
+            Assert.Null(RecipeMetadata.Constant("class R : Recipe { public override TxPolicy Transaction => X ? TxPolicy.ReadOnly : TxPolicy.PerUnit; }", "Transaction"));
+            Assert.Null(RecipeMetadata.Constant("class Other { public TxPolicy Transaction => TxPolicy.ReadOnly; }", "Transaction"));
+            // legacy aliases (one version): pre-rename base type, property and enum names are still read, reported in English
+            Assert.Equal("ReadOnly", RecipeMetadata.Constant("class R : Receta { public override PoliticaTx Transaccion => PoliticaTx.Lectura; }", "Transaction"));
+            Assert.Equal("PerUnit", RecipeMetadata.Constant("class R : Receta { public override PoliticaTx Transaccion => PoliticaTx.PorUnidad; }", "Transaction"));
         }
 
         [Fact]
         public void InstalledRecipes_Regression_CompileWithoutDeniedCapabilities_AndMetadataMatches()
         {
-            var dir = Path.Combine(ScriptingTests.RepoRoot, "src", "Bimbridge.Addin", "recetas");
+            var dir = Path.Combine(ScriptingTests.RepoRoot, "src", "Bimbridge.Addin", "recipes");
             var files = Directory.GetFiles(dir, "*.cs").OrderBy(f => f).ToList();
             Assert.Equal(5, files.Count);
-            var expectRead = new HashSet<string> { "exportar_laminas", "montaje_soportes", "qc_manifiesto" };
+            var expectRead = new HashSet<string> { "export_sheets", "mounting_supports", "qc_manifest" };
             foreach (var f in files)
             {
                 var code = File.ReadAllText(f);
@@ -457,7 +460,7 @@ namespace Bimbridge.Tests
                     var denied = CapabilityPolicy.Denied(ExecutionProfile.RestrictedAutonomous, caps, Capability.Grantable);
                     Assert.True(denied.Count == 0, name + " " + year + ": " + string.Join(", ", denied));
                 }
-                Assert.Equal(expectRead.Contains(name) ? "Lectura" : null, RecipeMetadata.Constant(code, "Transaccion"));
+                Assert.Equal(expectRead.Contains(name) ? "ReadOnly" : null, RecipeMetadata.Constant(code, "Transaction"));
             }
         }
 
@@ -582,11 +585,11 @@ namespace Bimbridge.Tests
             var r = AuditGate.Apply(a, "s", "aplicar_cola", "doc", null,
                 () => { applied++; return new Dictionary<string, object> { ["estado"] = "aplicado" }; },
                 x => (string)x["estado"], why => new Dictionary<string, object> { ["estado"] = "rechazado", ["motivo"] = why },
-                (x, why) => { x["auditoria"] = AuditGate.Incompleta; x["motivo"] = why; return x; });
+                (x, why) => { x["auditoria"] = AuditGate.Incomplete; x["motivo"] = why; return x; });
             Assert.Equal(1, applied);
             Assert.Equal("aplicado", r["estado"]);                // no rollback is faked
-            Assert.Equal(AuditGate.Incompleta, r["auditoria"]);   // but it is not presented as verified
-            Assert.Contains("pendiente de reconciliar", (string)r["motivo"]);
+            Assert.Equal(AuditGate.Incomplete, r["auditoria"]);   // but it is not presented as verified
+            Assert.Contains("pending reconciliation", (string)r["motivo"]);
             Assert.Single(AuditLog.PendingIntents(p));
         }
     }

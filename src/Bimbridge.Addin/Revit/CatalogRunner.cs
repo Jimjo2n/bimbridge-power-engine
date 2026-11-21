@@ -25,12 +25,12 @@ namespace Bimbridge.Addin.Revit
         private const int DefaultPageSize = 100;
         private const int MaxPageSize = 200;
 
-        private readonly string _que;
+        private readonly string _kind;
         private readonly List<string> _cats;
         private readonly List<string> _lvls;
         private readonly List<string> _extra;
-        private readonly string _buscar;
-        private readonly string _tipoVista;
+        private readonly string _search;
+        private readonly string _viewType;
         private readonly int _page;
         private readonly int _pageSize;
         private readonly bool _mm;
@@ -48,16 +48,16 @@ namespace Bimbridge.Addin.Revit
 
         public CatalogRunner(IDictionary<string, object> a)
         {
-            _que = (Arg.GetString(a, "que") ?? "resumen").Trim().ToLowerInvariant();
-            if (_que == "categorías") _que = "categorias";
-            if (_que == "láminas" || _que == "hojas") _que = "laminas";
-            if (_que == "vínculos" || _que == "links") _que = "vinculos";
-            if (Array.IndexOf(Kinds, _que) < 0) { Error = "que: " + string.Join(", ", Kinds); return; }
+            _kind = (Arg.GetString(a, "que") ?? "resumen").Trim().ToLowerInvariant();
+            if (_kind == "categorías") _kind = "categorias";
+            if (_kind == "láminas" || _kind == "hojas") _kind = "laminas";
+            if (_kind == "vínculos" || _kind == "links") _kind = "vinculos";
+            if (Array.IndexOf(Kinds, _kind) < 0) { Error = "que: " + string.Join(", ", Kinds); return; }
             _cats = Arg.GetStringList(a, "cat");
             _lvls = Arg.GetStringList(a, "lvl");
             _extra = Arg.GetStringList(a, "f");
-            _buscar = Arg.GetString(a, "buscar");
-            _tipoVista = Arg.GetString(a, "tipo");
+            _search = Arg.GetString(a, "buscar");
+            _viewType = Arg.GetString(a, "tipo");
             _page = (int)(Arg.GetLong(a, "page") ?? 1);
             _pageSize = (int)(Arg.GetLong(a, "page_size") ?? DefaultPageSize);
             _mm = string.Equals(Arg.GetString(a, "units"), "mm", StringComparison.OrdinalIgnoreCase);
@@ -97,8 +97,8 @@ namespace Bimbridge.Addin.Revit
         /// <summary>Filter by text, sort and paginate: outside the Revit thread.</summary>
         public Dictionary<string, object> Finish()
         {
-            var d = new Dictionary<string, object> { ["que"] = _que };
-            if (_que == "resumen")
+            var d = new Dictionary<string, object> { ["que"] = _kind };
+            if (_kind == "resumen")
             {
                 foreach (var kv in _summary) d[kv.Key] = kv.Value;
                 d["categorias_top"] = _catCounts.OrderByDescending(k => k.Value).Take(25)
@@ -107,9 +107,9 @@ namespace Bimbridge.Addin.Revit
                 return d;
             }
             IEnumerable<object[]> rows = _rows;
-            if (!string.IsNullOrWhiteSpace(_buscar))
+            if (!string.IsNullOrWhiteSpace(_search))
             {
-                var b = _buscar.Trim();
+                var b = _search.Trim();
                 rows = rows.Where(r => r.Any(c => c is string s && s.IndexOf(b, StringComparison.OrdinalIgnoreCase) >= 0));
             }
             var list = rows.ToList();
@@ -128,7 +128,7 @@ namespace Bimbridge.Addin.Revit
 
         private void Plan()
         {
-            switch (_que)
+            switch (_kind)
             {
                 case "resumen": PlanSummary(); break;
                 case "categorias": PlanCategories(); break;
@@ -193,7 +193,7 @@ namespace Bimbridge.Addin.Revit
                         long n;
                         try { n = new FilteredElementCollector(doc).OfCategoryId(c.Id).WhereElementIsNotElementType().GetElementCount(); }
                         catch (Exception) { continue; }
-                        if (n == 0 && string.IsNullOrEmpty(_buscar)) continue;
+                        if (n == 0 && string.IsNullOrEmpty(_search)) continue;
                         _catCounts[BicName(c)] = n;
                         row?.Invoke(c, n);
                     }
@@ -296,9 +296,9 @@ namespace Bimbridge.Addin.Revit
             cols.AddRange(_extra);
             _cols = cols.ToArray();
             ViewType? only = null;
-            if (!string.IsNullOrWhiteSpace(_tipoVista))
+            if (!string.IsNullOrWhiteSpace(_viewType))
             {
-                only = ParseViewType(_tipoVista);
+                only = ParseViewType(_viewType);
                 if (only == null) { Error = "tipo: plano, rcp, seccion, alzado, 3d, detalle, dibujo, leyenda, tabla, area or estructural"; return; }
             }
             Dictionary<long, string> sheetOf = null;

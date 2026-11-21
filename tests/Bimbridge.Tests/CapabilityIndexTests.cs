@@ -43,7 +43,7 @@ namespace Bimbridge.Tests
             var (byDomain, total) = Idx.Search(new CapabilityQuery { Domain = "F20", PageSize = 100 });
             Assert.Equal(CapabilityCatalog.All.Count(c => c.Domain == "F20"), total);
             Assert.All(byDomain, c => Assert.Equal("F20", c.Domain));
-            var (hits, _) = Idx.Search(new CapabilityQuery { Text = "tuberia" });
+            var (hits, _) = Idx.Search(new CapabilityQuery { Text = "pípe" });
             Assert.Contains(hits, c => c.Id == "F18-PIPE-CREATE-001");
             var (pre, _) = Idx.Search(new CapabilityQuery { Text = "circ" });
             Assert.Contains(pre, c => c.Id == "F20-CIRCUIT-CREATE-001");

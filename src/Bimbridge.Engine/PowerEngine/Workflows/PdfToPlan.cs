@@ -52,12 +52,12 @@ namespace BimBridge.PowerEngine.Workflows
             var anchors = Registration.AnchorsByName(page, model);
             var sheet = sp.TryGetValue("lamina", out var lm) ? lm as Dictionary<string, object> : null;
             double? scale = null;
-            if (sheet != null && sheet.TryGetValue("escala", out var es) && es is Dictionary<string, object> esd && esd.TryGetValue("factor_revit", out var f) && f != null) scale = D(f);
-            var marco = (Dictionary<string, object>)sp["marco"];
+            if (sheet != null && sheet.TryGetValue("escala", out var scaleValue) && scaleValue is Dictionary<string, object> scaleMap && scaleMap.TryGetValue("factor_revit", out var f) && f != null) scale = D(f);
+            var frame = (Dictionary<string, object>)sp["marco"];
             var reg = Registration.Solve(anchors, new RegistrationOptions
             {
                 Mode = q.Mode, TolFt = q.TolFt, ExpectedRevitScale = scale, LinkTransform = q.LinkTransform,
-                UserUnit = marco.TryGetValue("unidad_usuario", out var uu) ? D(uu) : 1.0,
+                UserUnit = frame.TryGetValue("unidad_usuario", out var uu) ? D(uu) : 1.0,
             });
             var shaPdf = (string)syms.Result["sha256"];
             var rev = sheet != null && sheet.TryGetValue("revision", out var rv) && rv is Dictionary<string, object> rvd ? Arg.GetString(rvd, "valor") : null;
@@ -106,7 +106,7 @@ namespace BimBridge.PowerEngine.Workflows
         {
             var reasons = new List<object>();
             if (plan == null) return new Dictionary<string, object> { ["ejecutable"] = false, ["motivos"] = new List<object> { "no plan" } };
-            if (plan.Estado != "listo" && plan.Estado != "listo_con_ambiguedades") reasons.Add("plan status: " + plan.Estado);
+            if (plan.State != "listo" && plan.State != "listo_con_ambiguedades") reasons.Add("plan status: " + plan.State);
             if (plan.Registration == null || !plan.Registration.Ok) reasons.Add("no valid plan–model registration");
             if (plan.Batches.Count == 0) reasons.Add("nothing unambiguous to place");
             if (string.IsNullOrEmpty(plan.Fingerprint) && plan.Batches.Count > 0) reasons.Add("plan without fingerprint: the idempotency key cannot be derived");
@@ -171,7 +171,7 @@ namespace BimBridge.PowerEngine.Workflows
         /// <summary>Reads type rules from JSON: [{"codigo":"D","tipo":"Fam: Tipo","montaje":"losa"|"elev":9.25,"ws":"…","direccional":true}].</summary>
         public static List<TypeRule> RulesFromJson(List<object> rules) => rules.Cast<Dictionary<string, object>>().Select(r => new TypeRule
         {
-            Code = Arg.GetString(r, "codigo"), FamilyType = Arg.GetString(r, "tipo"), Montaje = Arg.GetString(r, "montaje"), Workset = Arg.GetString(r, "ws"),
+            Code = Arg.GetString(r, "codigo"), FamilyType = Arg.GetString(r, "tipo"), Mounting = Arg.GetString(r, "montaje"), Workset = Arg.GetString(r, "ws"),
             Host = Arg.GetString(r, "anfitrion"), ElevFt = r.TryGetValue("elev", out var e) && e != null ? D(e) : (double?)null,
             Directional = r.TryGetValue("direccional", out var d) && d is bool b && b,
         }).ToList();

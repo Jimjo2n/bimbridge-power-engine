@@ -42,7 +42,7 @@ namespace Bimbridge.Bridge
             if (!string.IsNullOrWhiteSpace(instancia))
             {
                 var why = await _revit.SwitchToAsync(instancia.Trim(), ct).ConfigureAwait(false);
-                if (why != null) return Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = why });
+                if (why != null) return Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalid, ["aviso"] = why });
             }
             if (server?.ClientInfo?.Name is string name && name.Length > 0) _revit.ClientName = name; if (server?.ClientInfo?.Version is string clientVer && clientVer.Length > 0) _revit.ClientVersion = clientVer;
             var ctxArgs = new Dictionary<string, object>();
@@ -137,7 +137,7 @@ namespace Bimbridge.Bridge
             var result = new CallToolResult { Content = new List<ContentBlock>() };
             byte[] bytes = null;
             var mime = o.TryGetValue("mime", out var m) ? m as string ?? "image/png" : "image/png";
-            if (resp.Estado == Status.Ok && o.TryGetValue("archivo", out var f) && f is string path)
+            if (resp.State == Status.Ok && o.TryGetValue("archivo", out var f) && f is string path)
             {
                 try { bytes = File.ReadAllBytes(path); }
                 catch (Exception ex) { o["aviso"] = "the image was generated but could not be read: " + ex.Message; }
@@ -145,14 +145,14 @@ namespace Bimbridge.Bridge
             o.Remove("mime");
             result.Content.Add(new TextContentBlock { Text = Json.Write(o) });
             if (bytes != null) result.Content.Add(ImageContentBlock.FromBytes(bytes, mime));
-            result.IsError = resp.Estado != Status.Ok;
+            result.IsError = resp.State != Status.Ok;
             return result;
         }
 
         [McpServerTool(Name = "lote", ReadOnly = true, Idempotent = true, OpenWorld = false)]
         [Description("Several reads in ONE call (they run concurrently): llamadas=[{\"tool\":\"query\",\"cat\":\"LightingFixtures\",\"count\":true},{\"tool\":\"catalog\",\"que\":\"niveles\"}]. " +
                      "Accepts revit_context, query, get, catalog, check, geo and sets; max 8. Returns results in the same order.")]
-        public async Task<string> Lote(
+        public async Task<string> Batch(
             McpServer server,
             [Description("List of calls: each with tool and its arguments")] JsonElement llamadas,
             CancellationToken ct = default)
@@ -160,12 +160,12 @@ namespace Bimbridge.Bridge
             if (server?.ClientInfo?.Name is string name && name.Length > 0) _revit.ClientName = name; if (server?.ClientInfo?.Version is string clientVer && clientVer.Length > 0) _revit.ClientVersion = clientVer;
             object parsed;
             try { parsed = Json.Parse(llamadas.ValueKind == JsonValueKind.String ? llamadas.GetString() : llamadas.GetRawText()); }
-            catch (Exception ex) { return Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "llamadas is not valid JSON: " + ex.Message }); }
+            catch (Exception ex) { return Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalid, ["aviso"] = "llamadas is not valid JSON: " + ex.Message }); }
             if (parsed is Dictionary<string, object> one) parsed = new List<object> { one };
             if (!(parsed is List<object> list) || list.Count == 0)
-                return Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "llamadas: list of {tool, …}" });
+                return Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalid, ["aviso"] = "llamadas: list of {tool, …}" });
             if (list.Count > MaxBatch)
-                return Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "lote accepts up to " + MaxBatch + " calls" });
+                return Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalid, ["aviso"] = "lote accepts up to " + MaxBatch + " calls" });
 
             var tasks = list.Select(item => RunBatchItem(item, ct)).ToList();
             var results = await Task.WhenAll(tasks).ConfigureAwait(false);
@@ -178,7 +178,7 @@ namespace Bimbridge.Bridge
         private async Task<Dictionary<string, object>> RunBatchItem(object item, CancellationToken ct)
         {
             if (!(item is Dictionary<string, object> d))
-                return new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "each call is an object {tool, …}" };
+                return new Dictionary<string, object> { ["estado"] = Status.Invalid, ["aviso"] = "each call is an object {tool, …}" };
             var tool = (Arg.GetString(d, "tool") ?? "").Trim().ToLowerInvariant();
             var args = new Dictionary<string, object>(d, StringComparer.Ordinal);
             args.Remove("tool");
@@ -199,10 +199,10 @@ namespace Bimbridge.Bridge
                 case "sets":
                     op = Wire.OpSets;
                     if (!string.Equals(Arg.GetString(args, "op") ?? "list", "list", StringComparison.OrdinalIgnoreCase))
-                        return new Dictionary<string, object> { ["tool"] = tool, ["estado"] = Status.Invalido, ["aviso"] = "in lote, sets only accepts op=list" };
+                        return new Dictionary<string, object> { ["tool"] = tool, ["estado"] = Status.Invalid, ["aviso"] = "in lote, sets only accepts op=list" };
                     break;
                 default:
-                    return new Dictionary<string, object> { ["tool"] = tool, ["estado"] = Status.Invalido, ["aviso"] = "lote accepts revit_context, query, get, catalog, check, geo and sets (no writes)" };
+                    return new Dictionary<string, object> { ["tool"] = tool, ["estado"] = Status.Invalid, ["aviso"] = "lote accepts revit_context, query, get, catalog, check, geo and sets (no writes)" };
             }
             var resp = await _revit.CallAsync(op, args, ReadTimeout, ct).ConfigureAwait(false);
             var o = new Dictionary<string, object> { ["tool"] = tool };
@@ -297,7 +297,7 @@ namespace Bimbridge.Bridge
         {
             Dictionary<string, object> a;
             try { a = args == null ? new Dictionary<string, object>() : Json.ParseObject(args); }
-            catch (FormatException ex) { return Task.FromResult(Json.Write(Response.Fail(0, Status.Invalido, ex.Message))); }
+            catch (FormatException ex) { return Task.FromResult(Json.Write(Response.Fail(0, Status.Invalid, ex.Message))); }
             a["name"] = name;
             if (exacto != null) a["exacto"] = exacto;
             if (lvl != null) a["lvl"] = lvl;
@@ -379,7 +379,7 @@ namespace Bimbridge.Bridge
         {
             object parsed;
             try { parsed = Json.Parse(ops.ValueKind == JsonValueKind.String ? ops.GetString() : ops.GetRawText()); }
-            catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "ops is not valid JSON: " + ex.Message })); }
+            catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalid, ["aviso"] = "ops is not valid JSON: " + ex.Message })); }
             if (parsed is Dictionary<string, object> single) parsed = new List<object> { single };
             var a = new Dictionary<string, object> { ["ops"] = parsed };
             if (summary != null) a["summary"] = summary;
@@ -422,7 +422,7 @@ namespace Bimbridge.Bridge
             [Description("Number of lines")] int lineas = 300)
         {
             var txt = ResultStore.Read(id, desde, lineas, out var total);
-            if (txt == null) return Task.FromResult(Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "result does not exist: " + id }));
+            if (txt == null) return Task.FromResult(Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalid, ["aviso"] = "result does not exist: " + id }));
             return Task.FromResult(Json.Write(new Dictionary<string, object> { ["texto"] = txt, ["total_lineas"] = (long)total, ["desde"] = (long)desde }));
         }
 
@@ -465,7 +465,7 @@ namespace Bimbridge.Bridge
             else if (args.HasValue && args.Value.ValueKind == JsonValueKind.String)
             {
                 try { a["args"] = Json.Parse(args.Value.GetString()); }
-                catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "args is not JSON: " + ex.Message })); }
+                catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalid, ["aviso"] = "args is not JSON: " + ex.Message })); }
             }
             return Call(server, Wire.OpExec, a, ct, WriteTimeout);
         }
@@ -494,27 +494,27 @@ namespace Bimbridge.Bridge
             CancellationToken ct = default)
             => CallWithArgs(server, Wire.OpDoc, accion, args, doc, clave, ct, WriteTimeout);
 
-        private Task<string> CallWithArgs(McpServer server, string op, string accion, JsonElement? args, string doc, string clave, CancellationToken ct, TimeSpan timeout)
+        private Task<string> CallWithArgs(McpServer server, string op, string action, JsonElement? args, string doc, string key, CancellationToken ct, TimeSpan timeout)
         {
             var a = new Dictionary<string, object>();
             if (args.HasValue && args.Value.ValueKind != JsonValueKind.Null && args.Value.ValueKind != JsonValueKind.Undefined)
             {
                 object parsed;
                 try { parsed = Json.Parse(args.Value.ValueKind == JsonValueKind.String ? args.Value.GetString() : args.Value.GetRawText()); }
-                catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "args is not JSON: " + ex.Message })); }
+                catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalid, ["aviso"] = "args is not JSON: " + ex.Message })); }
                 if (parsed is Dictionary<string, object> d) foreach (var kv in d) a[kv.Key] = kv.Value is string || kv.Value is bool ? kv.Value : Convert.ToString(kv.Value, System.Globalization.CultureInfo.InvariantCulture);
             }
-            a["accion"] = accion;
+            a["accion"] = action;
             if (doc != null) a[Wire.DocArg] = doc;
-            if (clave != null) a[Wire.KeyArg] = clave;
+            if (key != null) a[Wire.KeyArg] = key;
             return Call(server, op, a, ct, timeout);
         }
 
         [McpServerTool(Name = "tarea", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
-        [Description("Long resumable tasks: a recipe (class inheriting from Receta, by registered name, .cs file or code) walks units in batches, " +
+        [Description("Long resumable tasks: a recipe (class inheriting from Recipe, by registered name, .cs file or code) walks units in batches, " +
                      "with checkpoints, verified guardar/sync/pdf barriers and final QC. Any client can continue it by id. " +
                      "accion=iniciar | estado | resumen | esperar (desde=rev, max=s) | unidades | lista | recetas | reanudar | cancelar | reconciliar (decision=aplicada|no_aplicada, claves) | anotar (texto) | olvidar.")]
-        public Task<string> Tarea(
+        public Task<string> TaskTool(
             McpServer server,
             [Description("iniciar | estado | resumen | esperar | unidades | lista | recetas | reanudar | cancelar | reconciliar | anotar | olvidar")] string accion = "estado",
             [Description("Task id (on iniciar: optional, so it can be repeated without duplicating)")] string id = null,
@@ -542,7 +542,7 @@ namespace Bimbridge.Bridge
             if (args.HasValue && args.Value.ValueKind != JsonValueKind.Null && args.Value.ValueKind != JsonValueKind.Undefined)
             {
                 try { a["args"] = Json.Parse(args.Value.ValueKind == JsonValueKind.String ? args.Value.GetString() : args.Value.GetRawText()); }
-                catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "args is not JSON: " + ex.Message })); }
+                catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalid, ["aviso"] = "args is not JSON: " + ex.Message })); }
             }
             return Call(server, Wire.OpTask, a, ct, TimeSpan.FromSeconds(180));
         }
@@ -573,7 +573,7 @@ namespace Bimbridge.Bridge
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var resp = await _revit.CallAsync(op, args, timeout ?? ReadTimeout, ct).ConfigureAwait(false);
             var text = Render(resp);
-            UsageMetrics.Record(_revit.ClientName, op, op, Json.Write(args ?? new Dictionary<string, object>()).Length, text.Length, sw.ElapsedMilliseconds, resp.Estado);
+            UsageMetrics.Record(_revit.ClientName, op, op, Json.Write(args ?? new Dictionary<string, object>()).Length, text.Length, sw.ElapsedMilliseconds, resp.State);
             return text;
         }
 
@@ -585,11 +585,11 @@ namespace Bimbridge.Bridge
         internal static Dictionary<string, object> RenderDict(Response resp)
         {
             var o = new Dictionary<string, object>();
-            if (resp.Estado != Status.Ok) o["estado"] = resp.Estado;
+            if (resp.State != Status.Ok) o["estado"] = resp.State;
             if (resp.Rev.HasValue) o["rev"] = resp.Rev.Value;
-            if (resp.Datos is Dictionary<string, object> d) foreach (var kv in d) o[kv.Key] = kv.Value;
-            else if (resp.Datos != null) o["datos"] = resp.Datos;
-            if (!string.IsNullOrEmpty(resp.Aviso)) o["aviso"] = resp.Aviso;
+            if (resp.Data is Dictionary<string, object> d) foreach (var kv in d) o[kv.Key] = kv.Value;
+            else if (resp.Data != null) o["datos"] = resp.Data;
+            if (!string.IsNullOrEmpty(resp.Warning)) o["aviso"] = resp.Warning;
             return o;
         }
     }

@@ -185,7 +185,7 @@ namespace Bimbridge.Addin.Revit.Geo
         {
             var doc = DocTarget.Resolve(app, out var docError);
             if (doc == null) { Error = docError; return true; }
-            if (doc.IsFamilyDocument) { Error = Status.NoSoportado + ": geo checks project models (montaje, choques, ranges); the target is a family. For faces and connectors use fam caras / fam info, or exec"; return true; }
+            if (doc.IsFamilyDocument) { Error = Status.NotSupported + ": geo checks project models (montaje, choques, ranges); the target is a family. For faces and connectors use fam caras / fam info, or exec"; return true; }
             _doc = doc;
             DocKey = DocumentTracker.KeyOf(doc);
             DocTitle = doc.Title;

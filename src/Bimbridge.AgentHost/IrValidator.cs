@@ -116,8 +116,8 @@ namespace Bimbridge.AgentHost
                 if (op.Retries != null && (op.Retries < 0 || op.Retries > MaxRetries)) errors.Add(who + ": reintentos outside 0.." + MaxRetries);
                 if (op.Source != null)
                 {
-                    if (string.IsNullOrEmpty(op.Source.Fuente) || !srcIds.Contains(op.Source.Fuente)) errors.Add(who + ": source '" + op.Source.Fuente + "' not declared in the plan");
-                    if (op.Source.Pagina != null && op.Source.Pagina < 1) errors.Add(who + ": invalid page");
+                    if (string.IsNullOrEmpty(op.Source.SourceId) || !srcIds.Contains(op.Source.SourceId)) errors.Add(who + ": source '" + op.Source.SourceId + "' not declared in the plan");
+                    if (op.Source.Page != null && op.Source.Page < 1) errors.Add(who + ": invalid page");
                 }
                 pres[op] = ParsePre(who, op, errors);
                 var expected = op.ExpectedId(plan);

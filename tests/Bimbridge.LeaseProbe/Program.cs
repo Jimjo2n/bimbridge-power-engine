@@ -55,7 +55,7 @@ internal static class Program
                     var startK = new DateTime(long.Parse(a[4], CultureInfo.InvariantCulture), DateTimeKind.Utc);
                     while (DateTime.UtcNow < startK) Thread.SpinWait(100);
                     var gs = new Bimbridge.Engine.GrantStore(a[0]);
-                    var g = gs.Approve("t" + Environment.ProcessId, "doc", "P", new[] { Bimbridge.Engine.Capability.Modificar }, TimeSpan.FromHours(1), "sonda", DateTime.UtcNow);
+                    var g = gs.Approve("t" + Environment.ProcessId, "doc", "P", new[] { Bimbridge.Engine.Capability.Modify }, TimeSpan.FromHours(1), "sonda", DateTime.UtcNow);
                     Console.WriteLine("GRANT " + g.Task);
                     return 0;
                 case "validate":

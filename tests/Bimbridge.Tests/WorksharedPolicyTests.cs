@@ -7,9 +7,9 @@ namespace Bimbridge.Tests
 {
     public class WorksharedPolicyTests
     {
-        private static Dictionary<string, object> Ctx(bool ws, string ruta, string central = null)
+        private static Dictionary<string, object> Ctx(bool ws, string path, string central = null)
         {
-            var d = new Dictionary<string, object> { ["worksharing"] = ws, ["ruta"] = ruta };
+            var d = new Dictionary<string, object> { ["worksharing"] = ws, ["ruta"] = path };
             if (central != null) d["central"] = central;
             return d;
         }
@@ -31,7 +31,7 @@ namespace Bimbridge.Tests
         public void Workshared_Local_WithFlag_PassesAsRecordedDeviation()
         {
             Assert.Null(RevitCli.WorksharedPolicy(Ctx(true, "C:\\U\\Desktop\\NRT04_R21_detached.rvt", "C:\\U\\Desktop\\NRT04_R21_detached.rvt"), "archivo:c:\\u\\desktop\\nrt04_r21_detached.rvt", true, out var dev));
-            Assert.Contains("aceptado por el operador", dev);
+            Assert.Contains("accepted by the operator", dev);
         }
 
         [Theory]
@@ -42,9 +42,9 @@ namespace Bimbridge.Tests
         [InlineData("C:\\a.rvt", "\\\\servidor\\central.rvt", "archivo:x")]
         [InlineData("C:\\a.rvt", "Autodesk Docs://P/central.rvt", "archivo:x")]
         [InlineData("", null, "archivo:x")]
-        public void Workshared_CloudOrNetwork_IsBlocked_EvenWithFlag(string ruta, string central, string key)
+        public void Workshared_CloudOrNetwork_IsBlocked_EvenWithFlag(string path, string central, string key)
         {
-            Assert.NotNull(RevitCli.WorksharedPolicy(Ctx(true, ruta, central), key, true, out var dev));
+            Assert.NotNull(RevitCli.WorksharedPolicy(Ctx(true, path, central), key, true, out var dev));
             Assert.Null(dev);
         }
     }

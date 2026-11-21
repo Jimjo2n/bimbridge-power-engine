@@ -62,7 +62,7 @@ internal static class Program
         return sw.Elapsed.TotalMilliseconds * 1000.0 / reps;
     }
 
-    private static int Bytes(object datos) => Encoding.UTF8.GetByteCount(Json.Write(new Response { Id = 1, Datos = (Dictionary<string, object>)datos }.ToJson()));
+    private static int Bytes(object data) => Encoding.UTF8.GetByteCount(Json.Write(new Response { Id = 1, Data = (Dictionary<string, object>)data }.ToJson()));
 
     private static Dictionary<string, object> Page(CapabilityIndex idx, CapabilityQuery q)
     {

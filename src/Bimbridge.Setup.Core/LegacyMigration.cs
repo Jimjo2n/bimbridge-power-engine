@@ -221,8 +221,59 @@ namespace Bimbridge.Setup
         }
 
         /// <summary>
-        /// Saved scripts and recipes (recetas\, scripts\) that name the old namespaces stop compiling. Paused tasks keep their own
-        /// copy (tareas\*\receta.cs) bound to a hash and are not touched: finish or cancel them before updating.
+        /// Scripting API renamed to English (regex on the old name, replacement). Whole words only; enum members, Bim helpers and
+        /// members whose bare name is a common word are matched only in their qualified, override or base-call form.
+        /// </summary>
+        public static readonly (string Pattern, string Replacement)[] ScriptApiRenames = BuildScriptApiRenames();
+
+        private static (string, string)[] BuildScriptApiRenames()
+        {
+            var list = new List<(string, string)>
+            {
+                (@"\bOmitirUnidad\b", "SkipUnit"),
+                (@"\bPoliticaTx\.PorUnidad\b", "TxPolicy.PerUnit"), (@"\bPoliticaTx\.Ninguna\b", "TxPolicy.None"), (@"\bPoliticaTx\.Lectura\b", "TxPolicy.ReadOnly"),
+                (@"\bPoliticaTx\b", "TxPolicy"),
+                (@"\bVerificacion\.Aplicada\b", "Verification.Applied"), (@"\bVerificacion\.NoAplicada\b", "Verification.NotApplied"),
+                (@"\bVerificacion\.Desconocida\b", "Verification.Unknown"), (@"\bVerificacion\b", "Verification"),
+                (@"\bUnidad\.Guardar\b", "Unit.Save"), (@"\bUnidad\b", "Unit"),
+                (@"\bReceta\b", "Recipe"),
+                (@"\.Clave\b", ".Key"), (@"\.Datos\b", ".Data"), (@"\.BarreraArgs\b", ".BarrierArgs"), (@"\.Barrera\b", ".BarrierAction"),
+                (@"\.Excepcion\(", ".Exception("), (@"\.Omitir\(", ".Skip("), (@"\.Artefacto\(", ".Artifact("), (@"\.TareaId\b", ".TaskId"),
+            };
+            var members = new Dictionary<string, string>
+            {
+                ["Descripcion"] = "Description", ["Transaccion"] = "Transaction", ["Entradas"] = "Inputs", ["Preparar"] = "Prepare",
+                ["Unidades"] = "Units", ["Ejecutar"] = "Run", ["Verificar"] = "Verify", ["Postcondicion"] = "Postcondition",
+            };
+            foreach (var m in members)
+            {
+                list.Add((@"(\boverride\s+[\w<>\[\]?,. ]+?\s)" + m.Key + @"\b", "${1}" + m.Value));
+                list.Add((@"\bbase\." + m.Key + @"\b", "base." + m.Value));
+            }
+            var helpers = new Dictionary<string, (string NewClass, Dictionary<string, string> Members)>
+            {
+                ["Grupos"] = ("Groups", new Dictionary<string, string> { ["Inspeccionar"] = "Inspect", ["Firma"] = "Signature", ["Instancias"] = "Instances", ["Componer"] = "Compose", ["CambiarTipo"] = "ChangeType", ["VerificarComposicion"] = "VerifyComposition" }),
+                ["Montaje"] = ("Mounting", new Dictionary<string, string> { ["Cuerpo"] = "Body", ["Vista3D"] = "View3D", ["Soporte"] = "Support", ["Transformacion"] = "Transformation" }),
+                ["Vistas"] = ("Views", new Dictionary<string, string> { ["Rango"] = "Range", ["AplicarRango"] = "ApplyRange", ["CompararPlantilla"] = "CompareTemplate", ["PorQueNoSeVe"] = "WhyNotVisible", ["FiltroPorCategoria"] = "FilterByCategory" }),
+                ["Manifiesto"] = ("Manifest", new Dictionary<string, string> { ["Juntar"] = "Collect", ["Qc"] = "Qc" }),
+            };
+            foreach (var h in helpers)
+                foreach (var m in h.Value.Members)
+                    list.Add((@"\b" + h.Key + @"\." + m.Key + @"\b", h.Value.NewClass + "." + m.Value));
+            return list.ToArray();
+        }
+
+        /// <summary>Old namespaces and old scripting API names replaced by the current ones (see <see cref="ScriptApiRenames"/>).</summary>
+        public static string RewriteScriptText(string text)
+        {
+            var updated = text.Replace(LegacyNamespacePrefix, NewNamespacePrefix);
+            foreach (var r in ScriptApiRenames) updated = Regex.Replace(updated, r.Pattern, r.Replacement);
+            return updated;
+        }
+
+        /// <summary>
+        /// Saved scripts and recipes (recetas\, scripts\) that name the old namespaces or the old (Spanish) scripting API stop compiling.
+        /// Paused tasks keep their own copy (tareas\*\receta.cs) bound to a hash and are not touched: finish or cancel them before updating.
         /// </summary>
         public static bool RewriteScripts(SetupPaths p, Action<string> log)
         {
@@ -233,11 +284,11 @@ namespace Bimbridge.Setup
                     try
                     {
                         var text = File.ReadAllText(f);
-                        var updated = text.Replace(LegacyNamespacePrefix, NewNamespacePrefix);
+                        var updated = RewriteScriptText(text);
                         if (updated == text) continue;
                         File.WriteAllText(f, updated, new UTF8Encoding(false));
                         found = true;
-                        log("Updated namespaces in " + f);
+                        log("Updated names in " + f);
                     }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { log("Could not update " + f + ": " + ex.Message); }
                 }

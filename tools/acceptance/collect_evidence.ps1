@@ -2,7 +2,7 @@
 # Collects the 0.6.0 acceptance evidence into a zip on the Desktop. Only reads and copies; changes nothing in the MCP or Revit.
 # Does NOT include config.json, credentials or model files. Includes: folders of the requested tasks (journal, units, small
 # artifacts), metrics, operation journal (operaciones\) of the last 3 days, installer diagnostics and addin.log.
-param([string[]]$Tareas = @(), [int]$Dias = 3, [int]$MaxMbArtefacto = 20)
+param([string[]]$Tasks = @(), [int]$Days = 3, [int]$MaxMbArtifact = 20)
 $ErrorActionPreference = "Stop"
 $home_ = Join-Path $env:LOCALAPPDATA "Bimbridge"
 $stamp = Get-Date -Format "yyyyMMdd_HHmm"
@@ -12,19 +12,19 @@ New-Item -ItemType Directory -Force $out | Out-Null
 $setup = Join-Path $home_ "Bimbridge.Setup.exe"
 if (Test-Path $setup) { & $setup /diagnostico | Out-File -Encoding utf8 (Join-Path $out "diagnostics.json") }
 
-foreach ($t in $Tareas) {
+foreach ($t in $Tasks) {
   $src = Join-Path $home_ ("tareas\" + $t)
   if (-not (Test-Path $src)) { "task $t does not exist" | Add-Content (Join-Path $out "notes.md"); continue }
   $dst = Join-Path $out ("tareas\" + $t)
   New-Item -ItemType Directory -Force $dst | Out-Null
-  Get-ChildItem -Recurse -File $src | Where-Object { $_.Length -le $MaxMbArtefacto * 1MB } | ForEach-Object {
+  Get-ChildItem -Recurse -File $src | Where-Object { $_.Length -le $MaxMbArtifact * 1MB } | ForEach-Object {
     $rel = $_.FullName.Substring($src.Length).TrimStart('\')
     $target = Join-Path $dst $rel
     New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
     Copy-Item $_.FullName $target
   }
 }
-$since = (Get-Date).AddDays(-$Dias)
+$since = (Get-Date).AddDays(-$Days)
 foreach ($sub in "metricas", "operaciones") {
   $p = Join-Path $home_ $sub
   if (Test-Path $p) {

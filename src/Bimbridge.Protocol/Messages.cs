@@ -8,7 +8,7 @@ namespace Bimbridge.Protocol
     public static class Wire
     {
         /// <summary>Bumped when the format changes. Bridge and add-in must match.</summary>
-        public const int ProtocolVersion = 2;
+        public const int ProtocolVersion = 3;
 
         public const string PipePrefix = "Bimbridge.";
 
@@ -52,59 +52,59 @@ namespace Bimbridge.Protocol
     public static class Status
     {
         public const string Ok = "ok";
-        public const string EnCola = "en_cola";
-        public const string EnProceso = "en_proceso";
+        public const string Queued = "en_cola";
+        public const string InProgress = "en_proceso";
         /// <summary>The change is in the Revit queue; the user will apply it with the "Apply queue" button.</summary>
-        public const string Retenido = "retenido";
-        public const string Conflicto = "conflicto";
-        public const string RevitOcupado = "revit_ocupado";
-        public const string Revertido = "revertido";
-        public const string Vencido = "vencido";
-        public const string Rechazado = "rechazado";
-        public const string Invalido = "invalido";
-        public const string RevitNoDisponible = "revit_no_disponible";
+        public const string Held = "retenido";
+        public const string Conflict = "conflicto";
+        public const string RevitBusy = "revit_ocupado";
+        public const string RolledBack = "revertido";
+        public const string Expired = "vencido";
+        public const string Rejected = "rechazado";
+        public const string Invalid = "invalido";
+        public const string RevitUnavailable = "revit_no_disponible";
         public const string Incompatible = "incompatible";
         public const string Error = "error";
         /// <summary>The request deadline passed and the work was cancelled inside Revit.</summary>
-        public const string TiempoAgotado = "tiempo_agotado";
+        public const string TimedOut = "tiempo_agotado";
         /// <summary>The operation does not apply to this document type or Revit version (says which, and what alternative exists).</summary>
-        public const string NoSoportado = "no_soportado";
+        public const string NotSupported = "no_soportado";
         /// <summary>The pinned document or Revit is no longer open. Not redirected to another one.</summary>
-        public const string DestinoNoDisponible = "destino_no_disponible";
+        public const string TargetUnavailable = "destino_no_disponible";
         /// <summary>A user decision is needed (e.g. Hold is on, ambiguous data left unresolved).</summary>
-        public const string NecesitaUsuario = "necesita_usuario";
+        public const string NeedsUser = "necesita_usuario";
         /// <summary>An operation with that key started and its end is not recorded (Revit closed or was cut off): reconcile before repeating.</summary>
-        public const string Interrumpido = "interrumpido";
+        public const string Interrupted = "interrumpido";
         /// <summary>Applied, but the follow-up verification found differences from what was requested (they are listed).</summary>
-        public const string ConDiferencias = "completado_con_diferencias";
+        public const string CompletedWithDifferences = "completado_con_diferencias";
 
         // 0.6.0: semantic statuses that tell apart what was applied, what was rolled back and what is unknown.
         /// <summary>One part was committed and another was not (e.g. tx=ninguna with a failure halfway, or one document yes and another no). Reconcile before repeating.</summary>
-        public const string Parcial = "parcial";
+        public const string Partial = "parcial";
         /// <summary>It cannot be known whether it was applied (the evidence was lost). Reconcile before repeating.</summary>
-        public const string Desconocido = "desconocido";
+        public const string Unknown = "desconocido";
         /// <summary>The changes were committed, but producing the response failed. Nothing was rolled back.</summary>
-        public const string AplicadoErrorResultado = "aplicado_error_resultado";
-        public const string CancelacionSolicitada = "cancelacion_solicitada";
+        public const string AppliedResultError = "aplicado_error_resultado";
+        public const string CancelRequested = "cancelacion_solicitada";
         /// <summary>Cancellation confirmed: what was committed before cancelling stays applied and is listed.</summary>
-        public const string Cancelado = "cancelado";
+        public const string Cancelled = "cancelado";
         /// <summary>The task is waiting on context (user pause, open dialog, closed document). It keeps its progress.</summary>
-        public const string EsperandoContexto = "esperando_contexto";
+        public const string WaitingContext = "esperando_contexto";
         /// <summary>The operation journal is unavailable: a write with clave= is not applied when its idempotency cannot be guaranteed.</summary>
-        public const string DiarioNoDisponible = "diario_no_disponible";
+        public const string JournalUnavailable = "diario_no_disponible";
         /// <summary>A name matches several documents or elements: candidates are returned, the first one is not picked.</summary>
-        public const string Ambiguo = "ambiguo";
+        public const string Ambiguous = "ambiguo";
         /// <summary>Another task or barrier holds the document; the write was not applied.</summary>
-        public const string DocumentoOcupado = "documento_ocupado";
+        public const string DocumentBusy = "documento_ocupado";
 
         /// <summary>Terminal statuses that confirm NOTHING was applied (can be retried with the same key).</summary>
         public static bool ConfirmsNothingApplied(string s) =>
-            s == Revertido || s == Rechazado || s == Invalido || s == DestinoNoDisponible || s == NoSoportado || s == NecesitaUsuario ||
-            s == Conflicto || s == RevitOcupado || s == Vencido || s == DiarioNoDisponible || s == Ambiguo || s == DocumentoOcupado ||
-            s == Incompatible || s == RevitNoDisponible || s == TiempoAgotado;
+            s == RolledBack || s == Rejected || s == Invalid || s == TargetUnavailable || s == NotSupported || s == NeedsUser ||
+            s == Conflict || s == RevitBusy || s == Expired || s == JournalUnavailable || s == Ambiguous || s == DocumentBusy ||
+            s == Incompatible || s == RevitUnavailable || s == TimedOut;
 
         /// <summary>Terminal statuses that count as applied (repeating the key returns the stored result).</summary>
-        public static bool CountsAsApplied(string s) => s == Ok || s == ConDiferencias || s == Retenido || s == AplicadoErrorResultado;
+        public static bool CountsAsApplied(string s) => s == Ok || s == CompletedWithDifferences || s == Held || s == AppliedResultError;
     }
 
     public sealed class Request : IJsonWritable
@@ -130,7 +130,7 @@ namespace Bimbridge.Protocol
             {
                 Id = Arg.GetLong(o, "id") ?? 0,
                 Op = Arg.GetString(o, "op"),
-                AttemptId = Arg.GetString(o, "intento_id"),
+                AttemptId = LegacyAliases.GetString(o, "attempt_id"),
                 Args = o.TryGetValue("args", out var a) && a is Dictionary<string, object> d
                     ? d
                     : new Dictionary<string, object>(StringComparer.Ordinal),
@@ -142,36 +142,36 @@ namespace Bimbridge.Protocol
     public sealed class Response : IJsonWritable
     {
         public long Id;
-        public string Estado = Status.Ok;
+        public string State = Status.Ok;
         public long? Rev;
-        public object Datos;
-        public string Aviso;
+        public object Data;
+        public string Warning;
 
         public object ToJson()
         {
-            var d = new Dictionary<string, object> { ["id"] = Id, ["estado"] = Estado };
+            var d = new Dictionary<string, object> { ["id"] = Id, ["estado"] = State };
             if (Rev.HasValue) d["rev"] = Rev.Value;
-            if (Datos != null) d["datos"] = Datos;
-            if (!string.IsNullOrEmpty(Aviso)) d["aviso"] = Aviso;
+            if (Data != null) d["datos"] = Data;
+            if (!string.IsNullOrEmpty(Warning)) d["aviso"] = Warning;
             return d;
         }
 
         public static Response FromJson(string json)
         {
             var o = Json.ParseObject(json);
-            o.TryGetValue("datos", out var datos);
+            LegacyAliases.TryGet(o, "data", out var data);
             return new Response
             {
                 Id = Arg.GetLong(o, "id") ?? 0,
-                Estado = Arg.GetString(o, "estado") ?? Status.Error,
+                State = LegacyAliases.GetString(o, "status") ?? Status.Error,
                 Rev = Arg.GetLong(o, "rev"),
-                Datos = datos,
-                Aviso = Arg.GetString(o, "aviso"),
+                Data = data,
+                Warning = LegacyAliases.GetString(o, "warning"),
             };
         }
 
-        public static Response Fail(long id, string estado, string aviso) =>
-            new Response { Id = id, Estado = estado, Aviso = aviso };
+        public static Response Fail(long id, string status, string warning) =>
+            new Response { Id = id, State = status, Warning = warning };
     }
 
     /// <summary>Lenient reading of already-parsed JSON arguments.</summary>

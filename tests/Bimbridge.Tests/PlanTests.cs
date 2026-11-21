@@ -69,7 +69,7 @@ namespace Bimbridge.Tests
             Assert.Equal("11", held[1].Entries[0].After);
             Assert.Equal(11.0, Convert.ToDouble(held[1].Entries[0].Target));
 
-            s2.Finish(held[0], PlanStatus.Aplicado, "ok");
+            s2.Finish(held[0], PlanStatus.Applied, "ok");
             Assert.Single(Directory.GetFiles(s2.DocDir("C:\\modelos\\Tampa.rvt"), "P-*.json"));
             Assert.Equal(0, NewStore().LoadPersisted("C:\\otro.rvt"));
         }
@@ -83,8 +83,8 @@ namespace Bimbridge.Tests
             s.Hold(held);
             _now = _now.AddHours(3);
             Assert.Equal(1, s.ExpireOld(TimeSpan.FromMinutes(15)));
-            Assert.Equal(PlanStatus.Vencido, ready.Status);
-            Assert.Equal(PlanStatus.Retenido, held.Status);
+            Assert.Equal(PlanStatus.Expired, ready.Status);
+            Assert.Equal(PlanStatus.Held, held.Status);
         }
 
         [Fact]
@@ -121,7 +121,7 @@ namespace Bimbridge.Tests
             NewPlan(s, "S-codex", (3, "1", "2"));
             s.Hold(a); s.Hold(b);
             Assert.Equal(2, s.DiscardHeld(a.DocKey, "usuario"));
-            Assert.Equal(PlanStatus.Descartado, a.Status);
+            Assert.Equal(PlanStatus.Discarded, a.Status);
             Assert.Empty(s.Held(a.DocKey));
             Assert.Equal(2, s.ForSession("S-claude").Count);
             Assert.Equal(0, NewStore().LoadPersisted(a.DocKey));

@@ -59,7 +59,7 @@ namespace Bimbridge.Engine
         /// <summary>Fills job_id and transaction_id with what is known at the end.</summary>
         public void Complete(Request req, Response resp)
         {
-            if (resp?.Datos is Dictionary<string, object> d)
+            if (resp?.Data is Dictionary<string, object> d)
             {
                 if (JobId == null) JobId = Arg.GetString(d, "job_id");
                 if (req.Op == Wire.OpCommit && TransactionId == null) TransactionId = Arg.GetString(d, "plan_id");

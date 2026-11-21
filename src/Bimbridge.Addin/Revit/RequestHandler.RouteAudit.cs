@@ -31,7 +31,7 @@ namespace Bimbridge.Addin.Revit
                 start = ReadRoutePoint(request.Args, "inicio");
                 end = ReadRoutePoint(request.Args, "fin");
             }
-            catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
+            catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalid, ex.Message); }
 
             var findings = new List<object>();
             var sample = new List<object>();
@@ -132,11 +132,11 @@ namespace Bimbridge.Addin.Revit
                 return cursor == route.Count;
             }, highPriority: false, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!work.Ok) return FromWork(request.Id, work);
-            if (error != null) return Response.Fail(request.Id, cursor > 0 ? Status.Conflicto : Status.Invalido, error);
+            if (error != null) return Response.Fail(request.Id, cursor > 0 ? Status.Conflict : Status.Invalid, error);
             return new Response
             {
-                Id = request.Id, Rev = revision, Estado = fails ? Status.ConDiferencias : Status.Ok,
-                Datos = new Dictionary<string, object>
+                Id = request.Id, Rev = revision, State = fails ? Status.CompletedWithDifferences : Status.Ok,
+                Data = new Dictionary<string, object>
                 {
                     ["ruta"] = Arg.GetString(request.Args, "ruta"), ["nivel"] = Arg.GetString(request.Args, "nivel"),
                     ["elementos_revisados"] = (long)cursor, ["hallazgos"] = findings, ["muestra_sin_incidencia"] = sample,

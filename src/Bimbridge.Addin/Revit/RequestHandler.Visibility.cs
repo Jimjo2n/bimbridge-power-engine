@@ -24,10 +24,10 @@ namespace Bimbridge.Addin.Revit
             var ids = IdList(request.Args, "ids");
             if (views.Length == 0 || ids.Length == 0 || views.Length > 8 || (long)views.Length * ids.Length > 100 ||
                 views.Contains(0) || ids.Contains(0))
-                return Response.Fail(request.Id, Status.Invalido, "give positive IDs in vistas and ids. Maximum 8 views and 100 view-element pairs.");
+                return Response.Fail(request.Id, Status.Invalid, "give positive IDs in vistas and ids. Maximum 8 views and 100 view-element pairs.");
             VisibilityAudit audit;
             try { audit = new VisibilityAudit(request.Args, views, ids); }
-            catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
+            catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalid, ex.Message); }
 
             var rows = new List<object>();
             string error = null;
@@ -64,11 +64,11 @@ namespace Bimbridge.Addin.Revit
                             elements.Add(new Dictionary<string, object> { ["id"] = target.Id, ["estado"] = "no_encontrado" });
                             continue;
                         }
-                        var diagnosis = Bim.Vistas.PorQueNoSeVe(view, element);
+                        var diagnosis = Bim.Views.WhyNotVisible(view, element);
                         diagnosis["en_colector_de_vista"] = candidates.Contains(element.Id);
                         diagnosis["graficos_elemento"] = Colors(view.GetElementOverrides(element.Id));
                         diagnosis["filtros_coincidentes"] = orderedFilters
-                            .Where(filter => Bim.Vistas.MatchesFilter(filter.Filter, element))
+                            .Where(filter => Bim.Views.MatchesFilter(filter.Filter, element))
                             .Select(filter => new Dictionary<string, object>
                             {
                                 ["id"] = Ids.ToLong(filter.Id), ["nombre"] = filter.Filter.Name, ["activo"] = filter.Enabled,
@@ -95,12 +95,12 @@ namespace Bimbridge.Addin.Revit
                 return true;
             }, highPriority: false, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!work.Ok) return FromWork(request.Id, work);
-            if (error != null) return Response.Fail(request.Id, Status.Invalido, error);
+            if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
             var differences = audit.Compare(rows);
             return new Response
             {
-                Id = request.Id, Rev = rev, Estado = differences.Count == 0 ? Status.Ok : Status.ConDiferencias,
-                Datos = new Dictionary<string, object>
+                Id = request.Id, Rev = rev, State = differences.Count == 0 ? Status.Ok : Status.CompletedWithDifferences,
+                Data = new Dictionary<string, object>
                 {
                     ["vistas"] = rows,
                     ["diferencias"] = differences,

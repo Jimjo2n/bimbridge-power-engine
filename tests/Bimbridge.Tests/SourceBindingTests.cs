@@ -136,7 +136,7 @@ namespace Bimbridge.Tests
 
             // Uncertain result in another batch: unknown -> reconcile; "not applied" -> applied again exactly once.
             var other = OpsOf(Plan(sha: "sha-pdf-9"));
-            Commit(j, other, "doc-A", null, Status.Desconocido, ref applied);
+            Commit(j, other, "doc-A", null, Status.Unknown, ref applied);
             Assert.Equal(2, applied);
             Assert.Equal(OperationJournal.BeginKind.Interrupted, Commit(j, other, "doc-A", null, Status.Ok, ref applied));
             Assert.Equal(OperationJournal.BeginKind.New, Commit(j, other, "doc-A", null, Status.Ok, ref applied, OperationJournal.ReconcileMode.NotApplied));

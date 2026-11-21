@@ -112,7 +112,7 @@ namespace Bimbridge.Engine
                     var hello = Request.FromJson(helloText);
                     if (hello.Op != Wire.OpHello)
                     {
-                        await Send(stream, writeLock, Response.Fail(hello.Id, Status.Invalido, "hello must come first"), connCts.Token).ConfigureAwait(false);
+                        await Send(stream, writeLock, Response.Fail(hello.Id, Status.Invalid, "hello must come first"), connCts.Token).ConfigureAwait(false);
                         return;
                     }
                     var proto = Arg.GetLong(hello.Args, "protocol") ?? 0;
@@ -136,7 +136,7 @@ namespace Bimbridge.Engine
                     info["sesion"] = session.Id;
                     info["agente"] = session.AgentName;
                     info["identidad"] = session.AgentName == null ? "insuficiente" : "declarada";
-                    await Send(stream, writeLock, new Response { Id = hello.Id, Estado = Status.Ok, Datos = info }, connCts.Token).ConfigureAwait(false);
+                    await Send(stream, writeLock, new Response { Id = hello.Id, State = Status.Ok, Data = info }, connCts.Token).ConfigureAwait(false);
                     _journal?.Log(session.Id, "conectar", Status.Ok, 0, new Dictionary<string, object>
                     {
                         ["cliente"] = session.ClientName, ["pid"] = (long)session.ClientPid, ["agente"] = session.AgentName, ["identidad_fuente"] = session.IdentitySource,
@@ -167,12 +167,12 @@ namespace Bimbridge.Engine
                         try { req = Request.FromJson(text); }
                         catch (FormatException ex)
                         {
-                            await Send(stream, writeLock, Response.Fail(0, Status.Invalido, ex.Message), connCts.Token).ConfigureAwait(false);
+                            await Send(stream, writeLock, Response.Fail(0, Status.Invalid, ex.Message), connCts.Token).ConfigureAwait(false);
                             continue;
                         }
                         if (req.Op == Wire.OpPing)
                         {
-                            await Send(stream, writeLock, new Response { Id = req.Id, Estado = Status.Ok }, connCts.Token).ConfigureAwait(false);
+                            await Send(stream, writeLock, new Response { Id = req.Id, State = Status.Ok }, connCts.Token).ConfigureAwait(false);
                             continue;
                         }
                         // The heartbeat keeps the connection alive (read timeout) but does NOT count as agent activity:
@@ -186,11 +186,11 @@ namespace Bimbridge.Engine
                         var anonymous = s.AgentName == null;
                         if (_config.IdentityRequired && anonymous && IdentityPolicy.RequiresIdentity(req))
                         {
-                            var refused = Response.Fail(req.Id, Status.Rechazado, IdentityPolicy.RefusalMessage(s));
+                            var refused = Response.Fail(req.Id, Status.Rejected, IdentityPolicy.RefusalMessage(s));
                             var rj = new Dictionary<string, object> { ["aviso"] = "identidad_insuficiente", ["cliente"] = s.ClientName };
                             corr.WriteTo(rj);
                             if (reqDoc != null) rj["doc"] = reqDoc;
-                            _journal?.Log(s.Id, ToolName(req), refused.Estado, 0, rj);
+                            _journal?.Log(s.Id, ToolName(req), refused.State, 0, rj);
                             await Send(stream, writeLock, refused, connCts.Token).ConfigureAwait(false);
                             continue;
                         }
@@ -217,7 +217,7 @@ namespace Bimbridge.Engine
                             }
                             resp.Id = req.Id;
                             var ms = sw.ElapsedMilliseconds;
-                            var failed = resp.Estado == Status.Error || resp.Estado == Status.Desconocido || resp.Estado == Status.Invalido;
+                            var failed = resp.State == Status.Error || resp.State == Status.Unknown || resp.State == Status.Invalid;
                             _sessions.RequestFinished(s, ms, failed);
                             var extra = JournalExtra(resp) ?? new Dictionary<string, object>();
                             // Attribution: every journal line carries the agent, the client, the trace and the requested document.
@@ -229,7 +229,7 @@ namespace Bimbridge.Engine
                             // Explicit legacy mode (identidad_obligatoria=false): the anonymous operation is marked as such in the journal.
                             if (anonymous && !IdentityPolicy.IsRegistration(req)) extra["identidad"] = _config.IdentityRequired ? "sin_nombre" : "sin_nombre_modo_heredado";
                             if (reqDoc != null) extra["doc"] = reqDoc;
-                            _journal?.Log(s.Id, ToolName(req), resp.Estado, ms, extra);
+                            _journal?.Log(s.Id, ToolName(req), resp.State, ms, extra);
                             try { await Send(stream, writeLock, resp, connCts.Token, largeResults).ConfigureAwait(false); }
                             catch (Exception) { /* connection closed while working */ }
                         });
@@ -266,8 +266,8 @@ namespace Bimbridge.Engine
 
         private static Dictionary<string, object> JournalExtra(Response resp)
         {
-            if (resp.Estado == Status.Ok || string.IsNullOrEmpty(resp.Aviso)) return null;
-            var a = resp.Aviso.Length > 200 ? resp.Aviso.Substring(0, 200) + "…" : resp.Aviso;
+            if (resp.State == Status.Ok || string.IsNullOrEmpty(resp.Warning)) return null;
+            var a = resp.Warning.Length > 200 ? resp.Warning.Substring(0, 200) + "…" : resp.Warning;
             return new Dictionary<string, object> { ["aviso"] = a };
         }
 
@@ -311,7 +311,7 @@ namespace Bimbridge.Engine
             if (bytes <= budget) return json;
 
             var summary = new Dictionary<string, object> { ["bytes_respuesta"] = (long)bytes };
-            if (response.Datos is Dictionary<string, object> data)
+            if (response.Data is Dictionary<string, object> data)
                 foreach (var key in new[] { "total", "page", "pages", "cursor", "rev_instantanea", "recibo", "job_id", "plan_id" })
                     if (data.TryGetValue(key, out var field)) summary[key] = field;
             if (largeResults)
@@ -327,10 +327,10 @@ namespace Bimbridge.Engine
                 }
             }
             else summary["aviso_resultado"] = "The response exceeds the bridge limit. Narrow the read or restart the conversation with the updated bridge.";
-            var result = new Response { Id = response.Id, Estado = response.Estado, Rev = response.Rev, Aviso = response.Aviso, Datos = summary };
+            var result = new Response { Id = response.Id, State = response.State, Rev = response.Rev, Warning = response.Warning, Data = summary };
             var fitted = Json.Write(result);
             if (System.Text.Encoding.UTF8.GetByteCount(fitted) <= budget) return fitted;
-            result.Aviso = ResultTable.Trim(result.Aviso, 2000);
+            result.Warning = ResultTable.Trim(result.Warning, 2000);
             fitted = Json.Write(result);
             if (System.Text.Encoding.UTF8.GetByteCount(fitted) <= budget) return fitted;
             foreach (var key in new[] { "cursor", "recibo", "job_id", "plan_id" })

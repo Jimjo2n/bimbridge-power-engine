@@ -17,7 +17,7 @@ namespace Bimbridge.Addin.Revit
 
         public sealed class ApplyResult
         {
-            public string Status;      // PlanStatus.Aplicado / Conflicto / Revertido
+            public string Status;      // PlanStatus.Applied / Conflict / RolledBack
             public string Detail;
             public int Changed;
             public int Deleted;

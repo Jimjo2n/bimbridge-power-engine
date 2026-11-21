@@ -14,7 +14,7 @@ Usage: python compare_pyrevit.py <runs_folder> <journal_folder_or_file> [--csv o
 """
 import json, os, re, sys, statistics, glob, csv
 
-REGLAS = [  # (pattern in the title, class, equivalent MCP tool); Spanish words match the historical run titles
+RULES = [  # (pattern in the title, class, equivalent MCP tool); Spanish words match the historical run titles
     (r"sync|synchroniz|sincroniz|save|export|pdf set|print set", "F4", "document"),
     (r"preview|dry run|apply|place|commit|remove|restore|recover|update|create|hide|separate|rebuild|setup|correct|pass", "F3", "plan/commit"),
     (r"height|altura|clearance|soffit|mounting|support|soporte|floor under|column|geometr|rayo|intersec|opening|box|wall check|teco", "F2", "check clearance_up/clash"),
@@ -23,24 +23,24 @@ REGLAS = [  # (pattern in the title, class, equivalent MCP tool); Spanish words 
     (r"tag|etiquet|audit|qc|verif|inventor|count|estado|state|check|type marks|tipos|posici|position|patr|pattern|niveles|worksets|parámetros|parameter|ownership|probe|fuentes|source|families|familias|identity|grid|ejes|recintos|rooms|materiales|direcciones|mapa|map|read|inspect|diagnose|resolve|find", "F1", "query/get/check lighting_audit"),
 ]
 
-def clasificar(title):
+def classify(title):
     t = (title or "").lower()
-    for pat, cls, tool in REGLAS:
+    for pat, cls, tool in RULES:
         if re.search(pat, t):
             return cls, tool
     return "NC", "-"
 
-def leer_runs(carpeta):
+def read_runs(folder):
     runs = []
-    for d in sorted(os.listdir(carpeta)):
-        p = os.path.join(carpeta, d, "response.json")
+    for d in sorted(os.listdir(folder)):
+        p = os.path.join(folder, d, "response.json")
         if not os.path.isfile(p):
             continue
         try:
             r = json.load(open(p, encoding="utf-8"))
         except Exception:
             continue
-        script = os.path.join(carpeta, d, "script.py")
+        script = os.path.join(folder, d, "script.py")
         runs.append({
             "run": d, "modo": r.get("mode"), "estado": r.get("status"),
             "ms": int(r.get("elapsed_ms") or 0), "titulo": r.get("title") or "",
@@ -50,8 +50,8 @@ def leer_runs(carpeta):
         })
     return runs
 
-def leer_journal(ruta):
-    files = [ruta] if os.path.isfile(ruta) else glob.glob(os.path.join(ruta, "*.jsonl"))
+def read_journal(path):
+    files = [path] if os.path.isfile(path) else glob.glob(os.path.join(path, "*.jsonl"))
     ms = {}
     for f in files:
         for line in open(f, encoding="utf-8"):
@@ -70,10 +70,10 @@ def pct(v, p):
 def main():
     if len(sys.argv) < 3:
         print(__doc__); sys.exit(1)
-    runs = leer_runs(sys.argv[1])
-    mcp = leer_journal(sys.argv[2])
+    runs = read_runs(sys.argv[1])
+    mcp = read_journal(sys.argv[2])
     for r in runs:
-        r["clase"], r["mcp"] = clasificar(r["titulo"])
+        r["clase"], r["mcp"] = classify(r["titulo"])
         # The mode governs: any dry_run/modify is a write (phase 3) except document operations.
         if r["modo"] in ("dry_run", "modify") and r["clase"] != "F4":
             r["clase"], r["mcp"] = "F3", "plan/commit"
@@ -91,28 +91,28 @@ def main():
         if not g:
             continue
         ms = [r["ms"] for r in g]
-        fallos = sum(1 for r in g if r["estado"] != "ok")
-        print(f"{cls:5} {len(g):5} {100*len(g)/len(runs):4.0f}% {fallos:4} ({100*fallos/len(g):2.0f}%) "
+        failures = sum(1 for r in g if r["estado"] != "ok")
+        print(f"{cls:5} {len(g):5} {100*len(g)/len(runs):4.0f}% {failures:4} ({100*failures/len(g):2.0f}%) "
               f"{statistics.median(ms)/1000:8.1f} s {pct(ms,.9)/1000:7.1f} s {sum(ms)/60000:6.1f} min  {g[0]['mcp']}")
 
     f1 = [r for r in runs if r["clase"] == "F1"]
     if f1 and mcp:
         # Conservative assumption: each F1 run equals 2 MCP calls at the measured query/check p90.
-        medidos = [x for k in ("query", "check") for x in mcp.get(k, [])]
-        costo = pct(medidos, .9) * 2 if medidos else 0
+        measured = [x for k in ("query", "check") for x in mcp.get(k, [])]
+        cost = pct(measured, .9) * 2 if measured else 0
         py = sum(r["ms"] for r in f1)
-        fallos = sum(1 for r in f1 if r["estado"] != "ok")
+        failures = sum(1 for r in f1 if r["estado"] != "ok")
         out = [r["salida_chars"] for r in f1 if r["estado"] == "ok"]
         print()
         print("Replacement of what is already built (F1):")
-        print(f"  pyRevit Revit time: {py/60000:.1f} min over {len(f1)} runs; estimated MCP: {costo*len(f1)/60000:.2f} min "
-              f"(2 calls × measured p90 {pct(medidos,.9)} ms) → reduction {100*(1-costo*len(f1)/py):.0f} %")
-        print(f"  Script failures: {fallos}/{len(f1)} ({100*fallos/len(f1):.0f} %). With typed operations there are no "
+        print(f"  pyRevit Revit time: {py/60000:.1f} min over {len(f1)} runs; estimated MCP: {cost*len(f1)/60000:.2f} min "
+              f"(2 calls × measured p90 {pct(measured,.9)} ms) → reduction {100*(1-cost*len(f1)/py):.0f} %")
+        print(f"  Script failures: {failures}/{len(f1)} ({100*failures/len(f1):.0f} %). With typed operations there are no "
               f"AttributeError/TypeError errors; a wrong argument comes back as 'invalido' before touching Revit.")
         print(f"  Output returned to the AI: median {statistics.median(out):.0f} characters per run (pyRevit).")
-        con_script = [r["script_chars"] for r in f1 if r["script_chars"]]
-        if con_script:
-            print(f"  Script sent by the AI: median {statistics.median(con_script):.0f} characters; a typical MCP query ~80.")
+        with_script = [r["script_chars"] for r in f1 if r["script_chars"]]
+        if with_script:
+            print(f"  Script sent by the AI: median {statistics.median(with_script):.0f} characters; a typical MCP query ~80.")
         else:
             print("  Script size: not available in this copy (script.py missing); run the script on the PC to measure it.")
 

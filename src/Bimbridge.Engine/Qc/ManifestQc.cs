@@ -288,12 +288,12 @@ namespace Bimbridge.Engine.Qc
                 var x = Num(o, "x");
                 var y = Num(o, "y");
                 if (!x.HasValue || !y.HasValue) throw new ArgumentException("manifest element " + n + " has no x/y (mm)");
-                var tipos = o.TryGetValue("tipos", out var tp) && tp is List<object> tl ? tl.Select(s => Convert.ToString(s, CultureInfo.InvariantCulture)).ToList()
+                var types = o.TryGetValue("tipos", out var tp) && tp is List<object> tl ? tl.Select(s => Convert.ToString(s, CultureInfo.InvariantCulture)).ToList()
                     : Arg.GetString(o, "tipo") is string one ? new List<string> { one } : new List<string>();
                 list.Add(new Expected
                 {
                     Ref = Arg.GetString(o, "ref") ?? ("#" + n), X = x.Value, Y = y.Value, Z = Num(o, "z"), RotDeg = Num(o, "giro"),
-                    Level = Arg.GetString(o, "nivel"), Types = tipos, Tag = Arg.GetBool(o, "etiqueta"), Group = Arg.GetString(o, "grupo"),
+                    Level = Arg.GetString(o, "nivel"), Types = types, Tag = Arg.GetBool(o, "etiqueta"), Group = Arg.GetString(o, "grupo"),
                     Mounting = Arg.GetString(o, "montaje"), Source = Arg.GetString(o, "fuente"), Unconfirmed = Arg.GetStringList(o, "no_confirmado"),
                 });
             }

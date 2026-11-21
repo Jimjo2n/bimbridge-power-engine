@@ -221,12 +221,12 @@ namespace Bimbridge.Tests
             var f = new VisibilityQc.Facts
             {
                 HidingFilters = new List<string> { "COLOR - LIGHTING-EMERGENCY - DIST - FIXTURES ONLY" }, Template = "10-PRECONSTRUCTION",
-                PlanKind = "rcp", Cut = 5000, Top = 9000, ZMin = 2600, ZMax = 2700, RangeSource = "región de plano 17861903",
+                PlanKind = "rcp", Cut = 5000, Top = 9000, ZMin = 2600, ZMax = 2700, RangeSource = "plan region 17861903",
             };
             var reasons = VisibilityQc.Explain(f, out var notCheckable);
             Assert.Contains(reasons, x => x.Code == "filtro" && x.Detail.Contains("10-PRECONSTRUCTION"));
-            Assert.Contains(reasons, x => x.Code == "rango_de_vista" && x.Detail.Contains("región de plano") && x.Certain);
-            Assert.Contains(notCheckable, s => s.Contains("visibilidad propia de la familia"));
+            Assert.Contains(reasons, x => x.Code == "rango_de_vista" && x.Detail.Contains("plan region") && x.Certain);
+            Assert.Contains(notCheckable, s => s.Contains("the family's own visibility"));
         }
 
         [Fact]

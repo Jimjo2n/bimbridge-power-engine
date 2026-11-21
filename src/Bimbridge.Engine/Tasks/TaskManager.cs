@@ -68,14 +68,14 @@ namespace Bimbridge.Engine.Tasks
                         {
                             Error = "task " + draft.Id + " already exists with other content (different recipe, arguments or document: " + existing.ContentHash + " ≠ " + draft.ContentHash +
                                     "). Use another id, or tarea reanudar " + draft.Id + " to continue the existing one as is.",
-                            ErrorStatus = Status.Invalido,
+                            ErrorStatus = Status.Invalid,
                         };
                     var running = _running.ContainsKey(draft.Id);
                     if (!running && !TaskState.IsFinal(existing.State)) return Resume(draft.Id, client, null);
                     return new StartResult { Task = running ? _running[draft.Id].Task_ : existing, AlreadyRunning = running };
                 }
                 draft.Created = TaskTime.Now();
-                draft.State = TaskState.EnCola;
+                draft.State = TaskState.Queued;
                 draft.Client = client;
                 if (client != null && !draft.Clients.Contains(client)) draft.Clients.Add(client);
                 _store.Create(draft, recipeCode);
@@ -91,15 +91,15 @@ namespace Bimbridge.Engine.Tasks
             {
                 if (_running.TryGetValue(id, out var r)) return new StartResult { Task = r.Task_, AlreadyRunning = true };
                 var t = _store.Load(id);
-                if (t == null) return new StartResult { Error = "task " + id + " does not exist (tarea lista)", ErrorStatus = Status.Invalido };
-                if (t.State == TaskState.Aplicada)
+                if (t == null) return new StartResult { Error = "task " + id + " does not exist (tarea lista)", ErrorStatus = Status.Invalid };
+                if (t.State == TaskState.Applied)
                     return new StartResult { Task = t };
                 var elsewhere = HeldElsewhere(id);
-                if (elsewhere != null) return new StartResult { Task = t, Error = elsewhere, ErrorStatus = Status.DocumentoOcupado };
+                if (elsewhere != null) return new StartResult { Task = t, Error = elsewhere, ErrorStatus = Status.DocumentBusy };
                 if (policy != null) foreach (var kv in policy) t.Policy[kv.Key] = kv.Value;
                 t.Client = client ?? t.Client;
                 if (client != null && !t.Clients.Contains(client)) t.Clients.Add(client);
-                t.State = TaskState.EnCola;
+                t.State = TaskState.Queued;
                 t.Reason = null;
                 _store.Save(t);
                 Launch(t);
@@ -167,7 +167,7 @@ namespace Bimbridge.Engine.Tasks
                 {
                     r.CancelRequested = true;
                     var t = r.Task_;
-                    if (!TaskState.IsFinal(t.State)) { t.State = TaskState.CancelacionSolicitada; t.Reason = "cancellation requested; confirmed when the current unit finishes"; }
+                    if (!TaskState.IsFinal(t.State)) { t.State = TaskState.CancelRequested; t.Reason = "cancellation requested; confirmed when the current unit finishes"; }
                     Changed(t);
                     return t;
                 }
@@ -176,7 +176,7 @@ namespace Bimbridge.Engine.Tasks
                 if ((busy = HeldElsewhere(id)) != null) return s;
                 if (!TaskState.IsFinal(s.State))
                 {
-                    s.State = TaskState.Cancelada;
+                    s.State = TaskState.Cancelled;
                     s.Reason = "cancelled while not running; what was committed before stays applied";
                     s.Rev++;
                     _store.Save(s);
@@ -195,13 +195,13 @@ namespace Bimbridge.Engine.Tasks
             }
             var t = _store.Load(id);
             units = t == null ? new UnitLog() : _store.LoadUnits(id);
-            if (t != null && (t.State == TaskState.Ejecutando || t.State == TaskState.EnCola || t.State == TaskState.CancelacionSolicitada))
+            if (t != null && (t.State == TaskState.Running || t.State == TaskState.Queued || t.State == TaskState.CancelRequested))
             {
                 var lease = _store.ReadLease(id);
                 if (lease == null || !lease.Valid(DateTime.UtcNow) || lease.Instance == _instance)
                 {
                     // Nobody is running it: the process that held it died or Revit was closed.
-                    t.State = TaskState.Interrumpida;
+                    t.State = TaskState.Interrupted;
                     t.Reason = "the engine that was running it is gone (Revit was closed or restarted); tarea reanudar verifies what is doubtful and continues";
                 }
             }
@@ -278,7 +278,7 @@ namespace Bimbridge.Engine.Tasks
                            (illegal.Any(k => UnitState.IsDone(units.Get(k).State)) ? ". A committed unit is not run again." : "");
                 if (!applied)
                 {
-                    var why = (Authority == null ? "no authority configured" : Authority.Check(t, Capability.ReconciliarNoAplicada, DateTime.UtcNow));
+                    var why = (Authority == null ? "no authority configured" : Authority.Check(t, Capability.ReconcileNotApplied, DateTime.UtcNow));
                     if (why != null) return "autorizacion_requerida: marking as not applied will make it run again; " + why;
                 }
                 foreach (var k in targets)
@@ -287,7 +287,7 @@ namespace Bimbridge.Engine.Tasks
                     if (applied) seq = ++t.ConfirmSeq;
                     _store.AppendUnitEvent(id, new Dictionary<string, object>
                     {
-                        ["ev"] = "reconciliada", ["clave"] = k, ["estado"] = applied ? UnitState.Confirmada : UnitState.Pendiente, ["seq"] = seq,
+                        ["ev"] = "reconciliada", ["clave"] = k, ["estado"] = applied ? UnitState.Committed : UnitState.Pending, ["seq"] = seq,
                         ["antes"] = units.Get(k).State, ["quien"] = who, ["evidencia"] = note,
                         ["error"] = (applied ? "reconciled as applied" : "reconciled as not applied") + ": " + note + " (" + who + ")",
                     });
@@ -296,7 +296,7 @@ namespace Bimbridge.Engine.Tasks
                 {
                     ["t"] = TaskTime.Now(), ["texto"] = "reconciled " + targets.Count + " units as " + (applied ? "applied" : "not applied") + ": " + note, ["quien"] = who,
                 });
-                if (t.State == TaskState.Interrumpida || t.State == TaskState.Parcial) t.Reason = "reconciled; use tarea reanudar";
+                if (t.State == TaskState.Interrupted || t.State == TaskState.Partial) t.Reason = "reconciled; use tarea reanudar";
                 t.Rev++;
                 t.Summary = TaskSummary.Continuation(t, _store.LoadUnits(id));
                 _store.Save(t);

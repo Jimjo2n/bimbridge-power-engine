@@ -147,8 +147,8 @@ namespace Bimbridge.Tests
             Assert.Equal(new[] { k1, k2 }.OrderBy(x => x), open.Select(r => r.AttemptKey).OrderBy(x => x));
             Assert.Single(unreadable);
             var steps = NativeCapabilities.CopyMonitorManualSteps("MEP-LINK", new[] { "WC-A → WC-B" }, saveAuthorized: false);
-            Assert.Contains(steps, s => s.Contains("Copia por lotes"));
-            Assert.Contains(steps, s => s.Contains("No guarde"));
+            Assert.Contains(steps, s => s.Contains("Batch Copy"));
+            Assert.Contains(steps, s => s.Contains("Do not save"));
         }
 
         [Fact]
@@ -289,8 +289,8 @@ namespace Bimbridge.Tests
             var other = CopyMonitorFlow.Freeze(Store(), key, Expect(), new long[] { 1, 2 });
             Assert.True(other.Conflict);
             Assert.Equal(first.Frozen.Fingerprint, other.Frozen.Fingerprint);
-            Assert.Contains(other.Differences, x => x.StartsWith("mapeo de tipos distinto"));
-            Assert.Contains(other.Differences, x => x.StartsWith("exclusiones distintas"));
+            Assert.Contains(other.Differences, x => x.StartsWith("different type mapping"));
+            Assert.Contains(other.Differences, x => x.StartsWith("different exclusions"));
         }
 
         [Fact]
@@ -325,7 +325,7 @@ namespace Bimbridge.Tests
                 Assert.True(r.Conflict, string.Join("; ", r.Differences));
                 Assert.Equal(ok.Frozen.Fingerprint, r.Frozen.Fingerprint);
             }
-            Assert.Contains(CopyMonitorFlow.Load(Store(), key, Expect(fewer, maps: maps), true).Differences, x => x.Contains("+0 −1 modificados 0"));
+            Assert.Contains(CopyMonitorFlow.Load(Store(), key, Expect(fewer, maps: maps), true).Differences, x => x.Contains("+0 −1 modified 0"));
 
             // Without a preflight there is nothing to verify; an old attempt without expectations is not accepted.
             Assert.Null(CopyMonitorFlow.Load(Store(), WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "nada"), Expect(), true));
@@ -388,11 +388,11 @@ namespace Bimbridge.Tests
             var t0 = new DateTime(2026, 11, 10, 8, 0, 0, DateTimeKind.Utc);
             var list = new List<RevitInstance> { Inst(100, "2024", t0, ("d1", "s1", "X")), Inst(200, "2026", t0, ("d1", "s1", "Y"), ("d2", "s1", "Z")) };
             Assert.Null(TargetResolver.Resolve(list, "s1", null, null, "d1", out var why));
-            Assert.Contains("2 instancias", why);
+            Assert.Contains("2 Revit instances", why);
             Assert.Null(TargetResolver.Resolve(list, "s1", "2026", null, null, out why));
-            Assert.Contains("documentos abiertos", why);
+            Assert.Contains("documents are open", why);
             Assert.Null(TargetResolver.Resolve(list, "s2", "2026", null, "d2", out why));
-            Assert.Contains("otra sesión", why);
+            Assert.Contains("another session", why);
             var b = TargetResolver.Resolve(list, "s1", "2026", null, "d2", out why);
             Assert.NotNull(b);
             Assert.Equal("Z", b.DocumentIdentity);
@@ -486,7 +486,7 @@ namespace Bimbridge.Tests
             var tilted = new LinkTransform { BasisX = new[] { 1.0, 0, 0 }, BasisY = new[] { 0.0, Math.Cos(0.3), Math.Sin(0.3) }, BasisZ = new[] { 0.0, -Math.Sin(0.3), Math.Cos(0.3) } };
             Assert.Equal("no_verificable", CopyMonitorVerifier.Verify(src, null, new List<HostFixture>(), tilted, null, 77)["resultado"]);
             var scaled = new LinkTransform { BasisX = new[] { 2.0, 0, 0 }, BasisY = new[] { 0.0, 1, 0 }, BasisZ = new[] { 0.0, 0, 1 } };
-            Assert.Contains("escala", (string)CopyMonitorVerifier.Verify(src, null, new List<HostFixture>(), scaled, null, 77)["motivo"]);
+            Assert.Contains("scale", (string)CopyMonitorVerifier.Verify(src, null, new List<HostFixture>(), scaled, null, 77)["motivo"]);
         }
 
         [Fact]

@@ -23,5 +23,5 @@ Every test against Revit is `BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZ
 **Not included:** arbitrary C# execution as a substitute for typed operations, a second transaction engine, Python and Rust.
 
 ## New commands
-- `agenthost revit nrt03 | nrt06`: campaign harnesses, see `CAMPANA_NATIVA_rc1.md`.
+- `agenthost revit nrt03 | nrt06`: campaign harnesses, see `NATIVE_CAMPAIGN_rc1.md`.
 - Gate: every `agenthost revit …` and `ejecutar --revit-pid` require `BIMBRIDGE_REVIT_NATIVE=AUTORIZADO` **and** `--revit-disponible`. Without both, they do not connect and print the BLOCKED status.

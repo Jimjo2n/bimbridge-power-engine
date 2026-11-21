@@ -56,8 +56,8 @@ foreach ($v in 2022..2027) {
     Copy-Item "src/Bimbridge.Addin/bin/Release/R$v/Bimbridge.*.dll" $out
   }
   Copy-Item "src/Bimbridge.Addin/Bimbridge.addin" "dist/addin/$v/"
-  New-Item -ItemType Directory -Force "$out/recetas" | Out-Null
-  Copy-Item "src/Bimbridge.Addin/recetas/*.cs" "$out/recetas/"
+  New-Item -ItemType Directory -Force "$out/recipes" | Out-Null
+  Copy-Item "src/Bimbridge.Addin/recipes/*.cs" "$out/recipes/"
   New-Item -ItemType Directory -Force "$out/roslyn" | Out-Null
   Copy-Item "$roslyn/*.dll", "$roslyn/Bimbridge.Scripting.pdb" "$out/roslyn/"
   Remove-Item "$out/Bimbridge.Scripting.dll" -ErrorAction SilentlyContinue
@@ -73,16 +73,16 @@ Copy-Item native/power_engine/target/release/bimbridge_power_engine.dll dist/bri
 Copy-Item native/power_engine/target/release/bimbridge-power-engine.exe $pe/
 & $pythonPath -I -B tools/power_engine/vendor_python.py "$pe/python"
 if ($LASTEXITCODE -ne 0) { throw "Python Worker packaging failed" }
-$hello = '{"pe":1,"id":"build","trabajo":"hola","args":{"pe_min":1,"pe_max":1}}'
+$hello = '{"pe":1,"id":"build","job":"hola","args":{"pe_min":1,"pe_max":1}}'
 $helloFile = Join-Path $PSScriptRoot "obj\hello.jsonl"
 New-Item -ItemType Directory -Force (Split-Path $helloFile) | Out-Null
 [IO.File]::WriteAllText($helloFile, $hello + "`n", (New-Object System.Text.UTF8Encoding($false)))
 $pyHello = cmd /c "`"`"$pythonPath`" -I -S -B `"$pe/python/run_worker.py`" < `"$helloFile`"`"" | ConvertFrom-Json
-if ($LASTEXITCODE -ne 0 -or $pyHello.codigo -ne "OK" -or "pdf_grids" -notin $pyHello.resultado.capacidades) {
+if ($LASTEXITCODE -ne 0 -or $pyHello.code -ne "OK" -or "pdf_grids" -notin $pyHello.result.capacidades) {
   throw "The payload Python worker does not advertise pdf_grids with its packaged dependencies"
 }
 $rustHello = cmd /c "`"`"$PSScriptRoot\dist\bridge\power_engine\bimbridge-power-engine.exe`" < `"$helloFile`"`"" | ConvertFrom-Json
-if ($LASTEXITCODE -ne 0 -or $rustHello.codigo -ne "OK" -or "components" -notin $rustHello.resultado.capacidades) {
+if ($LASTEXITCODE -ne 0 -or $rustHello.code -ne "OK" -or "components" -notin $rustHello.result.capacidades) {
   throw "Rust IPC handshake failed in the payload"
 }
 $required = @(

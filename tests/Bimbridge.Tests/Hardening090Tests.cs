@@ -136,22 +136,22 @@ namespace Bimbridge.Tests
             Assert.Null(IndependentVerifier.CheckIndependence(In(pdf, markup), out var proof));
             Assert.Equal("sha256+linaje", proof["metodo"]);
             // no sha
-            Assert.Equal("independencia_no_comprobable", IndependentVerifier.CheckIndependence(In(new SourceRef { Id = "x", Kind = SourceKinds.Pdf }, markup), out _)?.Estado);
+            Assert.Equal("independencia_no_comprobable", IndependentVerifier.CheckIndependence(In(new SourceRef { Id = "x", Kind = SourceKinds.Pdf }, markup), out _)?.State);
             // no declared build
-            Assert.Equal("independencia_no_comprobable", IndependentVerifier.CheckIndependence(In(pdf), out _)?.Estado);
+            Assert.Equal("independencia_no_comprobable", IndependentVerifier.CheckIndependence(In(pdf), out _)?.State);
             // same content under another name
-            Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(In(pdf, new SourceRef { Id = "renamed", Sha256 = Sha('a') }), out _)?.Estado);
+            Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(In(pdf, new SourceRef { Id = "renamed", Sha256 = Sha('a') }), out _)?.State);
             // the build was derived from the expected source
-            Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(In(pdf, new SourceRef { Id = "plan", Sha256 = Sha('c'), DerivedFrom = { "sha256:" + Sha('a') } }), out _)?.Estado);
+            Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(In(pdf, new SourceRef { Id = "plan", Sha256 = Sha('c'), DerivedFrom = { "sha256:" + Sha('a') } }), out _)?.State);
             // the expected source was derived from the build
             var derived = new SourceRef { Id = "table", Kind = SourceKinds.Pdf, Sha256 = Sha('d'), DerivedFrom = { "markup-1" } };
-            Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(In(derived, markup), out _)?.Estado);
+            Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(In(derived, markup), out _)?.State);
             // common origin
             var a = new SourceRef { Id = "a", Kind = SourceKinds.Pdf, Sha256 = Sha('e'), DerivedFrom = { "root" } };
-            Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(In(a, new SourceRef { Id = "b", Sha256 = Sha('f'), DerivedFrom = { "root" } }), out _)?.Estado);
+            Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(In(a, new SourceRef { Id = "b", Sha256 = Sha('f'), DerivedFrom = { "root" } }), out _)?.State);
             // kinds that are never independent
-            foreach (var k in new[] { SourceKinds.Inferencia, SourceKinds.Modelo, SourceKinds.PlanEjecucion })
-                Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(In(new SourceRef { Id = "z", Kind = k, Sha256 = Sha('9') }, markup), out _)?.Estado);
+            foreach (var k in new[] { SourceKinds.Inference, SourceKinds.Model, SourceKinds.ExecutionPlan })
+                Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(In(new SourceRef { Id = "z", Kind = k, Sha256 = Sha('9') }, markup), out _)?.State);
         }
 
         [Fact]
@@ -160,9 +160,9 @@ namespace Bimbridge.Tests
             var pdf = new SourceRef { Id = "E", Kind = SourceKinds.Pdf, Sha256 = Sha('a') };
             var inp = In(pdf, new SourceRef { Id = "plan", Sha256 = Sha('b') });
             inp.BuildPlanFingerprint = IndependentVerifier.Fingerprint(inp.Expected);
-            Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(inp, out _)?.Estado);
+            Assert.Equal("no_independiente", IndependentVerifier.CheckIndependence(inp, out _)?.State);
             var r = IndependentVerifier.Verify(inp);
-            Assert.Equal("no_independiente", r.Estado);
+            Assert.Equal("no_independiente", r.State);
             // order-independent fingerprint
             var x = new[] { new IndependentVerifier.Item { Key = "a", X = 1 }, new IndependentVerifier.Item { Key = "b", Y = 2 } };
             Assert.Equal(IndependentVerifier.Fingerprint(x), IndependentVerifier.Fingerprint(Enumerable.Reverse(x)));
@@ -179,17 +179,17 @@ namespace Bimbridge.Tests
         [Fact]
         public void Delivery_CriticalReceipts_NeedRevisionOriginAndObservedEvidence()
         {
-            var t = new DeliveryTrack("e1", "archivo:c:\\a.rvt", new[] { DeliveryStages.Exportado, DeliveryStages.ArtefactoVerificado, DeliveryStages.EntregaConfirmada });
-            Assert.Contains("without a model revision", t.Record(R(DeliveryStages.Exportado, null, ("archivo", "a.pdf"), ("sha256", Sha('a')), ("origen", "export"), ("evidencia", Confidence.Comprobado))));
-            Assert.Contains("provenance", t.Record(R(DeliveryStages.Exportado, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("evidencia", Confidence.Comprobado))));
-            Assert.Contains("COMPROBADO", t.Record(R(DeliveryStages.Exportado, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("origen", "export"), ("evidencia", "REPORTADO"))));
-            Assert.Null(t.Record(R(DeliveryStages.Exportado, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("origen", "export"), ("evidencia", Confidence.Comprobado))));
+            var t = new DeliveryTrack("e1", "archivo:c:\\a.rvt", new[] { DeliveryStages.Exported, DeliveryStages.ArtifactVerified, DeliveryStages.DeliveryConfirmed });
+            Assert.Contains("without a model revision", t.Record(R(DeliveryStages.Exported, null, ("archivo", "a.pdf"), ("sha256", Sha('a')), ("origen", "export"), ("evidencia", Confidence.Verified))));
+            Assert.Contains("provenance", t.Record(R(DeliveryStages.Exported, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("evidencia", Confidence.Verified))));
+            Assert.Contains("COMPROBADO", t.Record(R(DeliveryStages.Exported, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("origen", "export"), ("evidencia", "REPORTADO"))));
+            Assert.Null(t.Record(R(DeliveryStages.Exported, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("origen", "export"), ("evidencia", Confidence.Verified))));
             // verifying a revision other than the exported one
-            Assert.Contains("revision r5 was exported", t.Record(R(DeliveryStages.ArtefactoVerificado, "r6", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("paginas", 3), ("origen", "pdf_info"), ("evidencia", Confidence.Comprobado))));
-            Assert.Null(t.Record(R(DeliveryStages.ArtefactoVerificado, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("paginas", 3), ("origen", "pdf_info"), ("evidencia", Confidence.Comprobado))));
+            Assert.Contains("revision r5 was exported", t.Record(R(DeliveryStages.ArtifactVerified, "r6", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("paginas", 3), ("origen", "pdf_info"), ("evidencia", Confidence.Verified))));
+            Assert.Null(t.Record(R(DeliveryStages.ArtifactVerified, "r5", ("archivo", "a.pdf"), ("sha256", Sha('a')), ("paginas", 3), ("origen", "pdf_info"), ("evidencia", Confidence.Verified))));
             // delivery is confirmed by a person, not by the agent
-            Assert.Contains("person", t.Record(R(DeliveryStages.EntregaConfirmada, "r5", ("confirma", "ok"), ("origen", "agente"))));
-            Assert.Null(t.Record(R(DeliveryStages.EntregaConfirmada, "r5", ("confirma", "ok"), ("origen", "usuario:operator"))));
+            Assert.Contains("person", t.Record(R(DeliveryStages.DeliveryConfirmed, "r5", ("confirma", "ok"), ("origen", "agente"))));
+            Assert.Null(t.Record(R(DeliveryStages.DeliveryConfirmed, "r5", ("confirma", "ok"), ("origen", "usuario:operator"))));
             Assert.True(t.Complete);
         }
 
@@ -234,7 +234,7 @@ namespace Bimbridge.Tests
             foreach (var b in Benchmarks.Catalog)
             {
                 foreach (var it in b.Items) Assert.Contains(it, known);
-                foreach (Match m in Regex.Matches(b.Arnes ?? "", @"N8-\d\d")) Assert.Contains(m.Value, b.Items);
+                foreach (Match m in Regex.Matches(b.Harness ?? "", @"N8-\d\d")) Assert.Contains(m.Value, b.Items);
             }
             Assert.Equal(5, Benchmarks.Catalog.Count(b => b.Items.Length > 0));
             Assert.Equal(new[] { "N8-02", "N8-11" }, Benchmarks.Catalog.First(b => b.Id == "B1").Items);

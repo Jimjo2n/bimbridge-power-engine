@@ -220,13 +220,13 @@ namespace Bimbridge.AgentHost
         {
             var res = new BuildResult();
             var plan = new PlanDraft { Objective = "Requirements from " + (doc.Title ?? doc.Name), DocKey = docKey, DocPrint = docPrint, LengthUnit = lengthUnit, Coordinates = coordinates };
-            plan.Sources.Add(new SourceDoc { Id = "doc-1", Nombre = doc.Name, Sha256 = doc.Sha256 });
+            plan.Sources.Add(new SourceDoc { Id = "doc-1", Name = doc.Name, Sha256 = doc.Sha256 });
             var index = new Dictionary<string, int>(StringComparer.Ordinal);
             var semantic = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var r in reqs)
             {
                 if (!r.Executable) { res.Review.Add(r); continue; }
-                var op = new OpDraft { Source = new SourceRef { Fuente = "doc-1", Pagina = r.Raw.Page > 0 ? r.Raw.Page : (long?)null, Seccion = r.Raw.Section, Requisito = r.Raw.ReqId, Cita = r.Raw.Original.Length > 200 ? r.Raw.Original.Substring(0, 199) + "…" : r.Raw.Original } };
+                var op = new OpDraft { Source = new SourceRef { SourceId = "doc-1", Page = r.Raw.Page > 0 ? r.Raw.Page : (long?)null, Section = r.Raw.Section, Requirement = r.Raw.ReqId, Quote = r.Raw.Original.Length > 200 ? r.Raw.Original.Substring(0, 199) + "…" : r.Raw.Original } };
                 if (r.Kind == "fijar_parametro")
                 {
                     op.Operation = "fijar_parametro";
@@ -251,7 +251,7 @@ namespace Bimbridge.AgentHost
             foreach (var op in plan.Ops.ToList())
                 op.DependsOn = op.DependsOn.Select(d => index.TryGetValue(d.Substring(1), out var i) ? "#" + i.ToString(CultureInfo.InvariantCulture) : "!" + d.Substring(1)).ToList();
             plan.AssignIdsSafe(res.Errors);
-            foreach (var op in plan.Ops) res.OpByRequirement[op.Source.Requisito] = op.Id;
+            foreach (var op in plan.Ops) res.OpByRequirement[op.Source.Requirement] = op.Id;
             res.Plan = plan;
             return res;
         }
@@ -262,9 +262,9 @@ namespace Bimbridge.AgentHost
             var errs = new List<string>();
             foreach (var s in plan.Sources)
             {
-                if (!documents.TryGetValue(s.Nombre, out var b)) { errs.Add("fuente_no_disponible: " + s.Nombre); continue; }
+                if (!documents.TryGetValue(s.Name, out var b)) { errs.Add("fuente_no_disponible: " + s.Name); continue; }
                 var sha = RequirementExtractor.Sha256Hex(b);
-                if (sha != s.Sha256) errs.Add("fuente_alterada: " + s.Nombre + " sha256 " + sha.Substring(0, 12) + "… ≠ " + s.Sha256.Substring(0, 12) + "…");
+                if (sha != s.Sha256) errs.Add("fuente_alterada: " + s.Name + " sha256 " + sha.Substring(0, 12) + "… ≠ " + s.Sha256.Substring(0, 12) + "…");
             }
             return errs;
         }
@@ -277,7 +277,7 @@ namespace Bimbridge.AgentHost
         {
             foreach (var op in p.Ops)
                 foreach (var d in op.DependsOn.Where(x => x.StartsWith("!", StringComparison.Ordinal)))
-                    errors.Add(op.Source?.Requisito + ": dependency on " + d.Substring(1) + " not converted");
+                    errors.Add(op.Source?.Requirement + ": dependency on " + d.Substring(1) + " not converted");
             foreach (var op in p.Ops) op.DependsOn = op.DependsOn.Where(x => !x.StartsWith("!", StringComparison.Ordinal)).ToList();
             p.AssignIds();
         }

@@ -115,9 +115,9 @@ namespace Bimbridge.Engine
                         if (!(ft is double || ft is long)) throw new QueryException("set_elevation: ft must be a number in feet (or use valor with units)");
                         s.Ft = Convert.ToDouble(ft, CultureInfo.InvariantCulture);
                     }
-                    else if (o.TryGetValue("valor", out var valor) && valor != null)
+                    else if (o.TryGetValue("valor", out var value) && value != null)
                     {
-                        if (!Lengths.TryFeet(valor, out var f, out var err)) throw new QueryException("set_elevation valor: " + err);
+                        if (!Lengths.TryFeet(value, out var f, out var err)) throw new QueryException("set_elevation valor: " + err);
                         s.Ft = f;
                     }
                     else throw new QueryException("set_elevation: missing ft (feet) or valor (\"10' - 9\\\"\", \"3277 mm\")");
@@ -134,8 +134,8 @@ namespace Bimbridge.Engine
                     break;
                 case "snap_to_surface":
                     if (s.RefOps.Count > 0) throw new QueryException("snap_to_surface measures elements that already exist: do not use @n (to place flush use place with montaje=losa)");
-                    var lado = (Arg.GetString(o, "lado") ?? "arriba").Trim().ToLowerInvariant();
-                    if (lado != "arriba" && lado != "abajo") throw new QueryException("snap_to_surface lado: arriba (default) or abajo");
+                    var side = (Arg.GetString(o, "lado") ?? "arriba").Trim().ToLowerInvariant();
+                    if (side != "arriba" && side != "abajo") throw new QueryException("snap_to_surface lado: arriba (default) or abajo");
                     OpCatalog.Length(o, "holgura", "snap_to_surface");
                     OpCatalog.Length(o, "max", "snap_to_surface");
                     var pts = OpCatalog.Number(o, "puntos", "snap_to_surface");
@@ -159,8 +159,8 @@ namespace Bimbridge.Engine
                     if (o.TryGetValue("centro", out var c) && c is List<object>) OpCatalog.Point(c, "rotate centro", false);
                     break;
                 case "mirror":
-                    var eje = OpCatalog.Points(o["eje"], "mirror eje", 2, 2, false);
-                    if (Math.Abs(eje[0][0] - eje[1][0]) + Math.Abs(eje[0][1] - eje[1][1]) < 1e-6) throw new QueryException("mirror eje: the two points are equal");
+                    var axis = OpCatalog.Points(o["eje"], "mirror eje", 2, 2, false);
+                    if (Math.Abs(axis[0][0] - axis[1][0]) + Math.Abs(axis[0][1] - axis[1][1]) < 1e-6) throw new QueryException("mirror eje: the two points are equal");
                     break;
                 case "copy":
                     if (!o.ContainsKey("nivel"))
@@ -182,17 +182,17 @@ namespace Bimbridge.Engine
                     OpCatalog.Length(o, "elev", "place");
                     OpCatalog.Length(o, "holgura", "place");
                     OpCatalog.Number(o, "rot", "place");
-                    var montaje = Arg.GetString(o, "montaje");
-                    if (montaje != null && !string.Equals(montaje, "losa", StringComparison.OrdinalIgnoreCase) && !string.Equals(montaje, "piso", StringComparison.OrdinalIgnoreCase))
+                    var mounting = Arg.GetString(o, "montaje");
+                    if (mounting != null && !string.Equals(mounting, "losa", StringComparison.OrdinalIgnoreCase) && !string.Equals(mounting, "piso", StringComparison.OrdinalIgnoreCase))
                         throw new QueryException("place montaje: losa (top face under what is above) or piso (base on what is below)");
-                    if (montaje != null && o.ContainsKey("elev")) throw new QueryException("place: use elev or montaje, not both");
+                    if (mounting != null && o.ContainsKey("elev")) throw new QueryException("place: use elev or montaje, not both");
                     if (o.TryGetValue("params", out var pr) && pr != null && !(pr is Dictionary<string, object>))
                         throw new QueryException("place params: {\"Parameter\": value}");
                     break;
                 case "tag":
                     if (o.TryGetValue("offset", out var off) && off != null) OpCatalog.Point(off, "tag offset", false);
-                    var ori = Arg.GetString(o, "orientacion");
-                    if (ori != null && ori != "horizontal" && ori != "vertical") throw new QueryException("tag orientacion: horizontal or vertical");
+                    var orientation = Arg.GetString(o, "orientacion");
+                    if (orientation != null && orientation != "horizontal" && orientation != "vertical") throw new QueryException("tag orientacion: horizontal or vertical");
                     break;
                 case "tag_move":
                     if (o.TryGetValue("head", out var h) && h != null) OpCatalog.Point(h, "tag_move head", false);
@@ -226,8 +226,8 @@ namespace Bimbridge.Engine
                     if ((vt == "duplicar" || vt == "callout") && Arg.GetString(o, "origen") == null) throw new QueryException("view_create " + vt + ": missing origen (view)");
                     if ((vt == "seccion" || vt == "callout") && !o.ContainsKey("caja")) throw new QueryException("view_create " + vt + ": missing caja [[x0,y0,z0],[x1,y1,z1]]");
                     if (o.ContainsKey("caja")) OpCatalog.Points(o["caja"], "view_create caja", 2, 2);
-                    var opc = Arg.GetString(o, "opcion");
-                    if (opc != null && opc != "duplicar" && opc != "detalles" && opc != "dependiente") throw new QueryException("view_create opcion: duplicar, detalles or dependiente");
+                    var option = Arg.GetString(o, "opcion");
+                    if (option != null && option != "duplicar" && option != "detalles" && option != "dependiente") throw new QueryException("view_create opcion: duplicar, detalles or dependiente");
                     break;
                 case "view_set":
                     if (!new[] { "plantilla", "rango", "escala", "detalle", "nombre", "recorte", "scope_box", "caja_seccion" }.Any(o.ContainsKey))
@@ -341,8 +341,8 @@ namespace Bimbridge.Engine
                 case "dimension":
                 {
                     var dl = OpCatalog.Points(o["linea"], "dimension linea", 2, 2, false);
-                    Draw2D.Segments(dl, false, out var de);
-                    if (de != null) throw new QueryException("dimension linea: " + de);
+                    Draw2D.Segments(dl, false, out var segErr);
+                    if (segErr != null) throw new QueryException("dimension linea: " + segErr);
                     var refs = (Arg.GetString(o, "refs") ?? "").Split(',').Where(x => x.Trim().Length > 0).ToList();
                     if (refs.Count < 2) throw new QueryException("dimension refs: at least 2 detail line ids");
                     if (refs.Any(x => x.Trim().StartsWith("@", StringComparison.Ordinal))) throw new QueryException("dimension refs: in 0.8.0 only existing ids (no @n of the same plan): create the lines in one plan and dimension in the next");
@@ -482,19 +482,19 @@ namespace Bimbridge.Engine
 
     public static class PlanStatus
     {
-        public const string Listo = "listo";            // planned, waiting for commit
-        public const string EnProceso = "en_proceso";
-        public const string Retenido = "retenido";      // in the Revit queue, waiting for the user to apply it
-        public const string Aplicado = "aplicado";
-        public const string Conflicto = "conflicto";
-        public const string Revertido = "revertido";
-        public const string Descartado = "descartado";
-        public const string Vencido = "vencido";
+        public const string Ready = "listo";            // planned, waiting for commit
+        public const string InProgress = "en_proceso";
+        public const string Held = "retenido";      // in the Revit queue, waiting for the user to apply it
+        public const string Applied = "aplicado";
+        public const string Conflict = "conflicto";
+        public const string RolledBack = "revertido";
+        public const string Discarded = "descartado";
+        public const string Expired = "vencido";
         /// <summary>alpha3: result of commit modo=ensayo (applied, verified and REVERTED). Not a plan state:
         /// the plan goes back to "listo". Never equivalent to applied.</summary>
-        public const string Ensayado = "ensayado";
+        public const string Trialed = "ensayado";
         /// <summary>Uncertain result already checked and recorded. Terminal: never returns to listo.</summary>
-        public const string Reconciliado = "reconciliado";
+        public const string Reconciled = "reconciliado";
     }
 
     public sealed class Plan : IJsonWritable
@@ -516,7 +516,7 @@ namespace Bimbridge.Engine
         public string ReceiptAttempt, ReceiptSession, ReceiptAgent, ReceiptDocPrint;
         public string Summary;          // short text the AI gives (or is generated) to show in the queue
         public DateTime CreatedUtc;
-        public string Status = PlanStatus.Listo;
+        public string Status = PlanStatus.Ready;
         public string StatusDetail;
         public DateTime? HeldUtc;
         public DateTime? FinishedUtc;
@@ -536,8 +536,8 @@ namespace Bimbridge.Engine
         /// <summary>Copy read from disk: the truth of the lock is still in the file (it may be another process's live intent).</summary>
         internal bool FromDisk;
 
-        public bool IsFinal => Status == PlanStatus.Aplicado || Status == PlanStatus.Conflicto || Status == PlanStatus.Revertido
-                               || Status == PlanStatus.Descartado || Status == PlanStatus.Vencido || Status == PlanStatus.Reconciliado;
+        public bool IsFinal => Status == PlanStatus.Applied || Status == PlanStatus.Conflict || Status == PlanStatus.RolledBack
+                               || Status == PlanStatus.Discarded || Status == PlanStatus.Expired || Status == PlanStatus.Reconciled;
 
         public int ElementCount => Entries.Where(e => e.Id != 0).Select(e => e.Id).Distinct().Count();
         public int CreationCount => Entries.Count(e => e.IsCreation);
@@ -572,7 +572,7 @@ namespace Bimbridge.Engine
                 Task = Arg.GetString(o, "tarea"),
                 Summary = Arg.GetString(o, "summary"),
                 CreatedUtc = DateTime.Parse(Arg.GetString(o, "created_utc") ?? DateTime.UtcNow.ToString("o"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                Status = Arg.GetString(o, "status") ?? PlanStatus.Retenido,
+                Status = Arg.GetString(o, "status") ?? PlanStatus.Held,
                 StatusDetail = Arg.GetString(o, "status_detail"),
             };
             var held = Arg.GetString(o, "held_utc");
@@ -616,8 +616,8 @@ namespace Bimbridge.Engine
                 }).ToList(),
             };
             if (BoundKey != null) d["clave_vinculada"] = BoundKey;   // AUD-19: the commit uses it even if clave= is not passed
-            var nuevos = CreationCount;
-            if (nuevos > 0) d["nuevos"] = (long)nuevos;
+            var created = CreationCount;
+            if (created > 0) d["nuevos"] = (long)created;
             if (Entries.Count > maxRows) d["filas_omitidas"] = (long)(Entries.Count - maxRows);
             if (Warnings.Count > 0) d["avisos"] = Warnings.Cast<object>().ToList();
             if (!string.IsNullOrEmpty(StatusDetail)) d["detalle"] = StatusDetail;
@@ -715,9 +715,9 @@ namespace Bimbridge.Engine
             var n = 0;
             lock (_lock)
                 foreach (var p in _plans.Values)
-                    if (p.Status == PlanStatus.Listo && _now() - p.CreatedUtc > maxAge)
+                    if (p.Status == PlanStatus.Ready && _now() - p.CreatedUtc > maxAge)
                     {
-                        p.Status = PlanStatus.Vencido;
+                        p.Status = PlanStatus.Expired;
                         p.StatusDetail = "more than " + (int)maxAge.TotalMinutes + " min passed; plan again";
                         n++;
                     }
@@ -728,7 +728,7 @@ namespace Bimbridge.Engine
         {
             lock (_lock)
             {
-                p.Status = PlanStatus.Retenido;
+                p.Status = PlanStatus.Held;
                 p.HeldUtc = _now();
                 p.StatusDetail = "in the Revit queue; the user will apply it with 'Apply queue'";
                 _plans[p.Id] = p;
@@ -741,7 +741,7 @@ namespace Bimbridge.Engine
         {
             lock (_lock)
                 return _plans.Values
-                    .Where(p => p.Status == PlanStatus.Retenido && string.Equals(p.DocKey, docKey, StringComparison.OrdinalIgnoreCase))
+                    .Where(p => p.Status == PlanStatus.Held && string.Equals(p.DocKey, docKey, StringComparison.OrdinalIgnoreCase))
                     .OrderBy(p => p.HeldUtc ?? p.CreatedUtc).ThenBy(p => p.Id, StringComparer.Ordinal)
                     .ToList();
         }
@@ -759,7 +759,7 @@ namespace Bimbridge.Engine
                 p.FinishedUtc = _now();
                 p.StorageWarning = null;
                 p.FromDisk = false;
-                if (status == Status.Desconocido) GroupAbort.PreserveInterrupted(p, detail);
+                if (status == Status.Unknown) GroupAbort.PreserveInterrupted(p, detail);
             }
             // The evidence of an uncertain result must survive a Revit close: it is never deleted on finish.
             try
@@ -783,7 +783,7 @@ namespace Bimbridge.Engine
         {
             lock (_lock)
                 return _plans.Values
-                    .Where(p => p.Reconciliation != null && p.Status != PlanStatus.Reconciliado && string.Equals(p.DocKey, docKey, StringComparison.OrdinalIgnoreCase))
+                    .Where(p => p.Reconciliation != null && p.Status != PlanStatus.Reconciled && string.Equals(p.DocKey, docKey, StringComparison.OrdinalIgnoreCase))
                     .OrderBy(p => p.FinishedUtc ?? p.CreatedUtc).ThenBy(p => p.Id, StringComparer.Ordinal)
                     .ToList();
         }
@@ -797,7 +797,7 @@ namespace Bimbridge.Engine
             var block = new DocWriteBlock { DocKey = docKey };
             lock (_lock)
                 foreach (var p in _plans.Values)
-                    if (!p.FromDisk && p.Reconciliation != null && p.Status != PlanStatus.Reconciliado && string.Equals(p.DocKey, docKey, StringComparison.OrdinalIgnoreCase))
+                    if (!p.FromDisk && p.Reconciliation != null && p.Status != PlanStatus.Reconciled && string.Equals(p.DocKey, docKey, StringComparison.OrdinalIgnoreCase))
                         block.Plans.Add(p.Id);
             try
             {
@@ -809,8 +809,8 @@ namespace Bimbridge.Engine
                     try { p = Plan.FromJson(ReadShared(f)); }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { block.Errors.Add(Path.GetFileName(f) + ": " + ex.Message); continue; }
                     catch (Exception) { block.CorruptFiles.Add(Path.GetFileName(f)); continue; }
-                    if (p.Status == PlanStatus.Reconciliado || p.Id == null) { if (p.Id == null) block.CorruptFiles.Add(Path.GetFileName(f)); continue; }
-                    if ((p.Reconciliation != null || p.Status == PlanStatus.EnProceso || p.Status == Status.Desconocido) && !block.Plans.Contains(p.Id)) block.Plans.Add(p.Id);
+                    if (p.Status == PlanStatus.Reconciled || p.Id == null) { if (p.Id == null) block.CorruptFiles.Add(Path.GetFileName(f)); continue; }
+                    if ((p.Reconciliation != null || p.Status == PlanStatus.InProgress || p.Status == Status.Unknown) && !block.Plans.Contains(p.Id)) block.Plans.Add(p.Id);
                 }
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { block.Errors.Add(ex.Message); }
@@ -843,7 +843,7 @@ namespace Bimbridge.Engine
                 var evidence = p.Reconciliation;
                 try
                 {
-                    p.Status = PlanStatus.EnProceso;
+                    p.Status = PlanStatus.InProgress;
                     p.Reconciliation = null;
                     GroupAbort.PreserveInterrupted(p, reason);
                     text = Json.Write(p);
@@ -895,7 +895,7 @@ namespace Bimbridge.Engine
                 }
                 lock (_lock)
                 {
-                    p.Status = PlanStatus.Reconciliado;
+                    p.Status = PlanStatus.Reconciled;
                     p.StatusDetail = check.Verdict + " by " + author;
                     p.FinishedUtc = _now();
                     p.StorageWarning = null;
@@ -989,7 +989,7 @@ namespace Bimbridge.Engine
         public int DiscardHeld(string docKey, string detail)
         {
             var list = Held(docKey);
-            foreach (var p in list) Finish(p, PlanStatus.Descartado, detail);
+            foreach (var p in list) Finish(p, PlanStatus.Discarded, detail);
             return list.Count;
         }
 
@@ -1004,12 +1004,12 @@ namespace Bimbridge.Engine
                 try
                 {
                     var p = Plan.FromJson(ReadShared(f));
-                    if (p.Status != PlanStatus.Retenido && p.Status != PlanStatus.EnProceso && p.Reconciliation == null) continue;
+                    if (p.Status != PlanStatus.Held && p.Status != PlanStatus.InProgress && p.Reconciliation == null) continue;
                     p.FromDisk = true;
                     // An intent without a result never turns into success nor goes back to listo.
-                    if (p.Status == PlanStatus.EnProceso)
+                    if (p.Status == PlanStatus.InProgress)
                     {
-                        p.Status = Status.Desconocido;
+                        p.Status = Status.Unknown;
                         p.StatusDetail = "the operation started and recorded no result; reconcile before writing";
                         GroupAbort.PreserveInterrupted(p, p.StatusDetail);
                     }

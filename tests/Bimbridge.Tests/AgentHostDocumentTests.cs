@@ -60,7 +60,7 @@ Después de REQ-001.
         {
             var (_, reqs, b) = Pipeline();
             string Why(string id) => string.Join(" | ", b.Review.Single(r => r.Raw.ReqId == id).Ambiguities.Concat(b.Review.Single(r => r.Raw.ReqId == id).Suspicious).Concat(b.Review.Single(r => r.Raw.ReqId == id).Unresolved));
-            Assert.Equal(new[] { "REQ-001", "REQ-002", "REQ-007" }, b.Plan.Ops.Select(o => o.Source.Requisito));
+            Assert.Equal(new[] { "REQ-001", "REQ-002", "REQ-007" }, b.Plan.Ops.Select(o => o.Source.Requirement));
             Assert.Contains("lenguaje_ambiguo", Why("REQ-003"));
             Assert.Contains("unidades_no_explicitas", Why("REQ-004"));
             Assert.Contains("contenido_sospechoso", Why("REQ-005"));
@@ -72,7 +72,7 @@ Después de REQ-001.
             Assert.Empty(b.Errors);
             // traceability and dependencies
             var op2 = b.Plan.Ops[1];
-            Assert.Equal(1L, op2.Source.Pagina);
+            Assert.Equal(1L, op2.Source.Page);
             Assert.Equal("QC-L03", op2.Params["valor"]);
             Assert.Equal("texto", op2.Params["unidades"]);
             Assert.Equal(new[] { b.Plan.Ops[0].Id }, op2.DependsOn);
@@ -86,7 +86,7 @@ Después de REQ-001.
         {
             var (_, reqs, b) = Pipeline();
             Assert.False(reqs.Single(r => r.Raw.ReqId == "REQ-005").Executable);
-            Assert.DoesNotContain(b.Plan.Ops, o => o.Source.Requisito == "REQ-005");
+            Assert.DoesNotContain(b.Plan.Ops, o => o.Source.Requirement == "REQ-005");
             Assert.All(b.Plan.Ops, o => Assert.Empty(o.Forbidden));
             // even if someone added an authorization field to the generated plan by hand, the validator rejects it
             var json = b.Plan.ToJson();
@@ -153,7 +153,7 @@ Después de REQ-001.
             Assert.Equal("qc_manifiesto", a.Map(vp.Ops[2], out _).Recipe);
             Assert.False(a.DiscoverCapabilities().WritesEnabled);
             Assert.False(a.Execute(vp.Ops[1], new ExecContext()).Ok);
-            Assert.Equal(Effect.Incierto, a.Observe(vp.Ops[1], new ExecContext()).Effect);
+            Assert.Equal(Effect.Uncertain, a.Observe(vp.Ops[1], new ExecContext()).Effect);
         }
 
         // ---------------- candidate kernel ----------------

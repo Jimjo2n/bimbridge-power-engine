@@ -33,7 +33,7 @@ namespace Bimbridge.Engine.Tasks
         public static string UserFolder => Home.Sub("recetas");
 
         private static readonly Regex VersionRx = new Regex(@"Version\s*=>\s*""([^""]*)""", RegexOptions.Compiled);
-        private static readonly Regex DescRx = new Regex(@"Descripcion\s*=>\s*""([^""]*)""", RegexOptions.Compiled);
+        private static readonly Regex DescRx = new Regex(@"Description\s*=>\s*""([^""]*)""", RegexOptions.Compiled);
 
         public List<Entry> List()
         {

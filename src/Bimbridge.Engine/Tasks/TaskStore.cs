@@ -323,7 +323,7 @@ namespace Bimbridge.Engine.Tasks
                     foreach (var k in Arg.GetStringList(ev, "claves"))
                     {
                         var u = Ensure(k);
-                        u.State = UnitState.EnCurso;
+                        u.State = UnitState.InProgress;
                         u.Attempts++;
                         u.Generation = Arg.GetString(ev, "generacion");
                         u.When = Arg.GetString(ev, "t");
@@ -334,7 +334,7 @@ namespace Bimbridge.Engine.Tasks
                     foreach (var k in Arg.GetStringList(ev, "claves"))
                     {
                         var u = Ensure(k);
-                        if (u.State == UnitState.EnCurso) { u.State = UnitState.Pendiente; u.Attempts = Math.Max(0, u.Attempts - 1); }
+                        if (u.State == UnitState.InProgress) { u.State = UnitState.Pending; u.Attempts = Math.Max(0, u.Attempts - 1); }
                     }
                     break;
                 case "fin":
@@ -345,7 +345,7 @@ namespace Bimbridge.Engine.Tasks
                     if (key == null) break;
                     var u = Ensure(key);
                     // R05, defense in depth: even if someone writes the event by hand, a reconciliation does not return committed units to pending.
-                    if (kind == "reconciliada" && UnitState.IsDone(u.State) && Arg.GetString(ev, "estado") == UnitState.Pendiente) { IllegalEvents++; break; }
+                    if (kind == "reconciliada" && UnitState.IsDone(u.State) && Arg.GetString(ev, "estado") == UnitState.Pending) { IllegalEvents++; break; }
                     u.State = Arg.GetString(ev, "estado") ?? u.State;
                     u.Error = Arg.GetString(ev, "error");
                     u.Ms = Arg.GetLong(ev, "ms") ?? u.Ms;
@@ -362,7 +362,7 @@ namespace Bimbridge.Engine.Tasks
                     foreach (var k in Arg.GetStringList(ev, "claves"))
                     {
                         var u = Ensure(k);
-                        u.State = UnitState.Pendiente;
+                        u.State = UnitState.Pending;
                         u.Error = Arg.GetString(ev, "motivo");
                     }
                     break;

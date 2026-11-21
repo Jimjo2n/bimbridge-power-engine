@@ -20,7 +20,7 @@ namespace Bimbridge.Addin.Revit
             if (!viewId.HasValue || viewId <= 0 || string.IsNullOrWhiteSpace(style) ||
                 !request.Args.TryGetValue("esperado_dibujo", out var value) || value is not List<object> rows ||
                 rows.Count == 0 || rows.Count > 2000 || rows.Any(r => r is not Dictionary<string, object>))
-                return Response.Fail(request.Id, Status.Invalido, "give the drafting view, line style and esperado_dibujo of the riser");
+                return Response.Fail(request.Id, Status.Invalid, "give the drafting view, line style and esperado_dibujo of the riser");
             var found = new List<object>();
             var missing = new List<object>();
             string error = null;
@@ -85,11 +85,11 @@ namespace Bimbridge.Addin.Revit
                 return true;
             }, highPriority: false, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!work.Ok) return FromWork(request.Id, work);
-            if (error != null) return Response.Fail(request.Id, Status.Invalido, error);
+            if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
             return new Response
             {
-                Id = request.Id, Rev = revision, Estado = missing.Count > 0 ? Status.ConDiferencias : Status.Ok,
-                Datos = new Dictionary<string, object> { ["observado"] = found, ["diferencias"] = missing,
+                Id = request.Id, Rev = revision, State = missing.Count > 0 ? Status.CompletedWithDifferences : Status.Ok,
+                Data = new Dictionary<string, object> { ["observado"] = found, ["diferencias"] = missing,
                     ["alcance"] = "Checks segments, labels and the given symbol types in the drafting view. MEP connectivity is checked in the MEP model." },
             };
         }

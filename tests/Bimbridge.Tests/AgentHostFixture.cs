@@ -38,7 +38,7 @@ namespace Bimbridge.Tests
         public static PlanDraft Plan(params OpDraft[] ops)
         {
             var p = new PlanDraft { Objective = "prueba", DocKey = Doc, DocPrint = Print, LengthUnit = "mm", Coordinates = "interno_revit" };
-            p.Sources.Add(new SourceDoc { Id = "src-1", Nombre = "especificacion.txt", Sha256 = SrcSha });
+            p.Sources.Add(new SourceDoc { Id = "src-1", Name = "especificacion.txt", Sha256 = SrcSha });
             p.Ops.AddRange(ops);
             return p.AssignIds();
         }

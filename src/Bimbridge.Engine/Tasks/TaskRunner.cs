@@ -94,7 +94,7 @@ namespace Bimbridge.Engine.Tasks
                 {
                     // Persisted while the TASK lease is still held (nobody else writes tarea.json), then released.
                     _docLeaseId = null;
-                    SetState(TaskState.EsperandoContexto, "the document is being modified by task " + dh.Instance + " (until " + dh.Expires + "); nothing was run, resume when it finishes");
+                    SetState(TaskState.WaitingContext, "the document is being modified by task " + dh.Instance + " (until " + dh.Expires + "); nothing was run, resume when it finishes");
                     _store.ReleaseLease(_t.Id, _owner);
                     return;
                 }
@@ -102,10 +102,10 @@ namespace Bimbridge.Engine.Tasks
             }
             _t.Preflight = Preflight;
             _t.Owner = _instance;
-            SetState(TaskState.Ejecutando, null);
+            SetState(TaskState.Running, null);
             try
             {
-                // rc3: authorize BEFORE any recipe code (constructor, Preparar, enumeration, Verificar during reconciliation).
+                // rc3: authorize BEFORE any recipe code (constructor, Prepare, enumeration, Verify during reconciliation).
                 // The backend repeats the check on the Revit thread through Preflight/RecipeGate in each phase.
                 Authorize(null);
                 if (!await ReconcileAsync(ct).ConfigureAwait(false)) return;
@@ -116,36 +116,36 @@ namespace Bimbridge.Engine.Tasks
             }
             catch (JournalUnavailableException ex)
             {
-                SetState(TaskState.Parcial, "the unit log could not be written (" + ex.Message + "): the task stopped so as not to lose count. " +
+                SetState(TaskState.Partial, "the unit log could not be written (" + ex.Message + "): the task stopped so as not to lose count. " +
                                              "What was committed up to the last checkpoint is listed; fix the data folder and resume (what is doubtful will be verified).");
             }
             catch (CheckpointException ex)
             {
-                SetState(TaskState.Parcial, "checkpoint not durable (" + ex.Message + "): the task stopped; the state on disk may lag behind the real one. " +
+                SetState(TaskState.Partial, "checkpoint not durable (" + ex.Message + "): the task stopped; the state on disk may lag behind the real one. " +
                                              "Fix the data folder and resume: what is doubtful will be verified from unidades.jsonl.");
             }
             catch (NotAuthorizedException ex)
             {
-                SetState(TaskState.Interrumpida, "autorizacion_requerida: " + ex.Message + ". Nothing more was run; a person must authorize it in Revit and then resume.");
+                SetState(TaskState.Interrupted, "autorizacion_requerida: " + ex.Message + ". Nothing more was run; a person must authorize it in Revit and then resume.");
             }
             catch (AuditUnavailableException ex)
             {
-                SetState(TaskState.Parcial, "auditoria_no_disponible: " + ex.Message);
+                SetState(TaskState.Partial, "auditoria_no_disponible: " + ex.Message);
             }
             catch (LeaseLostException ex)
             {
                 // In memory only: if another Revit already took the task, its tarea.json is the valid one (the checkpoint in finally decides).
-                _t.State = TaskState.Interrumpida;
+                _t.State = TaskState.Interrupted;
                 _t.Reason = "lease lost (" + ex.Message + "): this instance stopped running so as not to write without authority; what was committed stays in the log";
                 _changed(_t);
             }
             catch (OperationCanceledException)
             {
-                SetState(TaskState.Cancelada, "cancelled; what was committed before cancelling stays applied (" + Count(UnitState.Confirmada) + " units)");
+                SetState(TaskState.Cancelled, "cancelled; what was committed before cancelling stays applied (" + Count(UnitState.Committed) + " units)");
             }
             catch (Exception ex)
             {
-                SetState(TaskState.Interrumpida, "internal engine error (" + ex.GetType().Name + ": " + ex.Message + "); resume: what is doubtful will be verified before continuing");
+                SetState(TaskState.Interrupted, "internal engine error (" + ex.GetType().Name + ": " + ex.Message + "); resume: what is doubtful will be verified before continuing");
             }
             finally
             {
@@ -169,7 +169,7 @@ namespace Bimbridge.Engine.Tasks
             var reopened = gen != null && main?.Generation != null && gen != main.Generation;
             var persistSeq = _t.LastPersist?.Seq ?? 0;
             var doubtful = _units.Units.Values.Where(u => UnitState.NeedsReconcile(u.State) ||
-                                                          (reopened && u.State == UnitState.Confirmada && u.Seq > persistSeq)).ToList();
+                                                          (reopened && u.State == UnitState.Committed && u.Seq > persistSeq)).ToList();
             if (doubtful.Count > 0)
             {
                 _t.Reason = "verifying " + doubtful.Count + " doubtful units" + (reopened ? " (the document was reopened: what was committed after the last save may have been lost)" : "");
@@ -179,19 +179,19 @@ namespace Bimbridge.Engine.Tasks
                 var unknown = new List<string>();
                 foreach (var o in r.Value)
                 {
-                    var state = o.State == UnitState.Confirmada ? UnitState.Confirmada : o.State == UnitState.Pendiente || o.State == UnitState.Revertida ? UnitState.Pendiente : UnitState.Desconocida;
+                    var state = o.State == UnitState.Committed ? UnitState.Committed : o.State == UnitState.Pending || o.State == UnitState.RolledBack ? UnitState.Pending : UnitState.Unknown;
                     _store.AppendUnitEvent(_t.Id, new Dictionary<string, object>
                     {
                         ["ev"] = "verificada", ["clave"] = o.Key, ["estado"] = state, ["error"] = o.Error, ["generacion"] = gen,
                         ["creados"] = o.Created.Count > 0 ? (object)o.Created : null,
                     });
                     _units.Apply(new Dictionary<string, object> { ["ev"] = "verificada", ["clave"] = o.Key, ["estado"] = state, ["error"] = o.Error });
-                    if (state == UnitState.Desconocida) unknown.Add(o.Key);
+                    if (state == UnitState.Unknown) unknown.Add(o.Key);
                 }
                 _t.AddMetric("verificadas", r.Value.Count);
                 if (unknown.Count > 0)
                 {
-                    SetState(TaskState.Interrumpida, unknown.Count + " units could not be verified in the model (" + string.Join(", ", unknown.Take(5)) +
+                    SetState(TaskState.Interrupted, unknown.Count + " units could not be verified in the model (" + string.Join(", ", unknown.Take(5)) +
                                                      (unknown.Count > 5 ? "…" : "") + "). Review them and use tarea reconciliar with decision=aplicada or no_aplicada; then resume.");
                     return false;
                 }
@@ -217,7 +217,7 @@ namespace Bimbridge.Engine.Tasks
             var dup = list.GroupBy(u => u.Key).FirstOrDefault(g => g.Count() > 1);
             if (dup != null)
             {
-                SetState(TaskState.Parcial, "the recipe returned two units with the same key '" + dup.Key + "': keys must be unique and stable");
+                SetState(TaskState.Partial, "the recipe returned two units with the same key '" + dup.Key + "': keys must be unique and stable");
                 return null;
             }
             // Final barriers requested in the task (al_final=guardar,pdf …)
@@ -260,7 +260,7 @@ namespace Bimbridge.Engine.Tasks
             // On resume, rolled-back and conflicting units are retried (replanned on the current model).
             var pending = list.Where(u => !Done(u)).ToList();
             _t.Reason = null;
-            SetState(TaskState.Ejecutando, null);
+            SetState(TaskState.Running, null);
             var k = 1;
             double avg = -1;
             var emptyVisits = 0;
@@ -268,7 +268,7 @@ namespace Bimbridge.Engine.Tasks
             var i = 0;
             while (i < pending.Count)
             {
-                if (CancelRequested) { SetState(TaskState.Cancelada, "cancelled on request; what was committed before (" + Count(UnitState.Confirmada) + " units) stays applied"); return false; }
+                if (CancelRequested) { SetState(TaskState.Cancelled, "cancelled on request; what was committed before (" + Count(UnitState.Committed) + " units) stays applied"); return false; }
                 if (!await EnsureContextAsync(ct).ConfigureAwait(false)) return false;
                 RenewLease();
                 var u = pending[i];
@@ -299,10 +299,10 @@ namespace Bimbridge.Engine.Tasks
                 {
                     batchMs += o.Ms;
                     Record(o, gen);
-                    if (o.State == UnitState.Confirmada) sinceSave++;
-                    if (o.State == UnitState.Parcial || o.State == UnitState.Desconocida)
+                    if (o.State == UnitState.Committed) sinceSave++;
+                    if (o.State == UnitState.Partial || o.State == UnitState.Unknown)
                         stop = "unit " + o.Key + " ended up " + o.State + " (" + o.Error + "): reconcile it before continuing";
-                    else if (o.State == UnitState.Revertida && StopOnError)
+                    else if (o.State == UnitState.RolledBack && StopOnError)
                         stop = "unit " + o.Key + " failed and was rolled back: " + o.Error + ". Fix the cause and resume (it is retried), or resume with en_error=continuar";
                 }
                 var notRun = batch.Skip(outcomes.Count).Select(x => (object)x.Key).ToList();
@@ -317,8 +317,8 @@ namespace Bimbridge.Engine.Tasks
                 if (outcomes.Count > (int)_t.Metric("lote_max_real")) _t.SetMetric("lote_max_real", outcomes.Count);
                 i += outcomes.Count;
                 Checkpoint();
-                if (stop != null) { SetState(TaskState.Parcial, stop); return false; }
-                if (r.Fatal != null) { SetState(TaskState.Parcial, r.Fatal); return false; }
+                if (stop != null) { SetState(TaskState.Partial, stop); return false; }
+                if (r.Fatal != null) { SetState(TaskState.Partial, r.Fatal); return false; }
                 if (r.Wait != null)
                 {
                     if (!await WaitContextAsync(r.Wait, r.Action, ct).ConfigureAwait(false)) return false;
@@ -326,7 +326,7 @@ namespace Bimbridge.Engine.Tasks
                 }
                 if (outcomes.Count == 0)
                 {
-                    if (++emptyVisits >= 3) { SetState(TaskState.Parcial, "Revit did not run any unit in 3 consecutive visits; resume later"); return false; }
+                    if (++emptyVisits >= 3) { SetState(TaskState.Partial, "Revit did not run any unit in 3 consecutive visits; resume later"); return false; }
                     k = 1;
                     continue;
                 }
@@ -349,7 +349,7 @@ namespace Bimbridge.Engine.Tasks
         private void Record(UnitOutcome o, string gen)
         {
             long? seq = null;
-            if (o.State == UnitState.Confirmada) seq = ++_t.ConfirmSeq;
+            if (o.State == UnitState.Committed) seq = ++_t.ConfirmSeq;
             var ev = new Dictionary<string, object>
             {
                 ["ev"] = "fin", ["clave"] = o.Key, ["estado"] = o.State, ["ms"] = o.Ms, ["seq"] = seq, ["generacion"] = gen,
@@ -378,7 +378,7 @@ namespace Bimbridge.Engine.Tasks
             if (u.Ordinal == 0 && u.Key.StartsWith("auto-", StringComparison.Ordinal)) before.Clear();
             if (before.Count > 0)
             {
-                SetState(TaskState.Parcial, "barrier " + u.Barrier + " does not run because " + before.Count + " previous units are not committed (" +
+                SetState(TaskState.Partial, "barrier " + u.Barrier + " does not run because " + before.Count + " previous units are not committed (" +
                                             string.Join(", ", before.Take(5)) + (before.Count > 5 ? "…" : "") + "): saving/exporting now would leave an inconsistent result");
                 return false;
             }
@@ -407,10 +407,10 @@ namespace Bimbridge.Engine.Tasks
             _units.Apply(ev);
             foreach (var a in o.Artifacts) { a["unidad"] = u.Key; _t.Artifacts.Add(a); }
             foreach (var x in o.Exceptions) { x["unidad"] = u.Key; _t.Exceptions.Add(x); }
-            _t.AddMetric("barreras_ok", o.State == UnitState.Confirmada ? 1 : 0);
-            if (o.State != UnitState.Confirmada)
+            _t.AddMetric("barreras_ok", o.State == UnitState.Committed ? 1 : 0);
+            if (o.State != UnitState.Committed)
             {
-                SetState(TaskState.Parcial, "barrier " + u.Barrier + " failed: " + o.Error);
+                SetState(TaskState.Partial, "barrier " + u.Barrier + " failed: " + o.Error);
                 return false;
             }
             if (o.Persist != null)
@@ -432,10 +432,10 @@ namespace Bimbridge.Engine.Tasks
             if (r == null) return;
             _t.Postcondition = r.Value;
             var deviations = r.Value != null && r.Value.TryGetValue("desviaciones", out var dv) && dv is List<object> dl ? dl.Count : 0;
-            var conflicts = Count(UnitState.Conflicto);
-            var reverted = Count(UnitState.Revertida);
+            var conflicts = Count(UnitState.Conflict);
+            var reverted = Count(UnitState.RolledBack);
             var diff = deviations > 0 || conflicts > 0 || reverted > 0 || _t.Exceptions.Count > 0;
-            SetState(diff ? TaskState.AplicadaConDiferencias : TaskState.Aplicada,
+            SetState(diff ? TaskState.AppliedWithDifferences : TaskState.Applied,
                 diff ? "finished with " + conflicts + " conflicts, " + reverted + " rolled back, " + _t.Exceptions.Count + " exceptions and " + deviations + " QC deviations" : null);
         }
 
@@ -444,7 +444,7 @@ namespace Bimbridge.Engine.Tasks
         private async Task<bool> EnsureContextAsync(CancellationToken ct)
         {
             var c = _b.CheckContext(_t);
-            if (c.Fatal != null) { SetState(TaskState.Parcial, c.Fatal); return false; }
+            if (c.Fatal != null) { SetState(TaskState.Partial, c.Fatal); return false; }
             if (c.Wait == null) return true;
             return await WaitContextAsync(c.Wait, c.Action, ct).ConfigureAwait(false);
         }
@@ -454,22 +454,22 @@ namespace Bimbridge.Engine.Tasks
         {
             var start = Now();
             var delay = TimeSpan.FromSeconds(1);
-            SetState(TaskState.EsperandoContexto, why + (action != null ? ". Action: " + action : ""));
+            SetState(TaskState.WaitingContext, why + (action != null ? ". Action: " + action : ""));
             _t.AddMetric("esperas", 1);
             while (true)
             {
-                if (CancelRequested) { SetState(TaskState.Cancelada, "cancelled while waiting; what was committed before stays applied (" + Count(UnitState.Confirmada) + " units)"); return false; }
+                if (CancelRequested) { SetState(TaskState.Cancelled, "cancelled while waiting; what was committed before stays applied (" + Count(UnitState.Committed) + " units)"); return false; }
                 if (Now() - start > MaxWait)
                 {
-                    SetState(TaskState.EsperandoContexto, why + ". Stopped waiting after " + (int)MaxWait.TotalMinutes + " min; once resolved, use tarea reanudar");
+                    SetState(TaskState.WaitingContext, why + ". Stopped waiting after " + (int)MaxWait.TotalMinutes + " min; once resolved, use tarea reanudar");
                     return false;
                 }
                 await Delay(delay, ct).ConfigureAwait(false);
                 RenewLease();
                 var c = _b.CheckContext(_t);
-                if (c.Fatal != null) { SetState(TaskState.Parcial, c.Fatal); return false; }
-                if (c.Wait == null) { SetState(TaskState.Ejecutando, null); return true; }
-                if (c.Wait != why) { why = c.Wait; SetState(TaskState.EsperandoContexto, why + (c.Action != null ? ". Action: " + c.Action : "")); }
+                if (c.Fatal != null) { SetState(TaskState.Partial, c.Fatal); return false; }
+                if (c.Wait == null) { SetState(TaskState.Running, null); return true; }
+                if (c.Wait != why) { why = c.Wait; SetState(TaskState.WaitingContext, why + (c.Action != null ? ". Action: " + c.Action : "")); }
                 delay = TimeSpan.FromSeconds(Math.Min(15, delay.TotalSeconds * 2));
             }
         }
@@ -479,7 +479,7 @@ namespace Bimbridge.Engine.Tasks
             for (var attempt = 0; ; attempt++)
             {
                 var r = await step().ConfigureAwait(false);
-                if (r.Fatal != null) { SetState(TaskState.Parcial, r.Fatal); return null; }
+                if (r.Fatal != null) { SetState(TaskState.Partial, r.Fatal); return null; }
                 if (r.Wait == null) return r;
                 if (!await WaitContextAsync(r.Wait, r.Action, ct).ConfigureAwait(false)) return null;
             }
@@ -502,7 +502,7 @@ namespace Bimbridge.Engine.Tasks
         private IEnumerable<string> UnitCapabilities()
         {
             if (_t.Policy.TryGetValue("requiere", out var v) && v is List<object> l) return l.Select(x => Convert.ToString(x, System.Globalization.CultureInfo.InvariantCulture));
-            return new[] { Capability.Modificar };
+            return new[] { Capability.Modify };
         }
 
         /// <summary>R03: checks grants at the point of execution. barrierCap = null → the units' capabilities.</summary>

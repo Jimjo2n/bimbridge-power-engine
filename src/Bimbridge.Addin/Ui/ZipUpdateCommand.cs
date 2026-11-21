@@ -35,7 +35,7 @@ namespace Bimbridge.Addin.Ui
                 var td0 = new TaskDialog("BIMBRIDGE · Update staged")
                 {
                     MainInstruction = "An update to " + pending.Version + " is already waiting for Revit to close",
-                    MainContent = "Status: " + pending.Estado + ". Staged on " + pending.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm") +
+                    MainContent = "Status: " + pending.State + ". Staged on " + pending.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm") +
                                   (pending.Signed ? " (signed, key " + pending.KeyId + ")." : " (UNSIGNED, confirmed by " + pending.ConfirmedBy + ")."),
                     CommonButtons = TaskDialogCommonButtons.Close,
                 };
@@ -57,8 +57,8 @@ namespace Bimbridge.Addin.Ui
             var insp = ZipUpdate.Inspect(dlg.FileName, info?.ProductVersion ?? Updates.Format(UpdateService.Running), info?.Versions, keys, policy: Policy);
             if (!insp.Ok)
             {
-                Log("rechazado_" + insp.Estado, insp.Version, insp);
-                TaskDialog.Show("BIMBRIDGE · Package rejected", insp.Mensaje + (insp.Detalles.Count > 0 ? "\n\n" + string.Join("\n", insp.Detalles.Take(10)) : "") + "\n\nNothing was installed.");
+                Log("rechazado_" + insp.State, insp.Version, insp);
+                TaskDialog.Show("BIMBRIDGE · Package rejected", insp.Message + (insp.Details.Count > 0 ? "\n\n" + string.Join("\n", insp.Details.Take(10)) : "") + "\n\nNothing was installed.");
                 return Result.Failed;
             }
 
@@ -66,7 +66,7 @@ namespace Bimbridge.Addin.Ui
             {
                 MainInstruction = "Installed " + insp.Installed + "  →  new " + insp.Version,
                 MainContent = "Commit: " + insp.Commit + "\nRevit: " + string.Join(", ", insp.Revit) + "\nVerified files: " + insp.Files.Count +
-                              "\nZIP SHA-256: " + insp.ZipSha256.Substring(0, 16) + "…\n\n" + insp.Mensaje +
+                              "\nZIP SHA-256: " + insp.ZipSha256.Substring(0, 16) + "…\n\n" + insp.Message +
                               "\n\nIt will be staged now and installed when YOU close Revit. BIMBRIDGE does not close or restart Revit. If the installation cannot be verified, it goes back to " + insp.Installed + ".",
                 CommonButtons = TaskDialogCommonButtons.Cancel,
                 DefaultButton = TaskDialogResult.Cancel,
@@ -115,22 +115,22 @@ namespace Bimbridge.Addin.Ui
                 if (!File.Exists(f)) return null;
                 var o = Bimbridge.Protocol.Json.ParseObject(File.ReadAllText(f));
                 File.Move(f, f + "." + DateTime.UtcNow.ToString("yyyyMMddHHmmss") + ".visto");
-                var estado = Convert.ToString(o.TryGetValue("estado", out var e) ? e : null);
-                Runtime.Audit?.Append(VersionRegistry.HumanAuthor, "actualizar_zip_resultado", estado, new Dictionary<string, object> { ["version"] = o.TryGetValue("version", out var v) ? v : null });
-                return "Update from ZIP: " + estado + ". " + (o.TryGetValue("mensaje", out var m) ? m : "");
+                var status = Convert.ToString(o.TryGetValue("estado", out var e) ? e : null);
+                Runtime.Audit?.Append(VersionRegistry.HumanAuthor, "actualizar_zip_resultado", status, new Dictionary<string, object> { ["version"] = o.TryGetValue("version", out var v) ? v : null });
+                return "Update from ZIP: " + status + ". " + (o.TryGetValue("mensaje", out var m) ? m : "");
             }
             catch (Exception) { return null; }
         }
 
-        private static void Log(string estado, string version, ZipInspection insp)
+        private static void Log(string status, string version, ZipInspection insp)
         {
             try
             {
-                Runtime.Audit?.Append(VersionRegistry.HumanAuthor, "actualizar_zip", estado, new Dictionary<string, object>
+                Runtime.Audit?.Append(VersionRegistry.HumanAuthor, "actualizar_zip", status, new Dictionary<string, object>
                 {
-                    ["version"] = version, ["zip_sha256"] = insp?.ZipSha256, ["firmado"] = insp?.Signed, ["clave"] = insp?.KeyId, ["mensaje"] = insp?.Mensaje,
+                    ["version"] = version, ["zip_sha256"] = insp?.ZipSha256, ["firmado"] = insp?.Signed, ["clave"] = insp?.KeyId, ["mensaje"] = insp?.Message,
                 });
-                Runtime.Log("Update from ZIP: " + estado + " " + version);
+                Runtime.Log("Update from ZIP: " + status + " " + version);
             }
             catch (Exception) { }
         }

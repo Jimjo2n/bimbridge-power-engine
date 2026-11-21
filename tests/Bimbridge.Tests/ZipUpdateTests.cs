@@ -21,7 +21,7 @@ namespace Bimbridge.Tests
         public ZipUpdateTests() { Directory.CreateDirectory(_dir); }
         public void Dispose() { try { Directory.Delete(_dir, true); } catch (Exception) { } }
 
-        private string Pkg(string name, string version, RSA signer = null, string[] revit = null, string desde = null)
+        private string Pkg(string name, string version, RSA signer = null, string[] revit = null, string minFrom = null)
         {
             var src = Path.Combine(_dir, "src-" + name);
             Directory.CreateDirectory(src);
@@ -29,7 +29,7 @@ namespace Bimbridge.Tests
             File.WriteAllText(Path.Combine(src, "LEEME.txt"), "notas " + version);
             var zip = Path.Combine(_dir, name + ".zip");
             ZipUpdate.Build(zip, new Dictionary<string, string> { ["Bimbridge.Setup.exe"] = Path.Combine(src, "setup.exe"), ["LEEME.txt"] = Path.Combine(src, "LEEME.txt") },
-                version, "abc1234", revit ?? AllYears, desde, signer);
+                version, "abc1234", revit ?? AllYears, minFrom, signer);
             return zip;
         }
 
@@ -45,7 +45,7 @@ namespace Bimbridge.Tests
             using (var rsa = RSA.Create(2048))
             {
                 var r = ZipUpdate.Inspect(Pkg("a", "0.8.1", rsa), "0.8.0", new[] { "2024", "2026" }, Keys(rsa));
-                Assert.Equal("valido_firmado", r.Estado);
+                Assert.Equal("valido_firmado", r.State);
                 Assert.True(r.Signed);
                 Assert.Equal("0.8.1", r.Version);
                 Assert.Equal("0.8.0", r.Installed);
@@ -61,9 +61,9 @@ namespace Bimbridge.Tests
             using (var other = RSA.Create(2048))
             {
                 // Signed with an untrusted key.
-                Assert.Equal("clave_desconocida", ZipUpdate.Inspect(Pkg("b", "0.8.1", other), "0.8.0", null, Keys(good)).Estado);
+                Assert.Equal("clave_desconocida", ZipUpdate.Inspect(Pkg("b", "0.8.1", other), "0.8.0", null, Keys(good)).State);
                 // Keys are configured and the package is not signed.
-                Assert.Equal("firma_exigida", ZipUpdate.Inspect(Pkg("c", "0.8.1"), "0.8.0", null, Keys(good)).Estado);
+                Assert.Equal("firma_exigida", ZipUpdate.Inspect(Pkg("c", "0.8.1"), "0.8.0", null, Keys(good)).State);
                 // Manifest altered after signing (version bumped).
                 var zip = Pkg("d", "0.8.1", good);
                 using (var z = ZipFile.Open(zip, ZipArchiveMode.Update))
@@ -74,7 +74,7 @@ namespace Bimbridge.Tests
                     var ne = z.CreateEntry(ZipUpdate.ManifestName);
                     using (var w = new StreamWriter(ne.Open(), new UTF8Encoding(false))) w.Write(text.Replace("0.8.1", "0.9.9"));
                 }
-                Assert.Equal("firma_invalida", ZipUpdate.Inspect(zip, "0.8.0", null, Keys(good)).Estado);
+                Assert.Equal("firma_invalida", ZipUpdate.Inspect(zip, "0.8.0", null, Keys(good)).State);
             }
         }
 
@@ -83,25 +83,25 @@ namespace Bimbridge.Tests
         {
             var zip = Pkg("e", "0.8.1");
             var r = ZipUpdate.Inspect(zip, "0.8.0", null, null, policy: Lab);
-            Assert.Equal("valido_sin_firma", r.Estado);
+            Assert.Equal("valido_sin_firma", r.State);
             Assert.True(r.NeedsUnsignedConfirmation);
-            Assert.Contains("SIN FIRMA", r.Mensaje);
+            Assert.Contains("NO provenance SIGNATURE", r.Message);
             Assert.Throws<InvalidOperationException>(() => ZipUpdate.Stage(r, Path.Combine(_dir, "upd"), "operator", unsignedConfirmed: false, policy: Lab));
             var p = ZipUpdate.Stage(r, Path.Combine(_dir, "upd"), "operator", unsignedConfirmed: true, policy: Lab);
-            Assert.Equal("preparada", p.Estado);
+            Assert.Equal("preparada", p.State);
             Assert.False(p.Signed);
-            Assert.Equal(ProfilePolicy.Lab, p.Perfil);
+            Assert.Equal(ProfilePolicy.Lab, p.Profile);
         }
 
         [Fact]
         public void Production_RejectsUnsigned_EvenWithConfirmation_AndWithoutKeys()
         {
             var zip = Pkg("e2", "0.8.1");
-            Assert.Equal("firma_exigida", ZipUpdate.Inspect(zip, "0.8.0", null, null).Estado);
-            Assert.Equal("firma_exigida", ZipUpdate.Inspect(zip, "0.8.0", null, null, policy: Production).Estado);
+            Assert.Equal("firma_exigida", ZipUpdate.Inspect(zip, "0.8.0", null, null).State);
+            Assert.Equal("firma_exigida", ZipUpdate.Inspect(zip, "0.8.0", null, null, policy: Production).State);
             // lab without the explicit switch does not either
             var labNoFlag = ProfilePolicy.Parse("laboratorio", new[] { _dir }, false, null);
-            Assert.Equal("firma_exigida", ZipUpdate.Inspect(zip, "0.8.0", null, null, policy: labNoFlag).Estado);
+            Assert.Equal("firma_exigida", ZipUpdate.Inspect(zip, "0.8.0", null, null, policy: labNoFlag).State);
             var r = ZipUpdate.Inspect(zip, "0.8.0", null, null, policy: Lab);
             Assert.Throws<InvalidOperationException>(() => ZipUpdate.Stage(r, Path.Combine(_dir, "upd"), "operator", true, policy: Production));
         }
@@ -154,8 +154,8 @@ namespace Bimbridge.Tests
             using (var z = ZipFile.Open(zip, ZipArchiveMode.Update))
                 using (var w = new StreamWriter(z.CreateEntry("extra.dll").Open())) w.Write("x");
             var r = ZipUpdate.Inspect(zip, "0.8.0", null, null, policy: Lab);
-            Assert.Equal("hashes_no_coinciden", r.Estado);
-            Assert.Contains(r.Detalles, d => d.Contains("extra.dll"));
+            Assert.Equal("hashes_no_coinciden", r.State);
+            Assert.Contains(r.Details, d => d.Contains("extra.dll"));
 
             var zip2 = Pkg("g", "0.8.1");
             using (var z = ZipFile.Open(zip2, ZipArchiveMode.Update))
@@ -163,28 +163,28 @@ namespace Bimbridge.Tests
                 z.GetEntry("LEEME.txt").Delete();
                 using (var w = new StreamWriter(z.CreateEntry("LEEME.txt").Open())) w.Write("cambiado");
             }
-            Assert.Equal("hashes_no_coinciden", ZipUpdate.Inspect(zip2, "0.8.0", null, null, policy: Lab).Estado);
+            Assert.Equal("hashes_no_coinciden", ZipUpdate.Inspect(zip2, "0.8.0", null, null, policy: Lab).State);
 
             var zip3 = Pkg("h", "0.8.1");
             using (var z = ZipFile.Open(zip3, ZipArchiveMode.Update))
                 using (var w = new StreamWriter(z.CreateEntry("../../fuera.txt").Open())) w.Write("x");
-            Assert.Equal("ruta_peligrosa", ZipUpdate.Inspect(zip3, "0.8.0", null, null, policy: Lab).Estado);
+            Assert.Equal("ruta_peligrosa", ZipUpdate.Inspect(zip3, "0.8.0", null, null, policy: Lab).State);
             Assert.False(ZipUpdate.SafeEntry("C:/Windows/x.dll"));
             Assert.False(ZipUpdate.SafeEntry("/etc/x"));
 
             // An arbitrary ZIP is not a package.
             var plain = Path.Combine(_dir, "plain.zip");
             using (var z = ZipFile.Open(plain, ZipArchiveMode.Create)) using (var w = new StreamWriter(z.CreateEntry("Bimbridge.Setup.exe").Open())) w.Write("x");
-            Assert.Equal("no_es_paquete", ZipUpdate.Inspect(plain, "0.8.0", null, null, policy: Lab).Estado);
+            Assert.Equal("no_es_paquete", ZipUpdate.Inspect(plain, "0.8.0", null, null, policy: Lab).State);
         }
 
         [Fact]
         public void Compatibility_Years_MinimumFrom_AndDowngrade()
         {
-            Assert.Equal("incompatible", ZipUpdate.Inspect(Pkg("i", "0.8.1", revit: new[] { "2025", "2026" }), "0.8.0", new[] { "2024" }, null, policy: Lab).Estado);
-            Assert.Equal("incompatible", ZipUpdate.Inspect(Pkg("j", "0.9.0", desde: "0.8.0"), "0.7.0", null, null, policy: Lab).Estado);
-            Assert.Equal("misma_o_anterior", ZipUpdate.Inspect(Pkg("k", "0.8.0"), "0.8.0", null, null, policy: Lab).Estado);
-            Assert.Equal("valido_sin_firma", ZipUpdate.Inspect(Pkg("l", "0.7.0"), "0.8.0", null, null, allowOlder: true, policy: Lab).Estado);
+            Assert.Equal("incompatible", ZipUpdate.Inspect(Pkg("i", "0.8.1", revit: new[] { "2025", "2026" }), "0.8.0", new[] { "2024" }, null, policy: Lab).State);
+            Assert.Equal("incompatible", ZipUpdate.Inspect(Pkg("j", "0.9.0", minFrom: "0.8.0"), "0.7.0", null, null, policy: Lab).State);
+            Assert.Equal("misma_o_anterior", ZipUpdate.Inspect(Pkg("k", "0.8.0"), "0.8.0", null, null, policy: Lab).State);
+            Assert.Equal("valido_sin_firma", ZipUpdate.Inspect(Pkg("l", "0.7.0"), "0.8.0", null, null, allowOlder: true, policy: Lab).State);
         }
 
         [Fact]

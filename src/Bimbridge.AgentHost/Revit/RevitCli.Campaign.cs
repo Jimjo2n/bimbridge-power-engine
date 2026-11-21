@@ -79,7 +79,7 @@ namespace Bimbridge.AgentHost
             var journal = Directory.Exists(dir) ? Directory.GetFiles(dir, "*.jsonl", SearchOption.AllDirectories).Select(File.ReadAllText).FirstOrDefault(t => t.Contains("efecto_incierto")) : null;
             checks["respuesta_perdida_registrada_como_incierta"] = journal != null;
             checks["un_solo_commit"] = commits == 1;
-            checks["verificada_por_observacion"] = state == OpState.Verificada;
+            checks["verificada_por_observacion"] = state == OpState.Verified;
             report["estado_final"] = state; report["nota"] = note; report["commits"] = (long)commits;
             return Finish(o.OutDir, "nrt07", report, checks, link);
         }
@@ -93,10 +93,10 @@ namespace Bimbridge.AgentHost
             if (string.IsNullOrWhiteSpace(o.ExpectedPath)) { why = "missing --ruta-esperada"; return null; }
             var b = RevitBackend.Open(link, "persistente", out var err);
             if (b == null) { why = err; return null; }
-            var ruta = b.Context.GetValueOrDefault("ruta") as string;
+            var docPath = b.Context.GetValueOrDefault("ruta") as string;
             string Norm(string p) => (p ?? "").Trim().Replace('/', '\\').TrimEnd('\\');
-            if (!string.Equals(Norm(ruta), Norm(o.ExpectedPath), StringComparison.OrdinalIgnoreCase)) { b.Dispose(); why = "actual path " + ruta + " ≠ authorized " + o.ExpectedPath; return null; }
-            report["revit"] = new Dictionary<string, object> { ["pid"] = b.Context.GetValueOrDefault("pid"), ["addin"] = b.Context.GetValueOrDefault("addin"), ["documento"] = b.Context.GetValueOrDefault("documento"), ["ruta"] = ruta, ["clave"] = b.DocKey, ["huella"] = b.DocPrint };
+            if (!string.Equals(Norm(docPath), Norm(o.ExpectedPath), StringComparison.OrdinalIgnoreCase)) { b.Dispose(); why = "actual path " + docPath + " ≠ authorized " + o.ExpectedPath; return null; }
+            report["revit"] = new Dictionary<string, object> { ["pid"] = b.Context.GetValueOrDefault("pid"), ["addin"] = b.Context.GetValueOrDefault("addin"), ["documento"] = b.Context.GetValueOrDefault("documento"), ["ruta"] = docPath, ["clave"] = b.DocKey, ["huella"] = b.DocPrint };
             return b;
         }
 
@@ -183,7 +183,7 @@ namespace Bimbridge.AgentHost
                 var commits = link.Calls.Count(c => (string)c["op"] == Wire.OpCommit) - commitsBefore;
                 var expectCommits = 1;
                 checks["ronda" + n + "_" + point + "_cayo_en_escritura"] = crashed;
-                checks["ronda" + n + "_" + point + "_verificada"] = state2 == OpState.Verificada;
+                checks["ronda" + n + "_" + point + "_verificada"] = state2 == OpState.Verified;
                 checks["ronda" + n + "_" + point + "_un_commit"] = commits == expectCommits;
                 rounds.Add(new Dictionary<string, object> { ["punto"] = point, ["valor"] = value, ["caida_en"] = crashWhere, ["op_escritura"] = plan.Ops[1].Id, ["estado_tras_caida"] = state1, ["estado_final"] = state2, ["commits"] = (long)commits, ["nota"] = note });
             }
@@ -206,11 +206,11 @@ namespace Bimbridge.AgentHost
                 // integrated plan: consultar → batch (distinct value per element) → set (same value on the first 2) → read-only QC
                 var d = new PlanDraft { Objective = "NRT-06 integrated", DocKey = b.DocKey, DocPrint = b.DocPrint, LengthUnit = "mm", Coordinates = "interno_revit" };
                 var q = new OpDraft { Operation = "consultar" }; q.Params["categoria"] = o.Category; d.Ops.Add(q);
-                var lote = new OpDraft { Operation = "fijar_parametro_lote" };
-                lote.Scope["categoria"] = o.Category; lote.Scope["ids"] = o.Ids.Cast<object>().ToList();
-                lote.Params["parametro"] = o.Param;
-                lote.Params["valores"] = o.Ids.ToDictionary(i => i.ToString(CultureInfo.InvariantCulture), i => (object)("NRT-06 " + stamp + " #" + i.ToString(CultureInfo.InvariantCulture)));
-                lote.DependsOn.Add("#0"); d.Ops.Add(lote);
+                var batch = new OpDraft { Operation = "fijar_parametro_lote" };
+                batch.Scope["categoria"] = o.Category; batch.Scope["ids"] = o.Ids.Cast<object>().ToList();
+                batch.Params["parametro"] = o.Param;
+                batch.Params["valores"] = o.Ids.ToDictionary(i => i.ToString(CultureInfo.InvariantCulture), i => (object)("NRT-06 " + stamp + " #" + i.ToString(CultureInfo.InvariantCulture)));
+                batch.DependsOn.Add("#0"); d.Ops.Add(batch);
                 var fix = new OpDraft { Operation = "fijar_parametro" };
                 fix.Scope["categoria"] = o.Category; fix.Scope["ids"] = o.Ids.Take(2).Cast<object>().ToList();
                 fix.Params["parametro"] = o.Param; fix.Params["valor"] = "NRT-06 " + stamp + " fixed"; fix.Params["unidades"] = "texto";
@@ -235,7 +235,7 @@ namespace Bimbridge.AgentHost
                 using (var rb = PlanRunner.Open(Path.Combine(o.OutDir, "estado_fuera_alcance"), bad, b, new RunnerOptions { RealWrites = "persistente" }, out _))
                 {
                     rb?.Run();
-                    checks["rechazo_fuera_de_alcance"] = rb != null && rb.State.Ops[bad.Ops[0].Id].State == OpState.Fallida
+                    checks["rechazo_fuera_de_alcance"] = rb != null && rb.State.Ops[bad.Ops[0].Id].State == OpState.Failed
                                                         && link.Calls.Count(c => (string)c["op"] == Wire.OpCommit) == commits0;
                 }
 
@@ -247,18 +247,18 @@ namespace Bimbridge.AgentHost
                     report["resumen"] = r.Run();
                     var ops = vp.Ops.ToDictionary(x => x.Operation, x => r.State.Ops[x.Id]);
                     report["operaciones"] = vp.Ops.Select(x => (object)new Dictionary<string, object> { ["id"] = x.Id, ["op"] = x.Operation, ["estado"] = r.State.Ops[x.Id].State, ["directiva"] = OpState.DirectiveName(r.State.Ops[x.Id].State), ["nota"] = r.State.Ops[x.Id].Note, ["resultado"] = r.State.Ops[x.Id].Result }).ToList();
-                    checks["consulta_verificada"] = ops["consultar"].State == OpState.Verificada;
-                    checks["lote_verificado"] = ops["fijar_parametro_lote"].State == OpState.Verificada;
-                    checks["fijar_verificado_tras_lote"] = ops["fijar_parametro"].State == OpState.Verificada;
+                    checks["consulta_verificada"] = ops["consultar"].State == OpState.Verified;
+                    checks["lote_verificado"] = ops["fijar_parametro_lote"].State == OpState.Verified;
+                    checks["fijar_verificado_tras_lote"] = ops["fijar_parametro"].State == OpState.Verified;
                     // the sample model QC may have real deviations: it must RUN and leave evidence, not come out 0
-                    checks["qc_ejecutado_con_evidencia"] = ops["verificar_qc"].State == OpState.Verificada || (ops["verificar_qc"].State == OpState.Fallida && ops["verificar_qc"].Error == ErrorClass.Verificacion);
+                    checks["qc_ejecutado_con_evidencia"] = ops["verificar_qc"].State == OpState.Verified || (ops["verificar_qc"].State == OpState.Failed && ops["verificar_qc"].Error == ErrorClass.Verification);
                 }
                 var commits1 = link.Calls.Count(c => (string)c["op"] == Wire.OpCommit) - commits0;
                 checks["dos_commits_exactos"] = commits1 == 2;   // batch + set; consultar and QC do not write
                 // independent postcondition: the first 2 with the fixed value, the rest with their batch value
                 var rq = link.Call(Wire.OpQuery, new Dictionary<string, object> { [Wire.DocArg] = b.Context["doc"], ["ids"] = o.Ids.Select(x => (object)x.ToString(CultureInfo.InvariantCulture)).ToList(), ["f"] = new List<object> { "id", o.Param }, ["page_size"] = 200L }, false);
                 var got = new Dictionary<long, string>();
-                foreach (var row in ((rq.Datos as Dictionary<string, object>)?.GetValueOrDefault("rows") as List<object>) ?? new List<object>())
+                foreach (var row in ((rq.Data as Dictionary<string, object>)?.GetValueOrDefault("rows") as List<object>) ?? new List<object>())
                     if (row is List<object> l && l.Count >= 2) got[Convert.ToInt64(l[0], CultureInfo.InvariantCulture)] = Convert.ToString(l[1], CultureInfo.InvariantCulture);
                 checks["relectura_independiente"] = o.Ids.Select((id, k) => got.TryGetValue(id, out var v) && v == (k < 2 ? "NRT-06 " + stamp + " fixed" : "NRT-06 " + stamp + " #" + id.ToString(CultureInfo.InvariantCulture))).All(x => x);
                 // idempotency: resuming the same journal does not write

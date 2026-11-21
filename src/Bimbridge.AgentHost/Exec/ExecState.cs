@@ -11,24 +11,24 @@ namespace Bimbridge.AgentHost
     /// </summary>
     public static class OpState
     {
-        public const string Validada = "validada";
-        public const string EnEjecucion = "en_ejecucion";
-        public const string Ejecutada = "ejecutada";
-        public const string Verificada = "verificada";
-        public const string Fallida = "fallida";
+        public const string Validated = "validada";
+        public const string Running = "en_ejecucion";
+        public const string Executed = "ejecutada";
+        public const string Verified = "verificada";
+        public const string Failed = "fallida";
         /// <summary>There is or may be an effect, but not enough evidence to certify the result. Not repeated.</summary>
-        public const string RequiereVerificacion = "requiere_verificacion";
+        public const string NeedsVerification = "requiere_verificacion";
         /// <summary>Partial or uncertain effect: a person decides. Not repeated.</summary>
-        public const string RequiereReconciliar = "requiere_reconciliar";
-        public const string Bloqueada = "bloqueada";
-        public const string Cancelada = "cancelada";
+        public const string NeedsReconciliation = "requiere_reconciliar";
+        public const string Blocked = "bloqueada";
+        public const string Cancelled = "cancelada";
         /// <summary>alpha3: TEMPORARY write, verified and reverted (trial mode against Revit). Final; never counts as applied.</summary>
-        public const string Ensayada = "ensayada";
+        public const string Trialed = "ensayada";
 
-        public static readonly string[] All = { Validada, EnEjecucion, Ejecutada, Verificada, Fallida, RequiereVerificacion, RequiereReconciliar, Bloqueada, Cancelada, Ensayada };
-        public static readonly string[] Final = { Verificada, Fallida, RequiereVerificacion, RequiereReconciliar, Bloqueada, Cancelada, Ensayada };
+        public static readonly string[] All = { Validated, Running, Executed, Verified, Failed, NeedsVerification, NeedsReconciliation, Blocked, Cancelled, Trialed };
+        public static readonly string[] Final = { Verified, Failed, NeedsVerification, NeedsReconciliation, Blocked, Cancelled, Trialed };
         /// <summary>Final states that need a person or a reasoning agent.</summary>
-        public static readonly string[] Exceptions = { Fallida, RequiereVerificacion, RequiereReconciliar, Bloqueada };
+        public static readonly string[] Exceptions = { Failed, NeedsVerification, NeedsReconciliation, Blocked };
 
         public static bool IsValid(string s) => Array.IndexOf(All, s) >= 0;
         public static bool IsFinal(string s) => Array.IndexOf(Final, s) >= 0;
@@ -36,10 +36,10 @@ namespace Bimbridge.AgentHost
         private static readonly Dictionary<string, string[]> Legal = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             // validada → fallida: precondition or empty set before writing
-            [Validada] = new[] { EnEjecucion, Fallida, Bloqueada, Cancelada },
+            [Validated] = new[] { Running, Failed, Blocked, Cancelled },
             // en_ejecucion → validada: only if the effect was NOT observed (recovery) or the backend rejected without applying (retry)
-            [EnEjecucion] = new[] { Ejecutada, Fallida, Validada, RequiereVerificacion, RequiereReconciliar },
-            [Ejecutada] = new[] { Verificada, Fallida, RequiereVerificacion, Ensayada, RequiereReconciliar },
+            [Running] = new[] { Executed, Failed, Validated, NeedsVerification, NeedsReconciliation },
+            [Executed] = new[] { Verified, Failed, NeedsVerification, Trialed, NeedsReconciliation },
         };
 
         /// <summary>
@@ -51,14 +51,14 @@ namespace Bimbridge.AgentHost
         {
             switch (state)
             {
-                case Validada: return authorized ? "AUTHORIZED" : "PREPARED";
-                case EnEjecucion: return "EXECUTING";
-                case Ejecutada: return "COMMITTED";
-                case Verificada: return "VERIFIED";
-                case Ensayada: return "ROLLED_BACK";
-                case Bloqueada: case Cancelada: return "REJECTED";
-                case Fallida: return wroteNothing ? "REJECTED" : "FAILED";
-                case RequiereVerificacion: case RequiereReconciliar: return "OUTCOME_UNKNOWN";
+                case Validated: return authorized ? "AUTHORIZED" : "PREPARED";
+                case Running: return "EXECUTING";
+                case Executed: return "COMMITTED";
+                case Verified: return "VERIFIED";
+                case Trialed: return "ROLLED_BACK";
+                case Blocked: case Cancelled: return "REJECTED";
+                case Failed: return wroteNothing ? "REJECTED" : "FAILED";
+                case NeedsVerification: case NeedsReconciliation: return "OUTCOME_UNKNOWN";
                 default: throw new ArgumentException("unknown state: " + state);
             }
         }
@@ -69,26 +69,26 @@ namespace Bimbridge.AgentHost
     /// <summary>Error classification (stable: agents use it to decide).</summary>
     public static class ErrorClass
     {
-        public const string Precondicion = "precondicion";
-        public const string SinObjetivos = "sin_objetivos";
-        public const string Rechazo = "rechazo_backend";
-        public const string Transitorio = "transitorio";
-        public const string Verificacion = "verificacion";
-        public const string EfectoParcial = "efecto_parcial";
-        public const string EfectoIncierto = "efecto_incierto";
-        public const string EvidenciaInsuficiente = "evidencia_insuficiente";
-        public const string Dependencia = "dependencia";
-        public const string Cancelacion = "cancelacion";
-        public const string DocumentoDistinto = "documento_distinto";
-        public const string EstadoCorrupto = "estado_corrupto";
-        public const string PlanEnUso = "plan_en_uso";
-        public const string Interno = "interno";
+        public const string Precondition = "precondicion";
+        public const string NoTargets = "sin_objetivos";
+        public const string BackendRejection = "rechazo_backend";
+        public const string Transient = "transitorio";
+        public const string Verification = "verificacion";
+        public const string PartialEffect = "efecto_parcial";
+        public const string UncertainEffect = "efecto_incierto";
+        public const string InsufficientEvidence = "evidencia_insuficiente";
+        public const string Dependency = "dependencia";
+        public const string Cancellation = "cancelacion";
+        public const string DifferentDocument = "documento_distinto";
+        public const string CorruptState = "estado_corrupto";
+        public const string PlanInUse = "plan_en_uso";
+        public const string Internal = "interno";
     }
 
     /// <summary>Mutable state of an operation (the only mutable part of the run).</summary>
     public sealed class OpRecord
     {
-        public string State = OpState.Validada;
+        public string State = OpState.Validated;
         public int Attempt;
         public Dictionary<string, object> Result;
         public Dictionary<string, object> Evidence;
@@ -116,9 +116,9 @@ namespace Bimbridge.AgentHost
     /// <summary>State of the plan as a whole (derived from the journal).</summary>
     public static class PlanRunState
     {
-        public const string Activo = "activo";
-        public const string Pausado = "pausado";
-        public const string Cancelado = "cancelado";
+        public const string Active = "activo";
+        public const string Paused = "pausado";
+        public const string Cancelled = "cancelado";
     }
 
     /// <summary>A recovery diagnostic. Severity: info | aviso | error (error = cannot be recovered automatically).</summary>

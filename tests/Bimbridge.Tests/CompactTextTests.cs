@@ -17,7 +17,7 @@ namespace Bimbridge.Tests
                 ["total"] = 20L, ["cols"] = new List<object> { "id", "fam", "lvl", "ws" }, ["rows"] = rows,
                 ["ids"] = new List<object> { 1L, 2L, 3L, 4L, 9L },
             });
-            Assert.Contains("fijo: fam=LTG_DOWNLIGHT-SURFACE - ROUND; ws=DIST", t);
+            Assert.Contains("fixed: fam=LTG_DOWNLIGHT-SURFACE - ROUND; ws=DIST", t);
             Assert.Contains("ids: 1-4,9", t);
             Assert.Contains("id|lvl#", t);
             Assert.Contains("lvl#: 1=LEVEL05, 2=LEVEL06", t);

@@ -457,9 +457,9 @@ namespace Bimbridge.Addin.Revit.Writes
 
         private static void Mirror(BuildContext ctx, OpSpec op, IList<long> ids, Collector c)
         {
-            var eje = OpCatalog.Points(op.Args["eje"], "mirror eje", 2, 2, false);
+            var axisPoints = OpCatalog.Points(op.Args["eje"], "mirror eje", 2, 2, false);
             var copy = Arg.GetBool(op.Args, "copiar") ?? false;
-            var axis = WriteKit.List(eje[0][0], eje[0][1], eje[1][0], eje[1][1]);
+            var axis = WriteKit.List(axisPoints[0][0], axisPoints[0][1], axisPoints[1][0], axisPoints[1][1]);
             if (!copy) Templates(op, c, "loc", new Dictionary<string, object> { ["eje"] = axis }, "mirror");
             else Templates(op, c, "nuevo", new Dictionary<string, object> { ["eje"] = axis }, "mirrored copy of each created element");
             foreach (var e in Editable(ctx, ids, c, allowPinned: copy))
@@ -467,7 +467,7 @@ namespace Bimbridge.Addin.Revit.Writes
                 var id = Ids.ToLong(e.Id);
                 var loc = WriteKit.LocationOf(e);
                 if (loc == null) { c.Skip("has no location", id); continue; }
-                var m = Reflect(loc, eje[0][0], eje[0][1], eje[1][0], eje[1][1]);
+                var m = Reflect(loc, axisPoints[0][0], axisPoints[0][1], axisPoints[1][0], axisPoints[1][1]);
                 if (copy)
                     c.Add(new PlanEntry { Id = 0, Key = "nuevo", Before = "", After = "mirrored copy of " + id, Show = "mirrored copy of " + id + " at " + WriteKit.Xyz(m), Target = new Dictionary<string, object> { ["src"] = id, ["eje"] = axis } });
                 else
@@ -539,7 +539,7 @@ namespace Bimbridge.Addin.Revit.Writes
             var points = OpCatalog.Points(op.Args["puntos"], "place puntos", 1, 5000);
             var sourceItems = op.Args.TryGetValue("items_fuente", out var rawItems) ? rawItems as List<object> : null;
             var elev = OpCatalog.Length(op.Args, "elev", "place");
-            var montaje = Arg.GetString(op.Args, "montaje");
+            var mounting = Arg.GetString(op.Args, "montaje");
             var clearance = OpCatalog.Length(op.Args, "holgura", "place") ?? 0.0;
             var rot = OpCatalog.Number(op.Args, "rot", "place");
             Workset ws = null;
@@ -565,9 +565,9 @@ namespace Bimbridge.Addin.Revit.Writes
             }
 
             Dictionary<long, Dictionary<string, object>> geo = null;
-            var up = !string.Equals(montaje, "piso", StringComparison.OrdinalIgnoreCase);
-            if (montaje != null && ctx.GeoErrors.TryGetValue(op.Index, out var geoError)) throw new QueryException(geoError.StartsWith("place", StringComparison.Ordinal) ? geoError : "place montaje: " + geoError);
-            if (montaje != null && !ctx.Geo.TryGetValue(op.Index, out geo))
+            var up = !string.Equals(mounting, "piso", StringComparison.OrdinalIgnoreCase);
+            if (mounting != null && ctx.GeoErrors.TryGetValue(op.Index, out var geoError)) throw new QueryException(geoError.StartsWith("place", StringComparison.Ordinal) ? geoError : "place montaje: " + geoError);
+            if (mounting != null && !ctx.Geo.TryGetValue(op.Index, out geo))
                 throw new QueryException("place montaje: the type's body could not be measured (there are no instances of " + sym.FamilyName + ": " + sym.Name + " in the model). Give elev");
             ctx.GeoNominal.TryGetValue(op.Index, out var nominal);
 

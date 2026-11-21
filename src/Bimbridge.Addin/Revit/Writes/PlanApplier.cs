@@ -243,14 +243,14 @@ namespace Bimbridge.Addin.Revit.Writes
             var conflicts = _plan.FindConflicts(Current);
             if (conflicts.Count > 0)
             {
-                r.Status = PlanStatus.Conflicto;
+                r.Status = PlanStatus.Conflict;
                 r.Detail = conflicts.Count + " changes no longer match the plan (e.g. " +
                            string.Join("; ", conflicts.Take(3).Select(Describe)) + "). Nothing was applied; plan again.";
                 return r;
             }
             if (_doc.IsReadOnly)
             {
-                r.Status = PlanStatus.Revertido;
+                r.Status = PlanStatus.RolledBack;
                 r.Detail = "the document is read-only";
                 return r;
             }
@@ -297,7 +297,7 @@ namespace Bimbridge.Addin.Revit.Writes
             {
                 if (group.Start() != TransactionStatus.Started)
                 {
-                    r.Status = PlanStatus.Revertido;
+                    r.Status = PlanStatus.RolledBack;
                     r.Detail = "Revit did not allow the transaction to start (is another command running?)";
                     return r;
                 }
@@ -362,7 +362,7 @@ namespace Bimbridge.Addin.Revit.Writes
                 }
             }
 
-            r.Status = PlanStatus.Aplicado;
+            r.Status = PlanStatus.Applied;
             r.Created = _plan.Created.Count;
             _plan.Verification = Verify();
             foreach (var kv in _skipped)
@@ -383,7 +383,7 @@ namespace Bimbridge.Addin.Revit.Writes
             if (rolledBack) ResetCreated();
             else GroupAbort.Preserve(_plan, state, error, Evidence());
             _r.Created = _plan.Created.Count;
-            _r.Status = rolledBack ? PlanStatus.Revertido : Status.Desconocido;
+            _r.Status = rolledBack ? PlanStatus.RolledBack : Status.Unknown;
             _r.Detail = detail + (rolledBack ? ". Revit confirmed the group rollback." : ". The group rollback was not confirmed.");
             return _r;
         }
@@ -1213,8 +1213,8 @@ namespace Bimbridge.Addin.Revit.Writes
                     break;
                 case "seccion":
                 {
-                    var caja = (List<object>)t["caja"];
-                    var a = (List<object>)caja[0]; var b = (List<object>)caja[1];
+                    var corners = (List<object>)t["caja"];
+                    var a = (List<object>)corners[0]; var b = (List<object>)corners[1];
                     double ax = N(a, 0), ay = N(a, 1), az = N(a, 2), bx = N(b, 0), by = N(b, 1), bz = N(b, 2);
                     var dir = new XYZ(bx - ax, by - ay, 0);
                     var len = dir.GetLength();
@@ -1236,8 +1236,8 @@ namespace Bimbridge.Addin.Revit.Writes
                 }
                 case "callout":
                 {
-                    var caja = (List<object>)t["caja"];
-                    var a = (List<object>)caja[0]; var b = (List<object>)caja[1];
+                    var corners = (List<object>)t["caja"];
+                    var a = (List<object>)corners[0]; var b = (List<object>)corners[1];
                     v = ViewSection.CreateCallout(_doc, Ids.ToId(WriteKit.L(t, "origen")), vft, new XYZ(N(a, 0), N(a, 1), 0), new XYZ(N(b, 0), N(b, 1), 0));
                     break;
                 }
@@ -1251,7 +1251,7 @@ namespace Bimbridge.Addin.Revit.Writes
                 case "3d":
                 {
                     var v3 = View3D.CreateIsometric(_doc, vft);
-                    if (t.TryGetValue("caja", out var c) && c is List<object> caja) v3.SetSectionBox(Box((List<object>)caja[0], (List<object>)caja[1]));
+                    if (t.TryGetValue("caja", out var c) && c is List<object> corners) v3.SetSectionBox(Box((List<object>)corners[0], (List<object>)corners[1]));
                     v = v3;
                     break;
                 }

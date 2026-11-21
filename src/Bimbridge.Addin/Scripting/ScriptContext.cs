@@ -77,35 +77,35 @@ namespace Bimbridge.Addin.Scripting
         internal TaskSink Sink;
 
         /// <summary>Id of the task running this recipe (null in exec).</summary>
-        public string TareaId => Sink?.TaskId;
+        public string TaskId => Sink?.TaskId;
 
         /// <summary>Notes a decision in the task memory (it appears in the summary for the next agent).</summary>
-        public void Decision(string texto)
+        public void Decision(string text)
         {
-            if (Sink != null) Sink.Decisions.Add(texto); else Log("decision: " + texto);
+            if (Sink != null) Sink.Decisions.Add(text); else Log("decision: " + text);
         }
 
         /// <summary>Declares a traceable exception (something deliberately left unresolved, with its reason and evidence).</summary>
-        public void Excepcion(string motivo, object detalle = null)
+        public void Exception(string reason, object detail = null)
         {
-            var d = new Dictionary<string, object> { ["motivo"] = motivo, ["detalle"] = detalle == null ? null : ResultSerializer.ToJson(detalle, Doc, out _) };
-            if (Sink != null) Sink.Exceptions.Add(d); else Log("exception: " + motivo);
+            var d = new Dictionary<string, object> { ["motivo"] = reason, ["detalle"] = detail == null ? null : ResultSerializer.ToJson(detail, Doc, out _) };
+            if (Sink != null) Sink.Exceptions.Add(d); else Log("exception: " + reason);
         }
 
         /// <summary>Ends the unit without doing anything (whatever it did is rolled back) and records it as skipped with the reason.</summary>
-        public void Omitir(string motivo) => throw new OmitirUnidad(motivo);
+        public void Skip(string reason) => throw new SkipUnit(reason);
 
         /// <summary>
         /// Saves a text artifact (CSV/JSON/MD report) in the task folder and records it with its SHA-256. Returns the path.
         /// Outside a task it is saved in resultados\.
         /// </summary>
-        public string Artefacto(string nombre, string contenido)
+        public string Artifact(string name, string content)
         {
-            var safe = new string((nombre ?? "artefacto.txt").Select(c => char.IsLetterOrDigit(c) || c == '.' || c == '_' || c == '-' ? c : '_').ToArray());
+            var safe = new string((name ?? "artefacto.txt").Select(c => char.IsLetterOrDigit(c) || c == '.' || c == '_' || c == '-' ? c : '_').ToArray());
             var dir = Sink?.ArtifactsDir ?? Home.Sub("resultados");
             System.IO.Directory.CreateDirectory(dir);
             var path = System.IO.Path.Combine(dir, safe);
-            System.IO.File.WriteAllText(path, contenido ?? "");
+            System.IO.File.WriteAllText(path, content ?? "");
             var sha = Home.FileSha256(path);
             var a = new Dictionary<string, object> { ["ruta"] = path, ["sha256"] = sha, ["bytes"] = new System.IO.FileInfo(path).Length, ["tipo"] = System.IO.Path.GetExtension(path).TrimStart('.') };
             Sink?.Artifacts.Add(a);

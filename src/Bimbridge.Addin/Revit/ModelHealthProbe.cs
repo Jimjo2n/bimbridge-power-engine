@@ -65,7 +65,7 @@ namespace Bimbridge.Addin.Revit
         {
             var doc = DocTarget.Resolve(app, out var docError);
             if (doc == null) { Error = docError; return true; }
-            if (doc.IsFamilyDocument) { Error = Status.NoSoportado + ": model_health checks projects"; return true; }
+            if (doc.IsFamilyDocument) { Error = Status.NotSupported + ": model_health checks projects"; return true; }
             var deadline = sw.ElapsedMilliseconds + budgetMs;
             // AUD-17: no phase does work proportional to the model without checking the budget. Indivisible Revit calls
             // (GetWarnings, an id collector) go alone in their slice and the thread is yielded afterwards; everything else is chunked and limited.

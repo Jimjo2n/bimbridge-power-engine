@@ -112,25 +112,25 @@ def capabilities():
 
 def handle(req):
     rid = req.get("id")
-    job = req.get("trabajo") or ""
+    job = req.get("job") or ""
     args = req.get("args") or {}
     if req.get("pe") != PROTOCOL:
-        return {"pe": PROTOCOL, "id": rid, "codigo": "VERSION_INCOMPATIBLE", "error": "contract other than %d" % PROTOCOL}
+        return {"pe": PROTOCOL, "id": rid, "code": "VERSION_INCOMPATIBLE", "error": "contract other than %d" % PROTOCOL}
     if job == "hola":
         lo, hi = int(args.get("pe_min", 1)), int(args.get("pe_max", 1))
         if not (lo <= PROTOCOL <= hi):
-            return {"pe": PROTOCOL, "id": rid, "codigo": "VERSION_INCOMPATIBLE", "error": "only contract %d" % PROTOCOL}
-        return {"pe": PROTOCOL, "id": rid, "codigo": "OK", "resultado": {
+            return {"pe": PROTOCOL, "id": rid, "code": "VERSION_INCOMPATIBLE", "error": "only contract %d" % PROTOCOL}
+        return {"pe": PROTOCOL, "id": rid, "code": "OK", "result": {
             "motor": "python_document_worker", "version": __version__, "pe": PROTOCOL, "capacidades": capabilities(),
             "python": "%d.%d.%d" % sys.version_info[:3]}}
-    lim = req.get("limites") or {}
+    lim = req.get("limits") or {}
     limit_memory(lim.get("max_mem_mb"))
     t0 = time.perf_counter()
     try:
         fn = _jobs().get(job)
         if fn is None:
             raise JobError("NO_SOPORTADO", "unknown job: " + job)
-        res = fn(args, Paths(req.get("rutas")))
+        res = fn(args, Paths(req.get("paths")))
         code = "OK"
         err = None
     except JobError as e:
@@ -142,12 +142,12 @@ def handle(req):
     except Exception as e:  # a malicious or damaged document does not bring the worker down
         res, code, err = {}, "ERROR_MOTOR", "%s: %s" % (type(e).__name__, str(e)[:300])
         traceback.print_exc(file=sys.stderr)
-    out = {"pe": PROTOCOL, "id": rid, "codigo": code, "resultado": res, "telemetria": {"motor_ms": (time.perf_counter() - t0) * 1000.0}}
+    out = {"pe": PROTOCOL, "id": rid, "code": code, "result": res, "telemetry": {"motor_ms": (time.perf_counter() - t0) * 1000.0}}
     if err:
         out["error"] = err
     try:
         import resource
-        out["telemetria"]["memoria_pico_kb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        out["telemetry"]["memoria_pico_kb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     except ImportError:
         pass
     return out
@@ -164,9 +164,9 @@ def main():
         try:
             req = json.loads(line)
         except ValueError as e:
-            resp = {"pe": PROTOCOL, "id": None, "codigo": "INVALIDO", "error": "unreadable JSON: %s" % e}
+            resp = {"pe": PROTOCOL, "id": None, "code": "INVALIDO", "error": "unreadable JSON: %s" % e}
         else:
-            if req.get("trabajo") == "salir":
+            if req.get("job") == "salir":
                 break
             resp = handle(req)
         out.write((json.dumps(resp, ensure_ascii=False, separators=(",", ":"), allow_nan=False, default=str) + "\n").encode("utf-8"))

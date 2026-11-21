@@ -41,9 +41,9 @@ namespace Bimbridge.Engine
         }
 
         private static readonly Regex UsingLine = new Regex(@"^\s*using\s+(static\s+)?[A-Za-z_][\w\.]*(\s*=\s*[A-Za-z_][\w\.<>, ]*)?\s*;\s*$", RegexOptions.Compiled);
-        /// <summary>Step-by-step recipe (0.6.0): a class that inherits from Receta. Compiled as is inside the scripts namespace.</summary>
-        private static readonly Regex RecipeForm = new Regex(@"\bclass\s+\w+\s*:\s*(Bimbridge\.Addin\.Scripting\.)?Receta\b", RegexOptions.Compiled);
-        public const string RecipeBaseType = "Bimbridge.Addin.Scripting.Receta";
+        /// <summary>Step-by-step recipe (0.6.0): a class that inherits from Recipe. Compiled as is inside the scripts namespace.</summary>
+        private static readonly Regex RecipeForm = new Regex(@"\bclass\s+\w+\s*:\s*(Bimbridge\.Addin\.Scripting\.)?Recipe\b", RegexOptions.Compiled);
+        public const string RecipeBaseType = "Bimbridge.Addin.Scripting.Recipe";
 
         public static bool IsRecipe(string code) => code != null && RecipeForm.IsMatch(code);
 

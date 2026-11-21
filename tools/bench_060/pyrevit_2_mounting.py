@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # -*- coding: utf-8 -*-
-# Benchmark 0.6.0 · workload 2 (geometric QC of fixtures) · pyRevit engine. Same algorithm as the MCP's Bim.Montaje.Soporte:
+# Benchmark 0.6.0 · workload 2 (geometric QC of fixtures) · pyRevit engine. Same algorithm as the MCP's Bim.Mounting.Support:
 # body from solids (without "Light Source"), vertical ray from 1 mm below the base, category + link filter, clearance with tolerance.
 import time, json
 from Autodesk.Revit.DB import (FilteredElementCollector, BuiltInCategory, View3D, Level, Options, ViewDetailLevel, Solid, GeometryInstance,
     ElementMulticategoryFilter, ElementClassFilter, RevitLinkInstance, LogicalOrFilter, LogicalAndFilter, ExclusionFilter,
     ReferenceIntersector, FindReferenceTarget, XYZ, ElementId)
 from System.Collections.Generic import List
-NIVEL = None; TOL = 3.0; MAX = 3000.0
+LEVEL = None; TOL = 3.0; MAX = 3000.0
 doc = __revit__.ActiveUIDocument.Document
 FT = 304.8
 def iid(x): return x.Value if hasattr(x, "Value") else x.IntegerValue   # 2026 removed IntegerValue
@@ -29,7 +29,7 @@ def solids(ge, out, depth=0):
         elif isinstance(o, GeometryInstance):
             solids(o.GetInstanceGeometry(), out, depth + 1)
 
-def caja(e):
+def body_box(e):
     ss = []; solids(e.get_Geometry(opt), ss)
     pts = []
     for s in ss:
@@ -44,19 +44,19 @@ def caja(e):
     return (min(p.X for p in pts), min(p.Y for p in pts), min(p.Z for p in pts), max(p.X for p in pts), max(p.Y for p in pts), max(p.Z for p in pts))
 
 cat_list = List[BuiltInCategory](CATS)
-cuenta = {}; muestra = []
-luces = [e for e in FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_LightingFixtures).WhereElementIsNotElementType()
-         if not NIVEL or (doc.GetElement(e.LevelId) is not None and doc.GetElement(e.LevelId).Name == NIVEL)]
-for e in luces:
-    b = caja(e)
+counts = {}; sample = []
+fixtures = [e for e in FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_LightingFixtures).WhereElementIsNotElementType()
+         if not LEVEL or (doc.GetElement(e.LevelId) is not None and doc.GetElement(e.LevelId).Name == LEVEL)]
+for e in fixtures:
+    b = body_box(e)
     if b is None:
-        clase = "sin_cuerpo"
+        kind = "sin_cuerpo"
     else:
         f = LogicalAndFilter(LogicalOrFilter(ElementMulticategoryFilter(cat_list), ElementClassFilter(RevitLinkInstance)), ExclusionFilter(List[ElementId]([e.Id])))
         ri = ReferenceIntersector(f, FindReferenceTarget.Face, v3); ri.FindReferencesInRevitLinks = True
         start = b[2] - 1 / FT; h = (b[5] - b[2]) + 1 / FT
         hits = sorted(ri.Find(XYZ((b[0] + b[3]) / 2, (b[1] + b[4]) / 2, start), XYZ.BasisZ), key=lambda x: x.Proximity)
-        clase = "sin_referencia"; gap = None
+        kind = "sin_referencia"; gap = None
         for hw in hits:
             if hw.Proximity * FT > MAX + h * FT: break
             r = hw.GetReference(); host = doc.GetElement(r.ElementId)
@@ -64,8 +64,8 @@ for e in luces:
                 ld = host.GetLinkDocument(); hit = ld.GetElement(r.LinkedElementId) if ld else None
                 if hit is None or hit.Category is None or iid(hit.Category.Id) not in CAT_IDS: continue
             gap = (hw.Proximity - h) * FT
-            clase = "al_ras" if abs(gap) <= TOL else ("empotrado" if gap < 0 else "separado")
+            kind = "al_ras" if abs(gap) <= TOL else ("empotrado" if gap < 0 else "separado")
             break
-    cuenta[clase] = cuenta.get(clase, 0) + 1
-    if clase != "al_ras" and len(muestra) < 5: muestra.append([iid(e.Id), clase, None if b is None or gap is None else round(gap, 1)])
-print(json.dumps({"carga": "montaje", "motor": "pyrevit", "luces": len(luces), "cuenta": cuenta, "muestra": muestra, "ms": int((time.time() - t0) * 1000)}))
+    counts[kind] = counts.get(kind, 0) + 1
+    if kind != "al_ras" and len(sample) < 5: sample.append([iid(e.Id), kind, None if b is None or gap is None else round(gap, 1)])
+print(json.dumps({"carga": "montaje", "motor": "pyrevit", "luces": len(fixtures), "cuenta": counts, "muestra": sample, "ms": int((time.time() - t0) * 1000)}))

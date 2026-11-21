@@ -75,9 +75,9 @@ namespace Bimbridge.Engine
         public static string HeadPath(string path) => path + ".cabeza";
 
         /// <summary>Records an authority event. Returns its seq.</summary>
-        public long Append(string author, string op, string estado, Dictionary<string, object> extra = null)
+        public long Append(string author, string op, string status, Dictionary<string, object> extra = null)
         {
-            var me = new AuditItem { Id = Guid.NewGuid().ToString("N"), Author = author, Op = op, Estado = estado, Extra = extra, Pid = PidCache, T = Home.Now() };
+            var me = new AuditItem { Id = Guid.NewGuid().ToString("N"), Author = author, Op = op, State = status, Extra = extra, Pid = PidCache, T = Home.Now() };
             try { return AppendBatched(me); }
             catch (JournalUnavailableException) { Interlocked.Increment(ref _failures); throw; }
         }
@@ -102,7 +102,7 @@ namespace Bimbridge.Engine
 
         private sealed class AuditItem
         {
-            public string Id, Author, Op, Estado, Cid;
+            public string Id, Author, Op, State, Cid;
             public object T;
             public long Pid;
             public Dictionary<string, object> Extra;
@@ -205,7 +205,7 @@ namespace Bimbridge.Engine
             var name = DateTime.UtcNow.Ticks.ToString("D19", CultureInfo.InvariantCulture) + "-" + me.Id;
             var json = Json.Write(new Dictionary<string, object>
             {
-                ["id"] = me.Id, ["autor"] = me.Author, ["op"] = me.Op, ["estado"] = me.Estado, ["pid"] = me.Pid, ["t"] = me.T, ["extra"] = me.Extra,
+                ["id"] = me.Id, ["autor"] = me.Author, ["op"] = me.Op, ["estado"] = me.State, ["pid"] = me.Pid, ["t"] = me.T, ["extra"] = me.Extra,
             });
             try
             {
@@ -284,7 +284,7 @@ namespace Bimbridge.Engine
                     }
                     var it = new AuditItem
                     {
-                        Id = Arg.GetString(o, "id"), Author = Arg.GetString(o, "autor"), Op = Arg.GetString(o, "op"), Estado = Arg.GetString(o, "estado"),
+                        Id = Arg.GetString(o, "id"), Author = Arg.GetString(o, "autor"), Op = Arg.GetString(o, "op"), State = Arg.GetString(o, "estado"),
                         Pid = Arg.GetLong(o, "pid") ?? 0, T = o.TryGetValue("t", out var tv) ? tv : Home.Now(),
                         Extra = o.TryGetValue("extra", out var ev) ? ev as Dictionary<string, object> : null,
                     };
@@ -432,12 +432,12 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>Phase 2: result. If it fails, the intent is left without a result and <see cref="PendingIntents"/> returns it for reconciliation.</summary>
-        public void Outcome(string author, string op, string intentId, string estado, Dictionary<string, object> extra = null)
+        public void Outcome(string author, string op, string intentId, string status, Dictionary<string, object> extra = null)
         {
             var e = extra != null ? new Dictionary<string, object>(extra) : new Dictionary<string, object>();
             e["intencion"] = intentId;
             e["fase"] = "resultado";
-            Append(author, op, estado, e);
+            Append(author, op, status, e);
         }
 
         public static Dictionary<string, object> FindCommitReceipt(string path, string attempt, string session, string agent, string doc, string docPrint)
@@ -468,13 +468,13 @@ namespace Bimbridge.Engine
                     intent = candidate;
                     result = new Dictionary<string, object>
                     {
-                        ["intento_id"] = attempt, ["estado"] = Status.Desconocido, ["doc"] = doc, ["huella_doc"] = docPrint,
+                        ["intento_id"] = attempt, ["estado"] = Status.Unknown, ["doc"] = doc, ["huella_doc"] = docPrint,
                         ["plan_id"] = planId, ["inicio"] = Arg.GetString(entry, "t"),
                     };
                 }
                 else if (candidate == intent && Arg.GetString(entry, "fase") == "resultado")
                 {
-                    result["estado"] = Arg.GetString(entry, "estado_recibo") ?? state ?? Status.Desconocido;
+                    result["estado"] = Arg.GetString(entry, "estado_recibo") ?? state ?? Status.Unknown;
                     result["fin"] = Arg.GetString(entry, "t");
                     result["rev"] = Arg.GetLong(entry, "rev");
                 }
@@ -511,8 +511,8 @@ namespace Bimbridge.Engine
 
         // ---------------- internal ----------------
 
-        private long WriteLine(string author, string op, string estado, Dictionary<string, object> extra) =>
-            WriteBatch(new List<AuditItem> { new AuditItem { Author = author, Op = op, Estado = estado, Extra = extra, Pid = PidCache, T = Home.Now() } })[0];
+        private long WriteLine(string author, string op, string status, Dictionary<string, object> extra) =>
+            WriteBatch(new List<AuditItem> { new AuditItem { Author = author, Op = op, State = status, Extra = extra, Pid = PidCache, T = Home.Now() } })[0];
 
         /// <summary>
         /// Writes N lines with ONE append, ONE fsync and ONE head update. seq and prev are assigned in order under the lock.
@@ -536,7 +536,7 @@ namespace Bimbridge.Engine
                     ["pid"] = it.Pid,
                     ["autor"] = it.Author,
                     ["op"] = it.Op,
-                    ["estado"] = it.Estado,
+                    ["estado"] = it.State,
                     ["prev"] = prev,
                 };
                 if (it.Extra != null) foreach (var kv in it.Extra) if (!e.ContainsKey(kv.Key)) e[kv.Key] = kv.Value;
@@ -734,10 +734,10 @@ namespace Bimbridge.Engine
 
         private static void CheckLine(string raw, ref string prev, ref long n, List<string> errors) => CheckLine(raw, ref prev, ref n, errors, out _);
 
-        private static void CheckLine(string raw, ref string prev, ref long n, List<string> errors, out string lote)
+        private static void CheckLine(string raw, ref string prev, ref long n, List<string> errors, out string batchPos)
         {
             n++;
-            lote = null;
+            batchPos = null;
             Dictionary<string, object> o;
             try { o = Json.ParseObject(raw); }
             catch (FormatException) { errors.Add("line " + n + " unreadable"); prev = Home.Sha256Hex(raw); return; }
@@ -747,18 +747,18 @@ namespace Bimbridge.Engine
             try { seq = Convert.ToInt64(o.TryGetValue("seq", out var s) ? s : 0L, CultureInfo.InvariantCulture); }
             catch (Exception) { seq = -1; }
             if (seq != n) errors.Add("line " + n + ": seq " + seq + " out of order");
-            lote = Arg.GetString(o, "lote");
+            batchPos = Arg.GetString(o, "lote");
             prev = Home.Sha256Hex(raw);
         }
 
         /// <summary>"i/n" → (i, n). (0, 0) if there is no batch marker (individual record).</summary>
-        private static void ParseLote(string lote, out int i, out int n)
+        private static void ParseBatchPos(string batchPos, out int i, out int n)
         {
             i = 0; n = 0;
-            if (string.IsNullOrEmpty(lote)) return;
-            var k = lote.IndexOf('/');
-            if (k <= 0 || !int.TryParse(lote.Substring(0, k), NumberStyles.None, CultureInfo.InvariantCulture, out i) ||
-                !int.TryParse(lote.Substring(k + 1), NumberStyles.None, CultureInfo.InvariantCulture, out n)) { i = -1; n = -1; }
+            if (string.IsNullOrEmpty(batchPos)) return;
+            var k = batchPos.IndexOf('/');
+            if (k <= 0 || !int.TryParse(batchPos.Substring(0, k), NumberStyles.None, CultureInfo.InvariantCulture, out i) ||
+                !int.TryParse(batchPos.Substring(k + 1), NumberStyles.None, CultureInfo.InvariantCulture, out n)) { i = -1; n = -1; }
         }
 
         /// <summary>
@@ -767,7 +767,7 @@ namespace Bimbridge.Engine
         /// COMPLETE batch (all its lines with the "lote" marker i/n, i = 1..n in order, n = lag). Those lines are persisted but NOT confirmed
         /// (nobody received their seq), and the next write seals them. Returns the tolerated lag (0 if the head is up to date).
         /// </summary>
-        private static long CheckHead(string path, List<string> hashes, List<string> lotes, List<string> errors)
+        private static long CheckHead(string path, List<string> hashes, List<string> batchPositions, List<string> errors)
         {
             var hp = HeadPath(path);
             if (!File.Exists(hp)) return 0; // chains older than rc3
@@ -785,7 +785,7 @@ namespace Bimbridge.Engine
             if (lag > MaxBatch) { errors.Add("the head is " + lag + " records behind (more than one batch)"); return 0; }
             for (var k = 0; k < lag; k++)
             {
-                ParseLote(lotes[(int)seq + k], out var i, out var n);
+                ParseBatchPos(batchPositions[(int)seq + k], out var i, out var n);
                 if (i != k + 1 || n != lag) { errors.Add("the head is " + lag + " records behind and the tail is not a complete batch"); return 0; }
             }
             return lag;
@@ -812,19 +812,19 @@ namespace Bimbridge.Engine
             string prev = "";
             long n = 0, off = 0;
             var hashes = new List<string>();
-            var lotes = new List<string>();
+            var batchPositions = new List<string>();
             foreach (var raw in text.Split('\n'))
             {
                 if (raw.Length == 0) { off += 1; continue; }
                 r.LastOffset = off;
                 off += Encoding.UTF8.GetByteCount(raw) + 1;
-                CheckLine(raw, ref prev, ref n, r.Errors, out var lote);
+                CheckLine(raw, ref prev, ref n, r.Errors, out var batchPos);
                 hashes.Add(prev);
-                lotes.Add(lote);
+                batchPositions.Add(batchPos);
             }
             r.Lines = n;
             r.LastHash = n == 0 ? null : prev;
-            r.HeadLag = CheckHead(path, hashes, lotes, r.Errors);
+            r.HeadLag = CheckHead(path, hashes, batchPositions, r.Errors);
             return r;
         }
 
@@ -847,20 +847,20 @@ namespace Bimbridge.Engine
             var errors = new List<string>();
             string prev = "";
             long n = 0, off = 0;
-            var hashes = new List<string>(); var lotes = new List<string>(); var ends = new List<long>();
+            var hashes = new List<string>(); var batchPositions = new List<string>(); var ends = new List<long>();
             foreach (var raw in text.Split('\n'))
             {
                 if (raw.Length == 0) { off += 1; continue; }
                 off += Encoding.UTF8.GetByteCount(raw) + 1;
-                CheckLine(raw, ref prev, ref n, errors, out var lote);
-                hashes.Add(prev); lotes.Add(lote); ends.Add(off);
+                CheckLine(raw, ref prev, ref n, errors, out var batchPos);
+                hashes.Add(prev); batchPositions.Add(batchPos); ends.Add(off);
             }
             if (errors.Count > 0) return false;                        // the complete part is not a valid chain: real corruption
             // Incomplete batch at the end: its lines are removed (it was never confirmed).
             var keep = hashes.Count;
             if (keep > 0)
             {
-                ParseLote(lotes[keep - 1], out var li, out var ln);
+                ParseBatchPos(batchPositions[keep - 1], out var li, out var ln);
                 if (li > 0 && ln > 0 && li < ln) keep -= li;
             }
             var keepBytes = keep == 0 ? 0 : ends[keep - 1];
@@ -987,7 +987,7 @@ namespace Bimbridge.Engine
     /// </summary>
     public static class AuditGate
     {
-        public const string Incompleta = "auditoria_incompleta";
+        public const string Incomplete = "auditoria_incompleta";
 
         public static T Apply<T>(AuditLog audit, string author, string op, string target, Dictionary<string, object> extra,
             Func<T> apply, Func<T, string> status, Func<string, T> refused, Func<T, string, T> incomplete)
@@ -1003,7 +1003,7 @@ namespace Bimbridge.Engine
             try { audit.Outcome(author, op, intent, status(result), extra); }
             catch (JournalUnavailableException ex)
             {
-                return incomplete(result, Incompleta + ": the operation finished (its result is real and was not rolled back), but the result was not recorded in the audit (" +
+                return incomplete(result, Incomplete + ": the operation finished (its result is real and was not rolled back), but the result was not recorded in the audit (" +
                                           ex.Message + "). Intent " + intent + " pending reconciliation.");
             }
             return result;

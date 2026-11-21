@@ -255,7 +255,7 @@ namespace Bimbridge.Bridge
                 if (verb == "cerrar" && cmd.Positional.Count > 0 && !a.ContainsKey(Wire.DocArg)) a[Wire.DocArg] = cmd.Positional[0];
                 if (verb == "abrir" && cmd.Positional.Count > 0 && !a.ContainsKey("familia")) a["familia"] = string.Join(" ", cmd.Positional);
                 var resp = await _revit.CallAsync(op, a, op == Wire.OpDoc || op == Wire.OpTask ? LongTimeout : WriteTimeout, ct).ConfigureAwait(false);
-                var bad = resp.Estado != Status.Ok && resp.Estado != Status.ConDiferencias;
+                var bad = resp.State != Status.Ok && resp.State != Status.CompletedWithDifferences;
                 if (bad) failed++;
                 var text = Limit(CompactText.Write(RevitTools.RenderDict(resp)));
                 outs.Add(lines.Count > 1 ? "## " + (bad ? "ERROR " : "") + line + "\n" + text : text);
@@ -301,7 +301,7 @@ namespace Bimbridge.Bridge
             // What the add-in does not see: named pipe, serialization and the wait until the add-in receives the request.
             if (Arg.GetBool(a, "timing") == true) text = CompactText.Write(new Dictionary<string, object> { ["puente_ipc_total_ms"] = ipcMs }) + "\n" + text;
             text = Limit(text);
-            UsageMetrics.Record(_revit.ClientName, op, op, Json.Write(a).Length, text.Length, sw.ElapsedMilliseconds, resp.Estado);
+            UsageMetrics.Record(_revit.ClientName, op, op, Json.Write(a).Length, text.Length, sw.ElapsedMilliseconds, resp.State);
             return text;
         }
 
@@ -406,15 +406,15 @@ namespace Bimbridge.Bridge
             var ipc = System.Diagnostics.Stopwatch.StartNew();
             var resp = await _revit.CallAsync(op, a, timeout, ct).ConfigureAwait(false);
             ipc.Stop();
-            if (op == Wire.OpQuery && Arg.GetBool(a, "digest") == true && resp.Estado == Status.Ok
-                && (!(resp.Datos is Dictionary<string, object> digestData) || !digestData.ContainsKey("formato_digest")))
+            if (op == Wire.OpQuery && Arg.GetBool(a, "digest") == true && resp.State == Status.Ok
+                && (!(resp.Data is Dictionary<string, object> digestData) || !digestData.ContainsKey("formato_digest")))
                 return ("The connected add-in does not support query digest.", null, null, true);
             var o = RevitTools.RenderDict(resp);
             byte[] img = null; string mime = null;
             if (op == Wire.OpCapture)
             {
                 mime = o.TryGetValue("mime", out var m) ? m as string ?? "image/png" : "image/png";
-                if (resp.Estado == Status.Ok && o.TryGetValue("archivo", out var f) && f is string path)
+                if (resp.State == Status.Ok && o.TryGetValue("archivo", out var f) && f is string path)
                 {
                     try { img = File.ReadAllBytes(path); } catch (Exception ex) { o["aviso"] = "image not readable: " + ex.Message; }
                 }
@@ -446,7 +446,7 @@ namespace Bimbridge.Bridge
                 text = CompactText.Write(timing) + "\n" + text;
             }
             text = Limit(text);
-            return (text, img, mime, resp.Estado != Status.Ok && resp.Estado != Status.ConDiferencias);
+            return (text, img, mime, resp.State != Status.Ok && resp.State != Status.CompletedWithDifferences);
         }
     }
 }

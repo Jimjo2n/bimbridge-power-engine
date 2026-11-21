@@ -15,7 +15,7 @@ section;requirement;status;evidence;pending
 8;installer verifiable by hash, diagnostics, preserve config, rollback;implemented;SetupTests.Manifest_*, Diagnose_*, CacheSetup_KeepsCurrentAndPrevious;native §0
 9.1;unit + transport;done;193 tests green;—
 9.2;fault injection;done in the engine;TaskEngineTests;serialization and worker end only in the Revit backend (compiled)
-9.3;compiled/simulated/native matrix;done;docs/MATRIZ_CAPACIDADES.md generated from the code;—
+9.3;compiled/simulated/native matrix;done;docs/CAPABILITY_MATRIX.md generated from the code;—
 9.4;native acceptance 2024/2026;NOT RUN;tools/acceptance/PROCEDURE_0.6.0.md;requires the test machine
 9.5;equivalent MCP/pyRevit benchmark (3 workloads, 1 cold + 10 warm);harness ready, NOT RUN;tools/bench_060;requires the test machine
 9.6;soak test;NOT RUN;PROCEDURE_0.6.0 §8;requires the test machine

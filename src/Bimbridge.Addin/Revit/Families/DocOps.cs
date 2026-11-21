@@ -35,19 +35,19 @@ namespace Bimbridge.Addin.Revit.Families
 
         public static Dictionary<string, object> Save(UIApplication app, Document doc, IDictionary<string, object> a, Pending pend, List<string> diffs)
         {
-            if (doc.IsReadOnly) throw new OpFail(Status.NoSoportado, "the document is open read-only");
-            var como = Arg.GetString(a, "como");
+            if (doc.IsReadOnly) throw new OpFail(Status.NotSupported, "the document is open read-only");
+            var saveAs = Arg.GetString(a, "como");
             pend.StartUtc = DateTime.UtcNow;
             var d = new Dictionary<string, object> { ["doc"] = DocRegistry.Instance.IdOf(doc), ["titulo_antes"] = doc.Title, ["modificado_antes"] = doc.IsModified };
-            if (!string.IsNullOrWhiteSpace(como))
+            if (!string.IsNullOrWhiteSpace(saveAs))
             {
-                var path = Environment.ExpandEnvironmentVariables(como.Trim());
-                if (!Path.IsPathRooted(path)) throw new OpFail(Status.Invalido, "como= needs a full path (C:\\…\\file." + (doc.IsFamilyDocument ? "rfa" : "rvt") + ")");
+                var path = Environment.ExpandEnvironmentVariables(saveAs.Trim());
+                if (!Path.IsPathRooted(path)) throw new OpFail(Status.Invalid, "como= needs a full path (C:\\…\\file." + (doc.IsFamilyDocument ? "rfa" : "rvt") + ")");
                 var ext = Path.GetExtension(path).ToLowerInvariant();
-                if (doc.IsFamilyDocument && ext != ".rfa") throw new OpFail(Status.Invalido, "a family is saved as .rfa");
-                if (!doc.IsFamilyDocument && ext != ".rvt" && ext != ".rte") throw new OpFail(Status.Invalido, "a project is saved as .rvt (or .rte)");
+                if (doc.IsFamilyDocument && ext != ".rfa") throw new OpFail(Status.Invalid, "a family is saved as .rfa");
+                if (!doc.IsFamilyDocument && ext != ".rvt" && ext != ".rte") throw new OpFail(Status.Invalid, "a project is saved as .rvt (or .rte)");
                 var overwrite = Arg.GetBool(a, "sobrescribir") ?? false;
-                if (File.Exists(path) && !overwrite) throw new OpFail(Status.NecesitaUsuario, path + " already exists; pass sobrescribir=si if the user authorized it");
+                if (File.Exists(path) && !overwrite) throw new OpFail(Status.NeedsUser, path + " already exists; pass sobrescribir=si if the user authorized it");
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
                 var opts = new SaveAsOptions { OverwriteExistingFile = overwrite };
                 if (doc.IsWorkshared)
@@ -63,7 +63,7 @@ namespace Bimbridge.Addin.Revit.Families
             else
             {
                 if (string.IsNullOrEmpty(doc.PathName))
-                    throw new OpFail(Status.Invalido, "the document was never saved (" + doc.Title + "): use doc guardar como=C:\\…\\" + doc.Title + (doc.IsFamilyDocument ? ".rfa" : ".rvt"));
+                    throw new OpFail(Status.Invalid, "the document was never saved (" + doc.Title + "): use doc guardar como=C:\\…\\" + doc.Title + (doc.IsFamilyDocument ? ".rfa" : ".rvt"));
                 doc.Save();
                 d["accion"] = "guardar";
                 d["ruta"] = doc.PathName;
@@ -79,8 +79,8 @@ namespace Bimbridge.Addin.Revit.Families
 
         public static Dictionary<string, object> Sync(Document doc, IDictionary<string, object> a, List<string> diffs, DocumentTracker tracker)
         {
-            if (!doc.IsWorkshared) throw new OpFail(Status.NoSoportado, doc.Title + " is not workshared: there is no central model to sync with (use doc guardar)");
-            if (doc.IsFamilyDocument) throw new OpFail(Status.NoSoportado, "families are not synced");
+            if (!doc.IsWorkshared) throw new OpFail(Status.NotSupported, doc.Title + " is not workshared: there is no central model to sync with (use doc guardar)");
+            if (doc.IsFamilyDocument) throw new OpFail(Status.NotSupported, "families are not synced");
             var start = DateTime.UtcNow;
             var twc = new TransactWithCentralOptions();
             var so = new SynchronizeWithCentralOptions
@@ -111,13 +111,13 @@ namespace Bimbridge.Addin.Revit.Families
 
         public static Dictionary<string, object> Pdf(Document doc, IDictionary<string, object> a, NamedSets sets, string docHandle, Pending pend, List<string> diffs)
         {
-            if (doc.IsFamilyDocument) throw new OpFail(Status.NoSoportado, "doc pdf exports a project's sheets");
+            if (doc.IsFamilyDocument) throw new OpFail(Status.NotSupported, "doc pdf exports a project's sheets");
             var sheets = new List<ViewSheet>();
             var setName = Arg.GetString(a, "conjunto");
             var checkPaper = false;
             var order = Arg.GetString(a, "orden")?.Trim().ToLowerInvariant();
             if (order != null && order != "numero" && order != "entrada")
-                throw new OpFail(Status.Invalido, "orden=numero or entrada");
+                throw new OpFail(Status.Invalid, "orden=numero or entrada");
             if (setName != null)
             {
                 var vss = new FilteredElementCollector(doc).OfClass(typeof(ViewSheetSet)).Cast<ViewSheetSet>()
@@ -125,7 +125,7 @@ namespace Bimbridge.Addin.Revit.Families
                 if (vss == null)
                 {
                     var names = new FilteredElementCollector(doc).OfClass(typeof(ViewSheetSet)).Cast<ViewSheetSet>().Select(s => s.Name).ToList();
-                    throw new OpFail(Status.Invalido, "sheet set '" + setName + "' does not exist. Available: " + (names.Count == 0 ? "none" : string.Join(", ", names)));
+                    throw new OpFail(Status.Invalid, "sheet set '" + setName + "' does not exist. Available: " + (names.Count == 0 ? "none" : string.Join(", ", names)));
                 }
                 foreach (View v in vss.Views) if (v is ViewSheet vs) sheets.Add(vs);
                 var saved = SheetSetPdf.Read(vss);
@@ -134,12 +134,12 @@ namespace Bimbridge.Addin.Revit.Families
                 {
                     var members = sheets.ToDictionary(s => s.Id);
                     if (!PrintSheetSet.MatchesMembership(saved.Order.Select(Ids.ToLong).ToList(), members.Keys.Select(Ids.ToLong)))
-                        throw new OpFail(Status.Invalido, "the sheet set's sheets changed; save the set again or use orden=numero");
+                        throw new OpFail(Status.Invalid, "the sheet set's sheets changed; save the set again or use orden=numero");
                     sheets = saved.Order.Select(id => members[id]).ToList();
                     order = "entrada";
                 }
                 else if (order == "entrada")
-                    throw new OpFail(Status.Invalido, "the sheet set has no saved order; use orden=numero or save the set again");
+                    throw new OpFail(Status.Invalid, "the sheet set has no saved order; use orden=numero or save the set again");
                 if (saved.Preset != null) a = PrintSheetSet.ApplyPreset(a, saved.Preset);
             }
             foreach (var raw in Arg.GetStringList(a, "hojas"))
@@ -147,7 +147,7 @@ namespace Bimbridge.Addin.Revit.Families
                 IEnumerable<long> ids;
                 if (raw.StartsWith("$", StringComparison.Ordinal))
                 {
-                    if (!sets.TryGet(raw, docHandle, out var arr, out var err)) throw new OpFail(Status.Invalido, err);
+                    if (!sets.TryGet(raw, docHandle, out var arr, out var err)) throw new OpFail(Status.Invalid, err);
                     ids = arr;
                 }
                 else if (long.TryParse(raw, out var one)) ids = new[] { one };
@@ -155,26 +155,26 @@ namespace Bimbridge.Addin.Revit.Families
                 {
                     // sheet number (10E.02.NUL)
                     var byNumber = new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>().FirstOrDefault(s => string.Equals(s.SheetNumber, raw, StringComparison.OrdinalIgnoreCase));
-                    if (byNumber == null) throw new OpFail(Status.Invalido, "there is no sheet with id or number '" + raw + "'");
+                    if (byNumber == null) throw new OpFail(Status.Invalid, "there is no sheet with id or number '" + raw + "'");
                     ids = new[] { Ids.ToLong(byNumber.Id) };
                 }
                 foreach (var id in ids)
                 {
                     var s = doc.GetElement(Ids.ToId(id)) as ViewSheet;
-                    if (s == null) throw new OpFail(Status.Invalido, id + " is not a sheet");
+                    if (s == null) throw new OpFail(Status.Invalid, id + " is not a sheet");
                     sheets.Add(s);
                 }
             }
             sheets = sheets.GroupBy(s => s.Id).Select(g => g.First()).ToList();
             order ??= "numero";
             if (order == "numero") sheets = sheets.OrderBy(s => s.SheetNumber, StringComparer.OrdinalIgnoreCase).ToList();
-            if (sheets.Count == 0) throw new OpFail(Status.Invalido, "specify hojas=ids|$set|numbers or conjunto=\"Sheet set name\"");
+            if (sheets.Count == 0) throw new OpFail(Status.Invalid, "specify hojas=ids|$set|numbers or conjunto=\"Sheet set name\"");
             var notPrintable = sheets.Where(s => { try { return !s.CanBePrinted; } catch (Exception) { return false; } }).Select(s => s.SheetNumber).ToList();
-            if (notPrintable.Count > 0) throw new OpFail(Status.Invalido, "sheets Revit cannot print: " + string.Join(", ", notPrintable));
+            if (notPrintable.Count > 0) throw new OpFail(Status.Invalid, "sheets Revit cannot print: " + string.Join(", ", notPrintable));
             if (checkPaper) SheetSetPdf.CheckViewportBounds(doc, sheets, diffs);
 
             var folder = Environment.ExpandEnvironmentVariables(Arg.GetString(a, "carpeta") ?? Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
-            if (!Path.IsPathRooted(folder)) throw new OpFail(Status.Invalido, "carpeta= needs a full path");
+            if (!Path.IsPathRooted(folder)) throw new OpFail(Status.Invalid, "carpeta= needs a full path");
             Directory.CreateDirectory(folder);
             var combine = Arg.GetBool(a, "combinar") ?? true;
             var name = Arg.GetString(a, "nombre");
@@ -184,13 +184,13 @@ namespace Bimbridge.Addin.Revit.Families
             if (name != null && name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) name = name.Substring(0, name.Length - 4);
             var target = combine ? Path.Combine(folder, name + ".pdf") : null;
             if (target != null && File.Exists(target) && !(Arg.GetBool(a, "sobrescribir") ?? false))
-                throw new OpFail(Status.NecesitaUsuario, target + " already exists; pass sobrescribir=si or a different nombre=");
+                throw new OpFail(Status.NeedsUser, target + " already exists; pass sobrescribir=si or a different nombre=");
 
             // Settings from Tyler's brief (Use Sheet Size, Fit to Page, Center, Color, Vector, High; hide reference planes, scope boxes and crop regions).
             var paperName = Arg.GetString(a, "papel") ?? "Default";
             if (!Enum.TryParse(paperName, true, out ExportPaperFormat paper) || !Enum.IsDefined(typeof(ExportPaperFormat), paper) ||
                 int.TryParse(paperName, out _))
-                throw new OpFail(Status.Invalido, "papel: specify a Revit export paper format, for example Default");
+                throw new OpFail(Status.Invalid, "papel: specify a Revit export paper format, for example Default");
             var o = new PDFExportOptions
             {
                 Combine = combine,
@@ -284,10 +284,10 @@ namespace Bimbridge.Addin.Revit.Families
         {
             var active = app.ActiveUIDocument?.Document;
             if (active != null && active.Equals(doc))
-                throw new OpFail(Status.NoSoportado, "Revit does not allow closing the active document through the API (" + doc.Title + "); ask the user to activate another one or close it");
+                throw new OpFail(Status.NotSupported, "Revit does not allow closing the active document through the API (" + doc.Title + "); ask the user to activate another one or close it");
             var save = Arg.GetBool(a, "guardar") ?? false;
             if (!save && doc.IsModified && !(Arg.GetBool(a, "descartar") ?? false))
-                throw new OpFail(Status.NecesitaUsuario, doc.Title + " has unsaved changes: pass guardar=si or descartar=si (if the user authorized it)");
+                throw new OpFail(Status.NeedsUser, doc.Title + " has unsaved changes: pass guardar=si or descartar=si (if the user authorized it)");
             var id = DocRegistry.Instance.IdOf(doc);
             var title = doc.Title;
             var ok = doc.Close(save);
@@ -303,12 +303,12 @@ namespace Bimbridge.Addin.Revit.Families
         public static Dictionary<string, object> VerifyOnDisk(UIApplication app, Document doc, IDictionary<string, object> a)
         {
             var path = doc.PathName;
-            if (string.IsNullOrEmpty(path) || IsCloud(doc) || !File.Exists(path)) throw new OpFail(Status.NoSoportado, "verificar_disco: only an already saved local .rvt");
-            if (doc.IsWorkshared) throw new OpFail(Status.NoSoportado, "verificar_disco: not used on workshared documents");
-            if (doc.IsModified) throw new OpFail(Status.NecesitaUsuario, "verificar_disco: the document has unsaved changes; what is on disk is not what you see");
-            var param = Arg.GetString(a, "parametro") ?? throw new OpFail(Status.Invalido, "verificar_disco needs parametro=");
+            if (string.IsNullOrEmpty(path) || IsCloud(doc) || !File.Exists(path)) throw new OpFail(Status.NotSupported, "verificar_disco: only an already saved local .rvt");
+            if (doc.IsWorkshared) throw new OpFail(Status.NotSupported, "verificar_disco: not used on workshared documents");
+            if (doc.IsModified) throw new OpFail(Status.NeedsUser, "verificar_disco: the document has unsaved changes; what is on disk is not what you see");
+            var param = Arg.GetString(a, "parametro") ?? throw new OpFail(Status.Invalid, "verificar_disco needs parametro=");
             var ids = Arg.GetStringList(a, "ids").Select(x => long.Parse(x, CultureInfo.InvariantCulture)).ToList();
-            if (ids.Count < 1 || ids.Count > 200) throw new OpFail(Status.Invalido, "verificar_disco: between 1 and 200 ids");
+            if (ids.Count < 1 || ids.Count > 200) throw new OpFail(Status.Invalid, "verificar_disco: between 1 and 200 ids");
             // beta1 run1 (2026-10-28): Revit keeps the active .rvt open; File.OpenRead/File.Copy fail with IOException.
             // It is read ONCE with read/write sharing: the hash and the copy come from the same bytes.
             var tmp = Path.Combine(Path.GetTempPath(), "bimbridge-verif-" + Guid.NewGuid().ToString("N") + ".rvt");

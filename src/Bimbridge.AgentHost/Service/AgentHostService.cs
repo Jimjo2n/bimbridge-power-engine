@@ -85,7 +85,7 @@ namespace Bimbridge.AgentHost
                 var id = Path.GetFileName(d);
                 var view = Inspect(id, out var diags);
                 if (view == null) { Log("recuperacion_rechazada", new Dictionary<string, object> { ["plan"] = id, ["diag"] = string.Join("; ", diags) }); continue; }
-                if (view.Value.State.PlanState == PlanRunState.Activo && view.Value.State.Ops.Values.Any(o => !OpState.IsFinal(o.State)))
+                if (view.Value.State.PlanState == PlanRunState.Active && view.Value.State.Ops.Values.Any(o => !OpState.IsFinal(o.State)))
                 {
                     Log("recuperacion", new Dictionary<string, object> { ["plan"] = id, ["resumen"] = Compact.Summary(view.Value.Plan, view.Value.State) });
                     Enqueue(id);
@@ -188,7 +188,7 @@ namespace Bimbridge.AgentHost
                 if (id == null) return Error("peticion_invalida", "missing plan (or unknown command: " + cmd + ")");
                 if (!Directory.Exists(PlanDir(id))) return Error("plan_desconocido", id);
                 var view = Inspect(id, out var diags);
-                if (view == null) return Error(ErrorClass.EstadoCorrupto, string.Join("; ", diags.Where(d => d.Severity == "error")));
+                if (view == null) return Error(ErrorClass.CorruptState, string.Join("; ", diags.Where(d => d.Severity == "error")));
                 var (plan, st) = view.Value;
                 switch (cmd)
                 {
@@ -206,7 +206,7 @@ namespace Bimbridge.AgentHost
             }
             catch (Exception ex) when (ex is IOException || ex is FormatException || ex is InvalidOperationException || ex is ArgumentException || ex is KeyNotFoundException)
             {
-                return Error(ErrorClass.Interno, ex.GetType().Name + ": " + ex.Message);
+                return Error(ErrorClass.Internal, ex.GetType().Name + ": " + ex.Message);
             }
         }
 
@@ -248,8 +248,8 @@ namespace Bimbridge.AgentHost
             var model = DurableSimModel.Open(Path.Combine(PlanDir(id), "modelo"));
             using (var r = PlanRunner.Open(PlanDir(id), null, new SimulatedBackend(model), new RunnerOptions { LeaseTtl = _o.LeaseTtl }, out var diags))
             {
-                if (r == null) return Error(ErrorClass.EstadoCorrupto, string.Join("; ", diags));
-                if (!r.IsOwner) return Error(ErrorClass.PlanEnUso, "another process owns the plan");
+                if (r == null) return Error(ErrorClass.CorruptState, string.Join("; ", diags));
+                if (!r.IsOwner) return Error(ErrorClass.PlanInUse, "another process owns the plan");
                 if (cmd == "pausar") r.Pause(); else r.Cancel();
                 return Ok(Compact.Summary(r.Plan, r.State));
             }
@@ -268,8 +268,8 @@ namespace Bimbridge.AgentHost
             var model = DurableSimModel.Open(Path.Combine(PlanDir(id), "modelo"));
             using (var r = PlanRunner.Open(PlanDir(id), null, new SimulatedBackend(model), new RunnerOptions { LeaseTtl = _o.LeaseTtl }, out var diags))
             {
-                if (r == null) return Error(ErrorClass.EstadoCorrupto, string.Join("; ", diags));
-                if (!r.IsOwner) return Error(ErrorClass.PlanEnUso, "another process owns the plan");
+                if (r == null) return Error(ErrorClass.CorruptState, string.Join("; ", diags));
+                if (!r.IsOwner) return Error(ErrorClass.PlanInUse, "another process owns the plan");
                 r.Resume();
             }
             return Enqueue(id) ? Ok("resumed") : Error("cola_llena", "resumed but the queue is full; retry");

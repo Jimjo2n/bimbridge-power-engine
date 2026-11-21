@@ -27,7 +27,7 @@ namespace Bimbridge.Engine
         }
 
         public static string TrialStatus(bool functionalOk, bool restorationOk) =>
-            !restorationOk ? Protocol.Status.Desconocido : functionalOk ? PlanStatus.Ensayado : PlanStatus.Revertido;
+            !restorationOk ? Protocol.Status.Unknown : functionalOk ? PlanStatus.Trialed : PlanStatus.RolledBack;
 
         public const string CorrectReverted = "ensayo_correcto_revertido";
         public const string FunctionalFailureReverted = "fallo_funcional_revertido";

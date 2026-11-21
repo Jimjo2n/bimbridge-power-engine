@@ -20,13 +20,13 @@ namespace Bimbridge.Addin.Revit
             var scope = equipment ? "equipos" : "terminales";
             if (!request.Args.TryGetValue(scope, out var raw) || !(raw is List<object> input) ||
                 input.Count == 0 || input.Count > 200 || input.Any(x => x is not Dictionary<string, object>))
-                return Response.Fail(request.Id, Status.Invalido, scope + " requires 1 to 200 objects with the markup expectations");
+                return Response.Fail(request.Id, Status.Invalid, scope + " requires 1 to 200 objects with the markup expectations");
             var specs = input.Cast<Dictionary<string, object>>().ToList();
             var unexpected = new List<long>();
             if (equipment && request.Args.ContainsKey("ids_observados"))
             {
                 try { unexpected = RouteIds(request.Args, "ids_observados").Except(specs.Select(x => Arg.GetLong(x, "id") ?? 0)).ToList(); }
-                catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
+                catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalid, ex.Message); }
             }
             var rows = new List<object>();
             string error = null;
@@ -54,11 +54,11 @@ namespace Bimbridge.Addin.Revit
                 return true;
             }, highPriority: false, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!work.Ok) return FromWork(request.Id, work);
-            if (error != null) return Response.Fail(request.Id, Status.Invalido, error);
+            if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
             return new Response
             {
-                Id = request.Id, Rev = revision, Estado = differs ? Status.ConDiferencias : Status.Ok,
-                Datos = new Dictionary<string, object> { [scope] = rows, ["ids_no_previstos"] = unexpected },
+                Id = request.Id, Rev = revision, State = differs ? Status.CompletedWithDifferences : Status.Ok,
+                Data = new Dictionary<string, object> { [scope] = rows, ["ids_no_previstos"] = unexpected },
             };
         }
 

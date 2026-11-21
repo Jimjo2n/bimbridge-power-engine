@@ -89,7 +89,7 @@ namespace Bimbridge.AgentHost
             var backend = RevitBackend.Open(link, "persistente", out var err);
             if (backend == null) return Blocked(err);
             var ctx = backend.Context;
-            var ruta = ctx.GetValueOrDefault("ruta") as string;
+            var docPath = ctx.GetValueOrDefault("ruta") as string;
             report["revit"] = new Dictionary<string, object>
             {
                 ["pid"] = ctx.GetValueOrDefault("pid"), ["version"] = ctx.GetValueOrDefault("revit"), ["build"] = ctx.GetValueOrDefault("build"),
@@ -98,15 +98,15 @@ namespace Bimbridge.AgentHost
             };
             report["documento"] = new Dictionary<string, object>
             {
-                ["handle"] = ctx.GetValueOrDefault("doc"), ["titulo"] = ctx.GetValueOrDefault("documento"), ["ruta"] = ruta, ["clave"] = backend.DocKey,
+                ["handle"] = ctx.GetValueOrDefault("doc"), ["titulo"] = ctx.GetValueOrDefault("documento"), ["ruta"] = docPath, ["clave"] = backend.DocKey,
                 ["huella"] = backend.DocPrint, ["worksharing"] = ctx.GetValueOrDefault("worksharing"), ["modificado_antes"] = ctx.GetValueOrDefault("modificado"),
             };
-            Log("connected pid " + o.Pid + " · " + ruta + " · " + backend.DocKey);
+            Log("connected pid " + o.Pid + " · " + docPath + " · " + backend.DocKey);
             string Norm(string p) => (p ?? "").Trim().Replace('/', '\\').TrimEnd('\\');
-            if (!string.Equals(Norm(ruta), Norm(o.ExpectedPath), StringComparison.OrdinalIgnoreCase))
-                return Blocked("the actual document path (" + ruta + ") is not the authorized one (" + o.ExpectedPath + ")");
-            var file = o.DiskPath(ruta);
-            if (!File.Exists(file)) return Blocked("file not found on disk: " + ruta);
+            if (!string.Equals(Norm(docPath), Norm(o.ExpectedPath), StringComparison.OrdinalIgnoreCase))
+                return Blocked("the actual document path (" + docPath + ") is not the authorized one (" + o.ExpectedPath + ")");
+            var file = o.DiskPath(docPath);
+            if (!File.Exists(file)) return Blocked("file not found on disk: " + docPath);
 
             Dictionary<string, object> Snapshot(string label)
             {
@@ -116,15 +116,15 @@ namespace Bimbridge.AgentHost
                     ["f"] = new List<object> { "id", o.Param }, ["page_size"] = 100L,
                 }, false);
                 var c2 = link.Call(Wire.OpContext, new Dictionary<string, object>(), false);
-                var rows = (r.Datos as Dictionary<string, object>)?.GetValueOrDefault("rows") as List<object>;
+                var rows = (r.Data as Dictionary<string, object>)?.GetValueOrDefault("rows") as List<object>;
                 var vals = new Dictionary<string, object>();
                 foreach (var row in rows ?? new List<object>())
                     if (row is List<object> l && l.Count >= 2) vals[Convert.ToString(l[0], CultureInfo.InvariantCulture)] = l[1];
                 return new Dictionary<string, object>
                 {
-                    ["momento"] = label, ["estado"] = r.Estado, ["valores"] = vals, ["rev"] = c2.Rev,
-                    ["modificado"] = (c2.Datos as Dictionary<string, object>)?.GetValueOrDefault("modificado"),
-                    ["clave_doc"] = (c2.Datos as Dictionary<string, object>)?.GetValueOrDefault("clave_doc"),
+                    ["momento"] = label, ["estado"] = r.State, ["valores"] = vals, ["rev"] = c2.Rev,
+                    ["modificado"] = (c2.Data as Dictionary<string, object>)?.GetValueOrDefault("modificado"),
+                    ["clave_doc"] = (c2.Data as Dictionary<string, object>)?.GetValueOrDefault("clave_doc"),
                 };
             }
             bool AllEqual(Dictionary<string, object> vals, string v) =>
@@ -184,7 +184,7 @@ namespace Bimbridge.AgentHost
                 Log("runner: " + summary + " · " + rec.State);
             }
             var d0 = (Dictionary<string, object>)report["diario"];
-            checks["estado_op_verificada"] = (string)d0["estado_op"] == OpState.Verificada;
+            checks["estado_op_verificada"] = (string)d0["estado_op"] == OpState.Verified;
             var commits1 = link.Calls.Count(c => (string)c["op"] == Wire.OpCommit);
             checks["un_solo_commit"] = commits1 == 1;
             report["transaccion"] = link.Calls.Where(c => (string)c["op"] == Wire.OpCommit).Select(c => (object)new Dictionary<string, object> { ["estado"] = c["estado"], ["ms"] = c["ms"], ["modo"] = c.GetValueOrDefault("modo") }).ToList();
@@ -209,15 +209,15 @@ namespace Bimbridge.AgentHost
             var oldTimeout = link.WriteTimeout;
             link.WriteTimeout = o.DocTimeout;
             var save = link.Call(Wire.OpDoc, new Dictionary<string, object> { [Wire.DocArg] = ctx["doc"], ["accion"] = "guardar" }, true);
-            report["guardar"] = new Dictionary<string, object> { ["estado"] = save.Estado, ["aviso"] = save.Aviso, ["datos"] = save.Datos };
-            checks["guardado_ok"] = save.Estado == Status.Ok;
+            report["guardar"] = new Dictionary<string, object> { ["estado"] = save.State, ["aviso"] = save.Warning, ["datos"] = save.Data };
+            checks["guardado_ok"] = save.State == Status.Ok;
             var shaAfter = File.Exists(file) ? FileSha256(file) : null;
             report["sha256_despues"] = shaAfter;
             checks["sha256_cambio"] = shaAfter != null && shaAfter != shaBefore;
             var afterSave = Snapshot("tras_guardar");
             report["tras_guardar"] = afterSave;
             checks["sin_cambios_pendientes_tras_guardar"] = afterSave["modificado"] is bool m2 && !m2;
-            Log("save " + save.Estado + " · sha " + (shaAfter ?? "?").Substring(0, Math.Min(16, (shaAfter ?? "?").Length)));
+            Log("save " + save.State + " · sha " + (shaAfter ?? "?").Substring(0, Math.Min(16, (shaAfter ?? "?").Length)));
 
             if (!(bool)checks["guardado_ok"] || !(bool)checks["sha256_cambio"] || !(bool)checks["sin_cambios_pendientes_tras_guardar"])
             {
@@ -234,14 +234,14 @@ namespace Bimbridge.AgentHost
                 ["ids"] = o.Ids.Select(x => (object)x.ToString(CultureInfo.InvariantCulture)).ToList(),
             }, true);
             link.WriteTimeout = oldTimeout;
-            var dd = disk.Datos as Dictionary<string, object>;
-            report["verificacion_disco"] = new Dictionary<string, object> { ["estado"] = disk.Estado, ["aviso"] = disk.Aviso, ["datos"] = dd };
+            var dd = disk.Data as Dictionary<string, object>;
+            report["verificacion_disco"] = new Dictionary<string, object> { ["estado"] = disk.State, ["aviso"] = disk.Warning, ["datos"] = dd };
             var diskVals = new Dictionary<string, object>();
             foreach (var row in (dd?.GetValueOrDefault("filas") as List<object>) ?? new List<object>())
                 if (row is List<object> l && l.Count >= 3 && l[1] is bool ex && ex) diskVals[Convert.ToString(l[0], CultureInfo.InvariantCulture)] = l[2];
-            checks["disco_valores_esperados"] = disk.Estado == Status.Ok && AllEqual(diskVals, value);
+            checks["disco_valores_esperados"] = disk.State == Status.Ok && AllEqual(diskVals, value);
             checks["disco_sha_es_el_guardado"] = dd != null && string.Equals(dd.GetValueOrDefault("sha256") as string, shaAfter, StringComparison.OrdinalIgnoreCase);
-            Log("verificar_disco " + disk.Estado);
+            Log("verificar_disco " + disk.State);
 
             // 9. duplicate: resuming THE SAME journal must not produce a second commit or change the model
             using (var again = PlanRunner.Open(stateDir, null, backend, new RunnerOptions { RealWrites = "persistente" }, out var diags2))

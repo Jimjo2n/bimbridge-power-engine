@@ -83,7 +83,7 @@ namespace Bimbridge.Tests
         [Theory, InlineData(2024), InlineData(2026)]
         public void BuiltInRecipes_PassRestrictedAutonomousPolicy(int year)
         {
-            foreach (var f in Directory.GetFiles(Path.Combine(Root, "src", "Bimbridge.Addin", "recetas"), "*.cs"))
+            foreach (var f in Directory.GetFiles(Path.Combine(Root, "src", "Bimbridge.Addin", "recipes"), "*.cs"))
             {
                 var caps = Caps(File.ReadAllText(f), year);
                 var denied = Bimbridge.Engine.CapabilityPolicy.Denied(Bimbridge.Engine.ExecutionProfile.RestrictedAutonomous, caps);
@@ -120,18 +120,18 @@ namespace Bimbridge.Tests
         public static IEnumerable<object[]> Years() => RefVersion.Keys.OrderBy(y => y).Select(y => new object[] { y });
 
         [Theory, MemberData(nameof(Years))]
-        public void Lavamanos_CompilesAgainstEachYearsApi(int year)
+        public void Washbasin_CompilesAgainstEachYearsApi(int year)
         {
             var code = File.ReadAllText(Path.Combine(Root, "tools", "acceptance", "washbasin_exec.cs"));
             var (dll, diags) = Compile(code, year);
             Assert.True(dll != null, year + ": " + string.Join("\n", diags));
         }
 
-        /// <summary>The recipes shipped by the installer (src/Bimbridge.Addin/recetas) and a script that uses Bim.* compile for all 5 years.</summary>
+        /// <summary>The recipes shipped by the installer (src/Bimbridge.Addin/recipes) and a script that uses Bim.* compile for all 5 years.</summary>
         [Theory, MemberData(nameof(Years))]
         public void BuiltInRecipesAndBimHelpers_Compile(int year)
         {
-            var dir = Path.Combine(Root, "src", "Bimbridge.Addin", "recetas");
+            var dir = Path.Combine(Root, "src", "Bimbridge.Addin", "recipes");
             var files = Directory.GetFiles(dir, "*.cs");
             Assert.True(files.Length >= 4);
             foreach (var f in files)
@@ -146,8 +146,8 @@ namespace Bimbridge.Tests
                 var (db, gb) = Compile(File.ReadAllText(f), year);
                 Assert.True(db != null, year + " " + Path.GetFileName(f) + ": " + string.Join("\n", gb));
             }
-            var body = "var v = Bim.Montaje.Vista3D(doc);\nvar g = new FilteredElementCollector(doc).OfClass(typeof(Group)).Cast<Group>().FirstOrDefault();\n" +
-                       "var vp = doc.ActiveView as ViewPlan;\nreturn new { g = g == null ? null : Bim.Grupos.Inspeccionar(g), r = vp == null ? null : Bim.Vistas.Rango(vp), x = Bim.Montaje.Transformacion(Transform.Identity).Mirrored };";
+            var body = "var v = Bim.Mounting.View3D(doc);\nvar g = new FilteredElementCollector(doc).OfClass(typeof(Group)).Cast<Group>().FirstOrDefault();\n" +
+                       "var vp = doc.ActiveView as ViewPlan;\nreturn new { g = g == null ? null : Bim.Groups.Inspect(g), r = vp == null ? null : Bim.Views.Range(vp), x = Bim.Mounting.Transformation(Transform.Identity).Mirrored };";
             var (d2, g2) = Compile(body, year);
             Assert.True(d2 != null, string.Join("\n", g2));
         }

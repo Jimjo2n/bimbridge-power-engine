@@ -395,8 +395,8 @@ namespace Bimbridge.Setup
             host.Keys = () => keys;
             host.Policy = () => policy;
             var r = PendingApplier.Run(paths.UpdatesDir, host, TimeSpan.FromHours(24));
-            var estado = Convert.ToString(r["estado"]);
-            return Report(paths, estado == "aplicada_verificada" ? 0 : 1, "ZIP: " + estado + " — " + r["mensaje"]);
+            var status = Convert.ToString(r["estado"]);
+            return Report(paths, status == "aplicada_verificada" ? 0 : 1, "ZIP: " + status + " — " + r["mensaje"]);
         }
 
         private static int Report(SetupPaths p, int code, string text)

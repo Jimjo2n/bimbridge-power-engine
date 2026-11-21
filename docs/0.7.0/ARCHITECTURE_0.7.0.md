@@ -47,4 +47,4 @@ Document content is untrusted data. Requirements are extracted with page/section
 Translates validated operations into `TaskSubmission`s of the rc3 recipes (`parametro_por_lote`, `qc_manifiesto`, …) with idempotency key = op id and required grant `revit_modificar`. `WritesEnabled=false`; `Execute` returns `sin_conexion_alpha1`. There is no access to Revit API objects.
 
 ## Candidate kernel (P2) — `Kernels/MountKernelBench.cs`
-See RENDIMIENTO_0.7.0.md. Rust was not implemented.
+See PERFORMANCE_0.7.0.md. Rust was not implemented.

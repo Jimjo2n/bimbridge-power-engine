@@ -41,7 +41,7 @@ namespace BimBridge.PowerEngine.Workflows
 
     public sealed class RegistrationResult
     {
-        public string Estado = "ok", Motivo;
+        public string State = "ok", Reason;
         /// <summary>Page (pt, visible) → model (feet) as 3×4 (z is preserved). Includes the link if one was given.</summary>
         public double[] M;
         public double FtPerPt, RotationDeg, Tx, Ty, RevitScale;
@@ -49,13 +49,13 @@ namespace BimBridge.PowerEngine.Workflows
         public double RmsFt, MaxFt;
         public List<AnchorResidual> Anchors = new List<AnchorResidual>();
         public List<string> Warnings = new List<string>();
-        public bool Ok => Estado == "ok";
+        public bool Ok => State == "ok";
 
         public (double X, double Y) Map(double px, double py) => (M[0] * px + M[1] * py + M[3], M[4] * px + M[5] * py + M[7]);
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["estado"] = Estado, ["motivo"] = Motivo, ["matriz"] = M?.Select(v => (object)Math.Round(v, 12)).ToList(),
+            ["estado"] = State, ["motivo"] = Reason, ["matriz"] = M?.Select(v => (object)Math.Round(v, 12)).ToList(),
             ["pies_por_pt"] = Math.Round(FtPerPt, 9), ["escala_revit"] = Math.Round(RevitScale, 3), ["giro_deg"] = Math.Round(RotationDeg, 4),
             ["traslacion_ft"] = new List<object> { Math.Round(Tx, 5), Math.Round(Ty, 5) }, ["reflejado"] = Reflected,
             ["rms_ft"] = Math.Round(RmsFt, 5), ["max_ft"] = Math.Round(MaxFt, 5), ["anclas"] = Anchors.Select(a => (object)a.ToJson()).ToList(),
@@ -229,6 +229,6 @@ namespace BimBridge.PowerEngine.Workflows
 
         private static bool Finite(params double[] v) => v.All(x => !double.IsNaN(x) && !double.IsInfinity(x));
 
-        private static RegistrationResult Fail(RegistrationResult r, string estado, string motivo) { r.Estado = estado; r.Motivo = motivo; return r; }
+        private static RegistrationResult Fail(RegistrationResult r, string status, string reason) { r.State = status; r.Reason = reason; return r; }
     }
 }

@@ -14,16 +14,16 @@ namespace Bimbridge.Engine.Workflow
     /// </summary>
     public static class DeliveryStages
     {
-        public const string PlanGenerado = "plan_generado", PlanValidado = "plan_validado", PlanAutorizado = "plan_autorizado",
-            Ejecutada = "operacion_ejecutada", CommitConfirmado = "commit_confirmado", EstadoObservado = "estado_observado",
-            Guardado = "cambios_guardados", Sincronizado = "modelo_sincronizado", SetPersistido = "set_laminas_persistido",
-            Exportado = "archivo_exportado", ArtefactoVerificado = "artefacto_verificado", EntregaConfirmada = "entrega_confirmada";
+        public const string PlanGenerated = "plan_generado", PlanValidated = "plan_validado", PlanAuthorized = "plan_autorizado",
+            OperationRun = "operacion_ejecutada", CommitConfirmed = "commit_confirmado", StateObserved = "estado_observado",
+            Saved = "cambios_guardados", Synced = "modelo_sincronizado", SheetSetPersisted = "set_laminas_persistido",
+            Exported = "archivo_exportado", ArtifactVerified = "artefacto_verificado", DeliveryConfirmed = "entrega_confirmada";
 
         /// <summary>Canonical order. Guardado/Sincronizado/Set are optional depending on the delivery (see <see cref="DeliveryTrack.Required"/>).</summary>
         public static readonly string[] Order =
         {
-            PlanGenerado, PlanValidado, PlanAutorizado, Ejecutada, CommitConfirmado, EstadoObservado,
-            Guardado, Sincronizado, SetPersistido, Exportado, ArtefactoVerificado, EntregaConfirmada,
+            PlanGenerated, PlanValidated, PlanAuthorized, OperationRun, CommitConfirmed, StateObserved,
+            Saved, Synced, SheetSetPersisted, Exported, ArtifactVerified, DeliveryConfirmed,
         };
 
         /// <summary>
@@ -33,24 +33,24 @@ namespace Bimbridge.Engine.Workflow
         /// </summary>
         public static readonly HashSet<string> Critical = new HashSet<string>
         {
-            CommitConfirmado, EstadoObservado, Guardado, Sincronizado, SetPersistido, Exportado, ArtefactoVerificado, EntregaConfirmada,
+            CommitConfirmed, StateObserved, Saved, Synced, SheetSetPersisted, Exported, ArtifactVerified, DeliveryConfirmed,
         };
 
         /// <summary>What each milestone's receipt must carry (besides document and revision).</summary>
         public static readonly Dictionary<string, string[]> ReceiptFields = new Dictionary<string, string[]>
         {
-            [PlanGenerado] = new[] { "plan_id" },
-            [PlanValidado] = new[] { "plan_id", "validador" },
-            [PlanAutorizado] = new[] { "plan_id", "autoriza" },
-            [Ejecutada] = new[] { "plan_id" },
-            [CommitConfirmado] = new[] { "plan_id", "rev" },
-            [EstadoObservado] = new[] { "rev", "lectura" },
-            [Guardado] = new[] { "huella_disco" },
-            [Sincronizado] = new[] { "central", "huella_central" },
-            [SetPersistido] = new[] { "set", "laminas" },
-            [Exportado] = new[] { "archivo", "sha256" },
-            [ArtefactoVerificado] = new[] { "archivo", "sha256", "paginas" },
-            [EntregaConfirmada] = new[] { "confirma" },
+            [PlanGenerated] = new[] { "plan_id" },
+            [PlanValidated] = new[] { "plan_id", "validador" },
+            [PlanAuthorized] = new[] { "plan_id", "autoriza" },
+            [OperationRun] = new[] { "plan_id" },
+            [CommitConfirmed] = new[] { "plan_id", "rev" },
+            [StateObserved] = new[] { "rev", "lectura" },
+            [Saved] = new[] { "huella_disco" },
+            [Synced] = new[] { "central", "huella_central" },
+            [SheetSetPersisted] = new[] { "set", "laminas" },
+            [Exported] = new[] { "archivo", "sha256" },
+            [ArtifactVerified] = new[] { "archivo", "sha256", "paginas" },
+            [DeliveryConfirmed] = new[] { "confirma" },
         };
     }
 
@@ -110,17 +110,17 @@ namespace Bimbridge.Engine.Workflow
                 var origin = Arg.GetString(r.Data, "origen");
                 if (string.IsNullOrWhiteSpace(origin)) return r.Stage + ": provenance is missing (origen: operation or person that produced it)";
                 var ev = Arg.GetString(r.Data, "evidencia");
-                if (r.Stage == DeliveryStages.EntregaConfirmada)
+                if (r.Stage == DeliveryStages.DeliveryConfirmed)
                 {
                     if (!origin.StartsWith("usuario:", StringComparison.OrdinalIgnoreCase)) return r.Stage + ": the delivery confirmation is given by a person (origen=usuario:…), not the agent";
                 }
-                else if (ev != Confidence.Comprobado)
+                else if (ev != Confidence.Verified)
                     return r.Stage + ": the evidence is " + (ev ?? "(not stated)") + "; a critical milestone requires COMPROBADO (observed by BIMBRIDGE), not a reported result";
             }
             // 0.9.0: the exported artifact and its verification must be from the SAME revision (not merely not earlier)
-            if (r.Stage == DeliveryStages.ArtefactoVerificado)
+            if (r.Stage == DeliveryStages.ArtifactVerified)
             {
-                var exp0 = Receipts.FirstOrDefault(x => x.Stage == DeliveryStages.Exportado);
+                var exp0 = Receipts.FirstOrDefault(x => x.Stage == DeliveryStages.Exported);
                 if (exp0 != null && exp0.Revision != null && !string.Equals(exp0.Revision, r.Revision, StringComparison.Ordinal))
                     return "artefacto_verificado: revision " + r.Revision + " was verified but revision " + exp0.Revision + " was exported";
             }
@@ -128,12 +128,12 @@ namespace Bimbridge.Engine.Workflow
             var lastRev = Receipts.LastOrDefault(x => x.Revision != null)?.Revision;
             if (lastRev != null && r.Revision != null && CompareRev(r.Revision, lastRev) < 0)
                 return r.Stage + ": the receipt is from revision " + r.Revision + ", earlier than " + lastRev + " (stale artifact)";
-            if (r.Stage == DeliveryStages.ArtefactoVerificado)
+            if (r.Stage == DeliveryStages.ArtifactVerified)
             {
-                var exp = Receipts.FirstOrDefault(x => x.Stage == DeliveryStages.Exportado);
+                var exp = Receipts.FirstOrDefault(x => x.Stage == DeliveryStages.Exported);
                 if (exp != null && !string.Equals(Arg.GetString(exp.Data, "sha256"), Arg.GetString(r.Data, "sha256"), StringComparison.OrdinalIgnoreCase))
                     return "artefacto_verificado: the verified file is not the exported one (different sha256)";
-                var set = Receipts.FirstOrDefault(x => x.Stage == DeliveryStages.SetPersistido);
+                var set = Receipts.FirstOrDefault(x => x.Stage == DeliveryStages.SheetSetPersisted);
                 var expected = set == null ? null : Arg.GetLong(set.Data, "laminas");
                 var pages = Arg.GetLong(r.Data, "paginas");
                 if (expected.HasValue && pages.HasValue && expected.Value != pages.Value)

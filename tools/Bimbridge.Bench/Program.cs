@@ -463,11 +463,11 @@ namespace Bimbridge.Bench
 
             // 1) Fixed cost per session: tool list + server instructions (measured from the real bridge)
             var bridgeDll = typeof(Bimbridge.Bridge.Program).Assembly.Location;
-            var perfil = Environment.GetEnvironmentVariable("BIMBRIDGE_PROFILE") ?? "compacto";
+            var profile = Environment.GetEnvironmentVariable("BIMBRIDGE_PROFILE") ?? "compacto";
             var transport = new StdioClientTransport(new StdioClientTransportOptions
             {
                 Name = "bench", Command = "dotnet", Arguments = new[] { bridgeDll },
-                EnvironmentVariables = new Dictionary<string, string> { ["BIMBRIDGE_PIPE"] = "Bimbridge.bench.nobody", ["BIMBRIDGE_PROFILE"] = perfil },
+                EnvironmentVariables = new Dictionary<string, string> { ["BIMBRIDGE_PIPE"] = "Bimbridge.bench.nobody", ["BIMBRIDGE_PROFILE"] = profile },
             });
             await using (var c = await McpClient.CreateAsync(transport, new McpClientOptions { ClientInfo = new Implementation { Name = "bench", Version = "1" } }))
             {
@@ -480,8 +480,8 @@ namespace Bimbridge.Bench
                     perTool[t.Name] = (long)size;
                     total += size;
                 }
-                var instr = (perfil == "completo" ? Bimbridge.Bridge.Program.Instructions : Bimbridge.Bridge.CompactTools.Instructions).Length;
-                d["perfil"] = perfil;
+                var instr = (profile == "completo" ? Bimbridge.Bridge.Program.Instructions : Bimbridge.Bridge.CompactTools.Instructions).Length;
+                d["perfil"] = profile;
                 d["herramientas"] = (long)tools.Count;
                 d["esquemas_chars"] = total;
                 d["instrucciones_chars"] = (long)instr;
@@ -498,15 +498,15 @@ namespace Bimbridge.Bench
             void Case(string name, Dictionary<string, object> args, Func<List<Dictionary<string, object>>, string> naive, string aiRequest)
             {
                 var q = QuerySpec.Parse(args);
-                var datos = (Dictionary<string, object>)ResultTable.Build(q, rows, out _);
-                datos["rev"] = 4821L; datos["ms"] = 212L;
-                var mcp = Json.Write(datos);
+                var data = (Dictionary<string, object>)ResultTable.Build(q, rows, out _);
+                data["rev"] = 4821L; data["ms"] = 212L;
+                var mcp = Json.Write(data);
                 var script = naive(rows);
                 cases[name] = new Dictionary<string, object>
                 {
                     ["pide_ia_chars"] = (long)aiRequest.Length,
                     ["mcp_chars"] = (long)mcp.Length,
-                    ["compacto_chars"] = (long)CompactText.Write(datos).Length,
+                    ["compacto_chars"] = (long)CompactText.Write(data).Length,
                     ["script_chars"] = (long)script.Length,
                     ["ahorro_respuesta"] = Math.Round(1 - (double)mcp.Length / script.Length, 3),
                 };

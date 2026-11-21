@@ -33,7 +33,7 @@ Legacy assembly names remain for compatibility. Repository organization follows 
 
 1. [Development and build](DEVELOPMENT.md).
 2. [Architecture](0.9.0/POWER_ENGINE_ARCHITECTURE.md).
-3. [Capabilities](MATRIZ_CAPACIDADES.md).
+3. [Capabilities](CAPABILITY_MATRIX.md).
 4. [Execution policy](0.9.0/DYNAMIC_CODE_EXECUTION_POLICY.md).
 5. [Native validation](0.9.0/NATIVE_VALIDATION.md).
 6. [Contribution and review process](../CONTRIBUTING.md).

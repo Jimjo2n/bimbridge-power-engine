@@ -152,10 +152,10 @@ namespace Bimbridge.Addin.Ui
             // Fail-closed: with unreconciled operations the plan stays in the queue and the model is not touched.
             var key0 = DocumentTracker.KeyOf(doc) ?? p.DocKey;
             if (p.ReceiptDocPrint != null && !string.Equals(DocRegistry.Instance.IdentityOf(doc)?.Print, p.ReceiptDocPrint, StringComparison.Ordinal))
-                return new PlanOps.ApplyResult { Status = PlanStatus.Retenido, Detail = "The active document does not match the fingerprint of the held attempt." };
+                return new PlanOps.ApplyResult { Status = PlanStatus.Held, Detail = "The active document does not match the fingerprint of the held attempt." };
             try { Plans.LoadPersisted(key0); } catch (Exception ex) { Log("Queue: " + ex.Message); }
             var block0 = Plans.CheckWritable(key0);
-            if (block0.Blocked) { Log("Queue: plan " + p.Id + " NOT applied: " + block0.Message); return new PlanOps.ApplyResult { Status = PlanStatus.Retenido, Detail = block0.Message }; }
+            if (block0.Blocked) { Log("Queue: plan " + p.Id + " NOT applied: " + block0.Message); return new PlanOps.ApplyResult { Status = PlanStatus.Held, Detail = block0.Message }; }
             // R01: durable intent BEFORE touching the model (AuditGate); without it nothing is applied. Result afterwards.
             var ex0 = new Dictionary<string, object> { ["plan"] = p.Id, ["cambios"] = (long)p.Entries.Count };
             if (p.ReceiptAttempt != null)
@@ -172,9 +172,9 @@ namespace Bimbridge.Addin.Ui
                 catch (Exception ex) when (ex is DocWriteBlockedException || ex is PlanStoreException)
                 {
                     Log("Queue: plan " + p.Id + " NOT applied: " + ex.Message);
-                    return new PlanOps.ApplyResult { Status = PlanStatus.Retenido, Detail = ex.Message };
+                    return new PlanOps.ApplyResult { Status = PlanStatus.Held, Detail = ex.Message };
                 }
-                p.Status = PlanStatus.EnProceso;
+                p.Status = PlanStatus.InProgress;
                 PlanOps.ApplyResult r;
                 Tracker.CurrentWriter = p.SessionId;
                 try { r = PlanOps.Apply(doc, p, Config.SubBatchSize, Theme.ClientName(p.Client ?? p.SessionId)); }
@@ -182,7 +182,7 @@ namespace Bimbridge.Addin.Ui
                 {
                     // An exception after starting does not prove it was rolled back.
                     GroupAbort.PreserveInterrupted(p, ex.GetType().Name + ": " + ex.Message);
-                    r = new PlanOps.ApplyResult { Status = Bimbridge.Protocol.Status.Desconocido, Detail = ex.Message };
+                    r = new PlanOps.ApplyResult { Status = Bimbridge.Protocol.Status.Unknown, Detail = ex.Message };
                 }
                 finally { Tracker.CurrentWriter = null; }
                 Plans.Finish(p, r.Status, r.Detail);
@@ -193,15 +193,15 @@ namespace Bimbridge.Addin.Ui
                 }
                 catch (Exception ex) { Log("Queue: could not save the created elements: " + ex.Message); }
                 ex0["detalle"] = r.Detail;
-                if (r.Status == PlanStatus.Aplicado && PlanVerification.Postconditions(p.Verification) != PlanVerification.Met)
-                    ex0["estado_recibo"] = Bimbridge.Protocol.Status.ConDiferencias;
+                if (r.Status == PlanStatus.Applied && PlanVerification.Postconditions(p.Verification) != PlanVerification.Met)
+                    ex0["estado_recibo"] = Bimbridge.Protocol.Status.CompletedWithDifferences;
                 Journal?.Log(p.SessionId, "aplicar_cola", r.Status, sw.ElapsedMilliseconds, ex0);
                 MarkDirty();
                 return r;
             }, r => r.Status, why =>
             {
                 Log("Queue: plan " + p.Id + " NOT applied: " + why);
-                return new PlanOps.ApplyResult { Status = PlanStatus.Revertido, Detail = why };
+                return new PlanOps.ApplyResult { Status = PlanStatus.RolledBack, Detail = why };
             }, (r, why) =>
             {
                 // rc3: what was applied stays applied; the plan is flagged and the client sees it as unverified.

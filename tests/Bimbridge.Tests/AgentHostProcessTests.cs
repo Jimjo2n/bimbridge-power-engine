@@ -74,15 +74,15 @@ namespace Bimbridge.Tests
             Assert.Equal(0, AH.TxCount(c.Model, c.Hash, c.SetOp));
             var m = DurableSimModel.Open(c.Model);
             Assert.All(m.Targets(new Dictionary<string, object> { ["categoria"] = AH.Cat }), id => Assert.Null(m.Get(id, "Mounting Height")));
-            Assert.Equal(OpState.EnEjecucion, AH.StateOf(c.State, c.SetOp));
+            Assert.Equal(OpState.Running, AH.StateOf(c.State, c.SetOp));
 
             var r2 = Exec(c);
             Assert.Equal(0, r2.Code);
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));
-            Assert.Equal(2, AH.Transitions(c.State, c.SetOp, OpState.EnEjecucion));   // attempt 1 (crashed) + attempt 2 (after observing there was no effect)
+            Assert.Equal(2, AH.Transitions(c.State, c.SetOp, OpState.Running));   // attempt 1 (crashed) + attempt 2 (after observing there was no effect)
             Assert.Contains(AH.Notes(c.State, c.SetOp), n => ((Dictionary<string, object>)n["datos"])["efecto"].ToString() == "NoObservado");
             var st = AH.Read(c.State, out _, out _);
-            Assert.Equal(OpState.Verificada, st.Ops[c.SetOp].State);
+            Assert.Equal(OpState.Verified, st.Ops[c.SetOp].State);
             Assert.Equal(5L, Arg.GetLong(st.Ops[c.SetOp].Result, "cambiados"));
         }
 
@@ -95,14 +95,14 @@ namespace Bimbridge.Tests
             var r2 = Exec(c);
             Assert.Equal(0, r2.Code);
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));
-            Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.EnEjecucion));
+            Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.Running));
             var st = AH.Read(c.State, out _, out _);
             var rec = st.Ops[c.SetOp];
-            Assert.Equal(OpState.Verificada, rec.State);
+            Assert.Equal(OpState.Verified, rec.State);
             Assert.Equal(true, rec.Result["recuperada"]);
             Assert.Equal(5L, Arg.GetLong(rec.Result, "elementos"));        // rebuilt from the transaction, not invented
             Assert.Equal("Satisfechas", Arg.GetString(rec.Evidence, "postcondiciones"));
-            Assert.Equal(OpState.Verificada, st.Ops[c.QcOp].State);
+            Assert.Equal(OpState.Verified, st.Ops[c.QcOp].State);
         }
 
         [Fact]
@@ -114,10 +114,10 @@ namespace Bimbridge.Tests
             Assert.Equal(2, r2.Code);
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));
             var st = AH.Read(c.State, out _, out _);
-            Assert.Equal(OpState.Fallida, st.Ops[c.SetOp].State);
-            Assert.Equal(ErrorClass.Verificacion, st.Ops[c.SetOp].Error);
+            Assert.Equal(OpState.Failed, st.Ops[c.SetOp].State);
+            Assert.Equal(ErrorClass.Verification, st.Ops[c.SetOp].Error);
             Assert.Contains("expected 5, got 6", st.Ops[c.SetOp].Note);
-            Assert.Equal(OpState.Bloqueada, st.Ops[c.QcOp].State);
+            Assert.Equal(OpState.Blocked, st.Ops[c.QcOp].State);
         }
 
         [Fact]
@@ -125,12 +125,12 @@ namespace Bimbridge.Tests
         {
             var c = Setup();
             AssertCrashedAt(c, Exec(c, "runner.tras_ejecutar@" + c.SetOp), "runner.tras_ejecutar");
-            Assert.Equal(OpState.EnEjecucion, AH.StateOf(c.State, c.SetOp));    // the result never reached the journal
+            Assert.Equal(OpState.Running, AH.StateOf(c.State, c.SetOp));    // the result never reached the journal
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));             // but the transaction did reach the model
             Assert.Equal(0, Exec(c).Code);
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));
-            Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.EnEjecucion));
-            Assert.Equal(OpState.Verificada, AH.StateOf(c.State, c.SetOp));
+            Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.Running));
+            Assert.Equal(OpState.Verified, AH.StateOf(c.State, c.SetOp));
         }
 
         [Fact]
@@ -138,11 +138,11 @@ namespace Bimbridge.Tests
         {
             var c = Setup();
             AssertCrashedAt(c, Exec(c, "runner.en_verificacion@" + c.SetOp), "runner.en_verificacion");
-            Assert.Equal(OpState.Ejecutada, AH.StateOf(c.State, c.SetOp));
+            Assert.Equal(OpState.Executed, AH.StateOf(c.State, c.SetOp));
             Assert.Equal(0, Exec(c).Code);
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));
-            Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.EnEjecucion));
-            Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.Verificada));
+            Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.Running));
+            Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.Verified));
         }
 
         [Fact]
@@ -150,11 +150,11 @@ namespace Bimbridge.Tests
         {
             var c = Setup();
             AssertCrashedAt(c, Exec(c, "runner.tras_verificar@" + c.SetOp), "runner.tras_verificar");
-            Assert.Equal(OpState.Ejecutada, AH.StateOf(c.State, c.SetOp));
+            Assert.Equal(OpState.Executed, AH.StateOf(c.State, c.SetOp));
             Assert.Equal(0, Exec(c).Code);
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));
-            Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.EnEjecucion));
-            Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.Verificada));
+            Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.Running));
+            Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.Verified));
         }
 
         [Fact]
@@ -167,11 +167,11 @@ namespace Bimbridge.Tests
             Assert.Equal(2, r2.Code);
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));                      // proven by the compacted count
             var st = AH.Read(c.State, out _, out _);
-            Assert.Equal(OpState.RequiereVerificacion, st.Ops[c.SetOp].State);
-            Assert.Equal(ErrorClass.EvidenciaInsuficiente, st.Ops[c.SetOp].Error);
+            Assert.Equal(OpState.NeedsVerification, st.Ops[c.SetOp].State);
+            Assert.Equal(ErrorClass.InsufficientEvidence, st.Ops[c.SetOp].Error);
             Assert.Equal("Satisfechas", Arg.GetString(st.Ops[c.SetOp].Evidence, "postcondiciones"));
             Assert.Null(st.Ops[c.SetOp].Result);                                          // no fabricated result
-            Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.EnEjecucion));
+            Assert.Equal(1, AH.Transitions(c.State, c.SetOp, OpState.Running));
         }
 
         [Fact]
@@ -184,8 +184,8 @@ namespace Bimbridge.Tests
             Assert.Equal(2, Exec(c).Code);
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));
             var st = AH.Read(c.State, out _, out _);
-            Assert.Equal(OpState.RequiereReconciliar, st.Ops[c.SetOp].State);
-            Assert.Equal(ErrorClass.EfectoParcial, st.Ops[c.SetOp].Error);
+            Assert.Equal(OpState.NeedsReconciliation, st.Ops[c.SetOp].State);
+            Assert.Equal(ErrorClass.PartialEffect, st.Ops[c.SetOp].Error);
         }
 
         [Fact]
@@ -198,8 +198,8 @@ namespace Bimbridge.Tests
             m.CommitExternal(new List<object[]> { new object[] { first, "Mounting Height", 2700L, 3000L } });
             Assert.Equal(2, Exec(c).Code);
             var st = AH.Read(c.State, out _, out _);
-            Assert.Equal(OpState.Fallida, st.Ops[c.SetOp].State);
-            Assert.Equal(ErrorClass.Verificacion, st.Ops[c.SetOp].Error);
+            Assert.Equal(OpState.Failed, st.Ops[c.SetOp].State);
+            Assert.Equal(ErrorClass.Verification, st.Ops[c.SetOp].Error);
             Assert.Contains("4/5", st.Ops[c.SetOp].Note);
             Assert.Equal(1, AH.TxCount(c.Model, c.Hash, c.SetOp));
         }
@@ -222,7 +222,7 @@ namespace Bimbridge.Tests
             _out.WriteLine(r1.ToString());
             Assert.True(r1.Killed, r1.ToString());
             var mid = AH.Read(state, out _, out _);
-            Assert.Equal(8, mid.Ops.Values.Count(o => o.State == OpState.Verificada));
+            Assert.Equal(8, mid.Ops.Values.Count(o => o.State == OpState.Verified));
             // a new operating system process, with only what is on disk
             AH.ExpireDeadLease(state);
             var r2 = AH.Run(null, null, "ejecutar", "-", state, "--modelo", model);
@@ -234,7 +234,7 @@ namespace Bimbridge.Tests
                 Assert.Equal(1, fresh.TxFor(op.Id, hash).Count);
                 Assert.All(fresh.Targets(new Dictionary<string, object> { ["categoria"] = AH.Cat }), id => Assert.True(Values.Same(op.Params["valor"], fresh.Get(id, (string)op.Params["parametro"]))));
             }
-            Assert.Equal(20, AH.Read(state, out _, out _).Ops.Values.Count(o => o.State == OpState.Verificada));
+            Assert.Equal(20, AH.Read(state, out _, out _).Ops.Values.Count(o => o.State == OpState.Verified));
         }
 
         [Fact]
@@ -265,7 +265,7 @@ namespace Bimbridge.Tests
             Assert.Equal(4, r.Code);
             Assert.Contains("lease_perdido", r.Out);
             foreach (var op in c.Plan.Ops) Assert.Equal(0, AH.TxCount(c.Model, c.Hash, op.Id));     // no write
-            Assert.Equal(0, AH.Transitions(c.State, c.SetOp, OpState.EnEjecucion));                  // it did not even start
+            Assert.Equal(0, AH.Transitions(c.State, c.SetOp, OpState.Running));                  // it did not even start
             // No race: the next process (expired lease) takes the plan with a higher fencing token and completes it exactly once.
             var r2 = AH.Run(null, null, "ejecutar", c.PlanFile, c.State, "--modelo", c.Model, "--lease-ms", CrashTestLeaseMs);
             Assert.Equal(0, r2.Code);
@@ -370,7 +370,7 @@ namespace Bimbridge.Tests
             Assert.True(r2.Code == 0, r2.ToString());
             Assert.Equal(1, AH.TxCount(model, AH.Hash(plan), opId));
             var st = AH.Read(state, out _, out _);
-            Assert.Equal(OpState.Verificada, st.Ops[opId].State);
+            Assert.Equal(OpState.Verified, st.Ops[opId].State);
             var m = DurableSimModel.Open(model);
             Assert.All(ids, i => Assert.Equal("V" + i, m.Get(i, "Comments")));
         }

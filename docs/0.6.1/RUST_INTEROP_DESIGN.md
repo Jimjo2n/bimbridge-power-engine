@@ -70,4 +70,4 @@ public sealed class ComputeResult
 4. Measuring extraction time on the Revit thread (which Rust cannot speed up) is mandatory before step 1: if it dominates, extraction is optimized, not computation.
 
 ## Addendum 0.7.0-alpha1 — concrete candidate
-Kernel identified: `TriMesh.Extent` (vertical point→mesh ray for mounting). C# bench in `src/Bimbridge.AgentHost/Kernels/MountKernelBench.cs`, command `agenthost banco-kernel`. Baseline and decision in `docs/0.7.0/RENDIMIENTO_0.7.0.md`: ~1.2 µs/point with SIMD; Rust not justified until measured in real Revit. Deterministic binary input format and sha256 digest to compare a future implementation byte for byte.
+Kernel identified: `TriMesh.Extent` (vertical point→mesh ray for mounting). C# bench in `src/Bimbridge.AgentHost/Kernels/MountKernelBench.cs`, command `agenthost banco-kernel`. Baseline and decision in `docs/0.7.0/PERFORMANCE_0.7.0.md`: ~1.2 µs/point with SIMD; Rust not justified until measured in real Revit. Deterministic binary input format and sha256 digest to compare a future implementation byte for byte.

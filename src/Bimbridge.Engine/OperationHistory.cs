@@ -21,14 +21,14 @@ namespace Bimbridge.Engine
 
         public sealed class Record
         {
-            public string JobId, Kind, Session, Agent, Task, Estado, Error;
+            public string JobId, Kind, Session, Agent, Task, State, Error;
             public DateTime CreatedUtc, FinishedUtc;
             public long Ms;
             public string Retry;
 
             public Dictionary<string, object> ToJson() => new Dictionary<string, object>
             {
-                ["job_id"] = JobId, ["tipo"] = Kind, ["sesion"] = Session, ["agente"] = Agent, ["tarea"] = Task, ["estado"] = Estado, ["error"] = Error,
+                ["job_id"] = JobId, ["tipo"] = Kind, ["sesion"] = Session, ["agente"] = Agent, ["tarea"] = Task, ["estado"] = State, ["error"] = Error,
                 ["inicio"] = CreatedUtc.ToString("o", CultureInfo.InvariantCulture), ["fin"] = FinishedUtc.ToString("o", CultureInfo.InvariantCulture),
                 ["ms"] = Ms, ["reintento"] = Retry,
             };
@@ -36,7 +36,7 @@ namespace Bimbridge.Engine
             public static Record FromJson(Dictionary<string, object> d) => new Record
             {
                 JobId = Arg.GetString(d, "job_id"), Kind = Arg.GetString(d, "tipo"), Session = Arg.GetString(d, "sesion"), Agent = Arg.GetString(d, "agente"), Task = Arg.GetString(d, "tarea"),
-                Estado = Arg.GetString(d, "estado"), Error = Arg.GetString(d, "error"), Retry = Arg.GetString(d, "reintento"), Ms = Arg.GetLong(d, "ms") ?? 0,
+                State = Arg.GetString(d, "estado"), Error = Arg.GetString(d, "error"), Retry = Arg.GetString(d, "reintento"), Ms = Arg.GetLong(d, "ms") ?? 0,
                 CreatedUtc = DateTime.Parse(Arg.GetString(d, "inicio"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
                 FinishedUtc = DateTime.Parse(Arg.GetString(d, "fin"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
             };
@@ -48,14 +48,14 @@ namespace Bimbridge.Engine
         /// "revisar_diferencias" (AUD-14): it was applied, but the verification does not match what was requested; the differences
         /// must be reviewed or reconciled before accepting it, and the operation must NOT be repeated (it is already applied).
         /// </summary>
-        public static string RetryAdvice(string estado)
+        public static string RetryAdvice(string status)
         {
-            switch (estado)
+            switch (status)
             {
                 case Status.Ok: return "no_necesario";
-                case Status.ConDiferencias: return "revisar_diferencias";
-                case Status.Rechazado: case Status.Conflicto: case Status.Invalido: case Status.Vencido: case Status.Revertido: return "reintentable";
-                case Status.Cancelado: return "reconciliar_antes";   // it may have been cancelled midway
+                case Status.CompletedWithDifferences: return "revisar_diferencias";
+                case Status.Rejected: case Status.Conflict: case Status.Invalid: case Status.Expired: case Status.RolledBack: return "reintentable";
+                case Status.Cancelled: return "reconciliar_antes";   // it may have been cancelled midway
                 default: return "reconciliar_antes";
             }
         }
@@ -92,11 +92,11 @@ namespace Bimbridge.Engine
         {
             var r = new Record
             {
-                JobId = j.Id, Kind = j.Kind, Session = j.SessionId, Agent = j.AgentId, Task = j.Task, Estado = j.Estado, Error = j.Error,
+                JobId = j.Id, Kind = j.Kind, Session = j.SessionId, Agent = j.AgentId, Task = j.Task, State = j.State, Error = j.Error,
                 CreatedUtc = j.CreatedUtc, FinishedUtc = j.FinishedUtc ?? DateTime.UtcNow,
             };
             r.Ms = (long)(r.FinishedUtc - r.CreatedUtc).TotalMilliseconds;
-            r.Retry = RetryAdvice(r.Estado);
+            r.Retry = RetryAdvice(r.State);
             lock (_lock)
             {
                 Push(r);
@@ -153,17 +153,17 @@ namespace Bimbridge.Engine
 
         /// <summary>Query with a mandatory scope, filters (any may be null) and pagination; most recent first.
         /// Filters only narrow what is visible: asking for someone else's sesion= does not show it.</summary>
-        public (List<Record> Page, int Total) Query(Scope scope, string estado, string tipo, string sesion, DateTime? desde, string texto, int page = 1, int pageSize = 20)
+        public (List<Record> Page, int Total) Query(Scope scope, string status, string kind, string session, DateTime? since, string text, int page = 1, int pageSize = 20)
         {
             if (scope == null) throw new ArgumentNullException(nameof(scope));
             List<Record> all;
             lock (_lock) all = _ring.ToList();
             IEnumerable<Record> q = all.Where(scope.CanSee);
-            if (!string.IsNullOrWhiteSpace(estado)) q = q.Where(r => string.Equals(r.Estado, estado.Trim(), StringComparison.OrdinalIgnoreCase));
-            if (!string.IsNullOrWhiteSpace(tipo)) q = q.Where(r => (r.Kind ?? "").IndexOf(tipo.Trim(), StringComparison.OrdinalIgnoreCase) >= 0);
-            if (!string.IsNullOrWhiteSpace(sesion)) q = q.Where(r => string.Equals(r.Session, sesion.Trim(), StringComparison.OrdinalIgnoreCase) || string.Equals(r.Task, sesion.Trim(), StringComparison.OrdinalIgnoreCase));
-            if (desde.HasValue) q = q.Where(r => r.FinishedUtc >= desde.Value);
-            if (!string.IsNullOrWhiteSpace(texto)) q = q.Where(r => ((r.Kind ?? "") + " " + (r.Error ?? "") + " " + r.JobId).IndexOf(texto.Trim(), StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!string.IsNullOrWhiteSpace(status)) q = q.Where(r => string.Equals(r.State, status.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(kind)) q = q.Where(r => (r.Kind ?? "").IndexOf(kind.Trim(), StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!string.IsNullOrWhiteSpace(session)) q = q.Where(r => string.Equals(r.Session, session.Trim(), StringComparison.OrdinalIgnoreCase) || string.Equals(r.Task, session.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (since.HasValue) q = q.Where(r => r.FinishedUtc >= since.Value);
+            if (!string.IsNullOrWhiteSpace(text)) q = q.Where(r => ((r.Kind ?? "") + " " + (r.Error ?? "") + " " + r.JobId).IndexOf(text.Trim(), StringComparison.OrdinalIgnoreCase) >= 0);
             var list = q.ToList();
             var size = Math.Max(1, Math.Min(100, pageSize));
             return (list.Skip((Math.Max(1, page) - 1) * size).Take(size).ToList(), list.Count);

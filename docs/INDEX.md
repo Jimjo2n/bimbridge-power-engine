@@ -17,8 +17,8 @@
 
 ## Users
 - [Recipes](RECIPES.md)
-- [Capabilities](MATRIZ_CAPACIDADES.md)
-- [Compact tool schema](ESQUEMA_HERRAMIENTAS_compacto.json) and [complete tool schema](ESQUEMA_HERRAMIENTAS_completo.json); consult source for current behavior
+- [Capabilities](CAPABILITY_MATRIX.md)
+- [Compact tool schema](TOOL_SCHEMA_compact.json) and [complete tool schema](TOOL_SCHEMA_complete.json); consult source for current behavior
 
 ## Developers
 - [Project overview](PROJECT_OVERVIEW.md)

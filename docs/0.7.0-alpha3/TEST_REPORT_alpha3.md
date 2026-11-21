@@ -15,13 +15,13 @@ There used to be 326 tests, with one failing (`Key_ConcurrentInitialisation_Prod
 
 | Test | What it shows |
 |---|---|
-| `AgentHostRevitTests.Trial_FromAgentHost_IsEnsayada_ModelUnchanged_NothingPersisted` | The full path AgentHost → pipe → plan/commit trial: status `ensayada`, identical model and no persistent commit |
+| `AgentHostRevitTests.Trial_FromAgentHost_IsTrialed_ModelUnchanged_NothingPersisted` | The full path AgentHost → pipe → plan/commit trial: status `ensayada`, identical model and no persistent commit |
 | `…WritesNeedOperatorAuthorization_AndMatchingMode` | Without `RealWrites`, or with a different mode, the plan is rejected before touching anything |
 | `…Identity_WrongPid_ReadOnlyLevels_Workshared_AndOtherDocument_AreRefused` | Rejections for a foreign PID, level R, workshared document and a different fingerprint; never auto-selects |
-| `…TrialThatDoesNotRestore_IsNeverReportedAsEnsayada` | A trial that leaves changes ends in `requiere_reconciliar` |
+| `…TrialThatDoesNotRestore_IsNeverReportedAsTrialed` | A trial that leaves changes ends in `requiere_reconciliar` |
 | `…PlanOutsideScope_IsRejected_BeforeAnyCommit` | If the add-in plans ids outside the scope, it is discarded without a commit |
 | `…PersistentCommit_TimesOutAfterApplying_IsObserved_NotRepeated` | Timeout after applying: uncertain effect, observed, 1 commit and verified |
-| `…Semantics_ConsultaIsRead_EnsayoIsWrite` | `exec` classification |
+| `…Semantics_QueryIsRead_TrialIsWrite` | `exec` classification |
 | `…Nrt03_AgentHostCrash_AtEachPoint_ResumesWithoutDuplicateCommit` ×5 | AgentHost crash before sending, after a possible commit, after running without recording, during verification and after verifying without recording. In all 5 cases: 1 commit, verified and the out-of-scope element intact |
 | `PlanQueueTests` ×3 | An Enqueue during execution causes a single repeat and never concurrent runs; 600 enqueues across 10 plans with 6 workers without overlaps; full queue and idempotency |
 | `ChainLogStreamingTests` ×2 | A journal of about 40 MB and 40,000 records opens in streaming mode; corruption in the middle is still an error and a truncated tail is trimmed |

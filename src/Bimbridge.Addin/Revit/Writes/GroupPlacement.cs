@@ -28,7 +28,7 @@ namespace Bimbridge.Addin.Revit.Writes
         {
             var members = group.GetMemberIds().Select(group.Document.GetElement).ToArray();
             if (members.Any(e => e == null)) throw new QueryException("members are missing while checking the group");
-            return Home.Sha256Hex(OpSemantics.Canonical(members.Select(e => Bim.Grupos.Firma(group, e))
+            return Home.Sha256Hex(OpSemantics.Canonical(members.Select(e => Bim.Groups.Signature(group, e))
                 .OrderBy(x => x, StringComparer.Ordinal).ToList()));
         }
 

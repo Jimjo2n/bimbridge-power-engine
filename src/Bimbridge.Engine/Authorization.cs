@@ -30,32 +30,32 @@ namespace Bimbridge.Engine
     public static class Capability
     {
         /// <summary>Modify the model (recipe transactions).</summary>
-        public const string Modificar = "revit_modificar";
-        public const string Guardar = "revit_guardar";
+        public const string Modify = "revit_modificar";
+        public const string Save = "revit_guardar";
         public const string Sync = "revit_sync";
-        public const string Exportar = "revit_exportar";
-        public const string ArchivoEscritura = "archivo_escritura";
+        public const string Export = "revit_exportar";
+        public const string FileWrite = "archivo_escritura";
         /// <summary>Reconcile a doubtful unit as NOT applied (causes it to run again).</summary>
-        public const string ReconciliarNoAplicada = "reconciliar_no_aplicada";
+        public const string ReconcileNotApplied = "reconciliar_no_aplicada";
         /// <summary>Autonomously run a recipe that is NOT one of the installed ones (user file, inline codigo=, saved script).
         /// The grant binds task + document, and the task binds the recipe's exact SHA-256 (content fingerprint): approving means approving THAT code.</summary>
-        public const string RecetaExterna = "receta_externa";
+        public const string ExternalRecipe = "receta_externa";
         /// <summary>DLL references outside the trusted list.</summary>
-        public const string ReferenciaExterna = "referencia_externa";
+        public const string ExternalReference = "referencia_externa";
 
         /// <summary>The only things that run without a grant: model reads and the task's own artifacts.</summary>
         public static readonly string[] LowRisk = { };
 
-        public static readonly string[] Grantable = { Modificar, Guardar, Sync, Exportar, ArchivoEscritura, ReconciliarNoAplicada, RecetaExterna };
+        public static readonly string[] Grantable = { Modify, Save, Sync, Export, FileWrite, ReconcileNotApplied, ExternalRecipe };
 
         public static string ForBarrier(string barrier)
         {
             switch (barrier)
             {
-                case "guardar": return Guardar;
+                case "guardar": return Save;
                 case "sync": return Sync;
-                case "pdf": return Exportar;
-                default: return Exportar; // barriers declared by the recipe produce files outside the model
+                case "pdf": return Export;
+                default: return Export; // barriers declared by the recipe produce files outside the model
             }
         }
     }

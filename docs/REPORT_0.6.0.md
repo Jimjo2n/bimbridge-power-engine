@@ -67,7 +67,7 @@ Short test of a real task: [QUICK_TEST_OPERATOR.md](QUICK_TEST_OPERATOR.md).
 | `Bimbridge_codigo_0.6.0_<commit>.zip` and `codigo_0.6.0.gitbundle` | full source and repository with history (tag v0.6.0) |
 | `CHANGELOG_0.6.0.md` | changes with their verification level |
 | `PROTOCOL_0.6.0.md`, `TASK_SCHEMA_0.6.0.md`, `RECIPES.md` | contract of the `tarea` operation, checkpoint schema, recipes |
-| `MATRIZ_CAPACIDADES.md`, `REQUIREMENTS_STATUS_0.6.0.csv` | capability per command and requirement, with evidence |
+| `CAPABILITY_MATRIX.md`, `REQUIREMENTS_STATUS_0.6.0.csv` | capability per command and requirement, with evidence |
 | `acceptance\` | native procedure, manifest and perturbation scripts, `collect_evidence.ps1` |
 | `bench_060\` | equivalent MCP/pyRevit benchmark and summary |
 | `evidencia\` | test output, cost measurements and task summary |

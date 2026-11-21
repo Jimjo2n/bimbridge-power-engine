@@ -182,20 +182,20 @@ namespace Bimbridge.Addin.Ui
         {
             switch (c)
             {
-                case Capability.Modificar: return "modify the model";
-                case Capability.Guardar: return "save";
+                case Capability.Modify: return "modify the model";
+                case Capability.Save: return "save";
                 case Capability.Sync: return "sync with central";
-                case Capability.Exportar: return "export files (PDF…)";
-                case Capability.ArchivoEscritura: return "write files";
-                case Capability.ReconciliarNoAplicada: return "repeat uncertain units";
-                case Capability.RecetaExterna: return "run code that is not one of the installed recipes";
+                case Capability.Export: return "export files (PDF…)";
+                case Capability.FileWrite: return "write files";
+                case Capability.ReconcileNotApplied: return "repeat uncertain units";
+                case Capability.ExternalRecipe: return "run code that is not one of the installed recipes";
                 default: return c;
             }
         }
 
-        private static void TryAudit(string who, string op, string estado, Dictionary<string, object> extra)
+        private static void TryAudit(string who, string op, string status, Dictionary<string, object> extra)
         {
-            try { Runtime.Audit?.Append(who, op, estado, extra); }
+            try { Runtime.Audit?.Append(who, op, status, extra); }
             catch (JournalUnavailableException ex) { Runtime.Log("AUDIT not written (" + op + "): " + ex.Message); }
         }
     }

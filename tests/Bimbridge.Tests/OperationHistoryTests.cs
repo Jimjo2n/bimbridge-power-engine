@@ -37,18 +37,18 @@ namespace Bimbridge.Tests
             var h = new OperationHistory(p);
             jobs.OnAnyFinal = j => h.Add(j);
             Done(jobs, "S1", null, "doc pdf");
-            Done(jobs, "S1", null, "commit", Status.Conflicto, "the model changed");
-            var c = Done(jobs, "S2", null, "commit", Status.Desconocido, "connection dropped");
-            Done(jobs, "S2", null, "check", JobStatus.Cancelado, "cancelado");
+            Done(jobs, "S1", null, "commit", Status.Conflict, "the model changed");
+            var c = Done(jobs, "S2", null, "commit", Status.Unknown, "connection dropped");
+            Done(jobs, "S2", null, "check", JobStatus.Cancelled, "cancelled");
             Assert.Equal(4, h.Count);
             var (commits, n) = h.Query(All, null, "commit", null, null, null);
             Assert.Equal(2, n);
             Assert.Equal(c.Id, commits[0].JobId);                           // most recent first
             Assert.Equal("reconciliar_antes", commits[0].Retry);           // uncertain: never retry blindly
             Assert.Equal("reintentable", commits[1].Retry);                // conflict: nothing was applied
-            Assert.Equal("reconciliar_antes", h.Query(All, Status.Cancelado, null, null, null, null).Page[0].Retry);
+            Assert.Equal("reconciliar_antes", h.Query(All, Status.Cancelled, null, null, null, null).Page[0].Retry);
             Assert.Equal(2, h.Query(All, null, null, "S2", null, null).Total);
-            Assert.Equal(1, h.Query(All, null, null, null, null, "cortó").Total);
+            Assert.Equal(1, h.Query(All, null, null, null, null, "dropped").Total);
 
             // Restart: reloaded from the file; a broken line is reported, not silently dropped.
             File.AppendAllText(p, "{roto\n");
@@ -61,10 +61,10 @@ namespace Bimbridge.Tests
         }
 
         [Fact]
-        public void ConDiferencias_RequiresReview_NotSuccessWithoutPendingActions()
+        public void WithDifferences_RequiresReview_NotSuccessWithoutPendingActions()
         {
             // AUD-14
-            Assert.Equal("revisar_diferencias", OperationHistory.RetryAdvice(Status.ConDiferencias));
+            Assert.Equal("revisar_diferencias", OperationHistory.RetryAdvice(Status.CompletedWithDifferences));
             Assert.Equal("no_necesario", OperationHistory.RetryAdvice(Status.Ok));
             Assert.Equal("reconciliar_antes", OperationHistory.RetryAdvice("un_estado_nuevo_desconocido"));
         }
@@ -78,7 +78,7 @@ namespace Bimbridge.Tests
             jobs.OnAnyFinal = j => h.Add(j);
             Done(jobs, "S-ana-1", "A-ana", "commit");
             Done(jobs, "S-ana-1", "A-ana", "doc pdf");
-            Done(jobs, "S-bob-1", "A-bob", "commit", Status.Desconocido, "secreto de bob");
+            Done(jobs, "S-bob-1", "A-bob", "commit", Status.Unknown, "secreto de bob");
             Done(jobs, "S-anon-1", null, "check");
 
             var ana = h.Query(Me("S-ana-1", "A-ana"), null, null, null, null, null);
@@ -156,7 +156,7 @@ namespace Bimbridge.Tests
         }
 
         [Fact]
-        public async Task JobFinishingWithDifferences_AfterClientSawEnProceso_IsNeverRecordedAsOk()
+        public async Task JobFinishingWithDifferences_AfterClientSawInProgress_IsNeverRecordedAsOk()
         {
             // AUD-18: the client received en_proceso; the job finishes later with verification differences.
             var jobs = new JobStore();
@@ -170,24 +170,24 @@ namespace Bimbridge.Tests
                 // Like DocOp: result with the list of differences, without passing a status.
                 jobs.Complete(job, new Dictionary<string, object> { ["archivo"] = "x.pdf", ["diferencias"] = new List<object> { "the PDF has 3 pages and 4 sheets were requested" } });
             });
-            Assert.Equal(Status.EnProceso, job.Estado);                    // what the client saw at first
+            Assert.Equal(Status.InProgress, job.State);                    // what the client saw at first
             Assert.Equal(0, h.Count);
             release.SetResult(true);
             await job.Work;
-            Assert.Equal(Status.ConDiferencias, job.Estado);               // deferred response
-            Assert.Equal(Status.ConDiferencias, jobs.Get(job.Id).Estado);  // later query of the job_id
+            Assert.Equal(Status.CompletedWithDifferences, job.State);               // deferred response
+            Assert.Equal(Status.CompletedWithDifferences, jobs.Get(job.Id).State);  // later query of the job_id
             var rec = h.Query(All, null, null, null, null, null).Page.Single();
-            Assert.Equal(Status.ConDiferencias, rec.Estado);               // history
+            Assert.Equal(Status.CompletedWithDifferences, rec.State);               // history
             Assert.Equal("revisar_diferencias", rec.Retry);                // requires review, not "no_necesario"
             Assert.Equal(0, h.Query(All, Status.Ok, null, null, null, null).Total);
 
             // An explicit "ok" does not mask differences; other explicit statuses are respected; without differences it is still ok.
             var a = jobs.Create("S1", "doc ifc"); jobs.Complete(a, new Dictionary<string, object> { ["diferencias"] = new List<object> { "x" } }, Status.Ok);
-            Assert.Equal(Status.ConDiferencias, a.Estado);
+            Assert.Equal(Status.CompletedWithDifferences, a.State);
             var b = jobs.Create("S1", "exec"); jobs.Complete(b, new Dictionary<string, object> { ["diferencias"] = new List<object> { "x" } }, "parcial");
-            Assert.Equal("parcial", b.Estado);
+            Assert.Equal("parcial", b.State);
             var c = jobs.Create("S1", "doc pdf"); jobs.Complete(c, new Dictionary<string, object> { ["diferencias"] = new List<object>() });
-            Assert.Equal(Status.Ok, c.Estado);
+            Assert.Equal(Status.Ok, c.State);
         }
 
         [Fact]
@@ -200,7 +200,7 @@ namespace Bimbridge.Tests
             jobs.Run(j1, async () => { await Task.Delay(5000, j1.Cts.Token); jobs.Complete(j1, null); });
             Assert.True(jobs.Cancel(j1));
             await j1.Work;
-            Assert.Equal(JobStatus.Cancelado, j1.Status);
+            Assert.Equal(JobStatus.Cancelled, j1.Status);
             Assert.Equal(1, h.Count);
             Assert.False(jobs.Cancel(j1));                                  // already finished: cancel does nothing
         }

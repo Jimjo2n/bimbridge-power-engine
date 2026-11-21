@@ -28,12 +28,12 @@ namespace Bimbridge.Bridge
                 var sw = Stopwatch.StartNew();
                 var r = await c.CallAsync(op, args, t, CancellationToken.None);
                 Console.WriteLine("[" + label + "] " + op + " " + sw.ElapsedMilliseconds + " ms -> " + RevitTools.Render(r));
-                if (r.Estado != Status.Ok) ok = false;
+                if (r.State != Status.Ok) ok = false;
                 return r;
             }
 
             var ctx = await Run(a, "A", Wire.OpContext, new Dictionary<string, object>());
-            if (ctx.Estado != Status.Ok) return 2;
+            if (ctx.State != Status.Ok) return 2;
             Console.WriteLine("session A: " + (a.Hello != null && a.Hello.TryGetValue("sesion", out var s) ? s : "?"));
 
             var q1 = Run(a, "A", Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "LightingFixtures", ["group_by"] = "lvl" });
@@ -76,7 +76,7 @@ namespace Bimbridge.Bridge
             }
             string CommentsOf(Response r)
             {
-                var d = r.Datos as Dictionary<string, object>;
+                var d = r.Data as Dictionary<string, object>;
                 var row = (d?["rows"] as List<object>)?[0] as List<object>;
                 return row == null ? null : Convert.ToString(row[1], System.Globalization.CultureInfo.InvariantCulture) ?? "";
             }
@@ -89,7 +89,7 @@ namespace Bimbridge.Bridge
             try
             {
                 var ctx = await Call("0", Wire.OpContext, new Dictionary<string, object>());
-                if (ctx.Estado != Status.Ok) return 2;
+                if (ctx.State != Status.Ok) return 2;
                 var lv = c.Hello != null && c.Hello.TryGetValue("niveles", out var n) ? Convert.ToString(n) : "";
                 if (lv.IndexOf('P') < 0 || lv.IndexOf('W') < 0)
                 {
@@ -98,7 +98,7 @@ namespace Bimbridge.Bridge
                 }
 
                 var pick = await Call("0", Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "LightingFixtures", ["f"] = "id,Comments", ["page_size"] = 1L });
-                var row = ((pick.Datos as Dictionary<string, object>)?["rows"] as List<object>)?[0] as List<object>;
+                var row = ((pick.Data as Dictionary<string, object>)?["rows"] as List<object>)?[0] as List<object>;
                 if (row == null) { Console.WriteLine("No lighting fixtures."); return 4; }
                 var id = Convert.ToInt64(row[0]);
                 var original = Convert.ToString(row[1], System.Globalization.CultureInfo.InvariantCulture) ?? "";
@@ -110,29 +110,29 @@ namespace Bimbridge.Bridge
                 if (File.Exists(holdFile)) File.Delete(holdFile);
                 await Task.Delay(1200);
                 var p1 = await Call("1", Wire.OpPlan, Ops(id, test));
-                var p1Id = (p1.Datos as Dictionary<string, object>)?["plan_id"] as string;
-                Expect(p1.Estado == Status.Ok && p1Id != null, "plan returns diff and plan_id");
+                var p1Id = (p1.Data as Dictionary<string, object>)?["plan_id"] as string;
+                Expect(p1.State == Status.Ok && p1Id != null, "plan returns diff and plan_id");
                 var c1 = await Call("1", Wire.OpCommit, new Dictionary<string, object> { ["plan_id"] = p1Id });
-                Expect(c1.Estado == Status.Ok, "live commit applies");
+                Expect(c1.State == Status.Ok, "live commit applies");
                 Expect(CommentsOf(await Call("1", Wire.OpQuery, Get())) == test, "the model has the new value");
 
                 // 2) Hold
                 File.WriteAllText(holdFile, DateTime.Now.ToString("o"));
                 await Task.Delay(1200);
                 var p2 = await Call("2", Wire.OpPlan, Ops(id, original));
-                var p2Id = (p2.Datos as Dictionary<string, object>)?["plan_id"] as string;
+                var p2Id = (p2.Data as Dictionary<string, object>)?["plan_id"] as string;
                 var c2 = await Call("2", Wire.OpCommit, new Dictionary<string, object> { ["plan_id"] = p2Id });
-                Expect(c2.Estado == Status.Retenido, "commit with Hold stays in the queue");
+                Expect(c2.State == Status.Held, "commit with Hold stays in the queue");
                 Expect(CommentsOf(await Call("2", Wire.OpQuery, Get())) == test, "the model has NOT changed yet");
                 var j2 = await Call("2", Wire.OpJob, new Dictionary<string, object> { ["plan_id"] = p2Id });
-                Expect(j2.Estado == Status.Retenido, "job reports retenido");
+                Expect(j2.State == Status.Held, "job reports retenido");
 
                 // 3) Free-form code: does not exist
                 var bad = await Call("3", Wire.OpPlan, new Dictionary<string, object>
                 {
                     ["ops"] = new List<object> { new Dictionary<string, object> { ["op"] = "run_python", ["ids"] = "1" } },
                 });
-                Expect(bad.Estado == Status.Invalido, "free-form code is rejected");
+                Expect(bad.State == Status.Invalid, "free-form code is rejected");
 
                 Console.WriteLine();
                 Console.WriteLine(fails == 0 ? "WRITE PROBE OK" : "WRITE PROBE WITH " + fails + " FAILURES");

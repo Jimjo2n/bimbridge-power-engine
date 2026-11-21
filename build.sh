@@ -28,8 +28,8 @@ for v in 2022 2023 2024 2025 2026 2027; do
   fi
   cp src/Bimbridge.Addin/Bimbridge.addin dist/addin/$v/
   # bundled recipes (0.6.0): tarea iniciar receta=<name>; the user's own in %LOCALAPPDATA%\Bimbridge\recetas take precedence
-  mkdir -p dist/addin/$v/Bimbridge/recetas
-  cp src/Bimbridge.Addin/recetas/*.cs dist/addin/$v/Bimbridge/recetas/
+  mkdir -p dist/addin/$v/Bimbridge/recipes
+  cp src/Bimbridge.Addin/recipes/*.cs dist/addin/$v/Bimbridge/recipes/
   mkdir -p dist/addin/$v/Bimbridge/roslyn
   cp $ROSLYN/*.dll $ROSLYN/Bimbridge.Scripting.pdb dist/addin/$v/Bimbridge/roslyn/
   # the compiler does NOT go next to the add-in: only in roslyn/ (otherwise .NET would load it in the wrong context)

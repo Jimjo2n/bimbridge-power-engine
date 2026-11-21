@@ -89,11 +89,11 @@ namespace Bimbridge.Tests
         public void UnsafePlans_AreNotExecutable_AndSayWhy()
         {
             Assert.Equal(false, PdfToPlan.Execution(null)["ejecutable"]);
-            var noReg = Plan(Batch("F: A", new[] { 1.0, 2 })); noReg.Registration = new RegistrationResult { Estado = "pocas_anclas" };
-            Assert.Contains("registro", string.Join(" ", (List<object>)PdfToPlan.Execution(noReg)["motivos"]));
-            var state = Plan(Batch("F: A", new[] { 1.0, 2 })); state.Estado = "sin_nivel";
+            var noReg = Plan(Batch("F: A", new[] { 1.0, 2 })); noReg.Registration = new RegistrationResult { State = "pocas_anclas" };
+            Assert.Contains("registration", string.Join(" ", (List<object>)PdfToPlan.Execution(noReg)["motivos"]));
+            var state = Plan(Batch("F: A", new[] { 1.0, 2 })); state.State = "sin_nivel";
             Assert.Equal(false, PdfToPlan.Execution(state)["ejecutable"]);
-            var onlyAmb = Plan(); onlyAmb.Estado = "solo_ambiguedades"; onlyAmb.Ambiguous.Add(new PlacementItem());
+            var onlyAmb = Plan(); onlyAmb.State = "solo_ambiguedades"; onlyAmb.Ambiguous.Add(new PlacementItem());
             var ea = PdfToPlan.Execution(onlyAmb);
             Assert.Equal(false, ea["ejecutable"]); Assert.Equal(1L, ea["pendiente_de_persona"]);
             Assert.False(ea.ContainsKey("planes"));
@@ -102,7 +102,7 @@ namespace Bimbridge.Tests
             Assert.Equal(false, PdfToPlan.Execution(bad)["ejecutable"]);
             var notPlace = Plan(Batch("F: A", new[] { 1.0, 2 }));
             ((Dictionary<string, object>)notPlace.Batches[0]["operacion"])["op"] = "delete";
-            Assert.Contains("no es una operación place", string.Join(" ", (List<object>)PdfToPlan.Execution(notPlace)["motivos"]));
+            Assert.Contains("is not a place operation", string.Join(" ", (List<object>)PdfToPlan.Execution(notPlace)["motivos"]));
             var noPrint = Plan(Batch("F: A", new[] { 1.0, 2 })); noPrint.Fingerprint = null;
             Assert.Equal(false, PdfToPlan.Execution(noPrint)["ejecutable"]);
         }
@@ -111,12 +111,12 @@ namespace Bimbridge.Tests
         public void AmbiguousSymbolsAreLeftOut_AndLargePlansAreSplit()
         {
             var plan = Plan(Enumerable.Range(0, OpSpec.MaxOps + 5).Select(i => Batch("F: T" + i, new[] { (double)i, 0 })).ToArray());
-            plan.Estado = "listo_con_ambiguedades";
+            plan.State = "listo_con_ambiguedades";
             plan.Ambiguous.Add(new PlacementItem()); plan.Ambiguous.Add(new PlacementItem());
             var e = PdfToPlan.Execution(plan);
             Assert.Equal(true, e["ejecutable"]);
             Assert.Equal(2L, e["pendiente_de_persona"]);
-            Assert.Contains("NO se colocan", (string)e["aviso"]);
+            Assert.Contains("are NOT placed",(string)e["aviso"]);
             var plans = ((List<object>)e["planes"]).Cast<Dictionary<string, object>>().ToList();
             Assert.Equal(2, plans.Count);
             Assert.Equal(OpSpec.MaxOps, ((List<object>)plans[0]["ops"]).Count);

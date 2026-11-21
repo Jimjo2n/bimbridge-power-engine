@@ -56,7 +56,7 @@ Steps 2.1–2.7 of `PROCEDURE.md` (washbasin) on the copy. Also: `act "abrir fam
 ## 7. MCP vs pyRevit benchmark (§9.5)
 Folder `<package>\bench_060` (in `archivo=` with a full path). Same copy, same arguments, freshly opened Revit for the cold run:
 - Workload 1 family: `exec modo=ejecutar tx=ninguna archivo=mcp_1_family.cs` vs `pyrevit_1_family.py`.
-- Workload 2 mounting: `exec archivo=mcp_2_mounting.cs args={\"nivel\":\"<level>\"}` vs `pyrevit_2_mounting.py` (same NIVEL).
+- Workload 2 mounting: `exec archivo=mcp_2_mounting.cs args={\"nivel\":\"<level>\"}` vs `pyrevit_2_mounting.py` (same LEVEL).
 - Workload 3 groups/views/PDF: `exec modo=ejecutar tx=ninguna archivo=mcp_3_groups_views_pdf.cs` vs `pyrevit_3_groups_views_pdf.py`.
 1 cold + 10 warm runs per engine and workload. Record each run in `runs_template.csv` (the AI can fill it in with what it saw); `python summarize_bench.py runs.csv bench_060.md`.
 **Valid** only if `resultado_qc` matches between engines. `revit "metricas"` gives the real characters on the MCP side.
@@ -65,4 +65,4 @@ Folder `<package>\bench_060` (in `archivo=` with a full path). Same copy, same a
 Repeat step 2 with new ids 20 times (deleting the test tags between runs with Ctrl+Z). Note Revit memory (Task Manager) at the start and at the end, and the size of `%LOCALAPPDATA%\Bimbridge`. **Passed:** no errors; memory stable within reason (note the figure, no threshold is set).
 
 ## 9. Evidence
-`powershell -ExecutionPolicy Bypass -File <package>\acceptance\collect_evidence.ps1 -Tareas acept-060,acept-doc,acept-qc0,acept-pdf` → `evidence_060_<date>.zip` on the Desktop (without config.json or credentials). Send it to the MCP thread.
+`powershell -ExecutionPolicy Bypass -File <package>\acceptance\collect_evidence.ps1 -Tasks acept-060,acept-doc,acept-qc0,acept-pdf` → `evidence_060_<date>.zip` on the Desktop (without config.json or credentials). Send it to the MCP thread.

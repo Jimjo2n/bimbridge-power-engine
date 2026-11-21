@@ -60,8 +60,8 @@ namespace Bimbridge.Addin.Revit
         {
             var doc = DocTarget.Resolve(app, out var docError);
             if (doc == null) { Error = docError; return true; }
-            if (doc.IsFamilyDocument) { Error = Status.NoSoportado + ": copy_monitor checks projects, not families"; return true; }
-            if (!QueryRunner.TryCategory(_category, out var bic)) { Error = Status.Invalido + ": category " + _category + " does not exist"; return true; }
+            if (doc.IsFamilyDocument) { Error = Status.NotSupported + ": copy_monitor checks projects, not families"; return true; }
+            if (!QueryRunner.TryCategory(_category, out var bic)) { Error = Status.Invalid + ": category " + _category + " does not exist"; return true; }
             Rev = tracker.For(doc)?.Rev ?? 0;
             RevitVersion = app.Application.VersionNumber;
             DocumentIdentity = DocRegistry.Instance.IdentityOf(doc)?.Key;
@@ -74,12 +74,12 @@ namespace Bimbridge.Addin.Revit
                 var hits = links.Where(l => string.Equals(l.Name, _link, StringComparison.OrdinalIgnoreCase)
                                             || string.Equals((doc.GetElement(l.GetTypeId()) as RevitLinkType)?.Name, _link, StringComparison.OrdinalIgnoreCase)
                                             || l.Name.StartsWith(_link + " : ", StringComparison.OrdinalIgnoreCase)).ToList();
-                if (hits.Count > 1) { Error = Status.Invalido + ": there are " + hits.Count + " instances of link '" + _link + "'; use the id"; return true; }
+                if (hits.Count > 1) { Error = Status.Invalid + ": there are " + hits.Count + " instances of link '" + _link + "'; use the id"; return true; }
                 li = hits.FirstOrDefault();
             }
-            if (li == null) { Error = Status.Invalido + ": link '" + _link + "' does not exist. Links: " + string.Join(", ", links.Select(l => Ids.ToLong(l.Id) + " " + l.Name).Take(20)); return true; }
+            if (li == null) { Error = Status.Invalid + ": link '" + _link + "' does not exist. Links: " + string.Join(", ", links.Select(l => Ids.ToLong(l.Id) + " " + l.Name).Take(20)); return true; }
             var ldoc = li.GetLinkDocument();
-            if (ldoc == null) { Error = Status.Invalido + ": link '" + li.Name + "' is not loaded"; return true; }
+            if (ldoc == null) { Error = Status.Invalid + ": link '" + li.Name + "' is not loaded"; return true; }
 
             LinkInstanceId = Ids.ToLong(li.Id);
             LinkName = li.Name;

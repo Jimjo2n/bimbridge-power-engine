@@ -18,7 +18,7 @@ namespace Bimbridge.Engine
         public sealed class Info
         {
             public string Kind;
-            public string Nombre;        // how it is shown in the Queue
+            public string Name;        // how it is shown in the Queue
             public bool NeedsIds;
             public bool Creates;
             public string[] Required;
@@ -164,12 +164,12 @@ namespace Bimbridge.Engine
               "{\"op\":\"schedule_create\",\"categoria\":\"LightingFixtures\",\"campos\":[\"Level\",\"Type\",\"Count\"],\"nombre\":\"LIGHTING FIXTURE SCHEDULE\"}"),
         };
 
-        private static Info I(string kind, string nombre, bool needsIds, bool creates, string[] req, string[] opt, string help, string example) =>
-            new Info { Kind = kind, Nombre = nombre, NeedsIds = needsIds, Creates = creates, Required = req, Optional = opt, Help = help, Example = example };
+        private static Info I(string kind, string name, bool needsIds, bool creates, string[] req, string[] opt, string help, string example) =>
+            new Info { Kind = kind, Name = name, NeedsIds = needsIds, Creates = creates, Required = req, Optional = opt, Help = help, Example = example };
 
         public static readonly Dictionary<string, Info> ByKind = All.ToDictionary(i => i.Kind, StringComparer.OrdinalIgnoreCase);
 
-        public static string NameOf(string kind) => kind != null && ByKind.TryGetValue(kind, out var i) ? i.Nombre : kind;
+        public static string NameOf(string kind) => kind != null && ByKind.TryGetValue(kind, out var i) ? i.Name : kind;
 
         public static string KindList => string.Join(", ", All.Select(i => i.Kind));
 
@@ -201,7 +201,7 @@ namespace Bimbridge.Engine
 
         private static void AppendOne(StringBuilder sb, Info i)
         {
-            sb.Append("- ").Append(i.Kind).Append(" (").Append(i.Nombre).Append("): ");
+            sb.Append("- ").Append(i.Kind).Append(" (").Append(i.Name).Append("): ");
             if (i.NeedsIds) sb.Append("ids, ");
             if (i.Required.Length > 0) sb.Append(string.Join(", ", i.Required));
             if (i.Optional.Length > 0) sb.Append(" [").Append(string.Join(", ", i.Optional)).Append("]");

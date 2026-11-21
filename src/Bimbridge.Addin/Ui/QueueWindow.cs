@@ -156,8 +156,8 @@ namespace Bimbridge.Addin.Ui
                     _win.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render); // paint before applying
                     var r = Runtime.ApplyHeld(_doc, card.Plan);
                     card.ShowResult(r.Status, r.Detail);
-                    if (r.Status == PlanStatus.Aplicado) ok++;
-                    else if (r.Status == PlanStatus.Conflicto) conflict++;
+                    if (r.Status == PlanStatus.Applied) ok++;
+                    else if (r.Status == PlanStatus.Conflict) conflict++;
                     else failed++;
                 }
             }
@@ -186,9 +186,9 @@ namespace Bimbridge.Addin.Ui
             if (r != TaskDialogResult.Yes) return;
             foreach (var c in selected)
             {
-                Runtime.Plans.Finish(c.Plan, PlanStatus.Descartado, "discarded by the user");
-                Runtime.Journal?.Log(VersionRegistry.HumanAuthor, "descartar", PlanStatus.Descartado, 0, new Dictionary<string, object> { ["plan"] = c.Plan.Id });
-                c.ShowResult(PlanStatus.Descartado, "Discarded. The model was not touched.");
+                Runtime.Plans.Finish(c.Plan, PlanStatus.Discarded, "discarded by the user");
+                Runtime.Journal?.Log(VersionRegistry.HumanAuthor, "descartar", PlanStatus.Discarded, 0, new Dictionary<string, object> { ["plan"] = c.Plan.Id });
+                c.ShowResult(PlanStatus.Discarded, "Discarded. The model was not touched.");
             }
             Runtime.MarkDirty();
             ShowBanner(selected.Count == 1 ? "1 plan discarded" : selected.Count + " plans discarded", Theme.Slate);
@@ -278,16 +278,16 @@ namespace Bimbridge.Addin.Ui
                 _check.IsEnabled = false;
                 switch (status)
                 {
-                    case PlanStatus.Aplicado: SetChip("Applied", Theme.Green); break;
-                    case PlanStatus.Conflicto: SetChip("Skipped", Theme.Amber); break;
-                    case PlanStatus.Descartado: SetChip("Discarded", Theme.Slate); break;
+                    case PlanStatus.Applied: SetChip("Applied", Theme.Green); break;
+                    case PlanStatus.Conflict: SetChip("Skipped", Theme.Amber); break;
+                    case PlanStatus.Discarded: SetChip("Discarded", Theme.Slate); break;
                     default: SetChip("Rolled back", Theme.Red); break;
                 }
                 _detail.Text = Humanize(status, detail);
-                _detail.Foreground = Theme.B(status == PlanStatus.Aplicado ? Theme.Darken(Theme.Green, 0.8) : status == PlanStatus.Descartado ? Theme.Muted : Theme.Darken(status == PlanStatus.Conflicto ? Theme.Amber : Theme.Red, 0.8));
+                _detail.Foreground = Theme.B(status == PlanStatus.Applied ? Theme.Darken(Theme.Green, 0.8) : status == PlanStatus.Discarded ? Theme.Muted : Theme.Darken(status == PlanStatus.Conflict ? Theme.Amber : Theme.Red, 0.8));
                 _detail.Visibility = Visibility.Visible;
                 Theme.Enter(_detail, 4, 200); // occasional state change (apply/discard), not a refresh
-                Root.Opacity = status == PlanStatus.Descartado ? 0.7 : 1;
+                Root.Opacity = status == PlanStatus.Discarded ? 0.7 : 1;
             }
 
             private void SetChip(string text, Color c) => Theme.SetPill(_statusChip, _statusText, c, text);
@@ -315,9 +315,9 @@ namespace Bimbridge.Addin.Ui
             {
                 switch (status)
                 {
-                    case PlanStatus.Aplicado: return "Done: " + detail + ". Ctrl+Z undoes it.";
-                    case PlanStatus.Conflicto: return "Not applied: someone changed these elements while the plan was waiting. The AI will know and can plan it again. Detail: " + detail;
-                    case PlanStatus.Descartado: return detail;
+                    case PlanStatus.Applied: return "Done: " + detail + ". Ctrl+Z undoes it.";
+                    case PlanStatus.Conflict: return "Not applied: someone changed these elements while the plan was waiting. The AI will know and can plan it again. Detail: " + detail;
+                    case PlanStatus.Discarded: return detail;
                     default: return "Revit did not accept the change and it was fully undone. Detail: " + detail;
                 }
             }
@@ -359,11 +359,11 @@ namespace Bimbridge.Addin.Ui
             {
                 var rows = p.Entries.Take(300).Select(e => new DiffRow
                 {
-                    Elemento = e.Ref > 0 ? "created by @" + e.Ref : e.Id == 0 ? "new" : e.Id.ToString(CultureInfo.InvariantCulture),
-                    Cambio = OpName(e.Op),
-                    Campo = Field(e.Key),
-                    Antes = e.Id == 0 ? "—" : Show(e, e.Before),
-                    Después = e.Show ?? Show(e, e.After),
+                    Element = e.Ref > 0 ? "created by @" + e.Ref : e.Id == 0 ? "new" : e.Id.ToString(CultureInfo.InvariantCulture),
+                    Change = OpName(e.Op),
+                    Field = Field(e.Key),
+                    Before = e.Id == 0 ? "—" : Show(e, e.Before),
+                    After = e.Show ?? Show(e, e.After),
                 }).ToList();
                 var grid = new DataGrid
                 {
@@ -390,13 +390,13 @@ namespace Bimbridge.Addin.Ui
                     // column headers come from DiffRow property names; show them in English
                     switch (e.PropertyName)
                     {
-                        case nameof(DiffRow.Elemento): e.Column.Header = "Element"; break;
-                        case nameof(DiffRow.Cambio): e.Column.Header = "Change"; break;
-                        case nameof(DiffRow.Campo): e.Column.Header = "Field"; break;
-                        case nameof(DiffRow.Antes): e.Column.Header = "Before"; break;
-                        case nameof(DiffRow.Después): e.Column.Header = "After"; break;
+                        case nameof(DiffRow.Element): e.Column.Header = "Element"; break;
+                        case nameof(DiffRow.Change): e.Column.Header = "Change"; break;
+                        case nameof(DiffRow.Field): e.Column.Header = "Field"; break;
+                        case nameof(DiffRow.Before): e.Column.Header = "Before"; break;
+                        case nameof(DiffRow.After): e.Column.Header = "After"; break;
                     }
-                    if (e.Column is DataGridTextColumn tc && (e.PropertyName == nameof(DiffRow.Elemento) || e.PropertyName == nameof(DiffRow.Antes) || e.PropertyName == nameof(DiffRow.Después)))
+                    if (e.Column is DataGridTextColumn tc && (e.PropertyName == nameof(DiffRow.Element) || e.PropertyName == nameof(DiffRow.Before) || e.PropertyName == nameof(DiffRow.After)))
                         tc.FontFamily = Theme.Mono;
                 };
                 // sunken reading area: the diff stands apart from the rest of the card
@@ -466,11 +466,11 @@ namespace Bimbridge.Addin.Ui
 
         public sealed class DiffRow
         {
-            public string Elemento { get; set; }
-            public string Cambio { get; set; }
-            public string Campo { get; set; }
-            public string Antes { get; set; }
-            public string Después { get; set; }
+            public string Element { get; set; }
+            public string Change { get; set; }
+            public string Field { get; set; }
+            public string Before { get; set; }
+            public string After { get; set; }
         }
     }
 }

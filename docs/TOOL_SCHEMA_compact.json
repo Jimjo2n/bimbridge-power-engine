@@ -1,0 +1,263 @@
+{
+ "instructions": "Revit is open (projects and families, handle doc=dN). Read with revit (one-line commands; several lines = in parallel). Change with plan→commit (typed, one Undo), exec (C# against the Revit API) or act (families, connectors, save, sync, PDF). If the user authorized the task, apply without asking for confirmation per batch. Use other tools the user authorizes if something is not covered. User pause: stop. retenido: waiting in the queue, do not repeat. clave= prevents repeating a write. Help: revit \"guide\". Documents and geometry without Revit (PDF, DOCX, plan–model registration → ops): power \"cap\".",
+ "tools": [
+  {
+   "name": "plan",
+   "description": "Prepares changes WITHOUT applying them → diff + plan_id. One operation per line: \"op ids key=value\" (or JSON). set (set_param) $x name=Comments value=REVISAR | snap $flotando | tag $sin_tag view=123 | type $x to=\"Fam: Type\" | elev | ws | move rotate mirror copy delete place tag_move set_values set_type_param set_level group_* view_* sheet_* text_note filled_region. @n = what line n created. One plan = one Undo. Arguments: revit \"guide escritura op=tag\".",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "ops": {
+      "description": "Operations",
+      "type": "string"
+     },
+     "summary": {
+      "description": "Summary for the user",
+      "type": "string",
+      "default": null
+     },
+     "doc": {
+      "description": "Document (dN); default: the active one",
+      "type": "string",
+      "default": null
+     },
+     "tarea": {
+      "description": "Authorized task (allows commit after reconnecting)",
+      "type": "string",
+      "default": null
+     },
+     "timing": {
+      "description": "true = breakdown of wait and work in Revit (diagnostics)",
+      "type": "boolean",
+      "default": false
+     }
+    },
+    "required": [
+     "ops"
+    ]
+   },
+   "annotations": {
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "revit",
+   "description": "Reads (does not change the model). One command per line: verb + words + key=value; doc=dN pins the document.\nctx [instancia=2024] | docs | fam info|caras [familia=X] | res <id> desde= | cat [resumen|niveles|vistas|laminas|tipos|familias|plantillas|worksets|vinculos|filtros] | q <cat> lvl= t= ids= v= f= g=fields n=true digest=true timing=true s=$name elev>9 type~LT u=mm | get <ids|$x> [f=*] | chk lighting_audit | chk tabla_audit tabla=<id or name> | geo <recipe> <cat> lvl= | sets | job <id> | show <ids> | cap [vista] colorear=categorias resaltar=$x | tarea estado|resumen|esperar|unidades|lista|recetas <id> [desde=rev max=s] | guide [tema]\ncat: LF fixtures, LD devices, EF receptacles, EE panels, FA fire alarm. Compact text: fijo = shared value; col# = dictionary.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "c": {
+      "description": "Commands, e.g. \"q LF g=lvl,type\"",
+      "type": "string"
+     }
+    },
+    "required": [
+     "c"
+    ]
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "commit",
+   "description": "Applies a plan to ITS document. retenido = waiting in the Revit queue (do not repeat); conflicto = not applied. What was created: $creados. clave= (idempotency): the same key is never applied twice, even if the connection drops. Without plan_id and with ops= (same format as plan): plans and applies in a single round trip, with the same verifications.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "plan_id": {
+      "type": "string",
+      "default": null
+     },
+     "clave": {
+      "type": "string",
+      "default": null
+     },
+     "tarea": {
+      "type": "string",
+      "default": null
+     },
+     "reconciliar": {
+      "type": "string",
+      "default": null
+     },
+     "modo": {
+      "description": "aplicar (default) | ensayo: applies, verifies and ROLLS BACK; it is not a commit",
+      "type": "string",
+      "default": null
+     },
+     "ops": {
+      "description": "Operations (as in plan) to plan and apply in one round trip, without plan_id",
+      "type": "string",
+      "default": null
+     },
+     "summary": {
+      "description": "Summary for the user (with ops)",
+      "type": "string",
+      "default": null
+     },
+     "doc": {
+      "description": "Document dN (with ops)",
+      "type": "string",
+      "default": null
+     },
+     "timing": {
+      "description": "true = breakdown of wait and commit phases (diagnostics)",
+      "type": "boolean",
+      "default": false
+     }
+    }
+   },
+   "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "exec",
+   "description": "C# against the public Revit API (no operation list). Code: expression (doc.Title), body with return, or class with static object Run(ScriptContext ctx). doc, uidoc, app, uiapp, args, ctx already exist (ctx.Mm(), ctx.E(id), ctx.Set(\"$x\"), ctx.SaveSet, ctx.Log). modo=consulta (default: read-only, no transaction) | ensayo (changes and rolls back; requires level W) | ejecutar (tx=auto: one transaction and one Undo; grupo; ninguna: the script opens its own, required for EditFamily/LoadFamily). Returns the value as JSON, Revit warnings and what changed. A long script blocks Revit while it runs.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "codigo": {
+      "description": "C# code (or empty with nombre= to repeat a saved one)",
+      "type": "string",
+      "default": null
+     },
+     "modo": {
+      "description": "consulta | ensayo | ejecutar",
+      "type": "string",
+      "default": "consulta"
+     },
+     "tx": {
+      "description": "auto | grupo | ninguna",
+      "type": "string",
+      "default": null
+     },
+     "doc": {
+      "description": "Document dN (default: the active one)",
+      "type": "string",
+      "default": null
+     },
+     "args": {
+      "description": "Arguments for the script (JSON object) → args",
+      "default": null
+     },
+     "nombre": {
+      "description": "Saved script to repeat, or 'lista'",
+      "type": "string",
+      "default": null
+     },
+     "guardar": {
+      "description": "Save this code under that name",
+      "type": "string",
+      "default": null
+     },
+     "clave": {
+      "description": "Idempotency key (writes)",
+      "type": "string",
+      "default": null
+     },
+     "tarea": {
+      "description": "Authorized task",
+      "type": "string",
+      "default": null
+     },
+     "archivo": {
+      "description": ".cs file with the code (instead of codigo=)",
+      "type": "string",
+      "default": null
+     },
+     "refs": {
+      "description": "Extra DLLs, comma-separated (paths)",
+      "type": "string",
+      "default": null
+     },
+     "docs": {
+      "description": "Other documents the script touches: d2,d3",
+      "type": "string",
+      "default": null
+     },
+     "reconciliar": {
+      "description": "After an interrumpido with clave=: no_aplicado (repeat) | aplicado (mark done)",
+      "type": "string",
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "power",
+   "description": "power (does not change the model): cap [text|id] | estado | pdf info|extract|tables|symbols|grids ruta= paginas=[1] | pdf verify ruta= esperado=[{textos,papel_pt,rgb_vectorial}] [anterior=] [sha256_esperado=] | docx ruta= | flujo ruta= pagina= nivel= reglas=[{codigo,tipo,montaje|elev,ws}] ejes=[{nombre,p:[x0,y0,x1,y1]}] (feet) [decisiones=[{id_simbolo,decision,evidencia,codigo}]] → plan + ops for plan→commit | red ruta=tramos.json (proximity ≠ continuity ≠ physical connection). terminales ruta= pagina= nivel= parametro_sentido= anclas=[{nombre,pdf,modelo}] items=[{ref,pt,tipo,sentido,elev}] → terminal plans. equipos ruta= pagina= nivel= anclas=[{nombre,pdf,modelo}] reglas=[{ambito,codigo,clase,tipo}] items=[{ref,pt,ambito,zona,codigo,elev,evidencia}] → equipment plans. riser pdf= xlsx= hoja= [columnas= fila_encabezado= fila_inicio= fila_final=] pdf_aristas=[{id,origen,destino,pagina,evidencia}] vista= estilo= nodos=[…] trazado=[…]. riser_audit rereads the sources and compares observado=[…]. Page coordinates are never Revit coordinates: the workflow registers with anchors and escalates ambiguities.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "c": {
+      "description": "Commands, e.g. \"cap pdf\" or \"pdf symbols ruta=… paginas=1\"",
+      "type": "string"
+     }
+    },
+    "required": [
+     "c"
+    ]
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "act",
+   "description": "Document actions, one per line (doc=dN pins the target; clave= prevents repeats):\nabrir familia=\"X\" (EditFamily → dN of the RFA) | conector nombre=fria sistema=fria|caliente|sanitario|<PipeSystemType> cara=elem:n radio=6.5mm|diametro= flujo=entrada|salida|bidireccional [cota=radio|diametro] (creates or reconciles by name and verifies) | param nombre=X valor=6.5mm|formula= [tipo=T|todos_tipos=si] [crear=tipo|instancia dato=longitud] [asociar=elem:CONNECTOR_RADIUS] | cargar en=dN [sobrescribir=valores] | guardar [como=path] | sync [comentario=] | pdf conjunto=\"X\"|hojas=$x [carpeta= nombre=] | cerrar\nLong resumable tasks (one command; the engine batches, saves and exports as barriers): tarea iniciar receta=X|archivo=path.cs [id= objetivo= args.field=value | args={json}] [guardar_cada=N al_final=guardar,pdf en_error=continuar espera_s=10] | tarea reanudar|cancelar <id> | tarea reconciliar <id> decision=aplicada|no_aplicada [claves=a,b] | tarea anotar <id> texto=",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "c": {
+      "description": "Actions, e.g. \"conector nombre=fria sistema=fria cara=812:3 radio=6.5mm doc=d3\"",
+      "type": "string"
+     }
+    },
+    "required": [
+     "c"
+    ]
+   },
+   "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  }
+ ]
+}

@@ -5,11 +5,11 @@ namespace Bimbridge.Engine.Tasks
 {
     /// <summary>
     /// Recipe execution boundary (rc3). ALL of a recipe's code (constructor and static initializers, properties,
-    /// Preparar, the Unidades enumerator (each MoveNext), Ejecutar and Verificar) runs through <see cref="Run"/>:
+    /// Prepare, the Units enumerator (each MoveNext), Run and Verify) runs through <see cref="Run"/>:
     ///
     /// 1. before running, <c>authorize</c> (task lease, document lease and current grants) must return null;
     ///    otherwise the recipe never runs;
-    /// 2. in read/planning phases (everything except Ejecutar), a model write counter (in Revit: the revision of the
+    /// 2. in read/planning phases (everything except Run), a model write counter (in Revit: the revision of the
     ///    DocumentTracker, which goes up with each committed transaction, plus "a transaction is open") must stay the same; if it changes,
     ///    the phase fails with <c>escritura_en_fase_de_lectura</c> and the task stops.
     ///
@@ -28,16 +28,16 @@ namespace Bimbridge.Engine.Tasks
         }
 
         /// <summary>Phases in which the recipe can NOT modify the model.</summary>
-        public static bool IsReadPhase(string phase) => phase != Phase.Ejecutar;
+        public static bool IsReadPhase(string phase) => phase != Phase.Run;
 
         public static class Phase
         {
             public const string Constructor = "constructor";
-            public const string Preparar = "preparar";
-            public const string Enumerar = "enumerar";
-            public const string Ejecutar = "ejecutar";
-            public const string Verificar = "verificar";
-            public const string Postcondicion = "postcondicion";
+            public const string Prepare = "preparar";
+            public const string Enumerate = "enumerar";
+            public const string Run = "ejecutar";
+            public const string Verify = "verificar";
+            public const string Postcondition = "postcondicion";
         }
 
         /// <summary>Runs <paramref name="body"/> only if the authority allows it. Returns null or the reason for the refusal/failure.
@@ -52,7 +52,7 @@ namespace Bimbridge.Engine.Tasks
             {
                 var after = _writeCounter();
                 if (after != before)
-                    return "escritura_en_fase_de_lectura: the recipe modified the model during '" + phase + "' (only Ejecutar may write, inside the engine's transaction). The task stops.";
+                    return "escritura_en_fase_de_lectura: the recipe modified the model during '" + phase + "' (only Run may write, inside the engine's transaction). The task stops.";
             }
             return null;
         }

@@ -50,25 +50,25 @@ namespace Bimbridge.Setup
     {
         /// <summary>valido_firmado | valido_sin_firma | firma_invalida | clave_desconocida | firma_exigida | hashes_no_coinciden |
         /// ruta_peligrosa | no_es_paquete | demasiado_grande | incompatible | misma_o_anterior</summary>
-        public string Estado;
-        public string Mensaje;
+        public string State;
+        public string Message;
         public string ZipPath, ZipSha256, ManifestSha256;
-        public string Version, Commit, Installer, InstallerSha256, KeyId, Installed, DesdeMinima;
+        public string Version, Commit, Installer, InstallerSha256, KeyId, Installed, MinFromVersion;
         public List<string> Revit = new List<string>();
         public Dictionary<string, string> Files = new Dictionary<string, string>(StringComparer.Ordinal);
-        public List<string> Detalles = new List<string>();
+        public List<string> Details = new List<string>();
         public bool Signed;
         /// <summary>Can be staged. Unsigned, it also requires explicit confirmation from the user.</summary>
-        public bool Ok => Estado == "valido_firmado" || Estado == "valido_sin_firma";
-        public bool NeedsUnsignedConfirmation => Estado == "valido_sin_firma";
+        public bool Ok => State == "valido_firmado" || State == "valido_sin_firma";
+        public bool NeedsUnsignedConfirmation => State == "valido_sin_firma";
     }
 
     /// <summary>A staged update waiting for the user to close Revit. Saved in pendiente.json.</summary>
     public sealed class PendingUpdate
     {
-        public string Id, Version, From, Commit, StagedDir, Installer, InstallerSha256, ZipSha256, KeyId, Estado, ConfirmedBy;
+        public string Id, Version, From, Commit, StagedDir, Installer, InstallerSha256, ZipSha256, KeyId, State, ConfirmedBy;
         /// <summary>0.9.0: profile it was staged under (produccion | laboratorio). An unsigned package is applied only under laboratorio.</summary>
-        public string Perfil = ProfilePolicy.Production;
+        public string Profile = ProfilePolicy.Production;
         public bool Signed, AllowOlder;
         public DateTime CreatedUtc;
         public Dictionary<string, string> Files = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -77,7 +77,7 @@ namespace Bimbridge.Setup
         {
             ["esquema"] = "bimbridge.pendiente/1", ["id"] = Id, ["version"] = Version, ["desde"] = From, ["commit"] = Commit,
             ["carpeta"] = StagedDir, ["instalador"] = Installer, ["instalador_sha256"] = InstallerSha256, ["zip_sha256"] = ZipSha256,
-            ["clave"] = KeyId, ["firmado"] = Signed, ["permitir_anterior"] = AllowOlder, ["estado"] = Estado, ["confirmado_por"] = ConfirmedBy, ["perfil"] = Perfil,
+            ["clave"] = KeyId, ["firmado"] = Signed, ["permitir_anterior"] = AllowOlder, ["estado"] = State, ["confirmado_por"] = ConfirmedBy, ["perfil"] = Profile,
             ["creado_utc"] = CreatedUtc.ToString("o", CultureInfo.InvariantCulture),
             ["archivos"] = Files.ToDictionary(k => k.Key, k => (object)k.Value),
         };
@@ -89,8 +89,8 @@ namespace Bimbridge.Setup
                 Id = Arg.GetString(o, "id"), Version = Arg.GetString(o, "version"), From = Arg.GetString(o, "desde"), Commit = Arg.GetString(o, "commit"),
                 StagedDir = Arg.GetString(o, "carpeta"), Installer = Arg.GetString(o, "instalador"), InstallerSha256 = Arg.GetString(o, "instalador_sha256"),
                 ZipSha256 = Arg.GetString(o, "zip_sha256"), KeyId = Arg.GetString(o, "clave"), Signed = Arg.GetBool(o, "firmado") ?? false,
-                AllowOlder = Arg.GetBool(o, "permitir_anterior") ?? false, Estado = Arg.GetString(o, "estado"), ConfirmedBy = Arg.GetString(o, "confirmado_por"),
-                Perfil = Arg.GetString(o, "perfil") ?? ProfilePolicy.Production,
+                AllowOlder = Arg.GetBool(o, "permitir_anterior") ?? false, State = Arg.GetString(o, "estado"), ConfirmedBy = Arg.GetString(o, "confirmado_por"),
+                Profile = Arg.GetString(o, "perfil") ?? ProfilePolicy.Production,
             };
             DateTime.TryParse(Arg.GetString(o, "creado_utc"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out p.CreatedUtc);
             if (o.TryGetValue("archivos", out var a) && a is Dictionary<string, object> f)
@@ -151,7 +151,7 @@ namespace Bimbridge.Setup
                     r.Version = Arg.GetString(m, "version");
                     r.Commit = Arg.GetString(m, "commit");
                     r.Installer = Arg.GetString(m, "instalador");
-                    r.DesdeMinima = Arg.GetString(m, "desde_minima");
+                    r.MinFromVersion = Arg.GetString(m, "desde_minima");
                     r.Revit = Arg.GetStringList(m, "revit") ?? new List<string>();
                     if (m.TryGetValue("archivos", out var fa) && fa is Dictionary<string, object> files)
                         foreach (var kv in files) r.Files[kv.Key] = Convert.ToString(kv.Value, CultureInfo.InvariantCulture).ToLowerInvariant();
@@ -197,7 +197,7 @@ namespace Bimbridge.Setup
                         if (!string.Equals(got, exp, StringComparison.OrdinalIgnoreCase)) bad.Add(n + " hash mismatch");
                     }
                     foreach (var f in r.Files.Keys) if (!present.Contains(f)) bad.Add(f + " missing from the ZIP");
-                    if (bad.Count > 0) { r.Detalles.AddRange(bad); return Fail(r, "hashes_no_coinciden", bad.Count + " file(s) do not match the manifest"); }
+                    if (bad.Count > 0) { r.Details.AddRange(bad); return Fail(r, "hashes_no_coinciden", bad.Count + " file(s) do not match the manifest"); }
                 }
             }
             catch (InvalidDataException ex) { return Fail(r, "no_es_paquete", "damaged or invalid ZIP: " + ex.Message); }
@@ -208,12 +208,12 @@ namespace Bimbridge.Setup
             var iv = Updates.Parse(installed);
             var missing = (installedRevit ?? Enumerable.Empty<string>()).Where(y => !r.Revit.Contains(y)).ToList();
             if (missing.Count > 0) return Fail(r, "incompatible", "the package does not include Revit " + string.Join(", ", missing) + ", which is installed");
-            var min = Updates.Parse(r.DesdeMinima);
+            var min = Updates.Parse(r.MinFromVersion);
             if (min != null && iv != null && iv < min) return Fail(r, "incompatible", "requires at least " + Updates.Format(min) + " to be installed (found " + Updates.Format(iv) + ")");
             if (iv != null && nv <= iv && !allowOlder) return Fail(r, "misma_o_anterior", "the package is " + Updates.Format(nv) + " and " + Updates.Format(iv) + " is already installed");
 
-            r.Estado = r.Signed ? "valido_firmado" : "valido_sin_firma";
-            r.Mensaje = r.Signed
+            r.State = r.Signed ? "valido_firmado" : "valido_sin_firma";
+            r.Message = r.Signed
                 ? "Signed by trusted key " + r.KeyId + "; " + r.Files.Count + " file(s) verified."
                 : "NO provenance SIGNATURE: it was only checked that the files match their own manifest. Install it only if you know where it comes from.";
             return r;
@@ -228,7 +228,7 @@ namespace Bimbridge.Setup
         public static PendingUpdate Stage(ZipInspection insp, string updatesDir, string confirmedBy, bool unsignedConfirmed, bool allowOlder = false, ProfilePolicy policy = null)
         {
             policy = policy ?? new ProfilePolicy();
-            if (insp == null || !insp.Ok) throw new InvalidOperationException("the package did not pass inspection: " + insp?.Mensaje);
+            if (insp == null || !insp.Ok) throw new InvalidOperationException("the package did not pass inspection: " + insp?.Message);
             if (!insp.Signed) { var deny = policy.DenyUnsignedUpdate(); if (deny != null) throw new InvalidOperationException(deny); }
             if (insp.NeedsUnsignedConfirmation && !unsignedConfirmed) throw new InvalidOperationException("unsigned package: the user's explicit confirmation is missing");
             if (string.IsNullOrWhiteSpace(confirmedBy)) throw new InvalidOperationException("missing who confirmed");
@@ -258,9 +258,9 @@ namespace Bimbridge.Setup
             {
                 Id = id, Version = Updates.Format(Updates.Parse(insp.Version)), From = insp.Installed, Commit = insp.Commit, StagedDir = dir,
                 Installer = Path.Combine(dir, insp.Installer.Replace('/', Path.DirectorySeparatorChar)), InstallerSha256 = insp.InstallerSha256,
-                ZipSha256 = insp.ZipSha256, KeyId = insp.KeyId, Signed = insp.Signed, AllowOlder = allowOlder, Estado = "preparada",
+                ZipSha256 = insp.ZipSha256, KeyId = insp.KeyId, Signed = insp.Signed, AllowOlder = allowOlder, State = "preparada",
                 ConfirmedBy = confirmedBy, CreatedUtc = DateTime.UtcNow, Files = new Dictionary<string, string>(insp.Files, StringComparer.Ordinal),
-                Perfil = policy.Name,
+                Profile = policy.Name,
             };
             WriteJson(Path.Combine(updatesDir, PendingFile), p.ToJson());
             return p;
@@ -293,7 +293,7 @@ namespace Bimbridge.Setup
             {
                 if (p.Signed) return "pendiente.json says signed but there is no staged signature";
                 var deny = policy.DenyUnsignedUpdate();
-                return deny == null && p.Perfil == ProfilePolicy.Lab ? null : (deny ?? "unsigned package staged outside the lab profile");
+                return deny == null && p.Profile == ProfilePolicy.Lab ? null : (deny ?? "unsigned package staged outside the lab profile");
             }
             Dictionary<string, object> sig;
             try { sig = Json.ParseObject(File.ReadAllText(sf)); } catch (FormatException) { return "unreadable staged signature"; }
@@ -336,7 +336,7 @@ namespace Bimbridge.Setup
 
         /// <summary>Creates an update ZIP. With <paramref name="signer"/> it is signed; without it, it stays UNSIGNED (will require confirmation).</summary>
         public static Dictionary<string, object> Build(string outZip, IDictionary<string, string> files, string version, string commit,
-                                                       IEnumerable<string> revit, string desdeMinima, RSA signer)
+                                                       IEnumerable<string> revit, string minFromVersion, RSA signer)
         {
             var hashes = new SortedDictionary<string, object>(StringComparer.Ordinal);
             foreach (var kv in files) hashes[Norm(kv.Key)] = SetupCore.FileSha(kv.Value);
@@ -345,7 +345,7 @@ namespace Bimbridge.Setup
             var manifest = new Dictionary<string, object>
             {
                 ["esquema"] = Schema, ["producto"] = "BIMBRIDGE", ["version"] = version, ["commit"] = commit,
-                ["revit"] = revit.Cast<object>().ToList(), ["desde_minima"] = desdeMinima, ["instalador"] = installer,
+                ["revit"] = revit.Cast<object>().ToList(), ["desde_minima"] = minFromVersion, ["instalador"] = installer,
                 ["archivos"] = hashes.ToDictionary(k => k.Key, k => k.Value),
             };
             var mbytes = Encoding.UTF8.GetBytes(Json.Write(manifest));
@@ -394,7 +394,7 @@ namespace Bimbridge.Setup
 
         private static ZipArchiveEntry Find(ZipArchive zip, string name) => zip.Entries.FirstOrDefault(e => Norm(e.FullName) == name);
 
-        private static ZipInspection Fail(ZipInspection r, string estado, string msg) { r.Estado = estado; r.Mensaje = msg; return r; }
+        private static ZipInspection Fail(ZipInspection r, string status, string msg) { r.State = status; r.Message = msg; return r; }
 
         private static byte[] ReadAll(Stream s, int max)
         {
@@ -535,24 +535,24 @@ namespace Bimbridge.Setup
             return res;
         }
 
-        private static void SetState(string dir, PendingUpdate p, string estado)
+        private static void SetState(string dir, PendingUpdate p, string status)
         {
             var cur = ZipUpdate.ReadPending(dir);
             if (cur == null || cur.Id != p.Id) return;
-            p.Estado = estado;
+            p.State = status;
             ZipUpdate.WriteJson(Path.Combine(dir, ZipUpdate.PendingFile), p.ToJson());
         }
 
-        private static Dictionary<string, object> Finish(string dir, PendingUpdate p, string estado, string msg, Dictionary<string, object> extra = null)
+        private static Dictionary<string, object> Finish(string dir, PendingUpdate p, string status, string msg, Dictionary<string, object> extra = null)
         {
             var r = new Dictionary<string, object>
             {
-                ["esquema"] = "bimbridge.resultado_actualizacion/1", ["estado"] = estado, ["mensaje"] = msg,
+                ["esquema"] = "bimbridge.resultado_actualizacion/1", ["estado"] = status, ["mensaje"] = msg,
                 ["id"] = p?.Id, ["version"] = p?.Version, ["commit"] = p?.Commit, ["firmado"] = p?.Signed, ["utc"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
             };
             if (extra != null) foreach (var kv in extra) r[kv.Key] = kv.Value;
             ZipUpdate.WriteJson(Path.Combine(dir, ZipUpdate.ResultFile), r);
-            if (p != null && estado != "cancelada_usuario")
+            if (p != null && status != "cancelada_usuario")
             {
                 var cur = ZipUpdate.ReadPending(dir);
                 if (cur != null && cur.Id == p.Id) ZipUpdate.CancelPending(dir);

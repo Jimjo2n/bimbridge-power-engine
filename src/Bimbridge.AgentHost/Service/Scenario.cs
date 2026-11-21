@@ -26,7 +26,7 @@ namespace Bimbridge.AgentHost
             Directory.CreateDirectory(dir);
             var k = Math.Max(Chain, (n - 2 - Levels - 8) / Levels);
             var plan = new PlanDraft { Objective = "Scenario 1000: per-level parameters with chains, QC and deliberate failures", DocKey = "archivo:c:\\escenario.rvt", DocPrint = "huella-escenario-0001", LengthUnit = "mm", Coordinates = "interno_revit" };
-            plan.Sources.Add(new SourceDoc { Id = "doc-1", Nombre = "escenario_1000.txt", Sha256 = new string('e', 64) });
+            plan.Sources.Add(new SourceDoc { Id = "doc-1", Name = "escenario_1000.txt", Sha256 = new string('e', 64) });
             OpDraft Q(string cat) { var o = new OpDraft { Operation = "consultar" }; o.Params["categoria"] = cat; return o; }
             plan.Ops.Add(Q("OST_LightingFixtures"));
             plan.Ops.Add(Q("OST_LightingDevices"));
@@ -37,7 +37,7 @@ namespace Bimbridge.AgentHost
                 byLevel[l] = new List<int>(); chainEnds[l] = new List<int>();
                 for (var p = 0; p < k; p++)
                 {
-                    var o = new OpDraft { Operation = "fijar_parametro", Source = new SourceRef { Fuente = "doc-1", Pagina = l, Requisito = "REQ-L" + l.ToString("00", CultureInfo.InvariantCulture) + "-" + p.ToString("000", CultureInfo.InvariantCulture) } };
+                    var o = new OpDraft { Operation = "fijar_parametro", Source = new SourceRef { SourceId = "doc-1", Page = l, Requirement = "REQ-L" + l.ToString("00", CultureInfo.InvariantCulture) + "-" + p.ToString("000", CultureInfo.InvariantCulture) } };
                     o.Scope["categoria"] = "OST_LightingFixtures"; o.Scope["nivel"] = "L" + l.ToString("00", CultureInfo.InvariantCulture);
                     o.Params["parametro"] = "P" + p.ToString("000", CultureInfo.InvariantCulture); o.Params["valor"] = (long)(l * 1000 + p); o.Params["unidades"] = "mm";
                     o.Expected["elementos"] = (long)PerLevel;

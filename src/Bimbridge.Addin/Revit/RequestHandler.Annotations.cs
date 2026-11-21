@@ -16,8 +16,8 @@ namespace Bimbridge.Addin.Revit
         {
             List<long> ids;
             try { ids = RouteIds(request.Args, "ids"); }
-            catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
-            if (ids.Count == 0 || ids.Count > 100) return Response.Fail(request.Id, Status.Invalido, "give 1 to 100 dimension or tag IDs");
+            catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalid, ex.Message); }
+            if (ids.Count == 0 || ids.Count > 100) return Response.Fail(request.Id, Status.Invalid, "give 1 to 100 dimension or tag IDs");
             var rows = new List<object>();
             var differences = false;
             string error = null;
@@ -45,9 +45,9 @@ namespace Bimbridge.Addin.Revit
                 return true;
             }, highPriority: false, busyAfter: System.TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!work.Ok) return FromWork(request.Id, work);
-            if (error != null) return Response.Fail(request.Id, Status.Invalido, error);
-            return new Response { Id = request.Id, Rev = rev, Estado = differences ? Status.ConDiferencias : Status.Ok,
-                Datos = new Dictionary<string, object> { ["anotaciones"] = rows } };
+            if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
+            return new Response { Id = request.Id, Rev = rev, State = differences ? Status.CompletedWithDifferences : Status.Ok,
+                Data = new Dictionary<string, object> { ["anotaciones"] = rows } };
         }
     }
 }

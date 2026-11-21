@@ -46,7 +46,7 @@ namespace Bimbridge.Tests
             Assert.False(s.CheckWritable(Doc).Blocked);
             s.BeginWrite(p);
             Assert.True(File.Exists(FileOf(s, p.Id)));
-            Assert.True(s.Finish(p, PlanStatus.Aplicado, "ok"));
+            Assert.True(s.Finish(p, PlanStatus.Applied, "ok"));
             Assert.False(File.Exists(FileOf(s, p.Id)));
             Assert.False(s.CheckWritable(Doc).Blocked);
         }
@@ -63,8 +63,8 @@ namespace Bimbridge.Tests
             Assert.True(again.CheckWritable(Doc).Blocked);
             again.LoadPersisted(Doc);
             var q = again.Get(p.Id);
-            Assert.Equal(Status.Desconocido, q.Status);
-            Assert.NotEqual(PlanStatus.Listo, q.Status);
+            Assert.Equal(Status.Unknown, q.Status);
+            Assert.NotEqual(PlanStatus.Ready, q.Status);
             var other = NewPlan("P-2");
             Assert.Throws<DocWriteBlockedException>(() => again.BeginWrite(other));
             Assert.False(File.Exists(FileOf(again, "P-2")));
@@ -99,7 +99,7 @@ namespace Bimbridge.Tests
             var p = NewPlan();
             var ex = Assert.Throws<PlanStoreException>(() => s.BeginWrite(p));
             Assert.Contains("disk full", ex.Message);
-            Assert.Equal(PlanStatus.Listo, p.Status);
+            Assert.Equal(PlanStatus.Ready, p.Status);
             Assert.Null(p.Reconciliation);
         }
 
@@ -111,8 +111,8 @@ namespace Bimbridge.Tests
             s.Add(p);
             GroupAbort.PreserveInterrupted(p, "x");
             s.WriteFile = (_, __) => throw new UnauthorizedAccessException("denegado");
-            Assert.False(s.Finish(p, Status.Desconocido, "incierto"));
-            Assert.Contains("no es durable", p.StorageWarning);
+            Assert.False(s.Finish(p, Status.Unknown, "incierto"));
+            Assert.Contains("it is not durable", p.StorageWarning);
             Assert.True(p.Describe(0).ContainsKey("almacenamiento"));
             Assert.True(s.CheckWritable(Doc).Blocked);
         }
@@ -125,7 +125,7 @@ namespace Bimbridge.Tests
             s.Add(p);
             s.BeginWrite(p);
             s.RemoveFile = _ => throw new IOException("en uso");
-            Assert.False(s.Finish(p, PlanStatus.Aplicado, "ok"));
+            Assert.False(s.Finish(p, PlanStatus.Applied, "ok"));
             Assert.NotNull(p.StorageWarning);
             Assert.True(Store().CheckWritable(Doc).Blocked);
         }
@@ -136,7 +136,7 @@ namespace Bimbridge.Tests
             var s = Store();
             var p = NewPlan();
             s.Add(p);
-            s.Finish(p, Status.Desconocido, "sin datos");
+            s.Finish(p, Status.Unknown, "sin datos");
             Assert.NotNull(p.Reconciliation);
             Assert.True(Store().CheckWritable(Doc).Blocked);
         }
@@ -198,12 +198,12 @@ namespace Bimbridge.Tests
             var s = Store();
             var p = NewPlan();
             s.BeginWrite(p);
-            p.Status = PlanStatus.EnProceso;
+            p.Status = PlanStatus.InProgress;
             p.Created.AddRange(new long[] { 100, 101 });
             p.AppliedBatches = 1;
             s.Checkpoint(p);
             Assert.Null(p.Reconciliation);
-            Assert.Equal(PlanStatus.EnProceso, p.Status);
+            Assert.Equal(PlanStatus.InProgress, p.Status);
             var again = Store();
             again.LoadPersisted(Doc);
             Assert.Equal(new long[] { 100, 101 }, again.Get(p.Id).Created.ToArray());
@@ -273,7 +273,7 @@ namespace Bimbridge.Tests
             var p = NewPlan();
             s.Add(p);
             s.BeginWrite(p);
-            s.Finish(p, Status.Desconocido, "incierto");
+            s.Finish(p, Status.Unknown, "incierto");
             return p;
         }
 
@@ -296,7 +296,7 @@ namespace Bimbridge.Tests
             var p = Unknown(s);
             Assert.True(s.Reconcile(p, new ReconcileCheck { Verdict = ReconcileCheck.Reverted }, "s1"));
             Assert.False(s.CheckWritable(Doc).Blocked);
-            Assert.Equal(PlanStatus.Reconciliado, p.Status);
+            Assert.Equal(PlanStatus.Reconciled, p.Status);
             Assert.True(p.IsFinal);
             var archived = Directory.GetFiles(Path.Combine(s.DocDir(Doc), "reconciliados"));
             Assert.Single(archived);
@@ -314,7 +314,7 @@ namespace Bimbridge.Tests
             s.WriteFile = (_, __) => throw new IOException("disk full");
             Assert.Throws<PlanStoreException>(() => s.Reconcile(p, new ReconcileCheck { Verdict = ReconcileCheck.Applied }, "s1"));
             Assert.True(Store().CheckWritable(Doc).Blocked);
-            Assert.NotEqual(PlanStatus.Reconciliado, p.Status);
+            Assert.NotEqual(PlanStatus.Reconciled, p.Status);
         }
 
         [Fact]

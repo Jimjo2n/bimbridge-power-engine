@@ -29,7 +29,7 @@ namespace Bimbridge.Addin.Scripting
             public bool FromCache;
             public string[] Diagnostics;
             public string Kind;
-            /// <summary>Recipe type (when the code defines a class that inherits from Receta).</summary>
+            /// <summary>Recipe type (when the code defines a class that inherits from Recipe).</summary>
             public Type RecipeType;
             /// <summary>Explicit references used (path → version or error).</summary>
             public Dictionary<string, object> ExtraRefs;
@@ -311,14 +311,14 @@ namespace Bimbridge.Addin.Scripting
             Type recipe = null;
             foreach (var t in asm.GetTypes())
             {
-                if (recipe == null && !t.IsAbstract && typeof(Receta).IsAssignableFrom(t)) recipe = t;
+                if (recipe == null && !t.IsAbstract && typeof(Recipe).IsAssignableFrom(t)) recipe = t;
                 var m = t.GetMethod(ScriptSource.EntryMethod, BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(ScriptContext) }, null);
                 if (run == null && m != null && m.ReturnType == typeof(object)) run = m;
             }
             if (run == null && recipe == null)
             {
                 error = wrapped.Kind == "receta"
-                    ? "compiled, but there is no public non-abstract class inheriting from Receta"
+                    ? "compiled, but there is no public non-abstract class inheriting from Recipe"
                     : "compiled, but no class has 'public static object Run(ScriptContext ctx)'";
                 return null;
             }

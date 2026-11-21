@@ -25,7 +25,7 @@ namespace Bimbridge.Tests
             public async Task<Response> HandleAsync(Session session, Request request, CancellationToken ct)
             {
                 await Task.Delay(DelayMs).ConfigureAwait(false);   // non-interruptible phase: does not observe ct
-                return new Response { Id = request.Id, Estado = Status.Ok, Datos = new Dictionary<string, object> { ["hecho"] = true } };
+                return new Response { Id = request.Id, State = Status.Ok, Data = new Dictionary<string, object> { ["hecho"] = true } };
             }
             public void OnSessionClosed(Session session) => Interlocked.Increment(ref Closed);
         }
@@ -39,7 +39,7 @@ namespace Bimbridge.Tests
                 // Mandatory identity: each test connection declares a unique agent via configuration.
                 ["protocol"] = (long)Wire.ProtocolVersion, ["client"] = "prueba", ["agente"] = "Prueba " + Guid.NewGuid().ToString("N").Substring(0, 6), ["agente_fuente"] = AgentIdentity.SourceConfig,
             } }), CancellationToken.None);
-            Assert.Equal(Status.Ok, Response.FromJson(await Frame.ReadAsync(c, CancellationToken.None)).Estado);
+            Assert.Equal(Status.Ok, Response.FromJson(await Frame.ReadAsync(c, CancellationToken.None)).State);
             return c;
         }
 
@@ -67,7 +67,7 @@ namespace Bimbridge.Tests
                     Assert.Same(read, done);
                     var r = Response.FromJson(await read);
                     Assert.Equal(2, r.Id);
-                    Assert.Equal(Status.Ok, r.Estado);   // the session did not close during the 2.5 s (4x the threshold)
+                    Assert.Equal(Status.Ok, r.State);   // the session did not close during the 2.5 s (4x the threshold)
                     Assert.Equal(0, handler.Closed);
                 }
             }

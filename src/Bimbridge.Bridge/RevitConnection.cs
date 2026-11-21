@@ -109,7 +109,7 @@ namespace Bimbridge.Bridge
         public async Task<Response> CallAsync(string op, Dictionary<string, object> args, TimeSpan timeout, CancellationToken ct)
         {
             if (OpSemantics.Classify(op, args, out var invalid) == OpSemantics.Kind.Invalid)
-                return Response.Fail(0, Status.Invalido, invalid);
+                return Response.Fail(0, Status.Invalid, invalid);
             var write = IsWriteOp(op, args);
             var receiptQuery = op == Wire.OpJob && !string.IsNullOrEmpty(Arg.GetString(args, "intento_id"));
             var connectError = await EnsureConnectedAsync(ct, allowRetarget: !write && !receiptQuery).ConfigureAwait(false);
@@ -123,9 +123,9 @@ namespace Bimbridge.Bridge
                 pipe = _pipe;
                 pid = Instance?.Pid;
             }
-            if (pipe == null) return Response.Fail(0, Status.RevitNoDisponible, "The request was never sent to Revit.");
+            if (pipe == null) return Response.Fail(0, Status.RevitUnavailable, "The request was never sent to Revit.");
             if (receiptQuery && !supportsReceipt)
-                return Response.Fail(0, Status.NoSoportado, "This add-in does not support per-attempt receipts. Query job with plan_id or check the model before repeating.");
+                return Response.Fail(0, Status.NotSupported, "This add-in does not support per-attempt receipts. Query job with plan_id or check the model before repeating.");
 
             var id = Interlocked.Increment(ref _nextId);
             var req = new Request
@@ -139,14 +139,14 @@ namespace Bimbridge.Bridge
             var sent = false;
             Response Unknown()
             {
-                var response = Response.Fail(id, Status.Desconocido,
+                var response = Response.Fail(id, Status.Unknown,
                     "The write may have started or finished in Revit. Query the attempt or the plan and re-read the model before repeating.");
                 if (req.AttemptId != null)
-                    response.Datos = new Dictionary<string, object>
+                    response.Data = new Dictionary<string, object>
                     {
                         ["recibo"] = new Dictionary<string, object>
                         {
-                            ["intento_id"] = req.AttemptId, ["estado"] = Status.Desconocido, ["pid"] = pid,
+                            ["intento_id"] = req.AttemptId, ["estado"] = Status.Unknown, ["pid"] = pid,
                             ["doc"] = Arg.GetString(req.Args, "doc"), ["plan_id"] = Arg.GetString(req.Args, "plan_id"),
                             ["envio_confirmado"] = sent,
                         },
@@ -165,13 +165,13 @@ namespace Bimbridge.Bridge
                 catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException || (sending && ex is OperationCanceledException))
                 {
                     tcs.TrySetResult(write && sending ? Unknown() :
-                        Response.Fail(id, Status.RevitNoDisponible, sending ? "The connection to Revit was lost." : "The request was never sent to Revit."));
+                        Response.Fail(id, Status.RevitUnavailable, sending ? "The connection to Revit was lost." : "The request was never sent to Revit."));
                     if (sending) Drop(pipe);
                 }
                 using var registration = wait.Token.Register(() => tcs.TrySetResult(write ? Unknown() :
-                    Response.Fail(id, Status.RevitOcupado, "Revit did not respond in time. Check for an open dialog or narrow the query.")));
+                    Response.Fail(id, Status.RevitBusy, "Revit did not respond in time. Check for an open dialog or narrow the query.")));
                 var response = await tcs.Task.ConfigureAwait(false);
-                return write && sending && response.Estado == Status.RevitNoDisponible ? Unknown() : response;
+                return write && sending && response.State == Status.RevitUnavailable ? Unknown() : response;
             }
             finally { _pending.TryRemove(id, out _); }
         }
@@ -198,12 +198,12 @@ namespace Bimbridge.Bridge
                     var pinned = all.Where(x => x.Pid == PreferredPid).ToList();
                     if (PreferredPid != 0 && pinned.Count == 0)
                     {
-                        var abiertos = all.Count == 0 ? "none" : string.Join(", ", all.Select(d => "Revit " + d.RevitVersion + " (pid " + d.Pid + ")"));
+                        var openList = all.Count == 0 ? "none" : string.Join(", ", all.Select(d => "Revit " + d.RevitVersion + " (pid " + d.Pid + ")"));
                         var same = all.Where(x => x.RevitVersion == PinnedVersion).ToList();
                         if (!allowRetarget || same.Count != 1)
-                            return Response.Fail(0, Status.DestinoNoDisponible,
+                            return Response.Fail(0, Status.TargetUnavailable,
                                 "The selected Revit (" + PinnedVersion + ", pid " + PreferredPid + ") is no longer open. Not redirecting to another one" +
-                                (allowRetarget ? "" : " for writing") + ". Open: " + abiertos + ". Pick one with ctx instancia=<pid or version> and re-read before changing anything.");
+                                (allowRetarget ? "" : " for writing") + ". Open: " + openList +". Pick one with ctx instancia=<pid or version> and re-read before changing anything.");
                         RetargetNotice = "Revit " + PinnedVersion + " (pid " + PreferredPid + ") closed; this read ran on the other open Revit " + PinnedVersion + " (pid " + same[0].Pid + "). " +
                                          "Previous dN handles, sets and plans are not valid here.";
                         PreferredPid = same[0].Pid;
@@ -214,7 +214,7 @@ namespace Bimbridge.Bridge
                 }
 
                 if (candidates.Count == 0)
-                    return Response.Fail(0, Status.RevitNoDisponible, "No open Revit has the BIMBRIDGE - Power Engine add-in loaded.");
+                    return Response.Fail(0, Status.RevitUnavailable, "No open Revit has the BIMBRIDGE - Power Engine add-in loaded.");
 
                 string lastError = null;
                 foreach (var (pipeName, d) in candidates)
@@ -268,13 +268,13 @@ namespace Bimbridge.Bridge
                     }
                     if (text == null) { pipe.Dispose(); lastError = "Revit did not answer the hello"; continue; }
                     var resp = Response.FromJson(text);
-                    if (resp.Estado != Status.Ok) { pipe.Dispose(); return resp; }
+                    if (resp.State != Status.Ok) { pipe.Dispose(); return resp; }
 
                     lock (_connectionState)
                     {
                         _connCts = new CancellationTokenSource();
                         var token = _connCts.Token;
-                        Hello = resp.Datos as Dictionary<string, object> ?? new Dictionary<string, object>();
+                        Hello = resp.Data as Dictionary<string, object> ?? new Dictionary<string, object>();
                         Instance = d;
                         if (d != null) { PreferredPid = d.Pid; PinnedVersion = d.RevitVersion; }
                         _pipe = pipe;
@@ -283,7 +283,7 @@ namespace Bimbridge.Bridge
                     }
                     return null;
                 }
-                return Response.Fail(0, Status.RevitNoDisponible, "Could not connect to Revit (" + lastError + ").");
+                return Response.Fail(0, Status.RevitUnavailable, "Could not connect to Revit (" + lastError + ").");
             }
             finally
             {
@@ -361,7 +361,7 @@ namespace Bimbridge.Bridge
             }
             foreach (var kv in _pending)
                 if (ReferenceEquals(kv.Value.Pipe, closed))
-                    kv.Value.Waiter.TrySetResult(Response.Fail(kv.Key, Status.RevitNoDisponible, "The connection to Revit was lost."));
+                    kv.Value.Waiter.TrySetResult(Response.Fail(kv.Key, Status.RevitUnavailable, "The connection to Revit was lost."));
         }
 
         public void Dispose() => Drop();

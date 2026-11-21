@@ -1,6 +1,6 @@
 ID,Priority,Module,Acceptance_tests,Status_0.5.0,Evidence,Missing
-R001,P0,Instructions,"A01,A02",Done,"Instructions of both profiles, guides and help window without exclusivity; real schema in docs/ESQUEMA_HERRAMIENTAS_*.json",
-R002,P0,Capabilities,"A01,A29","Done, without Revit",ctx returns capabilities by document type and year; docs/MATRIZ_CAPACIDADES.md is generated from the code (test Capabilities_DocMatchesCode),check ctx in Revit
+R001,P0,Instructions,"A01,A02",Done,"Instructions of both profiles, guides and help window without exclusivity; real schema in docs/TOOL_SCHEMA_*.json",
+R002,P0,Capabilities,"A01,A29","Done, without Revit",ctx returns capabilities by document type and year; docs/CAPABILITY_MATRIX.md is generated from the code (test Capabilities_DocMatchesCode),check ctx in Revit
 R003,P0,API runner,A02,"Done, without Revit","exec: general C# (expression, body, class) with Roslyn 4.8; ScriptingTests compile against RevitAPI 2022–2026",run it inside Revit
 R004,P0,Families,"A03,A04","Done, without Revit","fam, exec and 7 plan operations accept RFA; geo and chk answer no_soportado with an alternative",test with a real RFA
 R005,P0,Identity,"A06,A25","Done, without Revit",DocTarget pins the document across all slices; if it is closed → destino_no_disponible,test in Revit switching views mid-job

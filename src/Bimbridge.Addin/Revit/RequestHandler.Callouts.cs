@@ -16,7 +16,7 @@ namespace Bimbridge.Addin.Revit
         {
             var viewId = Arg.GetLong(request.Args, "vista");
             if (!viewId.HasValue || viewId.Value <= 0)
-                return Response.Fail(request.Id, Status.Invalido, "give the positive ID of the view");
+                return Response.Fail(request.Id, Status.Invalid, "give the positive ID of the view");
             var rows = new List<object>();
             var refresh = new List<long>();
             string error = null;
@@ -68,7 +68,7 @@ namespace Bimbridge.Addin.Revit
                 return true;
             }, highPriority: false, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!work.Ok) return FromWork(request.Id, work);
-            if (error != null) return Response.Fail(request.Id, Status.Invalido, error);
+            if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
             var result = new Dictionary<string, object> { ["vista"] = viewId.Value, ["total"] = (long)rows.Count, ["llamadas"] = rows };
             const string set = "$llamadas_desactualizadas";
             if (refresh.Count > 0)
@@ -77,7 +77,7 @@ namespace Bimbridge.Addin.Revit
                 result["conjunto_para_regenerar"] = set;
             }
             else session.Sets.Remove(set);
-            return new Response { Id = request.Id, Rev = revision, Datos = result, Estado = differences ? Status.ConDiferencias : Status.Ok };
+            return new Response { Id = request.Id, Rev = revision, Data = result, State = differences ? Status.CompletedWithDifferences : Status.Ok };
         }
     }
 }

@@ -164,13 +164,13 @@ namespace Bimbridge.Tests
             {
                 d.Nearest(new double[] { 0, 0 }, new double[] { 1, 1 }, 2, 5);
                 Assert.Equal(EngineCSharp, d.Last.Engine);
-                Assert.Contains("desactivado", d.LastReason);
+                Assert.Contains("disabled", d.LastReason);
             }
             using (var d = new PowerEngineDispatcher(new PowerEngineOptions { Geometry = "rust_ipc", RustWorkerExe = "/no/existe" }))
             {
                 d.Duplicates(new double[] { 0, 0, 0, 0 }, 2, 0.1);
                 Assert.Equal(EngineCSharp, d.Last.Engine);
-                Assert.Contains("degradación", d.LastReason);
+                Assert.Contains("degradation", d.LastReason);
             }
             using (var d = new PowerEngineDispatcher(PowerEngineEnv.Options()))
             {
@@ -197,7 +197,7 @@ namespace Bimbridge.Tests
             var alias = Path.Combine(Path.GetTempPath(), "Microsoft", "WindowsApps", "python.exe");
             using var worker = new WorkerClient(EnginePython, alias, Array.Empty<string>());
             Assert.False(worker.EnsureStarted());
-            Assert.Contains("Alias WindowsApps rechazado", worker.LastStartError);
+            Assert.Contains("WindowsApps alias rejected", worker.LastStartError);
         }
 
         [Fact]
@@ -208,13 +208,13 @@ namespace Bimbridge.Tests
                 "-I", "-c", "import sys; sys.stderr.write('missing dependency ' + 'x' * 5000); sys.exit(9)"
             });
             Assert.False(worker.EnsureStarted());
-            Assert.Contains("saludo", worker.LastStartError);
+            Assert.Contains("handshake", worker.LastStartError);
             Assert.Contains("missing dependency", worker.LastStartError);
-            Assert.Contains("salida=9", worker.LastStartError);
+            Assert.Contains("exit=9", worker.LastStartError);
             Assert.InRange(worker.LastStartError.Length, 1, 2300);
         }
         private static string F(string n) => Path.Combine(Fx, n);
-        private static Dictionary<string, object> A(string ruta) => new Dictionary<string, object> { ["ruta"] = ruta };
+        private static Dictionary<string, object> A(string path) => new Dictionary<string, object> { ["ruta"] = path };
 
         [Fact]
         public void Python_Handshake_AndSymbols_ThroughTheCore()
@@ -321,7 +321,7 @@ namespace Bimbridge.Tests
         public void IncompatibleWorker_IsRefusedAtHandshake()
         {
             var fake = Path.Combine(Fx, "falso_pe2.py");
-            File.WriteAllText(fake, "import sys,json\nfor l in sys.stdin:\n r=json.loads(l)\n print(json.dumps({'pe':2,'id':r.get('id'),'codigo':'OK','resultado':{'pe':2}}),flush=True)\n");
+            File.WriteAllText(fake, "import sys,json\nfor l in sys.stdin:\n r=json.loads(l)\n print(json.dumps({'pe':2,'id':r.get('id'),'code':'OK','result':{'pe':2}}),flush=True)\n");
             using (var w = new WorkerClient(EnginePython, PowerEngineEnv.Python, new[] { "-I", fake }))
             {
                 var r = w.Call(new Request { Job = "pdf_info" });

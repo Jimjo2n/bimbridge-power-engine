@@ -43,7 +43,7 @@ namespace Bimbridge.Tests
             return Task.CompletedTask;
         }
 
-        private Task<McpClient> Connect(string clientName, string perfil = "completo")
+        private Task<McpClient> Connect(string clientName, string profile = "completo")
         {
             var bridgeDll = typeof(Bimbridge.Bridge.Program).Assembly.Location;
             var transport = new StdioClientTransport(new StdioClientTransportOptions
@@ -54,7 +54,7 @@ namespace Bimbridge.Tests
                 // Isolated from the real profile: its own config.json (missing = defaults) instead of the user's %APPDATA%.
                 EnvironmentVariables = new Dictionary<string, string>
                 {
-                    ["BIMBRIDGE_PIPE"] = _pipe, ["BIMBRIDGE_PROFILE"] = perfil,
+                    ["BIMBRIDGE_PIPE"] = _pipe, ["BIMBRIDGE_PROFILE"] = profile,
                     ["BIMBRIDGE_CONFIG"] = Path.Combine(Path.GetTempPath(), "bimbridge-e2e-config-" + Guid.NewGuid().ToString("N") + ".json"),
                     // Issue #3: operating requires a named agent; each test connection declares a unique one through configuration.
                     ["BIMBRIDGE_AGENT"] = "E2E " + clientName + " " + Guid.NewGuid().ToString("N").Substring(0, 6),
@@ -93,7 +93,7 @@ namespace Bimbridge.Tests
                     reconstructed.Append(((string)part["texto"]).Replace("\n", ""));
                     if (from + 7 >= (long)part["total_lineas"]) break;
                 }
-                var original = Assert.IsType<Dictionary<string, object>>(Response.FromJson(reconstructed.ToString()).Datos);
+                var original = Assert.IsType<Dictionary<string, object>>(Response.FromJson(reconstructed.ToString()).Data);
                 Assert.Equal(first["cursor"], original["cursor"]);
                 var largeRow = Assert.IsType<List<object>>(Assert.Single(Assert.IsType<List<object>>(original["rows"])));
                 Assert.Equal(new object[] { 70001L, FakeRevit.WideCell }, largeRow);
@@ -242,7 +242,7 @@ namespace Bimbridge.Tests
             Assert.Equal(9L, res[0]["total"]);
             Assert.Equal("niveles", res[1]["que"]);
             Assert.Equal("params", res[2]["op_vista"]);              // get f=* goes to the read of all parameters
-            Assert.Equal(Status.Invalido, res[3]["estado"]);
+            Assert.Equal(Status.Invalid, res[3]["estado"]);
 
             // a direct get f=* is also routed to params
             var all = await Call(c, "get", new Dictionary<string, object> { ["ids"] = "17855000", ["f"] = "*" });
@@ -334,8 +334,8 @@ namespace Bimbridge.Tests
             }
 
             // revit fam only reads
-            var famw = await c.CallToolAsync("revit", new Dictionary<string, object> { ["c"] = "fam abrir X" });
-            Assert.True(famw.IsError ?? false);
+            var famOpen = await c.CallToolAsync("revit", new Dictionary<string, object> { ["c"] = "fam abrir X" });
+            Assert.True(famOpen.IsError ?? false);
         }
 
         [Fact]
@@ -424,12 +424,12 @@ namespace Bimbridge.Tests
             {
                 ["protocol"] = (long)Wire.ProtocolVersion, ["client"] = "test", ["agente"] = "E2E deadline " + Guid.NewGuid().ToString("N").Substring(0, 6), ["agente_fuente"] = AgentIdentity.SourceConfig,
             } }), CancellationToken.None);
-            Assert.Equal(Status.Ok, Response.FromJson(await Frame.ReadAsync(pipe, CancellationToken.None)).Estado);
+            Assert.Equal(Status.Ok, Response.FromJson(await Frame.ReadAsync(pipe, CancellationToken.None)).State);
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
             await Frame.WriteAsync(pipe, Json.Write(new Request { Id = 2, Op = Wire.OpCheck, DeadlineMs = 300, Args = new Dictionary<string, object> { ["name"] = "slow" } }), CancellationToken.None);
             var resp = Response.FromJson(await Frame.ReadAsync(pipe, CancellationToken.None));
-            Assert.Equal(Status.TiempoAgotado, resp.Estado);
+            Assert.Equal(Status.TimedOut, resp.State);
             Assert.True(_fake.SlowCancelled);
             Assert.InRange(sw.ElapsedMilliseconds, 0, 5000);
         }
@@ -464,9 +464,9 @@ namespace Bimbridge.Tests
 
             private string Apply(Plan p)
             {
-                if (p.FindConflicts(Current).Count > 0) { _plans.Finish(p, PlanStatus.Conflicto, "changed"); return p.Status; }
+                if (p.FindConflicts(Current).Count > 0) { _plans.Finish(p, PlanStatus.Conflict, "changed"); return p.Status; }
                 foreach (var e in p.Entries) SetElev(e.Id, Convert.ToDouble(e.Target));
-                _plans.Finish(p, PlanStatus.Aplicado, "ok");
+                _plans.Finish(p, PlanStatus.Applied, "ok");
                 return p.Status;
             }
 
@@ -493,7 +493,7 @@ namespace Bimbridge.Tests
                 var data = (Dictionary<string, object>)ResultTable.Render(snapshot.Spec, snapshot.Rows, page, snapshot.Spec.PageSize);
                 data["cursor"] = cursor;
                 data["rev_instantanea"] = snapshot.Rev;
-                return new Response { Id = request.Id, Rev = snapshot.Rev, Datos = data };
+                return new Response { Id = request.Id, Rev = snapshot.Rev, Data = data };
             }
 
             public async Task<Response> HandleAsync(Session s, Request r, CancellationToken ct)
@@ -503,10 +503,10 @@ namespace Bimbridge.Tests
                 switch (r.Op)
                 {
                     case Wire.OpContext:
-                        return new Response { Id = r.Id, Rev = _versions.Rev, Datos = new Dictionary<string, object> { ["documento"] = "PRUEBA" } };
+                        return new Response { Id = r.Id, Rev = _versions.Rev, Data = new Dictionary<string, object> { ["documento"] = "PRUEBA" } };
                     case Wire.OpCheck:
                         try { await Task.Delay(30000, ct); }
-                        catch (OperationCanceledException) { SlowCancelled = true; return Response.Fail(r.Id, Status.TiempoAgotado, "cancelled"); }
+                        catch (OperationCanceledException) { SlowCancelled = true; return Response.Fail(r.Id, Status.TimedOut, "cancelled"); }
                         return new Response { Id = r.Id };
                     case Wire.OpQuery:
                         var cursor = Arg.GetString(r.Args, "cursor");
@@ -514,22 +514,22 @@ namespace Bimbridge.Tests
                             return WideQuery(s, r, cursor);
                         QuerySpec q;
                         try { q = QuerySpec.Parse(r.Args); }
-                        catch (Exception ex) when (ex is QueryException || ex is ArgumentException) { return Response.Fail(r.Id, Status.Invalido, ex.Message); }
+                        catch (Exception ex) when (ex is QueryException || ex is ArgumentException) { return Response.Fail(r.Id, Status.Invalid, ex.Message); }
                         IEnumerable<Dictionary<string, object>> rows = _rows;
                         if (q.FromSet != null)
                         {
-                            if (!s.Sets.TryGet(q.FromSet, out var set)) return Response.Fail(r.Id, Status.Invalido, "set does not exist: " + q.FromSet);
+                            if (!s.Sets.TryGet(q.FromSet, out var set)) return Response.Fail(r.Id, Status.Invalid, "set does not exist: " + q.FromSet);
                             rows = rows.Where(x => set.Contains((long)x["id"]));
                         }
                         if (q.Levels.Count > 0) rows = rows.Where(x => q.Levels.Contains((string)x["lvl"]));
-                        var datos = (Dictionary<string, object>)ResultTable.Build(q, rows, out var matched);
-                        if (q.SaveAs != null) { s.Sets.Save(q.SaveAs, matched); datos["guardado"] = q.SaveAs; }
-                        return new Response { Id = r.Id, Rev = _versions.Rev, Datos = datos };
+                        var data = (Dictionary<string, object>)ResultTable.Build(q, rows, out var matched);
+                        if (q.SaveAs != null) { s.Sets.Save(q.SaveAs, matched); data["guardado"] = q.SaveAs; }
+                        return new Response { Id = r.Id, Rev = _versions.Rev, Data = data };
                     case Wire.OpPlan:
                     {
                         List<OpSpec> ops;
                         try { ops = OpSpec.ParseAll(r.Args); }
-                        catch (QueryException ex) { return Response.Fail(r.Id, Status.Invalido, ex.Message); }
+                        catch (QueryException ex) { return Response.Fail(r.Id, Status.Invalid, ex.Message); }
                         var p = new Plan { Id = _plans.NewId(), SessionId = s.Id, Client = s.ClientName, DocKey = Doc, CreatedUtc = DateTime.UtcNow, Summary = Arg.GetString(r.Args, "summary") };
                         foreach (var op in ops)
                             foreach (var id in op.Ids)
@@ -538,43 +538,43 @@ namespace Bimbridge.Tests
                                 p.Entries.Add(new PlanEntry { Id = id, Op = op.Kind, Key = "elev", Before = before, After = PlanEntry.Canon(op.Ft.Value), Target = op.Ft.Value });
                             }
                         _plans.Add(p);
-                        return new Response { Id = r.Id, Datos = p.Describe() };
+                        return new Response { Id = r.Id, Data = p.Describe() };
                     }
                     case Wire.OpCommit:
                     {
                         lock (Seen) Seen.Add(r.Op + " " + Json.Write(r.Args));
                         var p = _plans.Get(Arg.GetString(r.Args, "plan_id"));
-                        if (p == null || p.SessionId != s.Id) return Response.Fail(r.Id, Status.Invalido, "does not exist");
+                        if (p == null || p.SessionId != s.Id) return Response.Fail(r.Id, Status.Invalid, "does not exist");
                         if (Hold.On || _plans.Held(Doc).Count > 0)
                         {
                             _plans.Hold(p);
                             var d = p.Describe(0);
                             d["posicion_en_cola"] = (long)(_plans.Held(Doc).FindIndex(x => x.Id == p.Id) + 1);
-                            return new Response { Id = r.Id, Estado = Status.Retenido, Datos = d, Aviso = "queued" };
+                            return new Response { Id = r.Id, State = Status.Held, Data = d, Warning = "queued" };
                         }
                         var st = Apply(p);
-                        return new Response { Id = r.Id, Estado = st == PlanStatus.Aplicado ? Status.Ok : Status.Conflicto, Datos = p.Describe(0) };
+                        return new Response { Id = r.Id, State = st == PlanStatus.Applied ? Status.Ok : Status.Conflict, Data = p.Describe(0) };
                     }
                     case Wire.OpJob:
                     {
                         var p = _plans.Get(Arg.GetString(r.Args, "plan_id"));
-                        if (p == null || p.SessionId != s.Id) return Response.Fail(r.Id, Status.Invalido, "does not exist");
-                        var est = p.Status == PlanStatus.Aplicado ? Status.Ok : p.Status;
-                        return new Response { Id = r.Id, Estado = est, Datos = p.Describe(0) };
+                        if (p == null || p.SessionId != s.Id) return Response.Fail(r.Id, Status.Invalid, "does not exist");
+                        var status = p.Status == PlanStatus.Applied ? Status.Ok : p.Status;
+                        return new Response { Id = r.Id, State = status, Data = p.Describe(0) };
                     }
                     case Wire.OpCatalog:
-                        return new Response { Id = r.Id, Rev = _versions.Rev, Datos = new Dictionary<string, object>
+                        return new Response { Id = r.Id, Rev = _versions.Rev, Data = new Dictionary<string, object>
                         {
                             ["que"] = Arg.GetString(r.Args, "que") ?? "resumen", ["total"] = 2L,
                             ["cols"] = new List<object> { "id", "nombre" }, ["rows"] = new List<object> { new List<object> { 1L, "LEVEL05" }, new List<object> { 2L, "LEVEL06" } },
                         } };
                     case Wire.OpParams:
-                        return new Response { Id = r.Id, Datos = new Dictionary<string, object> { ["op_vista"] = "params", ["ids"] = Arg.GetString(r.Args, "ids") } };
+                        return new Response { Id = r.Id, Data = new Dictionary<string, object> { ["op_vista"] = "params", ["ids"] = Arg.GetString(r.Args, "ids") } };
                     case Wire.OpCapture:
                     {
                         var file = Path.Combine(Path.GetTempPath(), "bimbridge-cap-" + Guid.NewGuid().ToString("N") + ".png");
                         File.WriteAllBytes(file, Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="));
-                        return new Response { Id = r.Id, Datos = new Dictionary<string, object>
+                        return new Response { Id = r.Id, Data = new Dictionary<string, object>
                         {
                             ["archivo"] = file, ["mime"] = "image/png",
                             ["leyenda"] = new Dictionary<string, object> { ["LightingFixtures"] = "orange (9)" },
@@ -585,14 +585,14 @@ namespace Bimbridge.Tests
                     case Wire.OpTask:
                         // Echo: the bridge must deliver the arguments as is (code, mode, args as an object, key, doc).
                         lock (Seen) Seen.Add(r.Op + " " + Json.Write(r.Args));
-                        return new Response { Id = r.Id, Datos = new Dictionary<string, object> { ["eco"] = r.Args } };
+                        return new Response { Id = r.Id, Data = new Dictionary<string, object> { ["eco"] = r.Args } };
                     case Wire.OpFam:
                         lock (Seen) Seen.Add(r.Op + " " + Json.Write(r.Args));
                         if (Arg.GetString(r.Args, "accion") == "conector" && Arg.GetString(r.Args, "radio") == null && Arg.GetString(r.Args, "diametro") == null)
-                            return Response.Fail(r.Id, Status.Invalido, "to create a pipe connector give radio= or diametro= with a unit");
-                        return new Response { Id = r.Id, Datos = new Dictionary<string, object> { ["eco"] = r.Args } };
+                            return Response.Fail(r.Id, Status.Invalid, "to create a pipe connector give radio= or diametro= with a unit");
+                        return new Response { Id = r.Id, Data = new Dictionary<string, object> { ["eco"] = r.Args } };
                     default:
-                        return Response.Fail(r.Id, Status.Invalido, "op " + r.Op);
+                        return Response.Fail(r.Id, Status.Invalid, "op " + r.Op);
                 }
             }
 

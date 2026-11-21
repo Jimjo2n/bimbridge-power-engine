@@ -15,8 +15,8 @@ namespace BimBridge.PowerEngine
     /// IPC transport: line-delimited JSON (one object per line, UTF-8) over the child process's stdin/stdout, the same
     /// <see cref="Json"/> as the rest of BIMBRIDGE. FFI transport (Rust): the same payloads in flat buffers.
     ///
-    /// Request: { "pe": 1, "id": "&lt;correlation&gt;", "trabajo": "...", "args": {...}, "limites": {...}, "rutas": [...] }
-    /// Response: { "pe": 1, "id": "&lt;same&gt;", "codigo": "OK|...", "resultado": {...}, "error": "...", "telemetria": {...} }
+    /// Request: { "pe": 1, "id": "&lt;correlation&gt;", "job": "...", "args": {...}, "limits": {...}, "paths": [...] }
+    /// Response: { "pe": 1, "id": "&lt;same&gt;", "code": "OK|...", "result": {...}, "error": "...", "telemetry": {...} }
     /// Handshake: job "hola" with { "pe_min", "pe_max" } → { "motor", "version", "pe", "capacidades": [...] }.
     /// </summary>
     public static class PowerEngineContracts
@@ -48,7 +48,7 @@ namespace BimBridge.PowerEngine
 
             public Dictionary<string, object> ToJson() => new Dictionary<string, object>
             {
-                ["tiempo_ms"] = (long)TimeoutMs, ["max_bytes"] = MaxMessageBytes, ["max_mem_mb"] = (long)MaxMemoryMb,
+                ["time_ms"] = (long)TimeoutMs, ["max_bytes"] = MaxMessageBytes, ["max_mem_mb"] = (long)MaxMemoryMb,
             };
         }
 
@@ -63,8 +63,8 @@ namespace BimBridge.PowerEngine
 
             public Dictionary<string, object> ToJson() => new Dictionary<string, object>
             {
-                ["pe"] = (long)ProtocolVersion, ["id"] = Id, ["trabajo"] = Job, ["args"] = Args, ["limites"] = Limits.ToJson(),
-                ["rutas"] = Paths.Cast<object>().ToList(),
+                ["pe"] = (long)ProtocolVersion, ["id"] = Id, ["job"] = Job, ["args"] = Args, ["limits"] = Limits.ToJson(),
+                ["paths"] = Paths.Cast<object>().ToList(),
             };
         }
 
@@ -113,11 +113,11 @@ namespace BimBridge.PowerEngine
             if (v == null || v < MinSupported || v > ProtocolVersion) return Response.Fail(expectedId, Codes.Incompatible, "contract version " + (v?.ToString(CultureInfo.InvariantCulture) ?? "(none)") + " outside [" + MinSupported + "," + ProtocolVersion + "]");
             var id = Arg.GetString(o, "id");
             if (!string.Equals(id, expectedId, StringComparison.Ordinal)) return Response.Fail(expectedId, Codes.EngineError, "correlation mismatch: expected " + expectedId + " and got " + (id ?? "(none)"));
-            var code = Arg.GetString(o, "codigo") ?? Codes.EngineError;
+            var code = Arg.GetString(o, "code") ?? Codes.EngineError;
             if (!Codes.All.Contains(code)) code = Codes.EngineError;
             var r = new Response { Id = id, Code = code, Error = Arg.GetString(o, "error") };
-            if (o.TryGetValue("resultado", out var res) && res is Dictionary<string, object> rd) r.Result = rd;
-            if (o.TryGetValue("telemetria", out var t) && t is Dictionary<string, object> td)
+            if (o.TryGetValue("result", out var res) && res is Dictionary<string, object> rd) r.Result = rd;
+            if (o.TryGetValue("telemetry", out var t) && t is Dictionary<string, object> td)
             {
                 r.Telemetry.EngineMs = ToD(td, "motor_ms");
                 r.Telemetry.PeakMemoryKb = (long)ToD(td, "memoria_pico_kb");

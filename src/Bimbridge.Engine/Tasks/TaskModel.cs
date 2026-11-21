@@ -10,42 +10,42 @@ namespace Bimbridge.Engine.Tasks
     /// <summary>Task states (§3.2). The connection state is something else: a task continues even if the client disconnects.</summary>
     public static class TaskState
     {
-        public const string Preparada = "preparada";
-        public const string EnCola = "en_cola";
-        public const string Ejecutando = "ejecutando";
-        public const string EsperandoContexto = "esperando_contexto";
-        public const string Aplicada = "aplicada";
-        public const string AplicadaConDiferencias = "aplicada_con_diferencias";
+        public const string Prepared = "preparada";
+        public const string Queued = "en_cola";
+        public const string Running = "ejecutando";
+        public const string WaitingContext = "esperando_contexto";
+        public const string Applied = "aplicada";
+        public const string AppliedWithDifferences = "aplicada_con_diferencias";
         /// <summary>Stopped with some units committed and others failed or not done: what was committed stays applied and is listed.</summary>
-        public const string Parcial = "parcial";
+        public const string Partial = "parcial";
         /// <summary>The process that was running it is gone (Revit closed, add-in unloaded): resume reconciles and continues.</summary>
-        public const string Interrumpida = "interrumpida";
-        public const string CancelacionSolicitada = "cancelacion_solicitada";
-        public const string Cancelada = "cancelada";
+        public const string Interrupted = "interrumpida";
+        public const string CancelRequested = "cancelacion_solicitada";
+        public const string Cancelled = "cancelada";
 
-        public static bool IsFinal(string s) => s == Aplicada || s == AplicadaConDiferencias || s == Cancelada;
-        public static bool IsActive(string s) => s == EnCola || s == Ejecutando || s == EsperandoContexto || s == CancelacionSolicitada;
+        public static bool IsFinal(string s) => s == Applied || s == AppliedWithDifferences || s == Cancelled;
+        public static bool IsActive(string s) => s == Queued || s == Running || s == WaitingContext || s == CancelRequested;
     }
 
     /// <summary>States of a work unit.</summary>
     public static class UnitState
     {
-        public const string Pendiente = "pendiente";
+        public const string Pending = "pendiente";
         /// <summary>Its start was recorded and its end is not on record (commit→journal window): verified on resume.</summary>
-        public const string EnCurso = "en_curso";
-        public const string Confirmada = "confirmada";
+        public const string InProgress = "en_curso";
+        public const string Committed = "confirmada";
         /// <summary>Failed and was rolled back (confirmed): nothing was left; retried on resume.</summary>
-        public const string Revertida = "revertida";
+        public const string RolledBack = "revertida";
         /// <summary>Its preconditions are not met (someone changed the elements): not applied; replanned on resume.</summary>
-        public const string Conflicto = "conflicto";
+        public const string Conflict = "conflicto";
         /// <summary>Error with committed changes (own transactions): reconcile before continuing.</summary>
-        public const string Parcial = "parcial";
-        public const string Desconocida = "desconocida";
+        public const string Partial = "parcial";
+        public const string Unknown = "desconocida";
         /// <summary>The recipe decided to do nothing (already correct, declared exception).</summary>
-        public const string Omitida = "omitida";
+        public const string Skipped = "omitida";
 
-        public static bool IsDone(string s) => s == Confirmada || s == Omitida;
-        public static bool NeedsReconcile(string s) => s == EnCurso || s == Parcial || s == Desconocida;
+        public static bool IsDone(string s) => s == Committed || s == Skipped;
+        public static bool NeedsReconcile(string s) => s == InProgress || s == Partial || s == Unknown;
     }
 
     public sealed class TaskDoc
@@ -111,7 +111,7 @@ namespace Bimbridge.Engine.Tasks
         public string ContentHash;
         public Dictionary<string, object> Args = new Dictionary<string, object>(StringComparer.Ordinal);
         public List<TaskDoc> Docs = new List<TaskDoc>();
-        public string State = TaskState.Preparada;
+        public string State = TaskState.Prepared;
         public string Reason;
         public string Created;
         public string Updated;
@@ -189,7 +189,7 @@ namespace Bimbridge.Engine.Tasks
             var r = new TaskRecord
             {
                 Id = Arg.GetString(o, "id"), Objective = Arg.GetString(o, "objetivo"), Scope = Arg.GetString(o, "alcance"),
-                ContentHash = Arg.GetString(o, "huella"), State = Arg.GetString(o, "estado") ?? TaskState.Preparada, Reason = Arg.GetString(o, "motivo"),
+                ContentHash = Arg.GetString(o, "huella"), State = Arg.GetString(o, "estado") ?? TaskState.Prepared, Reason = Arg.GetString(o, "motivo"),
                 Created = Arg.GetString(o, "creada"), Updated = Arg.GetString(o, "actualizada"), Rev = Arg.GetLong(o, "rev") ?? 0,
                 Client = Arg.GetString(o, "cliente"), Owner = Arg.GetString(o, "instancia"),
                 UnitsTotal = Arg.GetLong(o, "unidades_total") ?? 0, ConfirmSeq = Arg.GetLong(o, "seq_confirmacion") ?? 0,
@@ -267,7 +267,7 @@ namespace Bimbridge.Engine.Tasks
     public sealed class UnitRecord
     {
         public string Key;
-        public string State = UnitState.Pendiente;
+        public string State = UnitState.Pending;
         public long Seq;
         public int Attempts;
         public string Error;

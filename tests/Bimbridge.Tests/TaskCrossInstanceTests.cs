@@ -38,7 +38,7 @@ namespace Bimbridge.Tests
         {
             var root = TempRoot();
             var store = new TaskStore(root);
-            store.Create(Draft("ajena", 5, TaskState.Interrumpida), "// fake");
+            store.Create(Draft("ajena", 5, TaskState.Interrupted), "// fake");
             Assert.True(store.TryLease("ajena", "inst:B", "B", TimeSpan.FromHours(1), DateTime.UtcNow, out _));
             var file = Path.Combine(store.Dir("ajena"), "tarea.json");
             var before = File.ReadAllText(file);
@@ -46,11 +46,11 @@ namespace Bimbridge.Tests
 
             var t1 = mgr.Cancel("ajena", out var busy);
             Assert.NotNull(busy);
-            Assert.Contains("otro Revit", busy);
-            Assert.Equal(TaskState.Interrumpida, t1.State);
-            Assert.Contains("otro Revit", mgr.Note("ajena", "nota", "prueba"));
-            Assert.Contains("otro Revit", mgr.Reconcile("ajena", null, true, "comprobado", "prueba"));
-            Assert.Contains("otro Revit", mgr.Archive("ajena"));
+            Assert.Contains("another Revit", busy);
+            Assert.Equal(TaskState.Interrupted, t1.State);
+            Assert.Contains("another Revit", mgr.Note("ajena", "nota", "prueba"));
+            Assert.Contains("another Revit", mgr.Reconcile("ajena", null, true, "comprobado", "prueba"));
+            Assert.Contains("another Revit", mgr.Archive("ajena"));
 
             Assert.True(store.Exists("ajena"));
             Assert.Equal(before, File.ReadAllText(file));
@@ -63,7 +63,7 @@ namespace Bimbridge.Tests
             var root = TempRoot();
             var store = new TaskStore(root);
             var thief = new TaskStore(root);
-            var t = Draft("robada", 200, TaskState.EnCola);
+            var t = Draft("robada", 200, TaskState.Queued);
             store.Create(t, "// fake");
             var m = new FakeModel { MsPerUnit = 50 };
             var stolen = false;
@@ -95,8 +95,8 @@ namespace Bimbridge.Tests
             await runner.RunAsync(CancellationToken.None);
 
             Assert.True(marked);
-            Assert.Equal(TaskState.Interrumpida, runner.Task_.State);
-            Assert.Contains("lease perdido", runner.Task_.Reason);
+            Assert.Equal(TaskState.Interrupted, runner.Task_.State);
+            Assert.Contains("lease lost",runner.Task_.Reason);
             var onDisk = store.Load("robada");
             Assert.Equal(424242, onDisk.ConfirmSeq);
             Assert.Contains(onDisk.Decisions, d => (d["texto"] as string) == "marcador-B");
@@ -111,7 +111,7 @@ namespace Bimbridge.Tests
         {
             var root = TempRoot();
             var store = new TaskStore(root);
-            var t = Draft("normal", 5, TaskState.EnCola);
+            var t = Draft("normal", 5, TaskState.Queued);
             store.Create(t, "// fake");
             var leaseAtSave = new List<TaskStore.Lease>();
             store.FaultBeforeSave = id => leaseAtSave.Add(store.ReadLease(id));
@@ -119,13 +119,13 @@ namespace Bimbridge.Tests
 
             await runner.RunAsync(CancellationToken.None);
 
-            Assert.True(runner.Task_.State == TaskState.Aplicada, runner.Task_.Reason);
+            Assert.True(runner.Task_.State == TaskState.Applied, runner.Task_.Reason);
             var last = leaseAtSave.Last();
             Assert.NotNull(last);
             Assert.Equal("inst:A", last.Owner);
             Assert.False(last.Released, "the last tarea.json was written after releasing the lease");
             Assert.True(store.ReadLease("normal").Released);
-            Assert.Equal(TaskState.Aplicada, store.Load("normal").State);
+            Assert.Equal(TaskState.Applied, store.Load("normal").State);
         }
     }
 }

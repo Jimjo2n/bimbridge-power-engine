@@ -69,9 +69,9 @@ namespace Bimbridge.Engine.Coverage
         private const string DocOps = "src/Bimbridge.Addin/Revit/Families/DocOps.cs";
         private const string Draw2D = "src/Bimbridge.Engine/Draw2D.cs";
 
-        private static CapabilityEntry Typed(string id, string dom, string sub, string es, string en, string op, string strategyOp, string expected, string[] tests, string[] cmds = null, string[] cats = null, string limits = null, string prio = "P1") => new CapabilityEntry
+        private static CapabilityEntry Typed(string id, string dom, string sub, string name, string nameEn, string op, string strategyOp, string expected, string[] tests, string[] cmds = null, string[] cats = null, string limits = null, string prio = "P1") => new CapabilityEntry
         {
-            Id = id, Domain = dom, Subdomain = sub, Name = es, NameEn = en, Operation = op, Expected = expected, Strategy = "typed:" + strategyOp,
+            Id = id, Domain = dom, Subdomain = sub, Name = name, NameEn = nameEn, Operation = op, Expected = expected, Strategy = "typed:" + strategyOp,
             Status = CoverageStatus.IMPLEMENTED_UNVERIFIED, Implementation = new[] { PlanBuilder, PlanApplier, OpCatalogFile }, Tests = tests ?? new string[0],
             Verifier = "plan postconditions + model reread after commit (per-element diff)", Idempotency = "clave= per commit; unique plan_id",
             Recovery = "TransactionGroup + durable intent; reconciliation by plan_id", PostableCommands = cmds ?? new string[0], Categories = cats ?? new string[0],
@@ -79,40 +79,40 @@ namespace Bimbridge.Engine.Coverage
         };
 
         /// <summary>0.9.1 (Blocks C/D/E): typed modeling operation: offline validation in Engine.ModelOps and verification of what was created.</summary>
-        private static CapabilityEntry Model(string id, string dom, string sub, string es, string en, string op, string strategyOp, string expected, string[] api, string[] cmds = null, string[] cats = null, string limits = null, string prio = "P1")
+        private static CapabilityEntry Model(string id, string dom, string sub, string name, string nameEn, string op, string strategyOp, string expected, string[] api, string[] cmds = null, string[] cats = null, string limits = null, string prio = "P1")
         {
-            var e = Typed(id, dom, sub, es, en, op, strategyOp, expected, new[] { "ModelOpsTests" }, cmds, cats, limits, prio);
+            var e = Typed(id, dom, sub, name, nameEn, op, strategyOp, expected, new[] { "ModelOpsTests" }, cmds, cats, limits, prio);
             e.Implementation = e.Implementation.Concat(new[] { "src/Bimbridge.Engine/ModelOps.cs", "src/Bimbridge.Addin/Revit/Writes/PlanBuilder.Model.cs", "src/Bimbridge.Addin/Revit/Writes/PlanApplier.Model.cs" }).ToArray();
             e.ApiSurfaces = api ?? new string[0];
             e.Verifier = "reread of each created element against the request (verificacion_creacion)";
             return e;
         }
 
-        private static CapabilityEntry Dyn(string id, string dom, string sub, string es, string en, string op, string expected, string[] api, string[] cmds = null, string limits = null, string prio = "P2") => new CapabilityEntry
+        private static CapabilityEntry Dyn(string id, string dom, string sub, string name, string nameEn, string op, string expected, string[] api, string[] cmds = null, string limits = null, string prio = "P2") => new CapabilityEntry
         {
-            Id = id, Domain = dom, Subdomain = sub, Name = es, NameEn = en, Operation = op, Expected = expected, Strategy = "exec",
+            Id = id, Domain = dom, Subdomain = sub, Name = name, NameEn = nameEn, Operation = op, Expected = expected, Strategy = "exec",
             Status = CoverageStatus.DYNAMIC_CSHARP_ONLY, Implementation = new[] { ExecHandler }, ApiSurfaces = api ?? new string[0], PostableCommands = cmds ?? new string[0],
             Verifier = "no typed verifier: the script must return evidence; pending a typed operation with a verifier",
             Idempotency = "not guaranteed (arbitrary code)", Recovery = "durable intent + audit; no rollback of external effects",
             Limitations = limits ?? "reachable only with dynamic C#: missing typed operation, verifier and tests", Priority = prio,
         };
 
-        private static CapabilityEntry Missing(string id, string dom, string sub, string es, string en, string op, string expected, string[] api = null, string[] cmds = null, string limits = null, string prio = "P2") => new CapabilityEntry
+        private static CapabilityEntry Missing(string id, string dom, string sub, string name, string nameEn, string op, string expected, string[] api = null, string[] cmds = null, string limits = null, string prio = "P2") => new CapabilityEntry
         {
-            Id = id, Domain = dom, Subdomain = sub, Name = es, NameEn = en, Operation = op, Expected = expected, Strategy = "none",
+            Id = id, Domain = dom, Subdomain = sub, Name = name, NameEn = nameEn, Operation = op, Expected = expected, Strategy = "none",
             Status = CoverageStatus.MISSING, ApiSurfaces = api ?? new string[0], PostableCommands = cmds ?? new string[0],
             Limitations = limits ?? "not implemented in BIMBRIDGE", Priority = prio,
         };
 
-        private static CapabilityEntry NoApi(string id, string dom, string sub, string es, string en, string op, string expected, string[] missingApi, string[] cmds, string limits, string prio = "P1") => new CapabilityEntry
+        private static CapabilityEntry NoApi(string id, string dom, string sub, string name, string nameEn, string op, string expected, string[] missingApi, string[] cmds, string limits, string prio = "P1") => new CapabilityEntry
         {
-            Id = id, Domain = dom, Subdomain = sub, Name = es, NameEn = en, Operation = op, Expected = expected, Strategy = "postcommand",
+            Id = id, Domain = dom, Subdomain = sub, Name = name, NameEn = nameEn, Operation = op, Expected = expected, Strategy = "postcommand",
             Status = CoverageStatus.UNSUPPORTED_BY_PUBLIC_API, ApiSurfaces = missingApi, PostableCommands = cmds, Limitations = limits, Priority = prio,
         };
 
-        private static CapabilityEntry Engine(string id, string dom, string sub, string es, string en, string op, string expected, string[] impl, string[] tests, string verifier, string limits = null) => new CapabilityEntry
+        private static CapabilityEntry Engine(string id, string dom, string sub, string name, string nameEn, string op, string expected, string[] impl, string[] tests, string verifier, string limits = null) => new CapabilityEntry
         {
-            Id = id, Domain = dom, Subdomain = sub, Name = es, NameEn = en, Operation = op, Expected = expected, Strategy = "engine", DocumentKind = "any",
+            Id = id, Domain = dom, Subdomain = sub, Name = name, NameEn = nameEn, Operation = op, Expected = expected, Strategy = "engine", DocumentKind = "any",
             Status = CoverageStatus.OFFLINE_VERIFIED, Implementation = impl, Tests = tests, Verifier = verifier, Limitations = limits, Priority = "P0",
         };
 
@@ -290,7 +290,7 @@ namespace Bimbridge.Engine.Coverage
                 new CapabilityEntry { Id = "F35-AGENTHOST-001", Domain = "F35", Subdomain = "automation", Name = "Durable IR plans with cross-process recovery", NameEn = "Durable IR plans", Operation = "UPDATE", Expected = "plan run exactly once with recovery after a crash", Strategy = "engine", DocumentKind = "any", Status = CoverageStatus.OFFLINE_VERIFIED, Implementation = new[] { "src/Bimbridge.AgentHost/Exec/PlanRunner.cs" }, Tests = new[] { "AgentHostProcessTests", "AgentHostScenarioTests", "AgentHostAlphaTests" }, Verifier = "durable simulated model + journal", Limitations = "verified against the simulated backend; against Revit, pending the campaign", Priority = "P0" },
 
                 // ---------------- F36–F37 QA/QC and interactive workflows ----------------
-                new CapabilityEntry { Id = "F36-QC-MANIFEST-001", Domain = "F36", Subdomain = "QA/QC", Name = "One-to-one QC against manifest", NameEn = "QC against manifest", Operation = "VERIFY", Expected = "deviations in position, elevation, rotation, type, level and tags", Strategy = "exec", Status = CoverageStatus.IMPLEMENTED_UNVERIFIED, Implementation = new[] { "src/Bimbridge.Addin/recetas/qc_manifiesto.cs" }, Tests = new[] { "QcFixtureTests" }, Verifier = "postcondition with a list of deviations", Priority = "P1" },
+                new CapabilityEntry { Id = "F36-QC-MANIFEST-001", Domain = "F36", Subdomain = "QA/QC", Name = "One-to-one QC against manifest", NameEn = "QC against manifest", Operation = "VERIFY", Expected = "deviations in position, elevation, rotation, type, level and tags", Strategy = "exec", Status = CoverageStatus.IMPLEMENTED_UNVERIFIED, Implementation = new[] { "src/Bimbridge.Addin/recipes/qc_manifest.cs" }, Tests = new[] { "QcFixtureTests" }, Verifier = "postcondition with a list of deviations", Priority = "P1" },
                 new CapabilityEntry { Id = "F36-QC-INDEP-001", Domain = "F36", Subdomain = "QA/QC", Name = "Independent verification against a declared source", NameEn = "Independent verification", Operation = "VERIFY", Expected = "expected items from an independent source versus the model", Strategy = "engine", Status = CoverageStatus.OFFLINE_VERIFIED, Implementation = new[] { "src/Bimbridge.Engine/Workflow/Traceability.cs" }, Tests = new[] { "TraceabilityTests", "Hardening090Tests" }, Verifier = "refused if the expected source is the same one that guided the build", Priority = "P1" },
                 Engine("F37-NWE-001", "F37", "native workflows", "Native workflow engine: evidence-driven states, receipts and idempotency", "Native Workflow Engine", "VERIFY",
                     "workflow whose states only advance on observed evidence, persistent receipts per attempt key, reconciliation on uncertainty and no blind re-PostCommand",

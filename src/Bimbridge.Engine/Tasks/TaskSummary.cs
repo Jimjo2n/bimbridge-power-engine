@@ -16,15 +16,15 @@ namespace Bimbridge.Engine.Tasks
         {
             var c = units.Counts();
             long N(string s) => c.TryGetValue(s, out var n) ? n : 0;
-            var done = N(UnitState.Confirmada) + N(UnitState.Omitida);
+            var done = N(UnitState.Committed) + N(UnitState.Skipped);
             var parts = new List<string>
             {
                 "Task " + t.Id + " (" + (t.RecipeName ?? "?") + " v" + (t.RecipeVersion ?? "?") + ", doc " + (t.MainDoc?.Title ?? t.MainDoc?.Key ?? "?") + "): " + t.State + ".",
             };
             if (!string.IsNullOrEmpty(t.Objective)) parts.Add("Target: " + Clip(t.Objective, 140) + ".");
             parts.Add("Units: " + done + "/" + t.UnitsTotal + " done" +
-                      Opt(N(UnitState.Conflicto), " conflicts") + Opt(N(UnitState.Revertida), " rolled back") +
-                      Opt(N(UnitState.EnCurso) + N(UnitState.Parcial) + N(UnitState.Desconocida), " doubtful") + ".");
+                      Opt(N(UnitState.Conflict), " conflicts") + Opt(N(UnitState.RolledBack), " rolled back") +
+                      Opt(N(UnitState.InProgress) + N(UnitState.Partial) + N(UnitState.Unknown), " doubtful") + ".");
             if (t.LastPersist != null)
                 parts.Add("Last save: " + t.LastPersist.Kind + " " + t.LastPersist.When + " after " + t.LastPersist.Seq + " committed" +
                           (t.ConfirmSeq > t.LastPersist.Seq ? " (" + (t.ConfirmSeq - t.LastPersist.Seq) + " committed unsaved)" : "") + ".");
@@ -40,21 +40,21 @@ namespace Bimbridge.Engine.Tasks
         {
             switch (t.State)
             {
-                case TaskState.Aplicada: return "nothing; review artifacts if needed";
-                case TaskState.AplicadaConDiferencias:
+                case TaskState.Applied: return "nothing; review artifacts if needed";
+                case TaskState.AppliedWithDifferences:
                 {
                     // Points to the state that actually has units pending review (it is not always conflict).
-                    var st = new[] { UnitState.Revertida, UnitState.Conflicto, UnitState.Parcial, UnitState.Omitida }
+                    var st = new[] { UnitState.RolledBack, UnitState.Conflict, UnitState.Partial, UnitState.Skipped }
                         .FirstOrDefault(s => units.Units.Values.Any(u => u.State == s));
                     var which = units.Units.Values.Any(u => u.State == st) ? "tarea unidades estado=" + st.ToString().ToLowerInvariant() + ", " : "";
                     return "review deviations (" + which + "qc_final) and decide; tarea reanudar retries the rolled-back ones";
                 }
-                case TaskState.Cancelada: return "nothing unless you want to resume (tarea reanudar)";
-                case TaskState.Interrumpida: return units.Units.Values.Any(u => u.State == UnitState.Desconocida)
+                case TaskState.Cancelled: return "nothing unless you want to resume (tarea reanudar)";
+                case TaskState.Interrupted: return units.Units.Values.Any(u => u.State == UnitState.Unknown)
                     ? "tarea reconciliar with decision=aplicada|no_aplicada for the doubtful ones; then tarea reanudar"
                     : "tarea reanudar (verifies what is doubtful and continues)";
-                case TaskState.Parcial: return "read the reason; fix and tarea reanudar";
-                case TaskState.EsperandoContexto: return "resolve what the reason says; the task continues on its own (or tarea reanudar if it stopped waiting)";
+                case TaskState.Partial: return "read the reason; fix and tarea reanudar";
+                case TaskState.WaitingContext: return "resolve what the reason says; the task continues on its own (or tarea reanudar if it stopped waiting)";
                 default: return "wait (tarea esperar desde=" + t.Rev + ")";
             }
         }
@@ -69,13 +69,13 @@ namespace Bimbridge.Engine.Tasks
                 ["tarea"] = t.Id,
                 ["estado"] = t.State,
                 ["rev"] = t.Rev,
-                ["progreso"] = (N(UnitState.Confirmada) + N(UnitState.Omitida)) + "/" + t.UnitsTotal,
+                ["progreso"] = (N(UnitState.Committed) + N(UnitState.Skipped)) + "/" + t.UnitsTotal,
             };
             var counts = new Dictionary<string, object>();
             foreach (var kv in c.OrderBy(k => k.Key, StringComparer.Ordinal)) counts[kv.Key] = kv.Value;
             d["unidades"] = counts;
             if (!string.IsNullOrEmpty(t.Reason)) d["motivo"] = t.Reason;
-            var dev = units.Units.Values.Where(u => u.State == UnitState.Conflicto || u.State == UnitState.Revertida || UnitState.NeedsReconcile(u.State))
+            var dev = units.Units.Values.Where(u => u.State == UnitState.Conflict || u.State == UnitState.RolledBack || UnitState.NeedsReconcile(u.State))
                 .Take(5).Select(u => (object)(u.Key + ": " + u.State + (string.IsNullOrEmpty(u.Error) ? "" : " — " + Clip(u.Error, 120)))).ToList();
             if (dev.Count > 0) d["desviaciones"] = dev;
             if (t.Postcondition != null) d["qc_final"] = Compact(t.Postcondition);

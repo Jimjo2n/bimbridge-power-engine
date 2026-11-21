@@ -29,31 +29,31 @@ namespace Bimbridge.AgentHost
     /// <summary>Technical source document declared by the plan (e.g. a specifications PDF), identified by its SHA-256.</summary>
     public sealed class SourceDoc
     {
-        public string Id, Nombre, Sha256;
-        public Dictionary<string, object> ToJson() => new Dictionary<string, object> { ["id"] = Id, ["nombre"] = Nombre, ["sha256"] = Sha256 };
+        public string Id, Name, Sha256;
+        public Dictionary<string, object> ToJson() => new Dictionary<string, object> { ["id"] = Id, ["nombre"] = Name, ["sha256"] = Sha256 };
     }
 
     /// <summary>Traceability of an operation back to the requirement that produced it.</summary>
     public sealed class SourceRef
     {
-        public string Fuente;      // id of a SourceDoc of the plan
-        public long? Pagina;
-        public string Seccion, Requisito, Cita;
+        public string SourceId;      // id of a SourceDoc of the plan
+        public long? Page;
+        public string Section, Requirement, Quote;
 
         public Dictionary<string, object> ToJson()
         {
-            var d = new Dictionary<string, object> { ["fuente"] = Fuente };
-            if (Pagina != null) d["pagina"] = Pagina.Value;
-            if (Seccion != null) d["seccion"] = Seccion;
-            if (Requisito != null) d["requisito"] = Requisito;
-            if (Cita != null) d["cita"] = Cita;
+            var d = new Dictionary<string, object> { ["fuente"] = SourceId };
+            if (Page != null) d["pagina"] = Page.Value;
+            if (Section != null) d["seccion"] = Section;
+            if (Requirement != null) d["requisito"] = Requirement;
+            if (Quote != null) d["cita"] = Quote;
             return d;
         }
 
         public static SourceRef FromJson(Dictionary<string, object> o) => o == null ? null : new SourceRef
         {
-            Fuente = Arg.GetString(o, "fuente"), Pagina = Arg.GetLong(o, "pagina"), Seccion = Arg.GetString(o, "seccion"),
-            Requisito = Arg.GetString(o, "requisito"), Cita = Arg.GetString(o, "cita"),
+            SourceId = Arg.GetString(o, "fuente"), Page = Arg.GetLong(o, "pagina"), Section = Arg.GetString(o, "seccion"),
+            Requirement = Arg.GetString(o, "requisito"), Quote = Arg.GetString(o, "cita"),
         };
     }
 
@@ -121,8 +121,8 @@ namespace Bimbridge.AgentHost
         public string SourceIdentity(SourceRef r)
         {
             if (r == null) return "";
-            var doc = Sources.FirstOrDefault(s => s.Id == r.Fuente);
-            return (doc?.Sha256 ?? ("?" + r.Fuente)) + "|" + (r.Requisito ?? "") + "|" + (r.Pagina?.ToString(CultureInfo.InvariantCulture) ?? "");
+            var doc = Sources.FirstOrDefault(s => s.Id == r.SourceId);
+            return (doc?.Sha256 ?? ("?" + r.SourceId)) + "|" + (r.Requirement ?? "") + "|" + (r.Page?.ToString(CultureInfo.InvariantCulture) ?? "");
         }
 
         /// <summary>Assigns each operation its deterministic id. Dependencies are expressed by index as "#n" before calling.</summary>
@@ -159,7 +159,7 @@ namespace Bimbridge.AgentHost
             if (o.TryGetValue("unidades", out var u) && u is Dictionary<string, object> ud) plan.LengthUnit = Arg.GetString(ud, "longitud");
             if (o.TryGetValue("fuentes", out var fs) && fs is List<object> fl)
                 foreach (var x in fl.OfType<Dictionary<string, object>>())
-                    plan.Sources.Add(new SourceDoc { Id = Arg.GetString(x, "id"), Nombre = Arg.GetString(x, "nombre"), Sha256 = Arg.GetString(x, "sha256") });
+                    plan.Sources.Add(new SourceDoc { Id = Arg.GetString(x, "id"), Name = Arg.GetString(x, "nombre"), Sha256 = Arg.GetString(x, "sha256") });
             if (o.TryGetValue("operaciones", out var ops) && ops is List<object> list)
                 foreach (var x in list.OfType<Dictionary<string, object>>()) plan.Ops.Add(OpDraft.FromJson(x));
             foreach (var k in IrSchema.SystemOnlyPlanFields) if (o.ContainsKey(k)) plan.Forbidden.Add(k);
@@ -250,7 +250,7 @@ namespace Bimbridge.AgentHost
             Scope = IrIds.FreezeDict(d.Scope); Params = IrIds.FreezeDict(d.Params); Expected = IrIds.FreezeDict(d.Expected);
             DependsOn = new ReadOnlyCollection<string>(d.DependsOn.Distinct(StringComparer.Ordinal).ToList());
             Preconditions = pre; AllowEmpty = d.AllowEmpty; RetryMax = (int)(d.Retries ?? 0);
-            Source = d.Source == null ? null : new SourceRef { Fuente = d.Source.Fuente, Pagina = d.Source.Pagina, Seccion = d.Source.Seccion, Requisito = d.Source.Requisito, Cita = d.Source.Cita };
+            Source = d.Source == null ? null : new SourceRef { SourceId = d.Source.SourceId, Page = d.Source.Page, Section = d.Source.Section, Requirement = d.Source.Requirement, Quote = d.Source.Quote };
         }
 
         public string Param(string k) => Params.TryGetValue(k, out var v) && v != null ? Convert.ToString(v, CultureInfo.InvariantCulture) : null;
@@ -280,7 +280,7 @@ namespace Bimbridge.AgentHost
             CanonicalJson = OpSemantics.Canonical(draftJson);
             Hash = Home.Sha256Hex(CanonicalJson, 20);
             Objective = d.Objective; DocKey = d.DocKey; DocPrint = d.DocPrint; LengthUnit = d.LengthUnit; Coordinates = d.Coordinates;
-            Sources = new ReadOnlyCollection<SourceDoc>(d.Sources.Select(s => new SourceDoc { Id = s.Id, Nombre = s.Nombre, Sha256 = s.Sha256 }).ToList());
+            Sources = new ReadOnlyCollection<SourceDoc>(d.Sources.Select(s => new SourceDoc { Id = s.Id, Name = s.Name, Sha256 = s.Sha256 }).ToList());
             Ops = new ReadOnlyCollection<ValidatedOp>(ops);
             Order = new ReadOnlyCollection<string>(order);
             ById = new ReadOnlyDictionary<string, ValidatedOp>(ops.ToDictionary(o => o.Id, StringComparer.Ordinal));

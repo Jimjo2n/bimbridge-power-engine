@@ -53,7 +53,7 @@ namespace Bimbridge.Tests
             public async Task<Response> HandleAsync(Session s, Request r, CancellationToken ct)
             {
                 if ((r.Op == Wire.OpQuery || r.Op == Wire.OpCheck) && Interlocked.Decrement(ref BusyReads) >= 0)
-                    return Response.Fail(r.Id, Status.RevitOcupado, "simulated: Revit did not respond");
+                    return Response.Fail(r.Id, Status.RevitBusy, "simulated: Revit did not respond");
                 switch (r.Op)
                 {
                     case Wire.OpContext:
@@ -64,11 +64,11 @@ namespace Bimbridge.Tests
                             ["worksharing"] = Workshared, ["solo_lectura"] = false, ["modificado"] = Modified, ["niveles_mcp"] = Levels, ["retener"] = false,
                         };
                         if (OmitContextFlag != null) cx.Remove(OmitContextFlag);
-                        return new Response { Id = r.Id, Rev = 7, Datos = cx };
+                        return new Response { Id = r.Id, Rev = 7, Data = cx };
                     }
                     case Wire.OpCheck:
                         CheckCalls++;
-                        return new Response { Id = r.Id, Datos = new Dictionary<string, object>
+                        return new Response { Id = r.Id, Data = new Dictionary<string, object>
                         {
                             ["luminarias"] = 10L, ["sin_tag"] = new Dictionary<string, object> { ["n"] = QcCounts[0] },
                             ["tags_huerfanos"] = new Dictionary<string, object> { ["n"] = QcCounts[1] },
@@ -79,10 +79,10 @@ namespace Bimbridge.Tests
                         lock (Comments)
                         {
                             var ps = Arg.GetLong(r.Args, "page_size") ?? 50;
-                            if (ps < 1 || ps > 200) return new Response { Id = r.Id, Estado = Status.Invalido, Aviso = "page_size between 1 and 200" };   // same as CatalogRunner
+                            if (ps < 1 || ps > 200) return new Response { Id = r.Id, State = Status.Invalid, Warning = "page_size between 1 and 200" };   // same as CatalogRunner
                             var ids = Arg.GetStringList(r.Args, "ids").Select(long.Parse).ToList();
                             var sel = (ids.Count > 0 ? ids.Where(Comments.ContainsKey) : Comments.Keys.Where(k => k < 900)).ToList();
-                            if (Arg.GetBool(r.Args, "count") == true) return new Response { Id = r.Id, Datos = new Dictionary<string, object> { ["total"] = (long)sel.Count } };
+                            if (Arg.GetBool(r.Args, "count") == true) return new Response { Id = r.Id, Data = new Dictionary<string, object> { ["total"] = (long)sel.Count } };
                             QueryCalls++;
                             var f = Arg.GetStringList(r.Args, "f");
                             var rows = sel.Select(i => (object)f.Select(x => x == "id" ? (object)i : x == "Comments" ? Comments[i] : (object)("v_" + x)).ToList()).ToList();
@@ -94,7 +94,7 @@ namespace Bimbridge.Tests
                                 dq["page"] = (long)pg; dq["pages"] = (long)((sel.Count + ForcePage - 1) / ForcePage);
                                 if (TotalChangesOnPage2 && pg == 2) dq["total"] = (long)sel.Count + 1;
                             }
-                            return new Response { Id = r.Id, Datos = dq };
+                            return new Response { Id = r.Id, Data = dq };
                         }
                     }
                     case Wire.OpPlan:
@@ -108,7 +108,7 @@ namespace Bimbridge.Tests
                         if (ExtraIdInPlan) changes.Add((900, "x"));
                         var id = "P-" + (++_n);
                         _plans[id] = changes;
-                        return new Response { Id = r.Id, Datos = new Dictionary<string, object>
+                        return new Response { Id = r.Id, Data = new Dictionary<string, object>
                         {
                             ["plan_id"] = id, ["cambios"] = (long)changes.Count,
                             ["filas"] = changes.Select(c => (object)new List<object> { c.Id, "set_param", "Comments", Comments[c.Id] ?? "", c.Value }).ToList(),
@@ -119,7 +119,7 @@ namespace Bimbridge.Tests
                         var p = _plans[(string)r.Args["plan_id"]];
                         var trial = Arg.GetString(r.Args, "modo") == "ensayo";
                         if (trial && Engine.TrialGuard.Refuse(Modified, "commit modo=ensayo") is string refuse)   // same as the add-in (P0)
-                            return Response.Fail(r.Id, Status.Rechazado, refuse);
+                            return Response.Fail(r.Id, Status.Rejected, refuse);
                         if (trial)
                         {
                             TrialCommits++;
@@ -127,7 +127,7 @@ namespace Bimbridge.Tests
                             lock (Comments) { before = new Dictionary<long, string>(Comments); foreach (var c in p) Comments[c.Id] = c.Value; }
                             var tempOk = p.All(c => Comments[c.Id] == c.Value);
                             if (!LeakTrial) lock (Comments) foreach (var kv in before) Comments[kv.Key] = kv.Value;
-                            return new Response { Id = r.Id, Estado = LeakTrial ? Status.Desconocido : "ensayado", Datos = new Dictionary<string, object>
+                            return new Response { Id = r.Id, State = LeakTrial ? Status.Unknown : "ensayado", Data = new Dictionary<string, object>
                             {
                                 ["plan_id"] = r.Args["plan_id"],
                                 ["ensayo"] = new Dictionary<string, object> { ["grupo_estado"] = LeakTrial ? "Started" : "RolledBack", ["temporal_ok"] = tempOk, ["restauracion_ok"] = !LeakTrial },
@@ -136,7 +136,7 @@ namespace Bimbridge.Tests
                         Commits++;
                         if (!CommitNoop) { lock (Comments) foreach (var c in p) Comments[c.Id] = c.Value; Modified = true; }
                         if (CommitDelayMs > 0) await Task.Delay(CommitDelayMs, CancellationToken.None);
-                        return new Response { Id = r.Id, Datos = new Dictionary<string, object> { ["plan_id"] = r.Args["plan_id"], ["verificacion"] = new Dictionary<string, object> { ["releidos"] = (long)p.Count } } };
+                        return new Response { Id = r.Id, Data = new Dictionary<string, object> { ["plan_id"] = r.Args["plan_id"], ["verificacion"] = new Dictionary<string, object> { ["releidos"] = (long)p.Count } } };
                     }
                     case Wire.OpJob:
                         return new Response { Id = r.Id };
@@ -152,22 +152,22 @@ namespace Bimbridge.Tests
                                 System.IO.File.AppendAllText(DiskFile, "save" + Saves);
                                 Modified = false;
                             }
-                            return new Response { Id = r.Id, Datos = new Dictionary<string, object> { ["accion"] = "guardar" } };
+                            return new Response { Id = r.Id, Data = new Dictionary<string, object> { ["accion"] = "guardar" } };
                         }
                         if (verb == "verificar_disco")
                         {
-                            if (Modified) return Response.Fail(r.Id, Status.NecesitaUsuario, "unsaved changes");
+                            if (Modified) return Response.Fail(r.Id, Status.NeedsUser, "unsaved changes");
                             var ids = Arg.GetStringList(r.Args, "ids").Select(long.Parse).ToList();
-                            return new Response { Id = r.Id, Datos = new Dictionary<string, object>
+                            return new Response { Id = r.Id, Data = new Dictionary<string, object>
                             {
                                 ["sha256"] = RevitCli.FileSha256(DiskFile),
                                 ["filas"] = ids.Select(i => (object)new List<object> { i, DiskComments.ContainsKey(i), DiskComments.TryGetValue(i, out var v) ? v : null }).ToList(),
                             } };
                         }
-                        return Response.Fail(r.Id, Status.Invalido, verb);
+                        return Response.Fail(r.Id, Status.Invalid, verb);
                     }
                 }
-                return Response.Fail(r.Id, Status.NoSoportado, r.Op);
+                return Response.Fail(r.Id, Status.NotSupported, r.Op);
             }
         }
 
@@ -198,7 +198,7 @@ namespace Bimbridge.Tests
             RevitBackend.Open(RevitLink.ForTestPipe(pipe, fake.Pid), mode, out err);
 
         [Fact]
-        public void Trial_FromAgentHost_IsEnsayada_ModelUnchanged_NothingPersisted()
+        public void Trial_FromAgentHost_IsTrialed_ModelUnchanged_NothingPersisted()
         {
             var fake = new FakeBim();
             var (host, pipe) = Host(fake);
@@ -213,7 +213,7 @@ namespace Bimbridge.Tests
                     Assert.NotNull(r);
                     var s = r.Run();
                     var w = r.State.Ops[r.Plan.Ops[1].Id];
-                    Assert.Equal(OpState.Ensayada, w.State);
+                    Assert.Equal(OpState.Trialed, w.State);
                     Assert.Contains("trialed", s);
                     Assert.Equal("RolledBack", w.Evidence["addin_grupo_estado"]);
                     Assert.Equal(3L, w.Evidence["restaurados_relectura"]);
@@ -261,7 +261,7 @@ namespace Bimbridge.Tests
                 {
                     var other = PlanFor("otra-huella");
                     Assert.Null(PlanRunner.Open(AH.NewDir("rv-doc"), other, b, new RunnerOptions { RealWrites = "ensayo" }, out var d));
-                    Assert.Contains(d, x => x.Code == ErrorClass.DocumentoDistinto);
+                    Assert.Contains(d, x => x.Code == ErrorClass.DifferentDocument);
                 }
                 Assert.Null(RevitLink.ForPid(0, out var e4));
                 Assert.Contains("never picks", e4);
@@ -269,7 +269,7 @@ namespace Bimbridge.Tests
         }
 
         [Fact]
-        public void TrialThatDoesNotRestore_IsNeverReportedAsEnsayada()
+        public void TrialThatDoesNotRestore_IsNeverReportedAsTrialed()
         {
             var fake = new FakeBim { LeakTrial = true };
             var (host, pipe) = Host(fake);
@@ -279,7 +279,7 @@ namespace Bimbridge.Tests
             {
                 r.Run();
                 var w = r.State.Ops[r.Plan.Ops[1].Id];
-                Assert.Equal(OpState.RequiereReconciliar, w.State);
+                Assert.Equal(OpState.NeedsReconciliation, w.State);
                 Assert.Equal(1, fake.TrialCommits);   // not repeated
             }
         }
@@ -295,7 +295,7 @@ namespace Bimbridge.Tests
             {
                 r.Run();
                 var w = r.State.Ops[r.Plan.Ops[1].Id];
-                Assert.Equal(OpState.Fallida, w.State);
+                Assert.Equal(OpState.Failed, w.State);
                 Assert.Contains("outside the scope", w.Note);
                 Assert.Equal(0, fake.TrialCommits + fake.Commits);
             }
@@ -316,7 +316,7 @@ namespace Bimbridge.Tests
                     r.Run();
                     var w = r.State.Ops[r.Plan.Ops[1].Id];
                     Assert.Equal(1, fake.Commits);   // a timeout is not "not applied": it is not repeated
-                    Assert.True(w.State == OpState.Verificada || w.State == OpState.RequiereVerificacion, w.State + " " + w.Note);
+                    Assert.True(w.State == OpState.Verified || w.State == OpState.NeedsVerification, w.State + " " + w.Note);
                     Assert.Contains("efecto_incierto", System.IO.File.ReadAllText(r.State.JournalPath));
                 }
                 Assert.All(new long[] { 101, 102, 103 }, i => Assert.Equal("FINAL", fake.Comments[i]));
@@ -361,7 +361,7 @@ namespace Bimbridge.Tests
                     Assert.True(r2 != null, string.Join("; ", d2 ?? new List<Diagnostic>()));
                     r2.Run();
                     var w = r2.State.Ops[r2.Plan.Ops[1].Id];
-                    Assert.True(w.State == OpState.Verificada, point + ": " + w.State + " " + w.Note);
+                    Assert.True(w.State == OpState.Verified, point + ": " + w.State + " " + w.Note);
                 }
                 Assert.Equal(expectedCommits, fake.Commits);
                 Assert.All(new long[] { 101, 102, 103 }, i => Assert.Equal("NRT03", fake.Comments[i]));
@@ -381,7 +381,7 @@ namespace Bimbridge.Tests
                 Assert.Null(err);
                 r.Run();
                 var w = r.State.Ops[r.Plan.Ops[1].Id];
-                Assert.Equal(OpState.Fallida, w.State);                      // refused up front: not uncertain, not reconcile
+                Assert.Equal(OpState.Failed, w.State);                      // refused up front: not uncertain, not reconcile
                 Assert.Contains(Engine.TrialGuard.Code, (w.Note ?? "") + " " + (w.Error ?? ""));
                 Assert.Equal(0, fake.TrialCommits);
                 Assert.True(fake.Modified);
@@ -390,7 +390,7 @@ namespace Bimbridge.Tests
         }
 
         [Fact]
-        public void Semantics_ConsultaIsRead_EnsayoIsWrite()
+        public void Semantics_QueryIsRead_TrialIsWrite()
         {
             Assert.Equal(OpSemantics.ModeQuery, OpSemantics.ExecMode(new Dictionary<string, object> { ["modo"] = "consulta" }, out _));
             Assert.Equal(OpSemantics.ModeTrial, OpSemantics.ExecMode(new Dictionary<string, object> { ["modo"] = "prueba" }, out _));
@@ -448,15 +448,15 @@ namespace Bimbridge.Tests
         [InlineData("ruta_distinta")]
         [InlineData("workshared")]
         [InlineData("modificado")]
-        public void Nrt05_Blocked_BeforeAnyWrite(string caso)
+        public void Nrt05_Blocked_BeforeAnyWrite(string testCase)
         {
             var fake = Nrt05Fake();
-            if (caso == "workshared") fake.Workshared = true;
-            if (caso == "modificado") fake.Modified = true;
+            if (testCase == "workshared") fake.Workshared = true;
+            if (testCase == "modificado") fake.Modified = true;
             var (host, pipe) = Host(fake);
             var o = Nrt05Opts(fake, AH.NewDir("nrt05-b"));
-            if (caso == "sin_autorizacion") o.Authorized = false;
-            if (caso == "ruta_distinta") o.ExpectedPath = "C:\\nrt\\otra.rvt";
+            if (testCase == "sin_autorizacion") o.Authorized = false;
+            if (testCase == "ruta_distinta") o.ExpectedPath = "C:\\nrt\\otra.rvt";
             using (host)
             using (var link = RevitLink.ForTestPipe(pipe, fake.Pid))
                 Assert.Equal(3, RevitCli.Nrt05Run(link, o));
@@ -468,14 +468,14 @@ namespace Bimbridge.Tests
         public void OpState_DirectiveNames_CoverEveryState()
         {
             foreach (var s in OpState.All) Assert.False(string.IsNullOrEmpty(OpState.DirectiveName(s)));
-            Assert.Equal("AUTHORIZED", OpState.DirectiveName(OpState.Validada, authorized: true));
-            Assert.Equal("OUTCOME_UNKNOWN", OpState.DirectiveName(OpState.RequiereVerificacion));
-            Assert.Equal("ROLLED_BACK", OpState.DirectiveName(OpState.Ensayada));
+            Assert.Equal("AUTHORIZED", OpState.DirectiveName(OpState.Validated, authorized: true));
+            Assert.Equal("OUTCOME_UNKNOWN", OpState.DirectiveName(OpState.NeedsVerification));
+            Assert.Equal("ROLLED_BACK", OpState.DirectiveName(OpState.Trialed));
         }
 
         // ============================== rc1 ==============================
 
-        private static PlanDraft LotePlan(Dictionary<long, string> values)
+        private static PlanDraft BatchPlan(Dictionary<long, string> values)
         {
             var d = new PlanDraft { Objective = "lote", DocKey = Key, DocPrint = Print, LengthUnit = "mm", Coordinates = "interno_revit" };
             var w = new OpDraft { Operation = "fijar_parametro_lote" };
@@ -512,13 +512,13 @@ namespace Bimbridge.Tests
             var (host, pipe) = Host(fake);
             using (host)
             using (var b = Backend(pipe, fake, "persistente", out var err))
-            using (var r = PlanRunner.Open(AH.NewDir("rc11-busy"), LotePlan(new Dictionary<long, string> { [101] = "A", [102] = "B" }), b, new RunnerOptions { RealWrites = "persistente" }, out var diags))
+            using (var r = PlanRunner.Open(AH.NewDir("rc11-busy"), BatchPlan(new Dictionary<long, string> { [101] = "A", [102] = "B" }), b, new RunnerOptions { RealWrites = "persistente" }, out var diags))
             {
                 Assert.True(r != null, err + string.Join("; ", diags ?? new List<Diagnostic>()));
                 fake.BusyReads = 2;
                 r.Run();
                 var w = r.State.Ops[r.Plan.Ops[0].Id];
-                Assert.True(w.State == OpState.Verificada, w.State + " " + w.Note);
+                Assert.True(w.State == OpState.Verified, w.State + " " + w.Note);
             }
             Assert.Equal(1, fake.Commits);
             Assert.True(fake.BusyReads < 0);
@@ -544,14 +544,14 @@ namespace Bimbridge.Tests
             {
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 var cx = link.Call(Wire.OpContext, new Dictionary<string, object>(), false);
-                var doc = (string)((Dictionary<string, object>)cx.Datos)["doc"];
+                var doc = (string)((Dictionary<string, object>)cx.Data)["doc"];
                 foreach (var kv in values)
                 {
                     var q = new Dictionary<string, object> { [Wire.DocArg] = doc, ["page_size"] = 1L, ["f"] = new List<object> { "id", "Comments" }, ["ids"] = new List<object> { kv.Key.ToString(System.Globalization.CultureInfo.InvariantCulture) } };
                     var qr = link.Call(Wire.OpQuery, q, false);
                     var pl = new Dictionary<string, object> { [Wire.DocArg] = doc, ["ops"] = new List<object> { new Dictionary<string, object> { ["op"] = "set_param", ["ids"] = kv.Key.ToString(System.Globalization.CultureInfo.InvariantCulture), ["name"] = "Comments", ["value"] = kv.Value } } };
                     var pr = link.Call(Wire.OpPlan, pl, false);
-                    var cm = new Dictionary<string, object> { [Wire.DocArg] = doc, ["plan_id"] = ((Dictionary<string, object>)pr.Datos)["plan_id"] };
+                    var cm = new Dictionary<string, object> { [Wire.DocArg] = doc, ["plan_id"] = ((Dictionary<string, object>)pr.Data)["plan_id"] };
                     var cr = link.Call(Wire.OpCommit, cm, true);
                     // what the agent writes and reads in those two tool calls (read; write = plan+commit)
                     agentCharsA += Json.Write(q).Length + Json.Write(qr.ToJson()).Length + Json.Write(pl).Length + Json.Write(pr.ToJson()).Length + Json.Write(cr.ToJson()).Length;
@@ -590,7 +590,7 @@ namespace Bimbridge.Tests
                         Assert.True(r != null, string.Join("; ", diags ?? new List<Diagnostic>()));
                         var summary = r.Run();
                         msB = sw.ElapsedMilliseconds;
-                        Assert.All(r.Plan.Ops, o => Assert.Equal(OpState.Verificada, r.State.Ops[o.Id].State));
+                        Assert.All(r.Plan.Ops, o => Assert.Equal(OpState.Verified, r.State.Ops[o.Id].State));
                         var report = Json.Write(Handoff.Build(r));
                         // agent: sends the plan (validate), runs it (summary) and asks for the verification/handoff report
                         agentCharsB = planJson.Length + summary.Length + report.Length;
@@ -648,7 +648,7 @@ namespace Bimbridge.Tests
                     Assert.True(r != null, string.Join("; ", diags));
                     r.Run();
                     var rec = r.State.Ops[r.Plan.Ops[0].Id];
-                    Assert.NotEqual(OpState.Verificada, rec.State);            // there are differences: not certified
+                    Assert.NotEqual(OpState.Verified, rec.State);            // there are differences: not certified
                     var j = System.IO.File.ReadAllText(r.State.JournalPath);
                     Assert.Contains("F3", j);                                  // omitted
                     Assert.Contains("103", j);                                 // extra (F7)
@@ -657,7 +657,7 @@ namespace Bimbridge.Tests
                 using (var r2 = PlanRunner.Open(AH.NewDir("v080-ind2"), IndependentPlan(new Dictionary<string, object> { ["F1"] = "-" }, "E-1.3.02"), b, new RunnerOptions(), out _))
                 {
                     r2.Run();
-                    Assert.NotEqual(OpState.Verificada, r2.State.Ops[r2.Plan.Ops[0].Id].State);
+                    Assert.NotEqual(OpState.Verified, r2.State.Ops[r2.Plan.Ops[0].Id].State);
                     Assert.Contains("no_independiente", System.IO.File.ReadAllText(r2.State.JournalPath));
                 }
             }
@@ -702,12 +702,12 @@ namespace Bimbridge.Tests
             var (host, pipe) = Host(fake);
             using (host)
             using (var b = Backend(pipe, fake, "persistente", out var err))
-            using (var r = PlanRunner.Open(AH.NewDir("rc1-lote"), LotePlan(new Dictionary<long, string> { [101] = "A", [102] = "B", [103] = "A" }), b, new RunnerOptions { RealWrites = "persistente" }, out var diags))
+            using (var r = PlanRunner.Open(AH.NewDir("rc1-lote"), BatchPlan(new Dictionary<long, string> { [101] = "A", [102] = "B", [103] = "A" }), b, new RunnerOptions { RealWrites = "persistente" }, out var diags))
             {
                 Assert.True(r != null, err + string.Join("; ", diags ?? new List<Diagnostic>()));
                 r.Run();
                 var w = r.State.Ops[r.Plan.Ops[0].Id];
-                Assert.True(w.State == OpState.Verificada, w.State + " " + w.Note);
+                Assert.True(w.State == OpState.Verified, w.State + " " + w.Note);
             }
             Assert.Equal(1, fake.Commits);
             Assert.Equal("A", fake.Comments[101]); Assert.Equal("B", fake.Comments[102]); Assert.Equal("A", fake.Comments[103]);
@@ -717,17 +717,17 @@ namespace Bimbridge.Tests
         [Fact]
         public void Rc1_BatchValidator_RejectsMismatchedIds_NonNumericKeys_AndOversize()
         {
-            var ok = LotePlan(new Dictionary<long, string> { [1] = "x", [2] = "y" });
+            var ok = BatchPlan(new Dictionary<long, string> { [1] = "x", [2] = "y" });
             Assert.Empty(IrValidator.Validate(ok));
-            var bad = LotePlan(new Dictionary<long, string> { [1] = "x", [2] = "y" });
+            var bad = BatchPlan(new Dictionary<long, string> { [1] = "x", [2] = "y" });
             bad.Ops[0].Scope["ids"] = new List<object> { 1L, 3L }; bad.AssignIds();
             Assert.Contains(IrValidator.Validate(bad), e => e.Contains("must match"));
-            var nonNum = LotePlan(new Dictionary<long, string> { [1] = "x" });
+            var nonNum = BatchPlan(new Dictionary<long, string> { [1] = "x" });
             nonNum.Ops[0].Params["valores"] = new Dictionary<string, object> { ["abc"] = "x" }; nonNum.AssignIds();
             Assert.Contains(IrValidator.Validate(nonNum), e => e.Contains("numeric"));
-            var big = LotePlan(Enumerable.Range(1, IrValidator.MaxBatch + 1).ToDictionary(i => (long)i, i => "v"));
+            var big = BatchPlan(Enumerable.Range(1, IrValidator.MaxBatch + 1).ToDictionary(i => (long)i, i => "v"));
             Assert.Contains(IrValidator.Validate(big), e => e.Contains("between 1 and"));
-            var empty = LotePlan(new Dictionary<long, string> { [1] = "x" });
+            var empty = BatchPlan(new Dictionary<long, string> { [1] = "x" });
             empty.Ops[0].Params["valores"] = new Dictionary<string, object> { ["1"] = "" }; empty.AssignIds();
             Assert.NotEmpty(IrValidator.Validate(empty));
         }
@@ -743,7 +743,7 @@ namespace Bimbridge.Tests
             {
                 r.Run();
                 var w = r.State.Ops[r.Plan.Ops[1].Id];
-                Assert.NotEqual(OpState.Verificada, w.State);
+                Assert.NotEqual(OpState.Verified, w.State);
                 Assert.Equal(1, fake.Commits);   // not retried blindly
             }
         }
@@ -759,7 +759,7 @@ namespace Bimbridge.Tests
                 using (var r = PlanRunner.Open(AH.NewDir("rc1-pag"), Plan("PAG", 101, 102, 103, 104), b, new RunnerOptions { RealWrites = "persistente" }, out _))
                 {
                     r.Run();
-                    Assert.Equal(OpState.Verificada, r.State.Ops[r.Plan.Ops[1].Id].State);
+                    Assert.Equal(OpState.Verified, r.State.Ops[r.Plan.Ops[1].Id].State);
                 }
                 Assert.All(new long[] { 101, 102, 103, 104 }, i => Assert.Equal("PAG", fake.Comments[i]));
                 Assert.True(fake.QueryCalls >= 3);
@@ -769,7 +769,7 @@ namespace Bimbridge.Tests
                 using (var r = PlanRunner.Open(AH.NewDir("rc1-pag2"), Plan("PAG2", 101, 102, 103, 104), b, new RunnerOptions { RealWrites = "persistente" }, out _))
                 {
                     r.Run();
-                    Assert.NotEqual(OpState.Verificada, r.State.Ops[r.Plan.Ops[1].Id].State);
+                    Assert.NotEqual(OpState.Verified, r.State.Ops[r.Plan.Ops[1].Id].State);
                 }
                 Assert.Equal(commits, fake.Commits);   // the change between pages is detected BEFORE writing
             }
@@ -780,9 +780,9 @@ namespace Bimbridge.Tests
         [InlineData(2, 0, 0, false)]
         [InlineData(0, 1, 0, false)]
         [InlineData(0, 0, 3, false)]
-        public void Rc1_QcLightingTags_IsReadOnly_AndDeviationsFailThePostcondition(long sinTag, long huerf, long dup, bool pass)
+        public void Rc1_QcLightingTags_IsReadOnly_AndDeviationsFailThePostcondition(long untagged, long orphans, long dup, bool pass)
         {
-            var fake = new FakeBim { QcCounts = new[] { sinTag, huerf, dup } };
+            var fake = new FakeBim { QcCounts = new[] { untagged, orphans, dup } };
             var (host, pipe) = Host(fake);
             var d = new PlanDraft { Objective = "qc", DocKey = Key, DocPrint = Print, LengthUnit = "mm", Coordinates = "interno_revit" };
             var q = new OpDraft { Operation = "verificar_qc" }; q.Params["receta"] = RevitBackend.QcLightingTags; q.Scope["nivel"] = "L02";
@@ -794,7 +794,7 @@ namespace Bimbridge.Tests
                 Assert.True(r != null, err + string.Join("; ", diags ?? new List<Diagnostic>()));
                 r.Run();
                 var st = r.State.Ops[r.Plan.Ops[0].Id].State;
-                Assert.Equal(pass, st == OpState.Verificada);
+                Assert.Equal(pass, st == OpState.Verified);
             }
             Assert.True(fake.CheckCalls >= 1);
             Assert.Equal(0, fake.Commits + fake.TrialCommits);
@@ -865,7 +865,7 @@ namespace Bimbridge.Tests
             }
             Assert.Equal(2, fake.Commits);
             Assert.Equal(0, fake.Saves);
-            Assert.EndsWith("fijo", fake.Comments[101]);
+            Assert.EndsWith("fixed", fake.Comments[101]);
             Assert.EndsWith("#103", fake.Comments[103]);
         }
 
@@ -921,13 +921,13 @@ namespace Bimbridge.Tests
                         var sw = System.Diagnostics.Stopwatch.StartNew();
                         if (batch)
                         {
-                            using (var r = PlanRunner.Open(AH.NewDir("bench"), LotePlan(ids.ToDictionary(i => i, i => "V" + i)), b, new RunnerOptions { RealWrites = "persistente" }, out _))
-                            { r.Run(); Assert.Equal(OpState.Verificada, r.State.Ops[r.Plan.Ops[0].Id].State); }
+                            using (var r = PlanRunner.Open(AH.NewDir("bench"), BatchPlan(ids.ToDictionary(i => i, i => "V" + i)), b, new RunnerOptions { RealWrites = "persistente" }, out _))
+                            { r.Run(); Assert.Equal(OpState.Verified, r.State.Ops[r.Plan.Ops[0].Id].State); }
                         }
                         else
                         {
                             foreach (var id in ids)
-                                using (var r = PlanRunner.Open(AH.NewDir("bench"), LotePlan(new Dictionary<long, string> { [id] = "V" + id }), b, new RunnerOptions { RealWrites = "persistente" }, out _))
+                                using (var r = PlanRunner.Open(AH.NewDir("bench"), BatchPlan(new Dictionary<long, string> { [id] = "V" + id }), b, new RunnerOptions { RealWrites = "persistente" }, out _))
                                     r.Run();
                         }
                         sw.Stop();

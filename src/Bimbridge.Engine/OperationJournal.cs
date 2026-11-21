@@ -228,7 +228,7 @@ namespace Bimbridge.Engine
             public string Session;
             public string Started;
             public string Finished;
-            public string Estado;
+            public string State;
             public string JobId;
             public string Reconciled;
             public string Correlation;
@@ -247,7 +247,7 @@ namespace Bimbridge.Engine
             public string Session;
             public string Started;
             public string Finished;
-            public string Estado;
+            public string State;
             public object Result;
             public string JobId;
             /// <summary>Model fingerprint (ProjectInformation.UniqueId, cloud GUID…) when it was recorded: detects replaced files and copies.</summary>
@@ -348,7 +348,7 @@ namespace Bimbridge.Engine
                         r.DocPrint = Arg.GetString(o, "huella_doc") ?? r.DocPrint;
                         r.Generation = Arg.GetString(o, "generacion");
                         r.Finished = null;
-                        r.Estado = null;
+                        r.State = null;
                         r.Result = null;
                         r.JobId = null;
                         r.Attempts.Add(new Attempt
@@ -364,9 +364,9 @@ namespace Bimbridge.Engine
                         break;
                     case "fin" when r != null:
                         r.Finished = Arg.GetString(o, "t");
-                        r.Estado = Arg.GetString(o, "estado");
+                        r.State = Arg.GetString(o, "estado");
                         o.TryGetValue("resultado", out r.Result);
-                        if (r.Attempts.Count > 0) { var a = r.Attempts[r.Attempts.Count - 1]; a.Finished = r.Finished; a.Estado = r.Estado; }
+                        if (r.Attempts.Count > 0) { var a = r.Attempts[r.Attempts.Count - 1]; a.Finished = r.Finished; a.State = r.State; }
                         break;
                     case "reconciliado" when r != null:
                         var dec = Arg.GetString(o, "decision");
@@ -374,7 +374,7 @@ namespace Bimbridge.Engine
                         if (dec == "aplicado")
                         {
                             r.Finished = Arg.GetString(o, "t");
-                            r.Estado = Status.Ok;
+                            r.State = Status.Ok;
                             o.TryGetValue("evidencia", out r.Result);
                         }
                         break;
@@ -407,7 +407,7 @@ namespace Bimbridge.Engine
         private void Refresh() => Apply(_log.ReadNew());
 
         /// <summary>Final statuses that count as "already done" (not repeated).</summary>
-        public static bool IsDone(string estado) => Status.CountsAsApplied(estado);
+        public static bool IsDone(string status) => Status.CountsAsApplied(status);
 
         public BeginResult Begin(string key, string doc, string op, string hash, string task, string session, bool reconcile = false) =>
             Begin(key, doc, op, hash, task, session, reconcile ? ReconcileMode.NotApplied : ReconcileMode.None);
@@ -436,9 +436,9 @@ namespace Bimbridge.Engine
                         return new BeginResult { Kind = BeginKind.Mismatch, Previous = prev };
                     if (prev.DocPrint != null && docPrint != null && prev.DocPrint != docPrint)
                         return new BeginResult { Kind = BeginKind.DocumentReplaced, Previous = prev };
-                    if (prev.Finished != null && IsDone(prev.Estado))
+                    if (prev.Finished != null && IsDone(prev.State))
                         return new BeginResult { Kind = BeginKind.Completed, Previous = prev };
-                    if (!(prev.Finished != null && Status.ConfirmsNothingApplied(prev.Estado)))
+                    if (!(prev.Finished != null && Status.ConfirmsNothingApplied(prev.State)))
                     {
                         // No end, error, partial, unknown or cancelled: only with an explicit reconciliation decision.
                         if (mode == ReconcileMode.None) return new BeginResult { Kind = BeginKind.Interrupted, Previous = prev };
@@ -454,7 +454,7 @@ namespace Bimbridge.Engine
                 {
                     // Was the same operation recorded in another file with the same model (copy, Save As outside the MCP)?
                     var copy = _index.Values.FirstOrDefault(r => r.Key == key && r.DocPrint == docPrint && r.Doc != doc &&
-                                                                 !(r.Finished != null && Status.ConfirmsNothingApplied(r.Estado)));
+                                                                 !(r.Finished != null && Status.ConfirmsNothingApplied(r.State)));
                     if (copy != null)
                     {
                         if (copy.Hash != null && hash != null && copy.Hash != hash) return new BeginResult { Kind = BeginKind.Mismatch, Previous = copy, OtherDoc = copy.Doc };
@@ -494,7 +494,7 @@ namespace Bimbridge.Engine
                 var active = ReferenceEquals(attempt, record.Attempts.Last()) && _running.ContainsKey(Id(doc, record.Key));
                 return new Dictionary<string, object>
                 {
-                    ["intento_id"] = correlation, ["estado"] = attempt.Estado ?? (active ? Status.EnProceso : Status.Desconocido),
+                    ["intento_id"] = correlation, ["estado"] = attempt.State ?? (active ? Status.InProgress : Status.Unknown),
                     ["clave"] = record.Key, ["plan_id"] = attempt.PlanId, ["doc"] = doc, ["huella_doc"] = docPrint,
                     ["job_id"] = attempt.JobId, ["inicio"] = attempt.Started, ["fin"] = attempt.Finished,
                 };
@@ -526,15 +526,15 @@ namespace Bimbridge.Engine
         /// Records the end. en_proceso is NOT final and does nothing (the job continues and will record it when done).
         /// Throws <see cref="JournalUnavailableException"/> if it cannot write: the caller must warn that the end is not recorded.
         /// </summary>
-        public void Complete(string key, string doc, string estado, object result)
+        public void Complete(string key, string doc, string status, object result)
         {
-            if (estado == Status.EnProceso || estado == Status.EnCola || estado == Status.CancelacionSolicitada) return;
+            if (status == Status.InProgress || status == Status.Queued || status == Status.CancelRequested) return;
             lock (_lock)
             {
                 var id = Id(doc, key);
                 try
                 {
-                    Write(new Dictionary<string, object> { ["ev"] = "fin", ["clave"] = key, ["doc"] = doc, ["estado"] = estado, ["resultado"] = Trim(result) });
+                    Write(new Dictionary<string, object> { ["ev"] = "fin", ["clave"] = key, ["doc"] = doc, ["estado"] = status, ["resultado"] = Trim(result) });
                 }
                 finally
                 {
@@ -562,7 +562,7 @@ namespace Bimbridge.Engine
                 if (!applied)
                 {
                     // Explicitly marked as not applied: a new attempt with the same fingerprint may run.
-                    Write(new Dictionary<string, object> { ["ev"] = "fin", ["clave"] = key, ["doc"] = doc, ["estado"] = Status.Revertido, ["resultado"] = Trim(evidence) });
+                    Write(new Dictionary<string, object> { ["ev"] = "fin", ["clave"] = key, ["doc"] = doc, ["estado"] = Status.RolledBack, ["resultado"] = Trim(evidence) });
                 }
                 return true;
             }

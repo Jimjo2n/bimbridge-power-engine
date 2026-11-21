@@ -45,7 +45,7 @@ for line in lock.read_text(encoding="utf-8-sig").splitlines():
     p = lock.parent / name
     if not p.is_file() or hashlib.sha256(p.read_bytes()).hexdigest() != digest.lower():
         findings.append({"path": str(p.relative_to(ROOT)), "check": "wheel-integrity"})
-docs = ["README.md", "README.es.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md",
+docs = ["README.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md",
         "docs/INDEX.md", "docs/PROJECT_OVERVIEW.md", "docs/DEVELOPMENT.md",
         "docs/LICENSING.md", "docs/REPOSITORY_SETUP.md", "docs/security/TRUST_MODEL.md",
         "docs/integrations/MCP.md", "docs/operations/MAINTENANCE.md",

@@ -10,13 +10,13 @@ namespace Bimbridge.Engine
     {
         /// <summary>exec requested in a session with a person present: everything allowed but durably audited before it runs.</summary>
         TrustedInteractive,
-        /// <summary>Recipes/tasks that run unattended: only the Revit API inside the engine transaction, and files via ctx.Artefacto.
+        /// <summary>Recipes/tasks that run unattended: only the Revit API inside the engine transaction, and files via ctx.Artifact.
         /// Save/sync/export only through engine barriers. No processes, network, reflection, native code, registry or process exit.</summary>
         RestrictedAutonomous,
     }
 
     /// <summary>
-    /// Capability policy applied at the point of execution (before Run/Ejecutar), over what Roslyn's semantic analysis found.
+    /// Capability policy applied at the point of execution (before Run), over what Roslyn's semantic analysis found.
     /// Honest limit: this is a policy gate, not isolation; .NET offers no in-process sandbox. Hostile code can hide
     /// calls (e.g. via unlisted types); that is why the restricted profile also rejects all reflection and dynamic code.
     /// </summary>
@@ -54,7 +54,7 @@ namespace Bimbridge.Engine
             profile = trustedSessionActive ? ExecutionProfile.TrustedInteractive : ExecutionProfile.RestrictedAutonomous;
             if (trustedSessionActive) return null;
             if (run)
-                return "codigo_confiable_requerido: running arbitrary C# code that writes requires a person to enable "Trusted code" on the BIMBRIDGE ribbon in Revit. " +
+                return "codigo_confiable_requerido: running arbitrary C# code that writes requires a person to enable \"Trusted code\" on the BIMBRIDGE ribbon in Revit. " +
                        "Without that: modo=consulta (read-only), plan/commit, or a task with a recipe and a grant.";
             var denied = Denied(ExecutionProfile.RestrictedAutonomous, usedCapabilities);
             return denied.Count == 0 ? null : Explain(denied);
@@ -62,7 +62,7 @@ namespace Bimbridge.Engine
 
         public static string Explain(List<string> denied) =>
             "restricted autonomous profile: the code uses capabilities that are not allowed (" + string.Join(", ", denied.Take(8)) + (denied.Count > 8 ? ", …" : "") +
-            "). Use ctx.Artefacto for files and the Unidad.Guardar/Sync/Pdf barriers; processes, network, reflection and native code never run in a task.";
+            "). Use ctx.Artifact for files and the Unit.Save/Sync/Pdf barriers; processes, network, reflection and native code never run in a task.";
     }
 
     /// <summary>

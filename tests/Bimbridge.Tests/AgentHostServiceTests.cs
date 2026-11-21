@@ -22,9 +22,9 @@ namespace Bimbridge.Tests
 
         private static string PipeName() => "bimbridge-ah-" + Guid.NewGuid().ToString("N").Substring(0, 12);
 
-        private static Dictionary<string, object> Call(string pipe, string orden, Dictionary<string, object> extra = null)
+        private static Dictionary<string, object> Call(string pipe, string command, Dictionary<string, object> extra = null)
         {
-            var req = new Dictionary<string, object> { ["orden"] = orden };
+            var req = new Dictionary<string, object> { ["orden"] = command };
             if (extra != null) foreach (var kv in extra) req[kv.Key] = kv.Value;
             return ServiceClient.Call(pipe, req);
         }
@@ -162,9 +162,9 @@ namespace Bimbridge.Tests
             }
             finally { host.StopAsync().GetAwaiter().GetResult(); host.Dispose(); }
             var mid = AH.Read(Path.Combine(root, "planes", id), out _, out _);
-            var verified = mid.Ops.Count(o => o.Value.State == OpState.Verificada);
+            var verified = mid.Ops.Count(o => o.Value.State == OpState.Verified);
             Assert.InRange(verified, 5, 119);
-            Assert.DoesNotContain(mid.Ops.Values, o => o.State == OpState.EnEjecucion || o.State == OpState.Ejecutada);   // stopped BETWEEN operations
+            Assert.DoesNotContain(mid.Ops.Values, o => o.State == OpState.Running || o.State == OpState.Executed);   // stopped BETWEEN operations
             Assert.Null(PlanLease.Peek(Path.Combine(root, "planes", id)) is var l && l != null && !l.Released ? "lease not released" : null);
 
             var pipe2 = PipeName();

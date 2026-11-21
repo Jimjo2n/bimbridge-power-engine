@@ -43,8 +43,8 @@ namespace Bimbridge.Engine.Workflow
 
         public sealed class Result
         {
-            public string Estado;              // ok | diferencias | no_independiente | independencia_no_comprobable | revision_incorrecta | invalido
-            public string Motivo;
+            public string State;              // ok | diferencias | no_independiente | independencia_no_comprobable | revision_incorrecta | invalido
+            public string Reason;
             public List<string> Missing = new List<string>();
             public List<long> Extra = new List<long>();
             public List<string> Duplicates = new List<string>();
@@ -54,12 +54,12 @@ namespace Bimbridge.Engine.Workflow
             /// <summary>0.9.0: recorded independence proof (expected source, build sources, method).</summary>
             public Dictionary<string, object> Independence;
 
-            public bool Ok => Estado == "ok";
+            public bool Ok => State == "ok";
 
             public Dictionary<string, object> ToJson(int sample = 20)
             {
-                var d = new Dictionary<string, object> { ["estado"] = Estado, ["emparejados"] = (long)Matched };
-                if (Motivo != null) d["motivo"] = Motivo;
+                var d = new Dictionary<string, object> { ["estado"] = State, ["emparejados"] = (long)Matched };
+                if (Reason != null) d["motivo"] = Reason;
                 if (Independence != null) d["independencia"] = Independence;
                 void L<T>(string k, List<T> l) { if (l.Count > 0) { d[k + "_n"] = (long)l.Count; d[k] = l.Take(sample).Select(x => (object)x).ToList(); } }
                 L("omitidos", Missing); L("adicionales", Extra); L("duplicados", Duplicates); L("discrepancias", Mismatches); L("excepciones_justificadas", JustifiedExceptions);
@@ -73,7 +73,7 @@ namespace Bimbridge.Engine.Workflow
         /// with what built it; (4) lineages disjoint in both directions; (5) the expected items are not an exact copy of the plan.
         /// null = independent; otherwise (status, reason).
         /// </summary>
-        public static (string Estado, string Motivo)? CheckIndependence(Input input, out Dictionary<string, object> proof)
+        public static (string State, string Reason)? CheckIndependence(Input input, out Dictionary<string, object> proof)
         {
             proof = null;
             var exp = input.ExpectedSource;
@@ -126,11 +126,11 @@ namespace Bimbridge.Engine.Workflow
         public static Result Verify(Input input)
         {
             if (input?.ExpectedSource == null || string.IsNullOrWhiteSpace(input.ExpectedSource.Id))
-                return new Result { Estado = "invalido", Motivo = "the independent source of the expected items is missing" };
+                return new Result { State = "invalido", Reason = "the independent source of the expected items is missing" };
             var ind = CheckIndependence(input, out var proof);
-            if (ind != null) return new Result { Estado = ind.Value.Estado, Motivo = ind.Value.Motivo };
+            if (ind != null) return new Result { State = ind.Value.State, Reason = ind.Value.Reason };
             if (input.RequiredRevision != null && !string.Equals(input.RequiredRevision, input.ExpectedSource.Revision, StringComparison.Ordinal))
-                return new Result { Estado = "revision_incorrecta", Motivo = "the expected source is revision " + (input.ExpectedSource.Revision ?? "(no revision)") + " and revision " + input.RequiredRevision + " is required" };
+                return new Result { State = "revision_incorrecta", Reason = "the expected source is revision " + (input.ExpectedSource.Revision ?? "(no revision)") + " and revision " + input.RequiredRevision + " is required" };
 
             var res = new Result { Independence = proof };
             var usedObserved = new HashSet<int>();
@@ -193,7 +193,7 @@ namespace Bimbridge.Engine.Workflow
                 res.Extra.Add(o.ElementId);
             }
 
-            res.Estado = res.Missing.Count + res.Extra.Count + res.Duplicates.Count + res.Mismatches.Count == 0 ? "ok" : "diferencias";
+            res.State = res.Missing.Count + res.Extra.Count + res.Duplicates.Count + res.Mismatches.Count == 0 ? "ok" : "diferencias";
             return res;
         }
 

@@ -125,7 +125,7 @@ namespace Bimbridge.Scripting
             ("Autodesk.Revit.UI.UIDocument", "SaveAndClose", "revit_cerrar"),
             ("Autodesk.Revit.DB.WorksharingUtils", "*", "revit_sync"),
             // rc3: transactions belong to the engine. Standalone code that opens its own (or queues UI commands) could write
-            // outside Ejecutar or outside the audit: always denied in the restricted profile.
+            // outside Run or outside the audit: always denied in the restricted profile.
             ("Autodesk.Revit.DB.Transaction", "*", "revit_transaccion"), ("Autodesk.Revit.DB.SubTransaction", "*", "revit_transaccion"),
             ("Autodesk.Revit.DB.TransactionGroup", "*", "revit_transaccion"), ("Autodesk.Revit.UI.UIApplication", "PostCommand", "revit_transaccion"),
             ("System.Runtime.CompilerServices.ModuleInitializerAttribute", "*", "reflexion"),

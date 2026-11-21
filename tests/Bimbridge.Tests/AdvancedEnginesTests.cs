@@ -37,10 +37,10 @@ namespace Bimbridge.Tests
                 Assert.Single(near);
                 Assert.Equal(new List<object> { "c3", "c4" }, ((Dictionary<string, object>)near[0])["tramos"]);
                 Assert.Single((List<object>)r["conectado_fuera_del_conjunto"]);
-                var capas = (Dictionary<string, object>)r["capas"];
+                var layers = (Dictionary<string, object>)r["capas"];
                 // continuity: {c1,c2,c3}, {c4}, {c5}, {c6}, {c7}; physical: {c1,c2}, {c3}, {c4}, {c5,c6}, {c7}
-                Assert.Equal(5L, ((Dictionary<string, object>)capas["continuidad"])["componentes"]);
-                Assert.Equal(5L, ((Dictionary<string, object>)capas["conexion_fisica"])["componentes"]);
+                Assert.Equal(5L, ((Dictionary<string, object>)layers["continuidad"])["componentes"]);
+                Assert.Equal(5L, ((Dictionary<string, object>)layers["conexion_fisica"])["componentes"]);
                 eng?.Dispose();
             }
             Assert.Throws<ArgumentException>(() => MepNetwork.Analyze(new List<RunSegment> { S("x", 0, 0, 1, 0), S("x", 1, 0, 2, 0) }));
@@ -78,8 +78,8 @@ namespace Bimbridge.Tests
             Assert.Equal(new List<object> { "J3→D2" }, r["ramas_faltantes"]);
             Assert.Single((List<object>)r["aristas_sin_nodo"]);
             Assert.True((long)r["componentes_fisicos"] > (long)r["componentes_diagrama"]);
-            var dib = (Dictionary<string, object>)r["dibujo"];
-            Assert.True(dib.ContainsKey("cruces"));
+            var drawing = (Dictionary<string, object>)r["dibujo"];
+            Assert.True(drawing.ContainsKey("cruces"));
         }
 
         private static GroupInstance G(string id, string type, double ox, double oy, double rot, bool mirror, params (string T, double X, double Y)[] local)

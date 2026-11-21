@@ -23,7 +23,7 @@ namespace Bimbridge.AgentHost
 
         public sealed class StepResult
         {
-            public string Nombre, Op, Estado, Esperado, Motivo;
+            public string Name, Op, State, Expected, Reason;
             public bool Ok;
             public long Ms;
         }
@@ -40,24 +40,24 @@ namespace Bimbridge.AgentHost
             var stopped = false;
             foreach (var s in steps)
             {
-                var r = new StepResult { Nombre = Arg.GetString(s, "nombre") ?? ("step " + (results.Count + 1)), Op = Arg.GetString(s, "op"), Esperado = Arg.GetString(s, "esperar") ?? Status.Ok };
+                var r = new StepResult { Name = Arg.GetString(s, "nombre") ?? ("step " + (results.Count + 1)), Op = Arg.GetString(s, "op"), Expected = Arg.GetString(s, "esperar") ?? Status.Ok };
                 results.Add(r);
-                if (stopped) { r.Motivo = "not run: a previous step failed"; continue; }
+                if (stopped) { r.Reason = "not run: a previous step failed"; continue; }
                 Dictionary<string, object> args;
                 try { args = (Dictionary<string, object>)Subst(s.TryGetValue("args", out var a) ? a : new Dictionary<string, object>(), vars); }
-                catch (KeyNotFoundException ex) { r.Motivo = ex.Message; stopped = true; continue; }
+                catch (KeyNotFoundException ex) { r.Reason = ex.Message; stopped = true; continue; }
                 // the preflight pins the document; only a NEGATIVE step marked doc_explicito keeps its own doc (to check the rejection)
                 if (r.Op != Wire.OpContext && r.Op != Wire.OpDocs && !(Arg.GetBool(s, "doc_explicito") ?? false)) args[Wire.DocArg] = docHandle;
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 var resp = call(r.Op, args, Arg.GetBool(s, "escritura") ?? false);
                 r.Ms = sw.ElapsedMilliseconds;
-                r.Estado = resp.Estado;
+                r.State = resp.State;
                 var json = Json.Write(resp.ToJson());
                 var problems = new List<string>();
-                if (!string.Equals(resp.Estado, r.Esperado, StringComparison.Ordinal)) problems.Add("status " + resp.Estado + " (expected " + r.Esperado + ")" + (resp.Aviso != null ? ": " + resp.Aviso : ""));
+                if (!string.Equals(resp.State, r.Expected, StringComparison.Ordinal)) problems.Add("status " + resp.State + " (expected " + r.Expected + ")" + (resp.Warning != null ? ": " + resp.Warning : ""));
                 foreach (var t in Arg.GetStringList(s, "contiene") ?? new List<string>()) { var tt = SubstText(t, vars); if (json.IndexOf(tt, StringComparison.Ordinal) < 0) problems.Add("does not contain '" + tt + "'"); }
                 foreach (var t in Arg.GetStringList(s, "no_contiene") ?? new List<string>()) { var tt = SubstText(t, vars); if (json.IndexOf(tt, StringComparison.Ordinal) >= 0) problems.Add("contains '" + tt + "'"); }
-                if (s.TryGetValue("guardar", out var g) && g is Dictionary<string, object> gd && resp.Datos is Dictionary<string, object> dd)
+                if (s.TryGetValue("guardar", out var g) && g is Dictionary<string, object> gd && resp.Data is Dictionary<string, object> dd)
                     foreach (var kv in gd)
                     {
                         var v = Pick(dd, Convert.ToString(kv.Value, CultureInfo.InvariantCulture));
@@ -65,14 +65,14 @@ namespace Bimbridge.AgentHost
                         else vars[kv.Key] = Convert.ToString(v, CultureInfo.InvariantCulture);
                     }
                 r.Ok = problems.Count == 0;
-                r.Motivo = r.Ok ? null : string.Join("; ", problems);
+                r.Reason = r.Ok ? null : string.Join("; ", problems);
                 if (!r.Ok) stopped = true;
             }
             var pass = results.Count > 0 && results.All(x => x.Ok);
             return new Dictionary<string, object>
             {
                 ["item"] = item, ["titulo"] = Arg.GetString(spec, "titulo"), ["resultado"] = pass ? "APROBADA" : "FALLIDA",
-                ["pasos"] = results.Select(x => (object)new Dictionary<string, object> { ["nombre"] = x.Nombre, ["op"] = x.Op, ["estado"] = x.Estado, ["esperado"] = x.Esperado, ["ok"] = x.Ok, ["ms"] = x.Ms, ["motivo"] = x.Motivo }).ToList(),
+                ["pasos"] = results.Select(x => (object)new Dictionary<string, object> { ["nombre"] = x.Name, ["op"] = x.Op, ["estado"] = x.State, ["esperado"] = x.Expected, ["ok"] = x.Ok, ["ms"] = x.Ms, ["motivo"] = x.Reason }).ToList(),
             };
         }
 
@@ -138,7 +138,7 @@ namespace Bimbridge.AgentHost
         /// revit campana080 --revit-pid N --ruta-esperada C:\...\copia.rvt --autorizo-persistente --pasos N8-04.json --salida DIR [--var x=y ...]
         /// Common identity and preflight (CampaignPreflight): actual path = authorized, local, non-workshared; otherwise BLOQUEADA and no step is sent.
         /// </summary>
-        private static int Campana080(string[] a)
+        private static int RunCampaign080(string[] a)
         {
             var o = new Nrt05Options
             {

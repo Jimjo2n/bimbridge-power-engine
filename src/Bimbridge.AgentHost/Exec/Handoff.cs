@@ -35,10 +35,10 @@ namespace Bimbridge.AgentHost
                 if (rec.Note != null) row["nota"] = Trim(rec.Note, 160);
                 switch (rec.State)
                 {
-                    case OpState.Verificada: case OpState.Ensayada: confirmed.Add(row); break;
-                    case OpState.RequiereVerificacion: case OpState.RequiereReconciliar: case OpState.EnEjecucion: case OpState.Ejecutada:
+                    case OpState.Verified: case OpState.Trialed: confirmed.Add(row); break;
+                    case OpState.NeedsVerification: case OpState.NeedsReconciliation: case OpState.Running: case OpState.Executed:
                         uncertain.Add(row); break;
-                    case OpState.Fallida: case OpState.Bloqueada: case OpState.Cancelada: failed.Add(row); break;
+                    case OpState.Failed: case OpState.Blocked: case OpState.Cancelled: failed.Add(row); break;
                     default: pending.Add(row); break;
                 }
             }

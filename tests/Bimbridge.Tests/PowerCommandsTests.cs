@@ -30,7 +30,7 @@ namespace Bimbridge.Tests
                                      "{\"codigo\":\"S\",\"tipo\":\"LTG_STRIP LIGHT: S\",\"elev\":9.25,\"ws\":\"LIGHTING - DIST\",\"direccional\":true}]";
 
         [Fact]
-        public void Flujo_FromOneLine_ProducesPlaceOpsForPlanCommit()
+        public void Flow_FromOneLine_ProducesPlaceOpsForPlanCommit()
         {
             using (var pe = new PowerEngineDispatcher(PowerEngineEnv.Options()))
             {
@@ -47,7 +47,7 @@ namespace Bimbridge.Tests
         }
 
         [Fact]
-        public void Flujo_UsesOnlyReviewedSymbolsAndCarriesTheirEvidence()
+        public void Flow_UsesOnlyReviewedSymbolsAndCarriesTheirEvidence()
         {
             using var pe = new PowerEngineDispatcher(PowerEngineEnv.Options());
             var folders = new List<string> { Fx };
@@ -97,7 +97,7 @@ namespace Bimbridge.Tests
         }
 
         [Fact]
-        public void Flujo_WithoutModelGrids_RefusesInsteadOfGuessing()
+        public void Flow_WithoutModelGrids_RefusesInsteadOfGuessing()
         {
             using (var pe = new PowerEngineDispatcher(PowerEngineEnv.Options()))
             {

@@ -8,7 +8,7 @@ namespace Bimbridge.Engine.Workflow
 {
     /// <summary>
     /// 0.8.0: the SINGLE capability registry and traceability matrix Workflow → CAP → Operation → Component → State → Test → Result → Benchmark.
-    /// docs/MATRIZ_TRAZABILIDAD_0.8.0.md is generated from here (a test checks that it matches). The State is that of THIS 0.8.0 build:
+    /// docs/TRACEABILITY_MATRIX_0.8.0.md is generated from here (a test checks that it matches). The State is that of THIS 0.8.0 build:
     /// native evidence from earlier builds is kept separate (column "prior native") and never counts as proof for this build.
     /// </summary>
     public static class Traceability
@@ -20,7 +20,7 @@ namespace Bimbridge.Engine.Workflow
 
         public sealed class Row
         {
-            public string Workflows, Cap, Operacion, Familia, Componente, Estado, Prueba, Resultado, Benchmark, NativoPrevio;
+            public string Workflows, Cap, Operation, Family, Component, State, Test, Result, Benchmark, PriorNative;
         }
 
         public static readonly IReadOnlyDictionary<string, string> Workflows = new Dictionary<string, string>
@@ -136,8 +136,8 @@ namespace Bimbridge.Engine.Workflow
             R("—", "CAP-001", "measurement of ESTIMATED tokens and wire calls", "administration", "Engine TokenEstimate · AgentHost Bench", Simulated, "Bench_B0_586_OneByOne_vs_Plan", "OK (1,172 → 3 agent calls, simulated)", "B0", "—"),
         };
 
-        private static Row R(string wf, string cap, string op, string fam, string comp, string estado, string prueba, string res, string bench, string prev) =>
-            new Row { Workflows = wf, Cap = cap, Operacion = op, Familia = fam, Componente = comp, Estado = estado, Prueba = prueba, Resultado = res, Benchmark = bench, NativoPrevio = prev };
+        private static Row R(string wf, string cap, string op, string fam, string comp, string state, string test, string res, string bench, string prev) =>
+            new Row { Workflows = wf, Cap = cap, Operation = op, Family = fam, Component = comp, State = state, Test = test, Result = res, Benchmark = bench, PriorNative = prev };
 
         /// <summary>Registry consistency problems (known states, CAPs and WFs, coverage). Empty = consistent.</summary>
         public static List<string> Audit()
@@ -145,21 +145,21 @@ namespace Bimbridge.Engine.Workflow
             var p = new List<string>();
             foreach (var r in All)
             {
-                if (!States.Contains(r.Estado)) p.Add(r.Operacion + ": state " + r.Estado);
-                if (!Caps.ContainsKey(r.Cap)) p.Add(r.Operacion + ": CAP " + r.Cap);
-                if (!OpFamilies.Contains(r.Familia)) p.Add(r.Operacion + ": family " + r.Familia);
-                foreach (var w in Split(r.Workflows)) if (!Workflows.ContainsKey(w)) p.Add(r.Operacion + ": " + w);
-                if (r.Estado == Native) p.Add(r.Operacion + ": TESTED_NATIVE without a 0.8.0 native campaign");
+                if (!States.Contains(r.State)) p.Add(r.Operation + ": state " + r.State);
+                if (!Caps.ContainsKey(r.Cap)) p.Add(r.Operation + ": CAP " + r.Cap);
+                if (!OpFamilies.Contains(r.Family)) p.Add(r.Operation + ": family " + r.Family);
+                foreach (var w in Split(r.Workflows)) if (!Workflows.ContainsKey(w)) p.Add(r.Operation + ": " + w);
+                if (r.State == Native) p.Add(r.Operation + ": TESTED_NATIVE without a 0.8.0 native campaign");
             }
             foreach (var c in Caps.Keys) if (!All.Any(r => r.Cap == c)) p.Add(c + " has no rows");
             foreach (var w in Workflows.Keys) if (!All.Any(r => Split(r.Workflows).Contains(w))) p.Add(w + " has no rows");
-            foreach (var f in OpFamilies) if (!All.Any(r => r.Familia == f)) p.Add("family " + f + " has no rows");
+            foreach (var f in OpFamilies) if (!All.Any(r => r.Family == f)) p.Add("family " + f + " has no rows");
             return p;
         }
 
         private static IEnumerable<string> Split(string wf) => (wf ?? "").Split(',').Select(x => x.Trim()).Where(x => x.StartsWith("WF-", StringComparison.Ordinal));
 
-        public static Dictionary<string, int> CountByState() => States.ToDictionary(s => s, s => All.Count(r => r.Estado == s));
+        public static Dictionary<string, int> CountByState() => States.ToDictionary(s => s, s => All.Count(r => r.State == s));
 
         public static string Markdown(string version, string commitNote)
         {
@@ -173,31 +173,31 @@ namespace Bimbridge.Engine.Workflow
             sb.Append("Count: ").Append(string.Join(" · ", CountByState().Where(k => k.Value > 0).Select(k => k.Key + " " + k.Value))).Append(" · total ").Append(All.Count).Append("\n\n");
             sb.Append("## Single matrix\n\n| Workflow | CAP | Operation | Family | Component | State | Test | Result | Benchmark | Prior native |\n|---|---|---|---|---|---|---|---|---|---|\n");
             foreach (var r in All)
-                sb.Append("| ").Append(Esc(r.Workflows)).Append(" | ").Append(r.Cap).Append(" | ").Append(Esc(r.Operacion)).Append(" | ").Append(r.Familia).Append(" | ")
-                  .Append(Esc(r.Componente)).Append(" | ").Append(r.Estado).Append(" | ").Append(Esc(r.Prueba)).Append(" | ").Append(Esc(r.Resultado)).Append(" | ")
-                  .Append(Esc(r.Benchmark)).Append(" | ").Append(Esc(r.NativoPrevio)).Append(" |\n");
+                sb.Append("| ").Append(Esc(r.Workflows)).Append(" | ").Append(r.Cap).Append(" | ").Append(Esc(r.Operation)).Append(" | ").Append(r.Family).Append(" | ")
+                  .Append(Esc(r.Component)).Append(" | ").Append(r.State).Append(" | ").Append(Esc(r.Test)).Append(" | ").Append(Esc(r.Result)).Append(" | ")
+                  .Append(Esc(r.Benchmark)).Append(" | ").Append(Esc(r.PriorNative)).Append(" |\n");
 
             sb.Append("\n## By capability (CAP)\n\n| CAP | Name | Rows | States |\n|---|---|---|---|\n");
             foreach (var c in Caps)
             {
                 var rows = All.Where(r => r.Cap == c.Key).ToList();
                 sb.Append("| ").Append(c.Key).Append(" | ").Append(c.Value).Append(" | ").Append(rows.Count).Append(" | ")
-                  .Append(string.Join(", ", rows.GroupBy(r => r.Estado).OrderBy(g => Array.IndexOf(States, g.Key)).Select(g => g.Key + " " + g.Count()))).Append(" |\n");
+                  .Append(string.Join(", ", rows.GroupBy(r => r.State).OrderBy(g => Array.IndexOf(States, g.Key)).Select(g => g.Key + " " + g.Count()))).Append(" |\n");
             }
             sb.Append("\n## By workflow\n\n| WF | Name | Operations | Implemented (without 0.8.0 native acceptance) | Deferred / not supported |\n|---|---|---|---|---|\n");
             foreach (var w in Workflows)
             {
                 var rows = All.Where(r => Split(r.Workflows).Contains(w.Key)).ToList();
-                var ok = rows.Count(r => r.Estado == Unit || r.Estado == Simulated || r.Estado == NativePending);
-                var no = rows.Count(r => r.Estado == Deferred || r.Estado == NotSupported);
+                var ok = rows.Count(r => r.State == Unit || r.State == Simulated || r.State == NativePending);
+                var no = rows.Count(r => r.State == Deferred || r.State == NotSupported);
                 sb.Append("| ").Append(w.Key).Append(" | ").Append(w.Value).Append(" | ").Append(rows.Count).Append(" | ").Append(ok).Append(" | ").Append(no).Append(" |\n");
             }
             sb.Append("\n## By Revit operation family\n\n| Family | Rows | States |\n|---|---|---|\n");
             foreach (var f in OpFamilies)
             {
-                var rows = All.Where(r => r.Familia == f).ToList();
+                var rows = All.Where(r => r.Family == f).ToList();
                 sb.Append("| ").Append(f).Append(" | ").Append(rows.Count).Append(" | ")
-                  .Append(string.Join(", ", rows.GroupBy(r => r.Estado).OrderBy(g => Array.IndexOf(States, g.Key)).Select(g => g.Key + " " + g.Count()))).Append(" |\n");
+                  .Append(string.Join(", ", rows.GroupBy(r => r.State).OrderBy(g => Array.IndexOf(States, g.Key)).Select(g => g.Key + " " + g.Count()))).Append(" |\n");
             }
             sb.Append("\n*Implemented* = the code exists in this build (with or without tests without Revit, see the Test column); for the user it only counts after the native campaign.\n");
             return sb.ToString();

@@ -1,6 +1,6 @@
 # Recipes (0.6.0)
 
-A recipe is a C# class that inherits from `Receta`. It is registered **by file** (no MCP tool per recipe is needed):
+A recipe is a C# class that inherits from `Recipe`. It is registered **by file** (no MCP tool per recipe is needed):
 
 1. `%LOCALAPPDATA%\Bimbridge\recetas\<name>.cs` — the user's or team's recipes (these take precedence);
 2. `recipes\` next to the add-in — the ones shipped by the installer.
@@ -10,24 +10,24 @@ A recipe is a C# class that inherits from `Receta`. It is registered **by file**
 ## Contract
 
 ```csharp
-public class MiReceta : Receta
+public class MyRecipe : Recipe
 {
     public override string Version => "1";                      // part of the task fingerprint
-    public override string Descripcion => "…";
-    public override PoliticaTx Transaccion => PoliticaTx.PorUnidad;  // PorUnidad | Ninguna (opens its own) | Lectura
-    public override IEnumerable<string> Entradas => new[] { "vista" };
-    public override void Preparar(ScriptContext ctx) { base.Preparar(ctx); /* validate, read-only */ }
-    public override IEnumerable<Unidad> Unidades(ScriptContext ctx) { /* yield, STABLE keys (UniqueId) */ }
-    public override object Ejecutar(ScriptContext ctx, Unidad u) { /* one unit; ctx.Omitir("reason") if already done */ }
-    public override Verificacion Verificar(ScriptContext ctx, Unidad u) { /* after a crash: did it stick? */ }
-    public override object Postcondicion(ScriptContext ctx) { /* final QC; rolled back; return {desviaciones:[…]} */ }
+    public override string Description => "…";
+    public override TxPolicy Transaction => TxPolicy.PerUnit;  // PerUnit | None (opens its own) | ReadOnly
+    public override IEnumerable<string> Inputs => new[] { "vista" };
+    public override void Prepare(ScriptContext ctx) { base.Prepare(ctx); /* validate, read-only */ }
+    public override IEnumerable<Unit> Units(ScriptContext ctx) { /* yield, STABLE keys (UniqueId) */ }
+    public override object Run(ScriptContext ctx, Unit u) { /* one unit; ctx.Skip("reason") if already done */ }
+    public override Verification Verify(ScriptContext ctx, Unit u) { /* after a crash: did it stick? */ }
+    public override object Postcondition(ScriptContext ctx) { /* final QC; rolled back; return {desviaciones:[…]} */ }
 }
 ```
 
-- `new Unidad(clave, datos, ids)`: `ids` = elements it reads or changes; if another user changes them first, the unit becomes `conflicto` (not overwritten).
-- Barriers: `Unidad.Guardar()`, `Unidad.Sync(clave, comentario)`, `Unidad.Pdf(clave, opciones)`.
-- Memory: `ctx.Decision(text)`, `ctx.Excepcion(reason, detail)`, `ctx.Artefacto(name, content)` (with SHA-256).
-- `Bim.*` helpers (mm): `Grupos` (Inspeccionar, Firma, Componer, CambiarTipo, VerificarComposicion, Instancias), `Montaje` (Cuerpo, Soporte, Vista3D, Transformacion), `Vistas` (Rango, AplicarRango, CompararPlantilla, PorQueNoSeVe, FiltroPorCategoria), `Manifiesto` (Juntar, Qc). Those that write are called inside the engine's transaction.
+- `new Unit(key, data, ids)`: `ids` = elements it reads or changes; if another user changes them first, the unit becomes `conflicto` (not overwritten).
+- Barriers: `Unit.Save()`, `Unit.Sync(key, comment)`, `Unit.Pdf(key, options)`.
+- Memory: `ctx.Decision(text)`, `ctx.Exception(reason, detail)`, `ctx.Artifact(name, content)` (with SHA-256).
+- `Bim.*` helpers (mm): `Groups` (Inspect, Signature, Compose, ChangeType, VerifyComposition, Instances), `Mounting` (Body, Support, View3D, Transformation), `Views` (Range, ApplyRange, CompareTemplate, WhyNotVisible, FilterByCategory), `Manifest` (Collect, Qc). Those that write are called inside the engine's transaction.
 
 ## Bundled
 

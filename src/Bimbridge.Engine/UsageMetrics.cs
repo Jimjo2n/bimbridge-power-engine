@@ -32,9 +32,9 @@ namespace Bimbridge.Engine
 
         public static string Folder => _folder ?? (_folder = Home.Sub("metricas"));
 
-        public static void Record(string client, string tool, string op, long charsIn, long charsOut, long ms, string estado)
+        public static void Record(string client, string tool, string op, long charsIn, long charsOut, long ms, string status)
         {
-            var error = estado != null && estado != "ok" && estado != "completado_con_diferencias";
+            var error = status != null && status != "ok" && status != "completado_con_diferencias";
             lock (Lock)
             {
                 if (!ByTool.TryGetValue(tool, out var r)) ByTool[tool] = r = new Row();
@@ -57,7 +57,7 @@ namespace Bimbridge.Engine
                 var line = Json.Write(new Dictionary<string, object>
                 {
                     ["t"] = Home.Now(), ["cliente"] = client, ["herramienta"] = tool, ["op"] = op,
-                    ["chars_entrada"] = charsIn, ["chars_salida"] = charsOut, ["ms"] = ms, ["estado"] = estado,
+                    ["chars_entrada"] = charsIn, ["chars_salida"] = charsOut, ["ms"] = ms, ["estado"] = status,
                 }) + "\n";
                 File.AppendAllText(Path.Combine(Folder, "puente-" + DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture) + ".jsonl"), line);
             }

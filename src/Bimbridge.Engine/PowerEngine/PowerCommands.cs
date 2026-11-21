@@ -122,15 +122,15 @@ namespace BimBridge.PowerEngine
         private static Dictionary<string, object> Flow(PowerEngineDispatcher pe, IList<string> folders, Dictionary<string, object> a)
         {
             if (folders.Count == 0) return Err("no authorized document folders", "config.json → \"carpetas_documentos\"");
-            var ruta = Arg.GetString(a, "ruta");
-            if (ruta == null) return Err("missing ruta=", Help);
-            if (!(a.TryGetValue("ejes", out var ej) && ej is List<object> ejes) || ejes.Count < 2)
+            var path = Arg.GetString(a, "ruta");
+            if (path == null) return Err("missing ruta=", Help);
+            if (!(a.TryGetValue("ejes", out var gridsArg) && gridsArg is List<object> grids) || grids.Count < 2)
                 return Err("model grids are missing (ejes=[{nombre,p:[x0,y0,x1,y1]}] in feet)", "read them with revit and pass them as is; without grids there is no registration and nothing is placed");
-            if (!(a.TryGetValue("reglas", out var rg) && rg is List<object> reglas)) return Err("missing reglas=[{codigo,tipo,montaje|elev,ws}]", "without a rule a symbol stays ambiguous (sin_tipo); it is never guessed");
+            if (!(a.TryGetValue("reglas", out var rg) && rg is List<object> rules)) return Err("missing reglas=[{codigo,tipo,montaje|elev,ws}]", "without a rule a symbol stays ambiguous (sin_tipo); it is never guessed");
             var q = new PdfToPlan.Request
             {
-                PdfPath = ruta, Page = (int)(Arg.GetLong(a, "pagina") ?? 1), Level = Arg.GetString(a, "nivel"),
-                Rules = PdfToPlan.RulesFromJson(reglas), ModelGrids = PdfToPlan.GridsFromJson(ejes),
+                PdfPath = path, Page = (int)(Arg.GetLong(a, "pagina") ?? 1), Level = Arg.GetString(a, "nivel"),
+                Rules = PdfToPlan.RulesFromJson(rules), ModelGrids = PdfToPlan.GridsFromJson(grids),
                 TolFt = Num(a, "tol") ?? 0.25, MinConfidence = Num(a, "conf") ?? 0.9, Mode = Arg.GetString(a, "modo") ?? "semejanza",
             };
             if (a.TryGetValue("decisiones", out var decisions))
@@ -206,13 +206,13 @@ namespace BimBridge.PowerEngine
         /// <summary>red ruta=conductos.json: runs read from Revit (tools/acceptance/0.9.0/conduits_090.cs) → three-layer analysis.</summary>
         private static Dictionary<string, object> Network(PowerEngineDispatcher pe, IList<string> folders, Dictionary<string, object> a)
         {
-            var ruta = Arg.GetString(a, "ruta");
-            if (ruta == null) return Err("missing ruta= (runs JSON)", Help);
-            var full = Path.GetFullPath(ruta);
+            var path = Arg.GetString(a, "ruta");
+            if (path == null) return Err("missing ruta= (runs JSON)", Help);
+            var full = Path.GetFullPath(path);
             if (!PowerEngineDispatcher.PathAllowed(full, folders.Select(Path.GetFullPath).ToList()))
-                return new Dictionary<string, object> { ["codigo"] = PowerEngineContracts.Codes.PathDenied, ["error"] = "path not authorized: " + ruta };
+                return new Dictionary<string, object> { ["codigo"] = PowerEngineContracts.Codes.PathDenied, ["error"] = "path not authorized: " + path };
             var info = new FileInfo(full);
-            if (!info.Exists || info.Length > 64L << 20) return Err("does not exist or exceeds 64 MB: " + ruta, Help);
+            if (!info.Exists || info.Length > 64L << 20) return Err("does not exist or exceeds 64 MB: " + path, Help);
             double D(object o) => Convert.ToDouble(o, System.Globalization.CultureInfo.InvariantCulture);
             var segs = Json.Parse(File.ReadAllText(full)) is List<object> l ? l.Cast<Dictionary<string, object>>().Select(t =>
             {

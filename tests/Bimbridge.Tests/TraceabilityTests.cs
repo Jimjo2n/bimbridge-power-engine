@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.8.0: the single registry is consistent (states, 15 CAP, 14 WF, families) and docs/MATRIZ_TRAZABILIDAD_0.8.0.md matches the code.</summary>
+    /// <summary>0.8.0: the single registry is consistent (states, 15 CAP, 14 WF, families) and docs/TRACEABILITY_MATRIX_0.8.0.md matches the code.</summary>
     public class TraceabilityTests
     {
         private static string Root()
@@ -23,17 +23,17 @@ namespace Bimbridge.Tests
             Assert.Empty(Traceability.Audit());
             Assert.Equal(15, Traceability.Caps.Count);
             Assert.Equal(14, Traceability.Workflows.Count);
-            Assert.DoesNotContain(Traceability.All, r => r.Estado == Traceability.Native);
+            Assert.DoesNotContain(Traceability.All, r => r.State == Traceability.Native);
         }
 
         [Fact]
         public void Traceability_DocMatchesCode()
         {
-            var doc = Path.Combine(Root(), "docs", "0.8.0", "MATRIZ_TRAZABILIDAD_0.8.0.md");
-            var text = Traceability.Markdown("0.8.0", "Candidato interno; aceptación nativa pendiente.");
+            var doc = Path.Combine(Root(), "docs", "0.8.0", "TRACEABILITY_MATRIX_0.8.0.md");
+            var text = Traceability.Markdown("0.8.0", "Internal candidate; native acceptance pending.");
             // Regenerate: BIMBRIDGE_GEN_MATRIZ=1 dotnet test --filter Traceability_DocMatchesCode
             if (Environment.GetEnvironmentVariable("BIMBRIDGE_GEN_MATRIZ") == "1") { Directory.CreateDirectory(Path.GetDirectoryName(doc)); File.WriteAllText(doc, text); }
-            Assert.True(File.Exists(doc), "falta " + doc);
+            Assert.True(File.Exists(doc), "missing " + doc);
             Assert.Equal(text.Replace("\r\n", "\n"), File.ReadAllText(doc).Replace("\r\n", "\n"));
         }
     }

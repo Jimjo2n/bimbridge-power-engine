@@ -16,9 +16,9 @@ namespace Bimbridge.Tests
         private const string Fake = @"import sys,json,time
 keep=None
 for l in sys.stdin:
-    r=json.loads(l); j=r.get('trabajo'); i=r.get('id')
+    r=json.loads(l); j=r.get('job'); i=r.get('id')
     def out(c,res=None,err=None):
-        d={'pe':1,'id':i,'codigo':c,'resultado':res or {}}
+        d={'pe':1,'id':i,'code':c,'result':res or {}}
         if err: d['error']=err
         print(json.dumps(d),flush=True)
     if j=='hola': out('OK',{'motor':'python','version':'falso','pe':1,'capacidades':[]})
@@ -44,7 +44,7 @@ for l in sys.stdin:
         private static Request Job(string job) => new Request { Job = job, Limits = { MaxMemoryMb = 64, TimeoutMs = 20000 } };
 
         [Fact]
-        public void MemoriaExcedida_DuranteElTrabajo_SeCortaAntesDelTimeout_YReinicia()
+        public void MemoryExceeded_DuringJob_IsCutBeforeTimeout_AndRestarts()
         {
             using var w = new WorkerClient(EnginePython, PowerEngineEnv.Python, new[] { "-I", _script });
             var sw = Stopwatch.StartNew();
@@ -58,7 +58,7 @@ for l in sys.stdin:
         }
 
         [Fact]
-        public void PicoDeUnTrabajoFallido_NoCondenaAlSiguiente()
+        public void FailedJobPeak_DoesNotPenalizeTheNext()
         {
             using var w = new WorkerClient(EnginePython, PowerEngineEnv.Python, new[] { "-I", _script });
             Assert.False(w.Call(Job("comer_y_fallar")).Ok);

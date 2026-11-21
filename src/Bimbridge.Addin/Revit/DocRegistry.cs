@@ -292,13 +292,13 @@ namespace Bimbridge.Addin.Revit
             {
                 try { if (_pinned.IsValidObject) return _pinned; } catch (Exception) { }
                 _pinned = null;
-                error = Status.DestinoNoDisponible + ": document " + Id + " (" + Title + ") was closed during the request; not continuing on another one";
+                error = Status.TargetUnavailable + ": document " + Id + " (" + Title + ") was closed during the request; not continuing on another one";
                 return null;
             }
             var d = DocRegistry.Instance.Resolve(app, Id);
             if (d == null)
             {
-                error = Status.DestinoNoDisponible + ": document " + Id + " (" + Title + ") is no longer open; use docs to see the open ones";
+                error = Status.TargetUnavailable + ": document " + Id + " (" + Title + ") is no longer open; use docs to see the open ones";
                 return null;
             }
             _pinned = d;
@@ -331,7 +331,7 @@ namespace Bimbridge.Addin.Revit
             if (d == null) return null;
             if (uidoc == null || !uidoc.Document.Equals(d))
             {
-                error = Status.NoSoportado + ": this command uses the Revit UI and " + t.Id + " (" + t.Title + ") is not the active document; ask the user to activate it";
+                error = Status.NotSupported + ": this command uses the Revit UI and " + t.Id + " (" + t.Title + ") is not the active document; ask the user to activate it";
                 return null;
             }
             return uidoc;

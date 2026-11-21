@@ -30,12 +30,12 @@ namespace Bimbridge.Tests
                 if (request.Op == Wire.OpContext && Registry != null && Arg.GetString(request.Args, "agente") is string ag)
                 {
                     var rr = Registry.TryRegister(session, ag, null, null, out _);
-                    if (rr == RegisterResult.Duplicate) return Task.FromResult(Response.Fail(request.Id, Status.Conflicto, "alias in use"));
-                    if (rr == RegisterResult.Invalid) return Task.FromResult(Response.Fail(request.Id, Status.Invalido, "invalid alias"));
+                    if (rr == RegisterResult.Duplicate) return Task.FromResult(Response.Fail(request.Id, Status.Conflict, "alias in use"));
+                    if (rr == RegisterResult.Invalid) return Task.FromResult(Response.Fail(request.Id, Status.Invalid, "invalid alias"));
                 }
                 var d = new Dictionary<string, object> { ["ok"] = true };
                 if (request.Op == Wire.OpCommit) d["plan_id"] = "P-0001";
-                return Task.FromResult(new Response { Id = request.Id, Estado = Status.Ok, Datos = d });
+                return Task.FromResult(new Response { Id = request.Id, State = Status.Ok, Data = d });
             }
             public void OnSessionClosed(Session session) => SessionClosed?.Invoke(session);
         }
@@ -47,7 +47,7 @@ namespace Bimbridge.Tests
             var a = new Dictionary<string, object> { ["protocol"] = (long)Wire.ProtocolVersion, ["client"] = client, ["pid"] = pid };
             if (agent != null) { a["agente"] = agent; a["agente_fuente"] = AgentIdentity.SourceConfig; }
             await Frame.WriteAsync(c, Json.Write(new Request { Id = 1, Op = Wire.OpHello, Args = a }), CancellationToken.None);
-            Assert.Equal(Status.Ok, Response.FromJson(await Frame.ReadAsync(c, CancellationToken.None)).Estado);
+            Assert.Equal(Status.Ok, Response.FromJson(await Frame.ReadAsync(c, CancellationToken.None)).State);
             return c;
         }
 
@@ -69,14 +69,14 @@ namespace Bimbridge.Tests
                 host.Start();
                 using (var c = await Connect(pipe))
                 {
-                    Assert.Equal(Status.Ok, (await Call(c, 2, Wire.OpPing)).Estado);
+                    Assert.Equal(Status.Ok, (await Call(c, 2, Wire.OpPing)).State);
                     // Anonymous reads: refused (PR #22 review). Also ctx without agente=, which would return model data.
                     foreach (var op in new[] { Wire.OpQuery, Wire.OpSets, Wire.OpCheck, Wire.OpCatalog, Wire.OpParams, Wire.OpDocs, Wire.OpGeo, Wire.OpJob, Wire.OpContext,
                                                Wire.OpPlan, Wire.OpCommit, Wire.OpExec, Wire.OpFam, Wire.OpDoc, Wire.OpShow, Wire.OpCapture, Wire.OpTask, "desconocida" })
                     {
                         var r = await Call(c, 10, op, new Dictionary<string, object> { ["cat"] = "LightingFixtures" });
-                        Assert.Equal(Status.Rechazado, r.Estado);
-                        Assert.Contains("ctx agente=", r.Aviso);
+                        Assert.Equal(Status.Rejected, r.State);
+                        Assert.Contains("ctx agente=", r.Warning);
                     }
                 }
             }
@@ -98,19 +98,19 @@ namespace Bimbridge.Tests
                     host.Start();
                     using (var c = await Connect(pipe))
                     {
-                        Assert.Equal(Status.Rechazado, (await Call(c, 2, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).Estado);
+                        Assert.Equal(Status.Rejected, (await Call(c, 2, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).State);
                         // Empty or unreadable alias: not a valid registration; it gives no name and does not unlock reads.
                         var bad = await Call(c, 3, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "\n" });
-                        Assert.Contains(bad.Estado, new[] { Status.Rechazado, Status.Invalido });
-                        Assert.Equal(Status.Rechazado, (await Call(c, 31, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).Estado);
-                        Assert.Equal(Status.Ok, (await Call(c, 4, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "Revisor QA" })).Estado);
-                        Assert.Equal(Status.Ok, (await Call(c, 5, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).Estado);
+                        Assert.Contains(bad.State, new[] { Status.Rejected, Status.Invalid });
+                        Assert.Equal(Status.Rejected, (await Call(c, 31, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).State);
+                        Assert.Equal(Status.Ok, (await Call(c, 4, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "Revisor QA" })).State);
+                        Assert.Equal(Status.Ok, (await Call(c, 5, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).State);
                     }
                 }
                 var entries = journal.Recent(50);
-                Assert.Equal(2, entries.Count(e => Arg.GetString(e, "op") == Wire.OpQuery && Arg.GetString(e, "estado") == Status.Rechazado));
+                Assert.Equal(2, entries.Count(e => Arg.GetString(e, "op") == Wire.OpQuery && Arg.GetString(e, "estado") == Status.Rejected));
                 var rejected = entries.Single(e => Arg.GetString(e, "op") == Wire.OpQuery && (Arg.GetString(e, "request_id") ?? "").EndsWith("#2"));
-                Assert.Equal(Status.Rechazado, Arg.GetString(rejected, "estado"));
+                Assert.Equal(Status.Rejected, Arg.GetString(rejected, "estado"));
                 Assert.Equal("identidad_insuficiente", Arg.GetString(rejected, "aviso"));
                 Assert.Null(Arg.GetString(rejected, "agent_id"));
                 var read = entries.Single(e => Arg.GetString(e, "op") == Wire.OpQuery && Arg.GetString(e, "estado") == Status.Ok);
@@ -140,14 +140,14 @@ namespace Bimbridge.Tests
                 using (var a = await Connect(pipe, client: "claude-code", pid: 100))
                 using (var b = await Connect(pipe, client: "codex", pid: 200))
                 {
-                    Assert.Equal(Status.Ok, (await Call(a, 2, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "Modelador" })).Estado);
-                    Assert.Equal(Status.Conflicto, (await Call(b, 2, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "modelador" })).Estado);
-                    Assert.Equal(Status.Rechazado, (await Call(b, 3, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).Estado);   // still unnamed
-                    Assert.Equal(Status.Ok, (await Call(b, 4, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "Revisor" })).Estado);
+                    Assert.Equal(Status.Ok, (await Call(a, 2, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "Modelador" })).State);
+                    Assert.Equal(Status.Conflict, (await Call(b, 2, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "modelador" })).State);
+                    Assert.Equal(Status.Rejected, (await Call(b, 3, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" })).State);   // still unnamed
+                    Assert.Equal(Status.Ok, (await Call(b, 4, Wire.OpContext, new Dictionary<string, object> { ["agente"] = "Revisor" })).State);
                     var qa = Call(a, 5, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" });
                     var qb = Call(b, 5, Wire.OpQuery, new Dictionary<string, object> { ["cat"] = "x" });
-                    Assert.Equal(Status.Ok, (await qa).Estado);
-                    Assert.Equal(Status.Ok, (await qb).Estado);
+                    Assert.Equal(Status.Ok, (await qa).State);
+                    Assert.Equal(Status.Ok, (await qb).State);
                 }
                 await bothClosed.Task.WaitAsync(TimeSpan.FromSeconds(10));
             }
@@ -169,7 +169,7 @@ namespace Bimbridge.Tests
                 using (var c = await Connect(pipe, agent: "Integration client"))
                 {
                     var r = await Call(c, 7, Wire.OpCommit, new Dictionary<string, object> { ["plan_id"] = "P-0001", [Correlation.TraceArg] = "trace-abc-123" });
-                    Assert.Equal(Status.Ok, r.Estado);
+                    Assert.Equal(Status.Ok, r.State);
                 }
             }
             var corr = h.LastCorrelation;
@@ -191,7 +191,7 @@ namespace Bimbridge.Tests
             var corr = Correlation.For(s, req);
             Assert.NotEqual("x y", corr.TraceId);                       // invalid trace → new one
             Assert.Equal(16, corr.TraceId.Length);
-            corr.Complete(req, new Response { Estado = Status.Ok, Datos = new Dictionary<string, object> { ["job_id"] = "G-1" } });
+            corr.Complete(req, new Response { State = Status.Ok, Data = new Dictionary<string, object> { ["job_id"] = "G-1" } });
             var j = new Dictionary<string, object>();
             corr.WriteTo(j);
             Assert.Equal("G-1", j["job_id"]);
@@ -264,7 +264,7 @@ namespace Bimbridge.Tests
             {
                 host.Start();
                 using (var c = await Connect(pipe))
-                    Assert.Equal(Status.Ok, (await Call(c, 2, Wire.OpCommit, new Dictionary<string, object> { ["plan_id"] = "P-1" })).Estado);
+                    Assert.Equal(Status.Ok, (await Call(c, 2, Wire.OpCommit, new Dictionary<string, object> { ["plan_id"] = "P-1" })).State);
             }
             Assert.Contains(Wire.OpCommit, h.Ops);
         }

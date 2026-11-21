@@ -95,7 +95,7 @@ namespace Bimbridge.Tests
             var dll = Path.Combine(_p.AddinsDir("2024"), "Bimbridge", "Bimbridge.Addin.dll");
             var record = File.ReadAllText(_p.InstallRecord);
             var ex = Assert.Throws<IOException>(() => core.Install(PayloadWithoutBridge(), new InstallOptions { Versions = { "2024" }, Levels = "RPW" }, "0.6.0"));
-            Assert.Contains("estado anterior", ex.Message);
+            Assert.Contains("previous state", ex.Message);
             Assert.Equal("dll2024", File.ReadAllText(dll));
             Assert.Equal(record, File.ReadAllText(_p.InstallRecord));
         }
@@ -109,7 +109,7 @@ namespace Bimbridge.Tests
             using (new FileStream(_p.BridgeExe, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
                 var ex = Assert.Throws<IOException>(() => core.Install(Payload(), new InstallOptions { Versions = { "2024" }, Levels = "RPW" }, "0.6.0"));
-                Assert.Contains("No se cambió nada", ex.Message);
+                Assert.Contains("Nothing was changed", ex.Message);
             }
             Assert.Equal(record, File.ReadAllText(_p.InstallRecord));
         }
@@ -218,7 +218,7 @@ namespace Bimbridge.Tests
                 var diag = core.Diagnose();
                 foreach (var v in SetupCore.SupportedVersions)
                     Assert.Equal(true, ((System.Collections.Generic.Dictionary<string, object>)((System.Collections.Generic.Dictionary<string, object>)diag["addin"])[v])["coinciden"]);
-                Assert.True(File.Exists(Path.Combine(_p.AddinsDir("2026"), "Bimbridge", "recetas", "etiquetar_luces.cs")));
+                Assert.True(File.Exists(Path.Combine(_p.AddinsDir("2026"), "Bimbridge", "recipes", "tag_fixtures.cs")));
                 Assert.True(File.Exists(Path.Combine(_p.BinDir, "Bimbridge.AgentHost.exe")));
                 Assert.True(File.Exists(Path.Combine(_p.BinDir, "power_engine", "bimbridge-power-engine.exe")));
             }
@@ -230,7 +230,7 @@ namespace Bimbridge.Tests
             var core = new SetupCore(_p);
             var ex = Assert.Throws<InvalidDataException>(() =>
                 core.Install(SignedPayload("addin/2024/Bimbridge/Bimbridge.Addin.dll"), new InstallOptions { Versions = { "2024" }, Levels = "RPW" }, "0.6.0"));
-            Assert.Contains("hash distinto", ex.Message);
+            Assert.Contains("hash mismatch", ex.Message);
             Assert.False(Directory.Exists(_p.AddinsDir("2024")));
             Assert.False(File.Exists(_p.BridgeExe));
             Assert.Null(core.ReadInstalled());
@@ -253,7 +253,7 @@ namespace Bimbridge.Tests
             var y24 = (System.Collections.Generic.Dictionary<string, object>)addin["2024"];
             Assert.Equal(true, y24["coinciden"]);
             Assert.Equal(false, y24["reinicio_pendiente"]);
-            Assert.Equal("no instalado", addin["2023"]);
+            Assert.Equal("not installed", addin["2023"]);
             var cfg = (System.Collections.Generic.Dictionary<string, object>)d["config"];
             Assert.Equal(false, cfg["enabled"]);
             Assert.Equal("RPW", cfg["levels"]);
@@ -262,12 +262,12 @@ namespace Bimbridge.Tests
             // Someone changes the DLL and a set-aside file is left in use: the diagnostics report it.
             var dll = Path.Combine(_p.AddinsDir("2026"), "Bimbridge", "Bimbridge.Addin.dll");
             File.WriteAllText(dll, "otra");
-            File.WriteAllText(dll + Updates.LeftoverMark + "1", "vieja");
+            File.WriteAllText(dll + Updates.LeftoverMark + "1", "old");
             d = core.Diagnose();
             var y26 = (System.Collections.Generic.Dictionary<string, object>)((System.Collections.Generic.Dictionary<string, object>)d["addin"])["2026"];
             Assert.Equal(false, y26["coinciden"]);
             Assert.Equal(true, y26["reinicio_pendiente"]);
-            Assert.Contains("cambió", string.Join(",", (System.Collections.Generic.List<object>)y26["diferencias"]));
+            Assert.Contains("changed", string.Join(",", (System.Collections.Generic.List<object>)y26["diferencias"]));
 
             // Revit open with the add-in loaded: the current process descriptor counts as "alive".
             var inst = Path.Combine(_p.Home, "instances");
@@ -463,7 +463,7 @@ namespace Bimbridge.Tests
         }
 
         [Fact]
-        public void CopyOver_SobrescribeDestinoSoloLectura()
+        public void CopyOver_OverwritesReadOnlyTarget()
         {
             var dir = Path.Combine(Path.GetTempPath(), "bimbridge-copyover-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);

@@ -239,8 +239,8 @@ namespace Bimbridge.AgentHost
                 try { summary = r.Run(cts.Token); }
                 catch (PlanLease.LeaseLostException ex) { Console.WriteLine("lease_perdido " + ex.Message); return 4; }
                 Console.WriteLine(summary);
-                if (r.State.PlanState != PlanRunState.Activo) return 5;
-                return r.State.Ops.Values.All(o => o.State == OpState.Verificada || o.State == OpState.Ensayada) ? 0 : 2;
+                if (r.State.PlanState != PlanRunState.Active) return 5;
+                return r.State.Ops.Values.All(o => o.State == OpState.Verified || o.State == OpState.Trialed) ? 0 : 2;
             }
         }
 

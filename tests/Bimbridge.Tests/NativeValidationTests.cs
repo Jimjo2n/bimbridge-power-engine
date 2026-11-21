@@ -79,12 +79,12 @@ namespace Bimbridge.Tests
             var p = Sample();
             store.Add(p);
             GroupAbort.Preserve(p, "Error", "fallo", Ev());
-            store.Finish(p, Status.Desconocido, "incierto");
+            store.Finish(p, Status.Unknown, "incierto");
 
             var restarted = new PlanStore(_root);
             Assert.Equal(1, restarted.LoadPersisted(p.DocKey));
             var q = restarted.Get("P-1");
-            Assert.Equal(Status.Desconocido, q.Status);
+            Assert.Equal(Status.Unknown, q.Status);
             Assert.NotNull(q.FinishedUtc);
             Assert.Empty(restarted.Held(p.DocKey));
             Assert.Single(restarted.Unreconciled(p.DocKey));
@@ -104,7 +104,7 @@ namespace Bimbridge.Tests
             store.Hold(p);
             var file = Path.Combine(store.DocDir(p.DocKey), p.Id + ".json");
             Assert.True(File.Exists(file));
-            store.Finish(p, PlanStatus.Aplicado, "ok");
+            store.Finish(p, PlanStatus.Applied, "ok");
             Assert.False(File.Exists(file));
         }
 
@@ -149,7 +149,7 @@ namespace Bimbridge.Tests
             p.CreatedByOp[0] = new List<long> { 500, 501 };
             store.Add(p);
             Assert.Equal(expected, Abort(p, rollBack, new GroupAbort.Evidence { Changed = 2 }, out _));
-            store.Finish(p, Status.Desconocido, "incierto");
+            store.Finish(p, Status.Unknown, "incierto");
 
             var again = new PlanStore(_root);
             again.LoadPersisted(p.DocKey);
@@ -178,7 +178,7 @@ namespace Bimbridge.Tests
                 Skipped = new Dictionary<string, List<long>> { ["no editable"] = new List<long> { 88 } }, Warnings = new[] { "w" },
             };
             Assert.Equal(expected, Abort(p, rollBack, ev, out _));
-            store.Finish(p, Status.Desconocido, "incierto");
+            store.Finish(p, Status.Unknown, "incierto");
 
             var again = new PlanStore(_root);
             again.LoadPersisted(p.DocKey);
@@ -203,11 +203,11 @@ namespace Bimbridge.Tests
         }
 
         [Theory]
-        [InlineData(PlanStatus.Aplicado, PlanStatus.Aplicado)]
-        [InlineData(PlanStatus.Revertido, PlanStatus.Revertido)]
-        [InlineData(PlanStatus.Ensayado, PlanStatus.Ensayado)]
-        [InlineData(PlanStatus.EnProceso, Status.Desconocido)]
-        [InlineData(null, Status.Desconocido)]
+        [InlineData(PlanStatus.Applied, PlanStatus.Applied)]
+        [InlineData(PlanStatus.RolledBack, PlanStatus.RolledBack)]
+        [InlineData(PlanStatus.Trialed, PlanStatus.Trialed)]
+        [InlineData(PlanStatus.InProgress, Status.Unknown)]
+        [InlineData(null, Status.Unknown)]
         public void DisposeError_NeverUpgradesAResult(string before, string after) =>
             Assert.Equal(after, GroupAbort.StatusAfterDisposeError(before));
 

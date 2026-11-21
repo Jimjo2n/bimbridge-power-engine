@@ -28,9 +28,9 @@ out = ["# Benchmark 0.6.0 — MCP vs pyRevit (summary of " + sys.argv[1] + ")", 
        "| Workload | Engine | Cold ms | Warm p50 | p95 | n warm | Failures | Retries | AI chars (p50) | Estimated tokens (p50) | Actual tokens (p50) | Pairs | Estimated − actual error (p50) |",
        "|---|---|---|---|---|---|---|---|---|---|---|---|"]
 qc = {}
-for carga in sorted(set(r["carga"] for r in rows)):
-    for motor in ("mcp", "pyrevit"):
-        rs = [r for r in rows if r["carga"] == carga and r["motor"] == motor]
+for workload in sorted(set(r["carga"] for r in rows)):
+    for engine in ("mcp", "pyrevit"):
+        rs = [r for r in rows if r["carga"] == workload and r["motor"] == engine]
         if not rs: continue
         ok = [r for r in rs if not r.get("error")]
         warm = [num(r["ms_pared"]) for r in ok if r.get("frio") not in ("1", "si", "true") and num(r["ms_pared"]) is not None]
@@ -42,15 +42,15 @@ for carga in sorted(set(r["carga"] for r in rows)):
         deltas = [e - a for e, a in zip(estimates, actual) if e is not None and a is not None]
         toks = [a for a in actual if a is not None]
         out.append("| %s | %s | %s | %s | %s | %d | %d | %d | %s | %s | %s | %d | %s |" % (
-            carga, motor, cold[0] if cold else "—", pct(warm, .5), pct(warm, .95), len(warm),
+            workload, engine, cold[0] if cold else "—", pct(warm, .5), pct(warm, .95), len(warm),
             len(rs) - len(ok), sum(int(num(r.get("reintentos") or 0) or 0) for r in rs),
             pct([n for n in chars if n is not None], .5), pct([e for e in estimates if e is not None], .5), pct(toks, .5) if toks else "not measured",
             len(deltas), pct(deltas, .5) if deltas else "not measured"))
-        qc.setdefault(carga, {})[motor] = set(r.get("resultado_qc", "").strip() for r in ok)
+        qc.setdefault(workload, {})[engine] = set(r.get("resultado_qc", "").strip() for r in ok)
 out += ["", "## Same result?", ""]
-for carga, m in sorted(qc.items()):
+for workload, m in sorted(qc.items()):
     a, b = m.get("mcp", set()), m.get("pyrevit", set())
-    out.append("- %s: %s" % (carga, "match" if a and a == b else "do NOT match or an engine is missing (the timing comparison does not count until resolved)"))
+    out.append("- %s: %s" % (workload, "match" if a and a == b else "do NOT match or an engine is missing (the timing comparison does not count until resolved)"))
 out += ["", "Limits: one machine, one practice model; 1 cold run + ≥10 warm runs is indicative, not strong statistics. "
         "Estimate = ceil(characters/4). Fill in tokens_reales only if the client reports usage for that same exchange; leave it empty if there are only session totals."]
 text = "\n".join(out)

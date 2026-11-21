@@ -107,8 +107,8 @@ namespace Bimbridge.AgentHost
         }
 
         public Preflight Prepare(ValidatedOp op) => new Preflight { Error = NotConnected };
-        public ExecResult Execute(ValidatedOp op, ExecContext ctx) => ExecResult.Fail(ErrorClass.Rechazo, NotConnected);
-        public Observation Observe(ValidatedOp op, ExecContext ctx) => new Observation { Effect = Effect.Incierto, Detail = NotConnected };
-        public PostcheckResult CheckPostconditions(ValidatedOp op, ExecContext ctx) => new PostcheckResult { State = PostState.NoEvaluables, Detail = NotConnected };
+        public ExecResult Execute(ValidatedOp op, ExecContext ctx) => ExecResult.Fail(ErrorClass.BackendRejection, NotConnected);
+        public Observation Observe(ValidatedOp op, ExecContext ctx) => new Observation { Effect = Effect.Uncertain, Detail = NotConnected };
+        public PostcheckResult CheckPostconditions(ValidatedOp op, ExecContext ctx) => new PostcheckResult { State = PostState.NotEvaluable, Detail = NotConnected };
     }
 }

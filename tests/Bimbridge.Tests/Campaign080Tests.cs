@@ -33,9 +33,9 @@ namespace Bimbridge.Tests
             Response Call(string op, Dictionary<string, object> a, bool w)
             {
                 seen.Add((op, Arg.GetString(a, "doc"), w));
-                if (op == "plan") return new Response { Datos = new Dictionary<string, object> { ["plan_id"] = "P-7" } };
-                if (op == "commit") return new Response { Datos = new Dictionary<string, object> { ["plan_id"] = a["plan_id"] } };
-                return Response.Fail(0, Status.DestinoNoDisponible, "d999 does not exist");
+                if (op == "plan") return new Response { Data = new Dictionary<string, object> { ["plan_id"] = "P-7" } };
+                if (op == "commit") return new Response { Data = new Dictionary<string, object> { ["plan_id"] = a["plan_id"] } };
+                return Response.Fail(0, Status.TargetUnavailable, "d999 does not exist");
             }
             var r = Campaign080.RunSteps(spec, Call, "d1", null);
             Assert.Equal("FALLIDA", r["resultado"]);                 // the 4th step expected rechazado and was ok
@@ -43,9 +43,9 @@ namespace Bimbridge.Tests
             Assert.Equal("d1", seen[0].Doc);                          // the file's doc is replaced by the pinned one
             Assert.Equal("d999", seen[2].Doc);                        // except in the explicit negative step
             Assert.True(seen[1].Write);
-            var pasos = (List<object>)r["pasos"];
-            Assert.True((bool)((Dictionary<string, object>)pasos[1])["ok"]);
-            Assert.Contains("not run", (string)((Dictionary<string, object>)pasos[4])["motivo"]);
+            var steps = (List<object>)r["pasos"];
+            Assert.True((bool)((Dictionary<string, object>)steps[1])["ok"]);
+            Assert.Contains("not run", (string)((Dictionary<string, object>)steps[4])["motivo"]);
         }
 
         [Fact]

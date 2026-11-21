@@ -26,7 +26,7 @@ Also added:
 
 ## 2. Tools (real schema)
 
-Dump of `tools/list` from the compiled bridge: `docs/ESQUEMA_HERRAMIENTAS_compacto.json` and `docs/ESQUEMA_HERRAMIENTAS_completo.json`.
+Dump of `tools/list` from the compiled bridge: `docs/TOOL_SCHEMA_compact.json` and `docs/TOOL_SCHEMA_complete.json`.
 
 | Profile | 0.4.0 | 0.5.0 |
 |---|---|---|
@@ -37,7 +37,7 @@ The fixed cost of the compact profile grows by about 860 tokens per conversation
 
 ## 3. Capability and requirement matrix
 
-- `docs/MATRIZ_CAPACIDADES.md`: generated from `Engine/Capabilities.cs`, and a test fails if they differ. For each command it states whether it applies to projects or families, the permission level and the real evidence.
+- `docs/CAPABILITY_MATRIX.md`: generated from `Engine/Capabilities.cs`, and a test fails if they differ. For each command it states whether it applies to projects or families, the permission level and the real evidence.
 - `docs/REQUIREMENTS_STATUS_0.5.0.csv`: status of R001–R071 with evidence and what is missing.
 
 | Status | Requirements |
@@ -55,7 +55,7 @@ The ten P0 items (R001–R010) have code. Still missing: R006 (the set lacks gen
 
 | Test | What it shows |
 |---|---|
-| `ScriptingTests.Lavamanos_CompilesAgainstEachYearsApi` ×5 | `tools/acceptance/washbasin_exec.cs` compiles against RevitAPI/RevitAPIUI 2022, 2023, 2024, 2025 and 2026 and against each year's add-in |
+| `ScriptingTests.Washbasin_CompilesAgainstEachYearsApi` ×5 | `tools/acceptance/washbasin_exec.cs` compiles against RevitAPI/RevitAPIUI 2022, 2023, 2024, 2025 and 2026 and against each year's add-in |
 | `ScriptingTests.ExpressionAndBody_Compile` ×5, `Errors_PointToTheUsersLine`, `Wrap_*` | the three code forms; the error points at the user's line |
 | `DurabilityTests` (7) | journal: no repeat after restart, interrupted → reconcile, different fingerprint → rejection; results by handle; sets per document; matrix = code; tag rule |
 | `EndToEnd...ExecAndAct_PassArgumentsAndStopAfterFailure` | the bridge passes `codigo/modo/tx/doc/args/clave/tarea` unchanged; `act` stops after a failure and marks it; `revit fam` does not write |

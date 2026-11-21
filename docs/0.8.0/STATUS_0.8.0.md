@@ -2,7 +2,7 @@
 
 **Release status:** internal candidate **NATIVE_ACCEPTANCE_PENDING**. Branch `feature/0.8.0` from `v0.7.0-rc1` (14ec21d). No tag until the native campaign passes. Nothing in 0.8.0 has run in Revit: acceptance requires an isolated test instance and an approved scope (`BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION`).
 
-This document is the only 0.8.0 report: status, tests, performance, security, limitations and roadmap. The matrix is in [MATRIZ_TRAZABILIDAD_0.8.0.md](MATRIZ_TRAZABILIDAD_0.8.0.md) and the campaign in `tools/acceptance/0.8.0/PROCEDURE_0.8.0.md`.
+This document is the only 0.8.0 report: status, tests, performance, security, limitations and roadmap. The matrix is in [TRACEABILITY_MATRIX_0.8.0.md](TRACEABILITY_MATRIX_0.8.0.md) and the campaign in `tools/acceptance/0.8.0/PROCEDURE_0.8.0.md`.
 
 ## 1. What changed since rc1
 

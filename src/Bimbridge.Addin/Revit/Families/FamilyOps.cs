@@ -17,8 +17,8 @@ namespace Bimbridge.Addin.Revit.Families
     /// <summary>Error carrying a protocol status (no_soportado, invalido, necesita_usuario…).</summary>
     public sealed class OpFail : Exception
     {
-        public readonly string Estado;
-        public OpFail(string estado, string message) : base(message) { Estado = estado; }
+        public readonly string State;
+        public OpFail(string status, string message) : base(message) { State = status; }
     }
 
     /// <summary>
@@ -45,18 +45,18 @@ namespace Bimbridge.Addin.Revit.Families
 
         public static Document RequireFamily(Document doc, string what)
         {
-            if (doc == null) throw new OpFail(Status.Invalido, "no document");
+            if (doc == null) throw new OpFail(Status.Invalid, "no document");
             if (!doc.IsFamilyDocument)
-                throw new OpFail(Status.NoSoportado, what + " works on a family document (RFA) and " + DocRegistry.Instance.IdOf(doc) + " (" + doc.Title +
+                throw new OpFail(Status.NotSupported, what + " works on a family document (RFA) and " + DocRegistry.Instance.IdOf(doc) + " (" + doc.Title +
                                                      ") is a project. Open the family with: fam abrir familia=\"Name\" (or doc=dN if it is already open)");
             return doc;
         }
 
         public static Document RequireProject(Document doc, string what)
         {
-            if (doc == null) throw new OpFail(Status.Invalido, "no document");
+            if (doc == null) throw new OpFail(Status.Invalid, "no document");
             if (doc.IsFamilyDocument)
-                throw new OpFail(Status.NoSoportado, what + " works on a project and " + DocRegistry.Instance.IdOf(doc) + " (" + doc.Title + ") is a family; pass the project's doc=dN");
+                throw new OpFail(Status.NotSupported, what + " works on a project and " + DocRegistry.Instance.IdOf(doc) + " (" + doc.Title + ") is a family; pass the project's doc=dN");
             return doc;
         }
 
@@ -142,12 +142,12 @@ namespace Bimbridge.Addin.Revit.Families
 
         public static FaceInfo FindFace(Document doc, string label)
         {
-            if (string.IsNullOrWhiteSpace(label)) throw new OpFail(Status.Invalido, "missing cara=element:n (see fam caras)");
+            if (string.IsNullOrWhiteSpace(label)) throw new OpFail(Status.Invalid, "missing cara=element:n (see fam caras)");
             var parts = label.Trim().Split(':');
             if (parts.Length == 2 && long.TryParse(parts[0], out var eid) && int.TryParse(parts[1], out var n))
             {
                 var f = Faces(doc, eid).FirstOrDefault(x => x.Index == n);
-                if (f == null) throw new OpFail(Status.Invalido, "face " + label + " does not exist (fam caras lists the planar faces with a reference)");
+                if (f == null) throw new OpFail(Status.Invalid, "face " + label + " does not exist (fam caras lists the planar faces with a reference)");
                 return f;
             }
             // Revit stable reference
@@ -156,11 +156,11 @@ namespace Bimbridge.Addin.Revit.Families
                 var r = Reference.ParseFromStableRepresentation(doc, label.Trim());
                 var e = doc.GetElement(r.ElementId);
                 var pf = e?.GetGeometryObjectFromReference(r) as PlanarFace;
-                if (pf == null) throw new OpFail(Status.Invalido, "the reference is not a planar face");
+                if (pf == null) throw new OpFail(Status.Invalid, "the reference is not a planar face");
                 return new FaceInfo { ElementId = Ids.ToLong(r.ElementId), Index = 0, Face = pf, Ref = r, Center = pf.Origin, Normal = pf.FaceNormal };
             }
             catch (OpFail) { throw; }
-            catch (Exception ex) { throw new OpFail(Status.Invalido, "cara '" + label + "' not understood: use element:n from fam caras (" + ex.Message + ")"); }
+            catch (Exception ex) { throw new OpFail(Status.Invalid, "cara '" + label + "' not understood: use element:n from fam caras (" + ex.Message + ")"); }
         }
 
         private static bool OnFace(FaceInfo f, XYZ p, double tolFt)
@@ -231,7 +231,7 @@ namespace Bimbridge.Addin.Revit.Families
                 case "salida": case "out": return (int)FlowDirectionType.Out;
                 case "bidireccional": case "bidirectional": case "ambos": return (int)FlowDirectionType.Bidirectional;
                 case "": return null;
-                default: throw new OpFail(Status.Invalido, "flujo must be entrada, salida or bidireccional");
+                default: throw new OpFail(Status.Invalid, "flujo must be entrada, salida or bidireccional");
             }
         }
 
@@ -327,17 +327,17 @@ namespace Bimbridge.Addin.Revit.Families
                 if (e is Family f) return f;
                 if (e is FamilySymbol fs) return fs.Family;
                 if (e is FamilyInstance fi) return fi.Symbol?.Family;
-                throw new OpFail(Status.Invalido, "id " + id + " is not a family, family type or family instance");
+                throw new OpFail(Status.Invalid, "id " + id + " is not a family, family type or family instance");
             }
             var name = Arg.GetString(a, "familia") ?? Arg.GetString(a, "nombre");
-            if (string.IsNullOrWhiteSpace(name)) throw new OpFail(Status.Invalido, "specify familia=\"Name\" or id=");
+            if (string.IsNullOrWhiteSpace(name)) throw new OpFail(Status.Invalid, "specify familia=\"Name\" or id=");
             var matches = new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>()
                 .Where(f => DocRegistry.TitleMatches(f.Name, name)).ToList();
             if (matches.Count == 0)
             {
                 var similar = new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>()
                     .Where(f => f.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0).Select(f => f.Name).Take(8).ToList();
-                throw new OpFail(Status.Invalido, "no loaded family named '" + name + "'" + (similar.Count > 0 ? "; similar: " + string.Join(", ", similar) : ""));
+                throw new OpFail(Status.Invalid, "no loaded family named '" + name + "'" + (similar.Count > 0 ? "; similar: " + string.Join(", ", similar) : ""));
             }
             return matches[0];
         }
@@ -406,8 +406,8 @@ namespace Bimbridge.Addin.Revit.Families
         {
             RequireProject(project, "fam abrir");
             var fam = FindFamily(project, a);
-            if (fam.IsInPlace) throw new OpFail(Status.NoSoportado, "'" + fam.Name + "' is an in-place family: it cannot be opened with EditFamily");
-            if (!fam.IsEditable) throw new OpFail(Status.NoSoportado, "'" + fam.Name + "' is not editable (system or protected family)");
+            if (fam.IsInPlace) throw new OpFail(Status.NotSupported, "'" + fam.Name + "' is an in-place family: it cannot be opened with EditFamily");
+            if (!fam.IsEditable) throw new OpFail(Status.NotSupported, "'" + fam.Name + "' is not editable (system or protected family)");
             var forceNew = Arg.GetBool(a, "nuevo") ?? false;
             var projectKey = DocumentTracker.KeyOf(project);
             var skipped = new List<string>();
@@ -480,21 +480,21 @@ namespace Bimbridge.Addin.Revit.Families
                     DimType = Arg.GetString(a, "cota"),
                     Adopt = Arg.GetBool(a, "adoptar") ?? true,
                 };
-                if (string.IsNullOrWhiteSpace(r.Key)) throw new OpFail(Status.Invalido, "missing nombre= (semantic connector key, e.g. fria, caliente, desague): it is used to recognize the connector on repeat");
+                if (string.IsNullOrWhiteSpace(r.Key)) throw new OpFail(Status.Invalid, "missing nombre= (semantic connector key, e.g. fria, caliente, desague): it is used to recognize the connector on repeat");
                 double? Len(string k)
                 {
                     var s = Arg.GetString(a, k);
                     if (s == null) return null;
                     var v = LengthFeet(s);
-                    if (v == null) throw new OpFail(Status.Invalido, k + "='" + s + "' needs an explicit unit (mm, cm, m, in, ft)");
-                    if (v <= 0) throw new OpFail(Status.Invalido, k + " must be greater than 0");
+                    if (v == null) throw new OpFail(Status.Invalid, k + "='" + s + "' needs an explicit unit (mm, cm, m, in, ft)");
+                    if (v <= 0) throw new OpFail(Status.Invalid, k + " must be greater than 0");
                     return v;
                 }
                 r.RadiusFt = Len("radio");
                 r.DiameterFt = Len("diametro");
                 r.WidthFt = Len("ancho");
                 r.HeightFt = Len("alto");
-                if (r.RadiusFt.HasValue && r.DiameterFt.HasValue) throw new OpFail(Status.Invalido, "give radio or diametro, not both");
+                if (r.RadiusFt.HasValue && r.DiameterFt.HasValue) throw new OpFail(Status.Invalid, "give radio or diametro, not both");
                 return r;
             }
         }
@@ -514,20 +514,20 @@ namespace Bimbridge.Addin.Revit.Families
             {
                 case "tuberia":
                     if (!Enum.TryParse(s, true, out pipe) || s.Length == 0)
-                        throw new OpFail(Status.Invalido, "pipe system: " + string.Join(", ", Enum.GetNames(typeof(PipeSystemType))) + " (or fria, caliente, sanitario)");
+                        throw new OpFail(Status.Invalid, "pipe system: " + string.Join(", ", Enum.GetNames(typeof(PipeSystemType))) + " (or fria, caliente, sanitario)");
                     return (MEPSystemClassification)Enum.Parse(typeof(MEPSystemClassification), pipe.ToString());
                 case "ducto":
                     if (!Enum.TryParse(s, true, out duct) || s.Length == 0)
-                        throw new OpFail(Status.Invalido, "duct system: " + string.Join(", ", Enum.GetNames(typeof(DuctSystemType))));
+                        throw new OpFail(Status.Invalid, "duct system: " + string.Join(", ", Enum.GetNames(typeof(DuctSystemType))));
                     return (MEPSystemClassification)Enum.Parse(typeof(MEPSystemClassification), duct.ToString());
                 case "electrico":
                     if (!Enum.TryParse(s, true, out elec) || s.Length == 0)
-                        throw new OpFail(Status.Invalido, "electrical system: " + string.Join(", ", Enum.GetNames(typeof(ElectricalSystemType))));
+                        throw new OpFail(Status.Invalid, "electrical system: " + string.Join(", ", Enum.GetNames(typeof(ElectricalSystemType))));
                     MEPSystemClassification ec;
                     return Enum.TryParse(elec.ToString(), true, out ec) ? ec : MEPSystemClassification.PowerCircuit;
                 case "conduit": return MEPSystemClassification.UndefinedSystemClassification;
                 case "bandeja": return MEPSystemClassification.UndefinedSystemClassification;
-                default: throw new OpFail(Status.Invalido, "connector tipo: tuberia, ducto, electrico, conduit or bandeja");
+                default: throw new OpFail(Status.Invalid, "connector tipo: tuberia, ducto, electrico, conduit or bandeja");
             }
         }
 
@@ -546,7 +546,7 @@ namespace Bimbridge.Addin.Revit.Families
             // 1) By semantic key (connector description)
             var byKey = all.Where(c => string.Equals(Description(c), q.Key, StringComparison.OrdinalIgnoreCase)).ToList();
             if (byKey.Count > 1)
-                throw new OpFail(Status.NecesitaUsuario, "there are " + byKey.Count + " connectors with key '" + q.Key + "' (ids " + string.Join(",", byKey.Select(c => Ids.ToLong(c.Id))) +
+                throw new OpFail(Status.NeedsUser, "there are " + byKey.Count + " connectors with key '" + q.Key + "' (ids " + string.Join(",", byKey.Select(c => Ids.ToLong(c.Id))) +
                                                          "): pre-existing duplicates. Decide which to keep and delete the other (plan delete or exec) before reconciling");
             ConnectorElement ce = byKey.FirstOrDefault();
             var how = ce != null ? "existing (by key)" : null;
@@ -557,16 +557,16 @@ namespace Bimbridge.Addin.Revit.Families
                 var cands = all.Where(c => Description(c).Length == 0 && OnFace(face, c.Origin, 0.5 / MmPerFt)).ToList();
                 try { cands = cands.Where(c => cls == MEPSystemClassification.UndefinedSystemClassification || c.SystemClassification == cls).ToList(); } catch (Exception) { }
                 if (cands.Count > 1)
-                    throw new OpFail(Status.NecesitaUsuario, "there are " + cands.Count + " keyless connectors of the same system on face " + face.Label + ": pick one with exec or delete the extra one");
+                    throw new OpFail(Status.NeedsUser, "there are " + cands.Count + " keyless connectors of the same system on face " + face.Label + ": pick one with exec or delete the extra one");
                 if (cands.Count == 1) { ce = cands[0]; how = "adopted (was on face " + face.Label + " without a key)"; }
             }
 
             // 3) Create
             if (ce == null)
             {
-                if (face == null) throw new OpFail(Status.Invalido, "connector '" + q.Key + "' does not exist: to create it specify cara=element:n (fam caras)");
+                if (face == null) throw new OpFail(Status.Invalid, "connector '" + q.Key + "' does not exist: to create it specify cara=element:n (fam caras)");
                 if (q.Kind == "tuberia" && !q.RadiusFt.HasValue && !q.DiameterFt.HasValue)
-                    throw new OpFail(Status.Invalido, "to create a pipe connector specify radio= or diametro= with a unit (e.g. radio=6.5mm); none is assumed");
+                    throw new OpFail(Status.Invalid, "to create a pipe connector specify radio= or diametro= with a unit (e.g. radio=6.5mm); none is assumed");
                 switch (q.Kind)
                 {
                     case "tuberia": ce = ConnectorElement.CreatePipeConnector(doc, pipe, face.Ref); break;
@@ -704,9 +704,9 @@ namespace Bimbridge.Addin.Revit.Families
 
         // ---------------- parameters ----------------
 
-        private static ForgeTypeId Spec(string dato)
+        private static ForgeTypeId Spec(string dataType)
         {
-            switch ((dato ?? "longitud").Trim().ToLowerInvariant())
+            switch ((dataType ?? "longitud").Trim().ToLowerInvariant())
             {
                 case "longitud": return SpecTypeId.Length;
                 case "tamano_tuberia": case "tamaño_tuberia": return SpecTypeId.PipeSize;
@@ -716,7 +716,7 @@ namespace Bimbridge.Addin.Revit.Families
                 case "si_no": case "sí_no": return SpecTypeId.Boolean.YesNo;
                 case "angulo": case "ángulo": return SpecTypeId.Angle;
                 case "caudal_tuberia": return SpecTypeId.Flow;
-                default: throw new OpFail(Status.Invalido, "dato: longitud, tamano_tuberia, texto, entero, numero, si_no, angulo, caudal_tuberia");
+                default: throw new OpFail(Status.Invalid, "dato: longitud, tamano_tuberia, texto, entero, numero, si_no, angulo, caudal_tuberia");
             }
         }
 
@@ -725,25 +725,25 @@ namespace Bimbridge.Addin.Revit.Families
             RequireFamily(doc, "fam param");
             var fm = doc.FamilyManager;
             var name = Arg.GetString(a, "nombre");
-            if (string.IsNullOrWhiteSpace(name)) throw new OpFail(Status.Invalido, "missing nombre= of the family parameter");
+            if (string.IsNullOrWhiteSpace(name)) throw new OpFail(Status.Invalid, "missing nombre= of the family parameter");
             var fp = fm.get_Parameter(name);
-            var crear = Arg.GetString(a, "crear");
-            if (fp == null && crear == null) throw new OpFail(Status.Invalido, "family parameter '" + name + "' does not exist (fam info lists them); to create it: crear=tipo|instancia dato=longitud");
+            var create = Arg.GetString(a, "crear");
+            if (fp == null && create == null) throw new OpFail(Status.Invalid, "family parameter '" + name + "' does not exist (fam info lists them); to create it: crear=tipo|instancia dato=longitud");
             if (fp == null)
             {
-                var inst = crear.Trim().ToLowerInvariant().StartsWith("inst");
+                var inst = create.Trim().ToLowerInvariant().StartsWith("inst");
                 fp = fm.AddParameter(name, GroupTypeId.General, Spec(Arg.GetString(a, "dato")), inst);
                 changes.Add("created parameter " + name + " (" + (inst ? "instance" : "type") + ")");
             }
 
             // Types to touch
             var types = new List<FamilyType>();
-            var tipo = Arg.GetString(a, "tipo");
+            var typeName = Arg.GetString(a, "tipo");
             if (Arg.GetBool(a, "todos_tipos") ?? false) types.AddRange(fm.Types.Cast<FamilyType>());
-            else if (tipo != null)
+            else if (typeName != null)
             {
-                var t = fm.Types.Cast<FamilyType>().FirstOrDefault(x => string.Equals(x.Name, tipo, StringComparison.OrdinalIgnoreCase));
-                if (t == null) throw new OpFail(Status.Invalido, "type '" + tipo + "' does not exist. Types: " + string.Join(", ", fm.Types.Cast<FamilyType>().Select(x => x.Name)));
+                var t = fm.Types.Cast<FamilyType>().FirstOrDefault(x => string.Equals(x.Name, typeName, StringComparison.OrdinalIgnoreCase));
+                if (t == null) throw new OpFail(Status.Invalid, "type '" + typeName + "' does not exist. Types: " + string.Join(", ", fm.Types.Cast<FamilyType>().Select(x => x.Name)));
                 types.Add(t);
             }
             else if (fm.CurrentType != null) types.Add(fm.CurrentType);
@@ -754,39 +754,39 @@ namespace Bimbridge.Addin.Revit.Families
                 if (fp.Formula != formula) { fm.SetFormula(fp, formula.Length == 0 ? null : formula); changes.Add("formula → " + (formula.Length == 0 ? "(none)" : formula)); }
             }
 
-            var valor = Arg.GetString(a, "valor");
+            var value = Arg.GetString(a, "valor");
             var original = fm.CurrentType;
             var values = new List<object>();
-            if (valor != null)
+            if (value != null)
             {
-                if (!string.IsNullOrEmpty(fp.Formula)) throw new OpFail(Status.Invalido, "'" + name + "' has a formula (" + fp.Formula + "): its value comes from it; change the formula or remove it with formula=\"\"");
+                if (!string.IsNullOrEmpty(fp.Formula)) throw new OpFail(Status.Invalid, "'" + name + "' has a formula (" + fp.Formula + "): its value comes from it; change the formula or remove it with formula=\"\"");
                 foreach (var t in types)
                 {
                     if (fm.CurrentType == null || fm.CurrentType.Name != t.Name) fm.CurrentType = t;
                     switch (fp.StorageType)
                     {
                         case StorageType.Double:
-                            var ft = LengthFeet(valor);
+                            var ft = LengthFeet(value);
                             double v;
                             if (ft.HasValue) v = ft.Value;
-                            else if (!double.TryParse(valor.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out v))
-                                throw new OpFail(Status.Invalido, "valor '" + valor + "' is not a number; lengths need a unit (6.5mm)");
+                            else if (!double.TryParse(value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out v))
+                                throw new OpFail(Status.Invalid, "valor '" + value + "' is not a number; lengths need a unit (6.5mm)");
                             else
                             {
                                 string specId = null;
                                 try { specId = fp.Definition.GetDataType()?.TypeId; } catch (Exception) { }
                                 if (specId != null && (specId.Contains(".length") || specId.Contains("pipesize") || specId.Contains("ductsize")))
-                                    throw new OpFail(Status.Invalido, "'" + name + "' is a length: give the value with a unit (e.g. 6.5mm) so feet are not confused with mm");
+                                    throw new OpFail(Status.Invalid, "'" + name + "' is a length: give the value with a unit (e.g. 6.5mm) so feet are not confused with mm");
                             }
                             fm.Set(fp, v);
                             break;
                         case StorageType.Integer:
-                            var low = valor.Trim().ToLowerInvariant();
-                            var iv = low == "si" || low == "sí" || low == "true" ? 1 : low == "no" || low == "false" ? 0 : int.Parse(valor, CultureInfo.InvariantCulture);
+                            var low = value.Trim().ToLowerInvariant();
+                            var iv = low == "si" || low == "sí" || low == "true" ? 1 : low == "no" || low == "false" ? 0 : int.Parse(value, CultureInfo.InvariantCulture);
                             fm.Set(fp, iv);
                             break;
-                        case StorageType.String: fm.Set(fp, valor); break;
-                        default: throw new OpFail(Status.NoSoportado, "'" + name + "' stores a " + fp.StorageType + ": use exec for that case");
+                        case StorageType.String: fm.Set(fp, value); break;
+                        default: throw new OpFail(Status.NotSupported, "'" + name + "' stores a " + fp.StorageType + ": use exec for that case");
                     }
                     var shown = fp.StorageType == StorageType.String ? fm.CurrentType.AsString(fp) : fm.CurrentType.AsValueString(fp);
                     values.Add(new object[] { t.Name, shown });
@@ -795,17 +795,17 @@ namespace Bimbridge.Addin.Revit.Families
                 if (original != null && fm.CurrentType?.Name != original.Name) fm.CurrentType = original;
             }
 
-            var asociar = Arg.GetString(a, "asociar");
-            if (asociar != null)
+            var associate = Arg.GetString(a, "asociar");
+            if (associate != null)
             {
-                var parts = asociar.Split(new[] { ':' }, 2);
-                if (parts.Length != 2 || !long.TryParse(parts[0], out var eid)) throw new OpFail(Status.Invalido, "asociar=element:PARAMETER (e.g. 12345:CONNECTOR_RADIUS)");
-                var e = doc.GetElement(Ids.ToId(eid)) ?? throw new OpFail(Status.Invalido, "element does not exist: " + eid);
+                var parts = associate.Split(new[] { ':' }, 2);
+                if (parts.Length != 2 || !long.TryParse(parts[0], out var eid)) throw new OpFail(Status.Invalid, "asociar=element:PARAMETER (e.g. 12345:CONNECTOR_RADIUS)");
+                var e = doc.GetElement(Ids.ToId(eid)) ?? throw new OpFail(Status.Invalid, "element does not exist: " + eid);
                 Parameter ep = null;
                 if (Enum.TryParse(parts[1], out BuiltInParameter bip)) ep = Bip(e, bip);
                 if (ep == null) ep = e.LookupParameter(parts[1]);
-                if (ep == null) throw new OpFail(Status.Invalido, "element " + eid + " does not have parameter " + parts[1]);
-                if (!fm.CanElementParameterBeAssociated(ep)) throw new OpFail(Status.NoSoportado, parts[1] + " of " + eid + " cannot be associated with a family parameter");
+                if (ep == null) throw new OpFail(Status.Invalid, "element " + eid + " does not have parameter " + parts[1]);
+                if (!fm.CanElementParameterBeAssociated(ep)) throw new OpFail(Status.NotSupported, parts[1] + " of " + eid + " cannot be associated with a family parameter");
                 var cur = fm.GetAssociatedFamilyParameter(ep);
                 if (cur == null || cur.Id != fp.Id)
                 {
@@ -851,13 +851,13 @@ namespace Bimbridge.Addin.Revit.Families
         {
             RequireFamily(famDoc, "fam cargar");
             var target = Arg.GetString(a, "en");
-            if (string.IsNullOrWhiteSpace(target)) throw new OpFail(Status.Invalido, "missing en=dN (project to load the family into; docs lists the open ones)");
+            if (string.IsNullOrWhiteSpace(target)) throw new OpFail(Status.Invalid, "missing en=dN (project to load the family into; docs lists the open ones)");
             var info = DocRegistry.Instance.Find(target, out var err);
-            if (info == null) throw new OpFail(Status.DestinoNoDisponible, err);
-            var project = DocRegistry.Instance.Resolve(app, info.Id) ?? throw new OpFail(Status.DestinoNoDisponible, "project " + target + " is no longer open");
+            if (info == null) throw new OpFail(Status.TargetUnavailable, err);
+            var project = DocRegistry.Instance.Resolve(app, info.Id) ?? throw new OpFail(Status.TargetUnavailable, "project " + target + " is no longer open");
             RequireProject(project, "fam cargar en=");
             var mode = (Arg.GetString(a, "sobrescribir") ?? "no").Trim().ToLowerInvariant();
-            if (mode != "no" && mode != "valores") throw new OpFail(Status.Invalido, "sobrescribir=no (keeps the project's parameter values) or valores");
+            if (mode != "no" && mode != "valores") throw new OpFail(Status.Invalid, "sobrescribir=no (keeps the project's parameter values) or valores");
             var connectors = Connectors(famDoc);
             var famConnectors = connectors.Count;
             var verifyPorts = Arg.GetBool(a, "verificar_puertos") == true;

@@ -44,7 +44,7 @@ namespace Bimbridge.Tests
             Assert.Equal(new Version(0, 9, 1), r.Version);
             Assert.Equal("https://github.com/" + Repo + "/releases/download/v0.9.1/Bimbridge.Setup.exe", r.SetupUrl);
             Assert.Equal(6, skipped.Count);
-            Assert.Contains(skipped, s => s.StartsWith("v0.9.5") && s.Contains("URL inesperada"));
+            Assert.Contains(skipped, s => s.StartsWith("v0.9.5") && s.Contains("unexpected URL"));
             Assert.Equal("v0.9.3", OnlineUpdate.Pick(json, Repo, true, out _).Tag);      // prerelease only if requested
             Assert.Null(OnlineUpdate.Pick("[]", Repo, false, out _));
             // A release from ANOTHER repository served in the response is not accepted.
@@ -147,7 +147,7 @@ namespace Bimbridge.Tests
             var bytes = Encoding.ASCII.GetBytes("instalador");
             // Hash differs from the published one (tampered or corrupt).
             var ex = Assert.Throws<OnlineUpdateException>(() => Run(Encoding.ASCII.GetBytes("instalad0r"), Sha(bytes), new Version(0, 9, 1), out _));
-            Assert.Contains("no coincide", ex.Message);
+            Assert.Contains("does not match", ex.Message);
             Assert.Empty(Leftovers());
             // Size differs from the declared one (truncated download).
             Assert.Throws<OnlineUpdateException>(() => Run(bytes, Sha(bytes), new Version(0, 9, 1), out _, declaredSize: bytes.Length + 1));

@@ -114,7 +114,7 @@ namespace Bimbridge.Tests
             DurableSimModel.Create(m, AH.Doc, "huella-OTRO-modelo", new[] { AH.Cat + "=5@L03" });
             var r = Open(Path.Combine(dir, "estado"), AH.BasePlan(), m, out var diags);
             Assert.Null(r);
-            Assert.Contains(diags, d => d.Code == ErrorClass.DocumentoDistinto);
+            Assert.Contains(diags, d => d.Code == ErrorClass.DifferentDocument);
             Assert.False(File.Exists(Path.Combine(dir, "estado", "diario.jsonl")));
         }
 
@@ -138,7 +138,7 @@ namespace Bimbridge.Tests
             {
                 Assert.NotNull(r);
                 Assert.Contains(diags, d => d.Code == "diario_linea_final_truncada");
-                Assert.All(r.State.Ops.Values, o => Assert.Equal(OpState.Verificada, o.State));
+                Assert.All(r.State.Ops.Values, o => Assert.Equal(OpState.Verified, o.State));
             }
             Assert.EndsWith("\n", File.ReadAllText(j));
         }
@@ -165,7 +165,7 @@ namespace Bimbridge.Tests
             {
                 Assert.NotNull(r);
                 Assert.Contains(diags, d => d.Code == "checkpoint_alterado");
-                Assert.All(r.State.Ops.Values, o => Assert.Equal(OpState.Verificada, o.State));
+                Assert.All(r.State.Ops.Values, o => Assert.Equal(OpState.Verified, o.State));
             }
         }
 
@@ -302,11 +302,11 @@ namespace Bimbridge.Tests
             var plan = AH.Plan(AH.Set("Mounting Height", 2700L, level: "L99"), AH.Qc("#0"));
             var (state, model, _) = RunToEnd(plan);
             var st = AH.Read(state, out _, out _);
-            Assert.Equal(OpState.Fallida, st.Ops[plan.Ops[0].Id].State);
-            Assert.Equal(ErrorClass.SinObjetivos, st.Ops[plan.Ops[0].Id].Error);
-            Assert.Equal(OpState.Bloqueada, st.Ops[plan.Ops[1].Id].State);
+            Assert.Equal(OpState.Failed, st.Ops[plan.Ops[0].Id].State);
+            Assert.Equal(ErrorClass.NoTargets, st.Ops[plan.Ops[0].Id].Error);
+            Assert.Equal(OpState.Blocked, st.Ops[plan.Ops[1].Id].State);
             Assert.Equal(0, AH.TxCount(model, AH.Hash(plan), plan.Ops[0].Id));
-            Assert.Equal(0, AH.Transitions(state, plan.Ops[0].Id, OpState.EnEjecucion));
+            Assert.Equal(0, AH.Transitions(state, plan.Ops[0].Id, OpState.Running));
         }
 
         [Fact]
@@ -315,7 +315,7 @@ namespace Bimbridge.Tests
             var plan = AH.Plan(AH.Set("Mounting Height", 2700L, level: "L99", allowEmpty: true));
             var (state, model, _) = RunToEnd(plan);
             var rec = AH.Read(state, out _, out _).Ops[plan.Ops[0].Id];
-            Assert.Equal(OpState.Verificada, rec.State);
+            Assert.Equal(OpState.Verified, rec.State);
             Assert.Equal(true, rec.Result["vacio"]);
             Assert.Equal(0L, Arg.GetLong(rec.Result, "elementos"));
             Assert.Equal(0L, Arg.GetLong(rec.Evidence, "objetivos"));
@@ -330,11 +330,11 @@ namespace Bimbridge.Tests
             Assert.Empty(IrValidator.Validate(AH.Plan(AH.Set("X", 1L, level: "L99")), out var vp));
             var b = new SimulatedBackend(model);
             var ctx = new ExecContext { PlanHash = vp.Hash, Fencing = 1, Attempt = 1 };
-            Assert.Equal(Effect.SinObjetivos, b.Observe(vp.Ops[0], ctx).Effect);                // never "applied" because 0 == 0
+            Assert.Equal(Effect.NoTargets, b.Observe(vp.Ops[0], ctx).Effect);                // never "applied" because 0 == 0
             var r = b.Execute(vp.Ops[0], ctx);                                                  // defense in depth
             Assert.False(r.Ok);
-            Assert.Equal(ErrorClass.SinObjetivos, r.ErrorClass);
-            Assert.Equal(PostState.NoSatisfechas, b.CheckPostconditions(vp.Ops[0], ctx).State);
+            Assert.Equal(ErrorClass.NoTargets, r.ErrorClass);
+            Assert.Equal(PostState.NotSatisfied, b.CheckPostconditions(vp.Ops[0], ctx).State);
         }
 
         // ---------------- cancellation, pause, repetition, retries ----------------
@@ -354,19 +354,19 @@ namespace Bimbridge.Tests
                 // the token is cancelled after the 3rd operation: the runner finishes the current operation and stops between operations
                 var first3 = plan.Ops.Select(o => o.Id).ToList();
                 r.State.CheckpointEvery = 1000;
-                var t = new Thread(() => { while (r.State.Ops.Values.Count(o => o.State == OpState.Verificada) < 3) Thread.Sleep(1); cts.Cancel(); });
+                var t = new Thread(() => { while (r.State.Ops.Values.Count(o => o.State == OpState.Verified) < 3) Thread.Sleep(1); cts.Cancel(); });
                 t.Start();
                 r.Run(cts.Token);
                 t.Join();
-                n = r.State.Ops.Values.Count(o => o.State == OpState.Verificada);
+                n = r.State.Ops.Values.Count(o => o.State == OpState.Verified);
                 Assert.InRange(n, 3, 10);
-                Assert.DoesNotContain(r.State.Ops.Values, o => o.State == OpState.EnEjecucion || o.State == OpState.Ejecutada);
+                Assert.DoesNotContain(r.State.Ops.Values, o => o.State == OpState.Running || o.State == OpState.Executed);
                 r.Cancel();
-                var after = r.State.Ops.Values.Count(o => o.State == OpState.Cancelada);
+                var after = r.State.Ops.Values.Count(o => o.State == OpState.Cancelled);
                 Assert.Equal(10 - n, after);
-                Assert.Equal(PlanRunState.Cancelado, r.State.PlanState);
+                Assert.Equal(PlanRunState.Cancelled, r.State.PlanState);
             }
-            Assert.Equal(PlanRunState.Cancelado, AH.Read(state, out _, out _).PlanState);
+            Assert.Equal(PlanRunState.Cancelled, AH.Read(state, out _, out _).PlanState);
         }
 
         [Fact]
@@ -379,12 +379,12 @@ namespace Bimbridge.Tests
             using (var r = Open(state, plan, model, out _)) { r.Pause(); Assert.Contains("pausado", r.Run()); }
             using (var r = Open(state, plan, model, out _))
             {
-                Assert.Equal(PlanRunState.Pausado, r.State.PlanState);
+                Assert.Equal(PlanRunState.Paused, r.State.PlanState);
                 Assert.Contains("pausado", r.Run());
-                Assert.Equal(0, r.State.Ops.Values.Count(o => o.State == OpState.Verificada));
+                Assert.Equal(0, r.State.Ops.Values.Count(o => o.State == OpState.Verified));
                 r.Resume();
                 r.Run();
-                Assert.All(r.State.Ops.Values, o => Assert.Equal(OpState.Verificada, o.State));
+                Assert.All(r.State.Ops.Values, o => Assert.Equal(OpState.Verified, o.State));
             }
         }
 
@@ -414,10 +414,10 @@ namespace Bimbridge.Tests
             var state = Path.Combine(dir, "estado");
             using (var r = Open(state, plan, m, out _)) r.Run();
             var st = AH.Read(state, out _, out _);
-            Assert.Equal(OpState.Verificada, st.Ops[plan.Ops[0].Id].State);
+            Assert.Equal(OpState.Verified, st.Ops[plan.Ops[0].Id].State);
             Assert.Equal(3, st.Ops[plan.Ops[0].Id].Attempt);
-            Assert.Equal(OpState.Fallida, st.Ops[plan.Ops[1].Id].State);
-            Assert.Equal(ErrorClass.Transitorio, st.Ops[plan.Ops[1].Id].Error);
+            Assert.Equal(OpState.Failed, st.Ops[plan.Ops[1].Id].State);
+            Assert.Equal(ErrorClass.Transient, st.Ops[plan.Ops[1].Id].Error);
             Assert.Equal(2, st.Ops[plan.Ops[1].Id].Attempt);
             Assert.Equal(1, AH.TxCount(m, AH.Hash(plan), plan.Ops[0].Id));
             Assert.Equal(0, AH.TxCount(m, AH.Hash(plan), plan.Ops[1].Id));
@@ -431,8 +431,8 @@ namespace Bimbridge.Tests
             var plan = AH.Plan(op);
             var (state, model, _) = RunToEnd(plan);
             var rec = AH.Read(state, out _, out _).Ops[plan.Ops[0].Id];
-            Assert.Equal(OpState.Fallida, rec.State);
-            Assert.Equal(ErrorClass.Precondicion, rec.Error);
+            Assert.Equal(OpState.Failed, rec.State);
+            Assert.Equal(ErrorClass.Precondition, rec.Error);
             Assert.Equal(0, AH.TxCount(model, AH.Hash(plan), plan.Ops[0].Id));
         }
 

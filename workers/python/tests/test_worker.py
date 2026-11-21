@@ -29,21 +29,21 @@ def setUpModule():
 class Worker:
     """Real, isolated process (-I -B), speaking JSON lines the way the C# core does."""
 
-    def __init__(self, rutas=None):
+    def __init__(self, paths=None):
         self.p = subprocess.Popen([sys.executable, "-I", "-B", os.path.join(ROOT, "run_worker.py")], stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        self.rutas = [FX] if rutas is None else rutas
+        self.paths = [FX] if paths is None else paths
         self.n = 0
 
     def raw(self, line):
         self.p.stdin.write((line + "\n").encode()); self.p.stdin.flush()
         return json.loads(self.p.stdout.readline())
 
-    def call(self, job, args=None, limites=None, rutas=None, pe=1):
+    def call(self, job, args=None, limits=None, paths=None, pe=1):
         self.n += 1
-        req = {"pe": pe, "id": "t%d" % self.n, "trabajo": job, "args": args or {}, "rutas": self.rutas if rutas is None else rutas}
-        if limites:
-            req["limites"] = limites
+        req = {"pe": pe, "id": "t%d" % self.n, "job": job, "args": args or {}, "paths": self.paths if paths is None else paths}
+        if limits:
+            req["limits"] = limits
         r = self.raw(json.dumps(req))
         assert r["id"] == req["id"], "broken correlation"
         return r
@@ -51,7 +51,7 @@ class Worker:
     def close(self):
         try:
             self.p.stderr.close()
-            self.p.stdin.write(b'{"pe":1,"trabajo":"salir"}\n'); self.p.stdin.flush()
+            self.p.stdin.write(b'{"pe":1,"job":"salir"}\n'); self.p.stdin.flush()
             self.p.wait(5)
         except Exception:  # noqa: BLE001
             self.p.kill()
@@ -82,22 +82,22 @@ class ContractTests(unittest.TestCase):
 
     def test_handshake(self):
         r = self.w.call("hola", {"pe_min": 1, "pe_max": 1})
-        self.assertEqual(r["codigo"], "OK")
-        self.assertEqual(r["resultado"]["pe"], 1)
-        self.assertIn("pdf_symbols", r["resultado"]["capacidades"])
+        self.assertEqual(r["code"], "OK")
+        self.assertEqual(r["result"]["pe"], 1)
+        self.assertIn("pdf_symbols", r["result"]["capacidades"])
 
     def test_version_mismatch(self):
-        self.assertEqual(self.w.call("hola", {"pe_min": 2, "pe_max": 3})["codigo"], "VERSION_INCOMPATIBLE")
-        self.assertEqual(self.w.call("pdf_info", {"ruta": fx("plan_vectorial.pdf")}, pe=2)["codigo"], "VERSION_INCOMPATIBLE")
+        self.assertEqual(self.w.call("hola", {"pe_min": 2, "pe_max": 3})["code"], "VERSION_INCOMPATIBLE")
+        self.assertEqual(self.w.call("pdf_info", {"ruta": fx("plan_vectorial.pdf")}, pe=2)["code"], "VERSION_INCOMPATIBLE")
 
     def test_unknown_job_and_bad_json_do_not_kill_worker(self):
-        self.assertEqual(self.w.call("format_disk")["codigo"], "NO_SOPORTADO")
-        self.assertEqual(self.w.raw("{not json")["codigo"], "INVALIDO")
-        self.assertEqual(self.w.call("hola")["codigo"], "OK")
+        self.assertEqual(self.w.call("format_disk")["code"], "NO_SOPORTADO")
+        self.assertEqual(self.w.raw("{not json")["code"], "INVALIDO")
+        self.assertEqual(self.w.call("hola")["code"], "OK")
 
     def test_telemetry(self):
         r = self.w.call("pdf_info", {"ruta": fx("plan_vectorial.pdf")})
-        self.assertGreater(r["telemetria"]["motor_ms"], 0)
+        self.assertGreater(r["telemetry"]["motor_ms"], 0)
 
 
 class PdfDeliveryTests(unittest.TestCase):
@@ -118,14 +118,14 @@ class PdfDeliveryTests(unittest.TestCase):
                 pdf.write(path)
             worker = Worker()
             try:
-                receipt = worker.call("pdf_info", {"ruta": current})["resultado"]["sha256"]
+                receipt = worker.call("pdf_info", {"ruta": current})["result"]["sha256"]
                 expected = [{"textos": ["E-101", "QC REV 02"], "papel_pt": [612, 792], "rgb_vectorial": [[255, 0, 255]]},
                             {"textos": ["E-102", "QC REV 02"]}]
                 args = {"ruta": current, "anterior": previous, "esperado": expected, "sha256_esperado": receipt}
                 valid = worker.call("pdf_verify", args)
-                self.assertEqual(valid["codigo"], "OK", valid)
-                self.assertEqual(valid["resultado"]["estado"], "verificado", valid)
-                stale = worker.call("pdf_verify", dict(args, ruta=previous))["resultado"]
+                self.assertEqual(valid["code"], "OK", valid)
+                self.assertEqual(valid["result"]["estado"], "verificado", valid)
+                stale = worker.call("pdf_verify", dict(args, ruta=previous))["result"]
                 self.assertEqual(stale["estado"], "con_diferencias")
                 self.assertEqual({d["tipo"] for d in stale["diferencias"]},
                                  {"recibo_distinto", "igual_al_anterior", "texto_ausente", "rgb_vectorial_no_encontrado"})
@@ -154,15 +154,15 @@ class FeederWorkbookTests(unittest.TestCase):
             worker = Worker()
             try:
                 args = {"ruta": path, "hoja": "Feeders"}
-                self.assertEqual(worker.call("xlsx_feeders", args)["codigo"], "INVALIDO")
+                self.assertEqual(worker.call("xlsx_feeders", args)["code"], "INVALIDO")
                 response = worker.call("xlsx_feeders", dict(args, fila_inicio=2, fila_final=2))
-                self.assertEqual(response["codigo"], "OK", response)
-                edge, = response["resultado"]["aristas"]
+                self.assertEqual(response["code"], "OK", response)
+                edge, = response["result"]["aristas"]
                 self.assertEqual(edge["id"], "XF-2")
                 self.assertIsNone(edge["destino"])
                 self.assertTrue(edge["abierto"])
                 self.assertEqual(edge["fuente"]["celdas"]["origen"], "B2")
-                self.assertEqual(worker.call("xlsx_feeders", dict(args, fila_inicio=3, fila_final=2))["codigo"], "INVALIDO")
+                self.assertEqual(worker.call("xlsx_feeders", dict(args, fila_inicio=3, fila_final=2))["code"], "INVALIDO")
             finally:
                 worker.close()
 
@@ -180,16 +180,16 @@ class PathAndNetworkGuards(unittest.TestCase):
         shutil.rmtree(cls.outside)
 
     def test_outside_path_denied(self):
-        self.assertEqual(self.w.call("pdf_info", {"ruta": os.path.join(self.outside, "outside.pdf")})["codigo"], "RUTA_DENEGADA")
+        self.assertEqual(self.w.call("pdf_info", {"ruta": os.path.join(self.outside, "outside.pdf")})["code"], "RUTA_DENEGADA")
 
     def test_verify_checks_authorization_for_previous_issue(self):
         reply = self.w.call("pdf_verify", {"ruta": fx("plan_vectorial.pdf"), "anterior": os.path.join(self.outside, "outside.pdf"),
                                            "esperado": [{"textos": ["E-101"]}]})
-        self.assertEqual(reply["codigo"], "RUTA_DENEGADA")
+        self.assertEqual(reply["code"], "RUTA_DENEGADA")
 
     def test_dotdot_denied(self):
         p = os.path.join(FX, "..", os.path.basename(self.outside), "outside.pdf")
-        self.assertEqual(self.w.call("pdf_info", {"ruta": p})["codigo"], "RUTA_DENEGADA")
+        self.assertEqual(self.w.call("pdf_info", {"ruta": p})["code"], "RUTA_DENEGADA")
 
     def test_symlink_escape_denied(self):
         with tempfile.TemporaryDirectory(dir=FX) as folder:
@@ -200,10 +200,10 @@ class PathAndNetworkGuards(unittest.TestCase):
                 if getattr(exc, "winerror", None) == 1314:
                     self.skipTest("Windows requires the symbolic link privilege")
                 raise
-            self.assertEqual(self.w.call("pdf_info", {"ruta": link})["codigo"], "RUTA_DENEGADA")
+            self.assertEqual(self.w.call("pdf_info", {"ruta": link})["code"], "RUTA_DENEGADA")
 
     def test_no_authorized_paths_means_nothing(self):
-        self.assertEqual(self.w.call("pdf_info", {"ruta": fx("plan_vectorial.pdf")}, rutas=[])["codigo"], "RUTA_DENEGADA")
+        self.assertEqual(self.w.call("pdf_info", {"ruta": fx("plan_vectorial.pdf")}, paths=[])["code"], "RUTA_DENEGADA")
 
     def test_prefix_sibling_denied(self):
         # /x/fx does not authorize /x/fx_other
@@ -211,7 +211,7 @@ class PathAndNetworkGuards(unittest.TestCase):
         os.makedirs(sib, exist_ok=True)
         shutil.copy(fx("plan_vectorial.pdf"), os.path.join(sib, "a.pdf"))
         try:
-            self.assertEqual(self.w.call("pdf_info", {"ruta": os.path.join(sib, "a.pdf")})["codigo"], "RUTA_DENEGADA")
+            self.assertEqual(self.w.call("pdf_info", {"ruta": os.path.join(sib, "a.pdf")})["code"], "RUTA_DENEGADA")
         finally:
             shutil.rmtree(sib)
 
@@ -233,8 +233,8 @@ class PdfTests(unittest.TestCase):
 
     def _symbols_match_truth(self, name):
         r = self.w.call("pdf_symbols", {"ruta": fx(name)})
-        self.assertEqual(r["codigo"], "OK", r.get("error"))
-        page = r["resultado"]["paginas"][0]
+        self.assertEqual(r["code"], "OK", r.get("error"))
+        page = r["result"]["paginas"][0]
         cands = page["candidatos"]
         t = truth(name)
         for lum in t["luminarias"]:
@@ -266,19 +266,19 @@ class PdfTests(unittest.TestCase):
             pdf.page(200, 100, "\n".join(c.ops))
             pdf.write(path)
             args = {"ruta": path, "trazabilidad": True}
-            result = self.w.call("pdf_symbols", args, rutas=[folder])["resultado"]
+            result = self.w.call("pdf_symbols", args, paths=[folder])["result"]
             inventory = result["paginas"][0]["inventario"]
             self.assertEqual([s["centro_pt"] for s in inventory], [[25, 33], [26, 33]])
             raw_alias = "%s:1:1:rectangulo|10.0|6.0|hueco:[25.0, 33.0]" % result["sha256"]
             alias = sha256(raw_alias.encode()).hexdigest()[:24]
             alias_decision = {"id_simbolo": alias, "codigo": "LT", "decision": "incluir", "evidencia": "review"}
-            applied = self.w.call("pdf_symbols", dict(args, decisiones=[alias_decision]), rutas=[folder])
-            self.assertEqual(applied["codigo"], "OK", applied.get("error"))
-            confirmed = applied["resultado"]["paginas"][0]["confirmados"]
+            applied = self.w.call("pdf_symbols", dict(args, decisiones=[alias_decision]), paths=[folder])
+            self.assertEqual(applied["code"], "OK", applied.get("error"))
+            confirmed = applied["result"]["paginas"][0]["confirmados"]
             self.assertEqual([entry["id_simbolo"] for entry in confirmed], [inventory[0]["id_simbolo"]])
             conflict = {"id_simbolo": inventory[0]["id_simbolo"], "decision": "excluir", "evidencia": "review"}
-            rejected = self.w.call("pdf_symbols", dict(args, decisiones=[alias_decision, conflict]), rutas=[folder])
-            self.assertEqual(rejected["codigo"], "INVALIDO")
+            rejected = self.w.call("pdf_symbols", dict(args, decisiones=[alias_decision, conflict]), paths=[folder])
+            self.assertEqual(rejected["code"], "INVALIDO")
 
     def test_symbols_page_rotate90_visible_space(self):
         p = self._symbols_match_truth("plan_rotado.pdf")
@@ -289,15 +289,15 @@ class PdfTests(unittest.TestCase):
         self._symbols_match_truth("plan_girado30.pdf")
 
     def test_confidence_only_high_when_legend_and_label_agree(self):
-        page = self.w.call("pdf_symbols", {"ruta": fx("plan_vectorial.pdf")})["resultado"]["paginas"][0]
+        page = self.w.call("pdf_symbols", {"ruta": fx("plan_vectorial.pdf")})["result"]["paginas"][0]
         self.assertTrue(all(c["confianza"] == 0.95 for c in page["candidatos"]))
         self.assertTrue(all(a["confianza"] < 0.7 for a in page["ambiguos"]))
 
     def test_grids_and_anchor_intersections_all_variants(self):
         for name in ("plan_vectorial.pdf", "plan_rotado.pdf", "plan_girado30.pdf"):
             r = self.w.call("pdf_grids", {"ruta": fx(name)})
-            self.assertEqual(r["codigo"], "OK", r.get("error"))
-            p = r["resultado"]["paginas"][0]
+            self.assertEqual(r["code"], "OK", r.get("error"))
+            p = r["result"]["paginas"][0]
             self.assertEqual(sorted(g["eje"] for g in p["ejes"]), ["1", "2", "3", "4", "5", "A", "B", "C", "D", "E", "F"])
             self.assertEqual(len(p["intersecciones"]), 30)
             got = {x["nombre"]: x["punto_pt"] for x in p["intersecciones"]}
@@ -324,71 +324,71 @@ class PdfTests(unittest.TestCase):
             pdf.page(480, 360, "\n".join(c.ops))
             pdf.write(path)
             args = {"ruta": path}
-            strict = self.w.call("pdf_grids", args, rutas=[folder])
-            self.assertEqual(strict["resultado"]["paginas"][0]["ejes"], [])
-            inferred = self.w.call("pdf_grids", {**args, "sin_globo": True}, rutas=[folder])
-            page = inferred["resultado"]["paginas"][0]
+            strict = self.w.call("pdf_grids", args, paths=[folder])
+            self.assertEqual(strict["result"]["paginas"][0]["ejes"], [])
+            inferred = self.w.call("pdf_grids", {**args, "sin_globo": True}, paths=[folder])
+            page = inferred["result"]["paginas"][0]
             self.assertEqual(page["metodo_ejes"], "rotulos_sin_globo")
             self.assertEqual(sorted(g["eje"] for g in page["ejes"]), ["1", "2", "A", "B"])
             self.assertEqual(sorted(a["nombre"] for a in page["intersecciones"]), ["A/1", "A/2", "B/1", "B/2"])
 
     def test_tables_schedule_and_grid_rejected(self):
-        r = self.w.call("pdf_tables", {"ruta": fx("plan_vectorial.pdf")})["resultado"]
+        r = self.w.call("pdf_tables", {"ruta": fx("plan_vectorial.pdf")})["result"]
         self.assertEqual(len(r["tablas"]), 1)
         t = r["tablas"][0]
         self.assertEqual(t["celdas"][0], ["TYPE", "DESCRIPTION", "WATTS", "MOUNTING"])
         self.assertIn(["S", "BS100LED-4-SA-HO", "70", "WALL"], t["celdas"])
         self.assertEqual(t["titulo"], "LUMINAIRE SCHEDULE")
         self.assertEqual(len(r["descartadas"]), 1)
-        r2 = self.w.call("pdf_tables", {"ruta": fx("plan_vectorial.pdf"), "incluir_rejillas": True})["resultado"]
+        r2 = self.w.call("pdf_tables", {"ruta": fx("plan_vectorial.pdf"), "incluir_rejillas": True})["result"]
         self.assertEqual(len(r2["tablas"]), 2)
 
     def test_tables_rotated_page(self):
-        r = self.w.call("pdf_tables", {"ruta": fx("plan_rotado.pdf")})["resultado"]
+        r = self.w.call("pdf_tables", {"ruta": fx("plan_rotado.pdf")})["result"]
         self.assertEqual(r["tablas"][0]["celdas"][0], ["TYPE", "DESCRIPTION", "WATTS", "MOUNTING"])
 
     def test_multipage_sizes_and_selection(self):
-        r = self.w.call("pdf_info", {"ruta": fx("multipagina.pdf")})["resultado"]
+        r = self.w.call("pdf_info", {"ruta": fx("multipagina.pdf")})["result"]
         self.assertEqual(r["paginas"], 3)
         sizes = [(p["ancho_in"], p["alto_in"]) for p in r["detalle_paginas"]]
         self.assertEqual(sizes[0], (8.5, 11.0))
         self.assertEqual(len(set(sizes)), 3)
         e = self.w.call("pdf_extract", {"ruta": fx("multipagina.pdf"), "paginas": [2]})
-        self.assertEqual([p["numero"] for p in e["resultado"]["paginas"]], [2])
-        self.assertEqual(self.w.call("pdf_extract", {"ruta": fx("multipagina.pdf"), "paginas": [4]})["codigo"], "INVALIDO")
+        self.assertEqual([p["numero"] for p in e["result"]["paginas"]], [2])
+        self.assertEqual(self.w.call("pdf_extract", {"ruta": fx("multipagina.pdf"), "paginas": [4]})["code"], "INVALIDO")
 
     def test_userunit(self):
-        p = self.w.call("pdf_info", {"ruta": fx("userunit2.pdf")})["resultado"]["detalle_paginas"][0]
+        p = self.w.call("pdf_info", {"ruta": fx("userunit2.pdf")})["result"]["detalle_paginas"][0]
         self.assertEqual((p["unidad_usuario"], p["ancho_in"], p["alto_in"]), (2.0, 8.5, 11.0))
 
     def test_extract_coordinates_and_truncation(self):
-        e = self.w.call("pdf_extract", {"ruta": fx("plan_vectorial.pdf")})["resultado"]
+        e = self.w.call("pdf_extract", {"ruta": fx("plan_vectorial.pdf")})["result"]
         pg = e["paginas"][0]
         self.assertFalse(e["truncado"])
         self.assertTrue(any(w["texto"] == "E-1.3.09" for w in pg["palabras"]))
         self.assertGreater(len(pg["lineas"]) + len(pg["rectangulos"]) + len(pg["curvas"]), 100)
         for w in pg["palabras"]:
             self.assertTrue(0 <= w["centro_norm"][0] <= 1 and 0 <= w["centro_norm"][1] <= 1)
-        t = self.w.call("pdf_extract", {"ruta": fx("multipagina.pdf"), "max_elementos": 5})["resultado"]
+        t = self.w.call("pdf_extract", {"ruta": fx("multipagina.pdf"), "max_elementos": 5})["result"]
         self.assertTrue(t["truncado"])
 
     def test_extract_rotated_is_visible_space(self):
-        e = self.w.call("pdf_extract", {"ruta": fx("plan_rotado.pdf"), "incluir": ["texto"]})["resultado"]["paginas"][0]
+        e = self.w.call("pdf_extract", {"ruta": fx("plan_rotado.pdf"), "incluir": ["texto"]})["result"]["paginas"][0]
         for w in e["palabras"]:
             self.assertTrue(0 <= w["bbox"][0] <= 1728.01 and 0 <= w["bbox"][1] <= 2592.01, w)
 
     def test_scanned_has_no_content(self):
-        self.assertEqual(self.w.call("pdf_extract", {"ruta": fx("escaneado.pdf")})["codigo"], "SIN_CONTENIDO")
-        i = self.w.call("pdf_info", {"ruta": fx("escaneado.pdf")})["resultado"]
+        self.assertEqual(self.w.call("pdf_extract", {"ruta": fx("escaneado.pdf")})["code"], "SIN_CONTENIDO")
+        i = self.w.call("pdf_info", {"ruta": fx("escaneado.pdf")})["result"]
         self.assertTrue(i["detalle_paginas"][0]["imagen"])
         self.assertIsNotNone(i["aviso"])
 
     def test_corrupt(self):
-        self.assertEqual(self.w.call("pdf_info", {"ruta": fx("danado.pdf")})["codigo"], "INVALIDO")
-        self.assertEqual(self.w.call("pdf_symbols", {"ruta": fx("danado.pdf")})["codigo"], "INVALIDO")
+        self.assertEqual(self.w.call("pdf_info", {"ruta": fx("danado.pdf")})["code"], "INVALIDO")
+        self.assertEqual(self.w.call("pdf_symbols", {"ruta": fx("danado.pdf")})["code"], "INVALIDO")
 
     def test_docx_given_to_pdf_job(self):
-        self.assertEqual(self.w.call("pdf_info", {"ruta": fx("especificacion.docx")})["codigo"], "INVALIDO")
+        self.assertEqual(self.w.call("pdf_info", {"ruta": fx("especificacion.docx")})["code"], "INVALIDO")
 
 
 class DocxTests(unittest.TestCase):
@@ -402,8 +402,8 @@ class DocxTests(unittest.TestCase):
 
     def test_docx_structure_and_injection_is_data(self):
         r = self.w.call("docx_extract", {"ruta": fx("especificacion.docx")})
-        self.assertEqual(r["codigo"], "OK")
-        res = r["resultado"]
+        self.assertEqual(r["code"], "OK")
+        res = r["result"]
         self.assertEqual(res["bloques"][0]["estilo"], "Heading1")
         self.assertGreaterEqual(res["tablas"], 1)
         tab = [b for b in res["bloques"] if b["tipo"] == "tabla"][0]
@@ -411,7 +411,7 @@ class DocxTests(unittest.TestCase):
         self.assertEqual(len(res["sospechosos"]), 1)
 
     def test_docx_invalid(self):
-        self.assertEqual(self.w.call("docx_extract", {"ruta": fx("plan_vectorial.pdf")})["codigo"], "INVALIDO")
+        self.assertEqual(self.w.call("docx_extract", {"ruta": fx("plan_vectorial.pdf")})["code"], "INVALIDO")
 
     def test_docx_xxe_rejected(self):
         import zipfile
@@ -420,7 +420,7 @@ class DocxTests(unittest.TestCase):
             z.writestr("word/document.xml", '<?xml version="1.0"?><!DOCTYPE d [<!ENTITY x SYSTEM "file:///etc/passwd">]>'
                        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>&x;</w:t></w:r></w:p></w:body></w:document>')
         try:
-            self.assertEqual(self.w.call("docx_extract", {"ruta": p})["codigo"], "INVALIDO")
+            self.assertEqual(self.w.call("docx_extract", {"ruta": p})["code"], "INVALIDO")
         finally:
             os.unlink(p)
 
@@ -432,8 +432,8 @@ class LargeAndLimits(unittest.TestCase):
             t0 = time.perf_counter()
             r = w.call("pdf_symbols", {"ruta": fx("grande_40p.pdf")})
             dt = time.perf_counter() - t0
-            self.assertEqual(r["codigo"], "OK")
-            pages = r["resultado"]["paginas"]
+            self.assertEqual(r["code"], "OK")
+            pages = r["result"]["paginas"]
             self.assertEqual(len(pages), 40)
             bubble = "circulo|14.0|14.0|hueco"  # grid bubbles: they are not fixtures
             n = sum(1 for p in pages for c in p["candidatos"] + p["ambiguos"] if c["firma"] != bubble)
@@ -441,7 +441,7 @@ class LargeAndLimits(unittest.TestCase):
             self.assertEqual(n, 20000, "every fixture ends up in candidatos, ambiguos or sin_leyenda; none is lost")
             self.assertGreater(sum(len(p["candidatos"]) for p in pages), 19800)
             self.assertLess(dt, 60.0)
-            sys.stderr.write("\n[grande_40p] pdf_symbols %.1f s, peak %s kB\n" % (dt, r["telemetria"].get("memoria_pico_kb")))
+            sys.stderr.write("\n[grande_40p] pdf_symbols %.1f s, peak %s kB\n" % (dt, r["telemetry"].get("memoria_pico_kb")))
         finally:
             w.close()
 
@@ -449,20 +449,20 @@ class LargeAndLimits(unittest.TestCase):
     def test_memory_limit_reported(self):
         w = Worker()
         try:
-            r = w.call("pdf_symbols", {"ruta": fx("grande_40p.pdf")}, limites={"max_mem_mb": 120})
-            self.assertIn(r["codigo"], ("LIMITE_MEMORIA", "OK"))
+            r = w.call("pdf_symbols", {"ruta": fx("grande_40p.pdf")}, limits={"max_mem_mb": 120})
+            self.assertIn(r["code"], ("LIMITE_MEMORIA", "OK"))
         finally:
             w.p.kill(); w.close()
 
     def test_kill_mid_job_then_restart(self):
         w = Worker()
-        req = {"pe": 1, "id": "x", "trabajo": "pdf_symbols", "args": {"ruta": fx("grande_40p.pdf")}, "rutas": [FX]}
+        req = {"pe": 1, "id": "x", "job": "pdf_symbols", "args": {"ruta": fx("grande_40p.pdf")}, "paths": [FX]}
         w.p.stdin.write((json.dumps(req) + "\n").encode()); w.p.stdin.flush()
         time.sleep(0.5)
         w.p.kill(); w.close()  # cancellation from C# means killing the process; no shared state remains
         w2 = Worker()
         try:
-            self.assertEqual(w2.call("hola")["codigo"], "OK")
+            self.assertEqual(w2.call("hola")["code"], "OK")
         finally:
             w2.close()
 

@@ -13,9 +13,9 @@ namespace Bimbridge.Engine
     {
         public static readonly string[] Topics = { "flujo", "consulta", "catalogo", "geo", "escritura", "exec", "familias", "documento", "recuperacion", "tareas", "recetas", "captura", "lote" };
 
-        public static string Get(string tema, string op = null)
+        public static string Get(string topic, string op = null)
         {
-            switch ((tema ?? "flujo").Trim().ToLowerInvariant())
+            switch ((topic ?? "flujo").Trim().ToLowerInvariant())
             {
                 case "flujo": return Flow;
                 case "consulta": case "query": return Query;
@@ -93,24 +93,24 @@ namespace Bimbridge.Engine
             "Follow up: revit \"tarea esperar <id> desde=<rev> max=60\" (waits for changes without polling) | tarea estado|resumen|unidades <id> [estado=conflicto] | tarea lista.\n" +
             "Another client (Codex↔Claude) picks it up with the id: tarea resumen <id> gives where it stopped, what is left and the decisions; no code needs to be resent.\n" +
             "Statuses: en_cola, ejecutando, esperando_contexto (pause/Hold/dialog/closed document: resumes on its own), aplicada, aplicada_con_diferencias, parcial, interrumpida, cancelada.\n" +
-            "interrumpida/parcial: act \"tarea reanudar <id>\" verifies what is uncertain (UniqueId of what was created or the recipe's Verificar; after a reopen, anything after the last save of that opening) " +
+            "interrumpida/parcial: act \"tarea reanudar <id>\" verifies what is uncertain (UniqueId of what was created or the recipe's Verify; after a reopen, anything after the last save of that opening) " +
             "and continues without duplicating. What cannot be proven stays desconocida: act \"tarea reconciliar <id> decision=aplicada|no_aplicada claves=…\". " +
             "Cancel: act \"tarea cancelar <id>\" (between units; what is committed stays). While it runs, the document is taken: other writes → documento_ocupado (exec/commit with tarea=<id> do go through).";
 
         private const string Recipes =
-            "RECIPES: C# class that inherits from Receta (by file in %LOCALAPPDATA%\\Bimbridge\\recetas\\<name>.cs, in the add-in's recetas\\, or as code). tarea recetas lists them.\n" +
-            "public class X : Receta { public override string Version => \"1\"; public override IEnumerable<string> Entradas => new[]{\"nivel\"};\n" +
-            "  public override IEnumerable<Unidad> Unidades(ScriptContext ctx) { foreach (var e in …) yield return new Unidad(\"luz:\" + e.UniqueId, datos, new[]{ ctx.Long(e.Id) }); yield return Unidad.Guardar(); }\n" +
-            "  public override object Ejecutar(ScriptContext ctx, Unidad u) { … return resumen; }   // inside its transaction; ctx.Omitir(\"reason\") skips it\n" +
-            "  public override Verificacion Verificar(ScriptContext ctx, Unidad u) => …;   // after a crash: was it applied?\n" +
-            "  public override object Postcondicion(ScriptContext ctx) => new { desviaciones = … }; }   // final read-only QC (rolled back)\n" +
+            "RECIPES: C# class that inherits from Recipe (by file in %LOCALAPPDATA%\\Bimbridge\\recetas\\<name>.cs, in the add-in's recetas\\, or as code). tarea recetas lists them.\n" +
+            "public class X : Recipe { public override string Version => \"1\"; public override IEnumerable<string> Inputs => new[]{\"nivel\"};\n" +
+            "  public override IEnumerable<Unit> Units(ScriptContext ctx) { foreach (var e in …) yield return new Unit(\"luz:\" + e.UniqueId, data, new[]{ ctx.Long(e.Id) }); yield return Unit.Save(); }\n" +
+            "  public override object Run(ScriptContext ctx, Unit u) { … return summary; }   // inside its transaction; ctx.Skip(\"reason\") skips it\n" +
+            "  public override Verification Verify(ScriptContext ctx, Unit u) => …;   // after a crash: was it applied?\n" +
+            "  public override object Postcondition(ScriptContext ctx) => new { desviaciones = … }; }   // final read-only QC (rolled back)\n" +
             "STABLE keys (UniqueId, not ElementId). Unit ids = what it reads/changes: if someone else changes them first, the unit becomes a conflict (nothing is overwritten). " +
-            "ctx.Decision(text), ctx.Excepcion(reason, detail), ctx.Artefacto(name, content) are kept in the task memory. Transaccion => PoliticaTx.Ninguna if the recipe opens its own (EditFamily/LoadFamily). " +
+            "ctx.Decision(text), ctx.Exception(reason, detail), ctx.Artifact(name, content) are kept in the task memory. Transaction => TxPolicy.None if the recipe opens its own (EditFamily/LoadFamily). " +
             "The task keeps an exact copy of the recipe (with its SHA-256): changing the file does not alter tasks already started.\n" +
             "BUILT-IN: etiquetar_luces (vista, tipo_etiqueta, guardar, pdf_hojas), parametro_por_lote (ids|conjunto, parametro, valor), qc_manifiesto (JSON manifest or path; CSV of deviations), " +
             "montaje_soportes (al_ras/empotrado/separado/sin_referencia, includes links), exportar_laminas (conjunto|hojas, antes=guardar|sync).\n" +
-            "Bim.* HELPERS (in scripts and recipes, mm): Grupos.Inspeccionar/Firma/Componer/CambiarTipo/VerificarComposicion; Montaje.Cuerpo/Soporte/Vista3D/Transformacion; " +
-            "Vistas.Rango/AplicarRango/CompararPlantilla/PorQueNoSeVe/FiltroPorCategoria; Manifiesto.Juntar/Qc. Those that write run inside the engine transaction.";
+            "Bim.* HELPERS (in scripts and recipes, mm): Groups.Inspect/Signature/Compose/ChangeType/VerifyComposition; Mounting.Body/Support/View3D/Transformation; " +
+            "Views.Range/ApplyRange/CompareTemplate/WhyNotVisible/FilterByCategory; Manifest.Collect/Qc. Those that write run inside the engine transaction.";
 
         private const string Query =
             "QUERY (query): cat (LightingFixtures, ElectricalFixtures, LightingDevices…), lvl, type (contains), ws, ids/$set, view (visible in that view).\n" +
@@ -152,7 +152,7 @@ namespace Bimbridge.Engine
 
         public static string TopicList => string.Join(", ", Topics);
 
-        public static int Size(string tema) => Encoding.UTF8.GetByteCount(Get(tema));
+        public static int Size(string topic) => Encoding.UTF8.GetByteCount(Get(topic));
 
         public static string All() => string.Join("\n\n", Topics.Select(t => Get(t)));
     }

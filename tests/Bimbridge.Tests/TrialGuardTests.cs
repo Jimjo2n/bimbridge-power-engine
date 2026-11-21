@@ -68,7 +68,7 @@ namespace Bimbridge.Tests
         public void Refuses_WhenModified_AllowsWhenClean()
         {
             Assert.StartsWith(TrialGuard.Code, TrialGuard.Refuse(true, "commit modo=ensayo"));
-            Assert.Contains("No se modificó nada", TrialGuard.Refuse(true, "exec modo=ensayo"));
+            Assert.Contains("Nothing was modified", TrialGuard.Refuse(true, "exec modo=ensayo"));
             Assert.Null(TrialGuard.Refuse(false, "commit modo=ensayo"));
             Assert.False(TrialGuard.MayOpenTemporaryGroup(true));
             Assert.True(TrialGuard.MayOpenTemporaryGroup(false));
@@ -106,7 +106,7 @@ namespace Bimbridge.Tests
         public void TemporaryGroups_CaptureAndTaskQc_AreSkippedWhenModified()
         {
             var c = Src("Capture.cs");
-            Assert.True(c.IndexOf("MayOpenTemporaryGroup(doc.IsModified)", System.StringComparison.Ordinal) < c.IndexOf("new TransactionGroup(doc, DocumentTracker.TemporaryPrefix + \" captura\")", System.StringComparison.Ordinal));
+            Assert.True(c.IndexOf("MayOpenTemporaryGroup(doc.IsModified)", System.StringComparison.Ordinal) < c.IndexOf("new TransactionGroup(doc, DocumentTracker.TemporaryPrefix + \" capture\")", System.StringComparison.Ordinal));
             var t = Src("RequestHandler.Tasks.cs");
             var gi = t.IndexOf("MayOpenTemporaryGroup(doc.IsModified)", System.StringComparison.Ordinal);
             Assert.True(gi > 0 && gi < t.IndexOf("\" qc tarea\")", System.StringComparison.Ordinal));

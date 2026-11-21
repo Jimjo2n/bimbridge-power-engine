@@ -31,32 +31,32 @@ namespace Bimbridge.Addin.Revit
         private async Task<Response> ModelHealthCheck(Request request, CancellationToken ct)
         {
             var probe = new ModelHealthProbe(Arg.GetStringList(request.Args, "cats"), Arg.GetStringList(request.Args, "requeridos"), out var err);
-            if (err != null) return Response.Fail(request.Id, Status.Invalido, "model_health: " + err);
+            if (err != null) return Response.Fail(request.Id, Status.Invalid, "model_health: " + err);
             var sw = Stopwatch.StartNew();
             var result = await RunMain((app, watch, budget) => probe.Step(app, watch, budget, _tracker),
                 highPriority: false, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!result.Ok) return FromWork(request.Id, result);
-            if (probe.Error != null) return Response.Fail(request.Id, Status.Invalido, probe.Error);
-            var datos = Engine.Qa.ModelHealth.Report(probe.Warnings, probe.Elements, probe.Connectors, probe.Sheets, probe.Views, Arg.GetStringList(request.Args, "requeridos"));
+            if (probe.Error != null) return Response.Fail(request.Id, Status.Invalid, probe.Error);
+            var data = Engine.Qa.ModelHealth.Report(probe.Warnings, probe.Elements, probe.Connectors, probe.Sheets, probe.Views, Arg.GetStringList(request.Args, "requeridos"));
             var trunc = probe.Truncation();
-            if (trunc.Count > 0) datos["truncado"] = trunc;   // very large model: report what was left unchecked
-            datos["ms"] = sw.ElapsedMilliseconds;
+            if (trunc.Count > 0) data["truncado"] = trunc;   // very large model: report what was left unchecked
+            data["ms"] = sw.ElapsedMilliseconds;
             // 0.9.1: benchmark metrics (observed: Revit thread, elements read, type and level cache hits).
             if (Arg.GetBool(request.Args, "metricas") == true)
-            datos["metricas"] = WorkflowMetrics.FromMainThread(sw.ElapsedMilliseconds, result.WaitMs, result.BusyMs, result.Slices, result.MaxSliceMs)
+            data["metricas"] = WorkflowMetrics.FromMainThread(sw.ElapsedMilliseconds, result.WaitMs, result.BusyMs, result.Slices, result.MaxSliceMs)
                 .Observe("elements_read", probe.Elements.Count).Observe("elements_written", 0).Observe("transactions", 0)
                 .Observe("cache_hits", probe.CacheHits).Observe("cache_misses", probe.CacheMisses).ToJson();
-            return new Response { Id = request.Id, Rev = probe.Rev, Datos = datos };
+            return new Response { Id = request.Id, Rev = probe.Rev, Data = data };
         }
 
         /// <summary>0.9.1 (Block I): fair sharing of long operations between agents (save, sync, export).</summary>
         private readonly OperationScheduler _scheduler = new OperationScheduler();
 
         /// <summary>Status panel (#5): the PERSON sees it in their Revit, so it includes every session. Memory only; never the Revit API.</summary>
-        public (List<Job> Running, List<OperationHistory.Record> Recent, Dictionary<string, object> Scheduler) OperationsForPanel(string estado, string texto)
+        public (List<Job> Running, List<OperationHistory.Record> Recent, Dictionary<string, object> Scheduler) OperationsForPanel(string status, string text)
         {
             var recent = _history == null ? new List<OperationHistory.Record>()
-                : _history.Query(new OperationHistory.Scope { SeeAll = true }, estado, null, null, null, texto, 1, 25).Page;
+                : _history.Query(new OperationHistory.Scope { SeeAll = true }, status, null, null, null, text, 1, 25).Page;
             return (_jobs.AllRunning(), recent, _scheduler.Stats());
         }
 
@@ -85,7 +85,7 @@ namespace Bimbridge.Addin.Revit
             if (ds != null)
             {
                 if (!DateTime.TryParse(ds, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var d))
-                    return Response.Fail(request.Id, Status.Invalido, "historial desde: ISO 8601 date");
+                    return Response.Fail(request.Id, Status.Invalid, "historial desde: ISO 8601 date");
                 since = d;
             }
             // AUD-13: by default only your own (same session or same named agent). todos=si requires the user's explicit authorization
@@ -93,21 +93,21 @@ namespace Bimbridge.Addin.Revit
             var agentId = Correlation.AgentIdOf(session.Principal, session.AgentName);
             var wantAll = Arg.GetBool(a, "todos") ?? false;
             var scope = OperationHistory.ScopeFor(session.Id, agentId, wantAll, _config.SharedHistory, out var refusal);
-            if (scope == null) return Response.Fail(request.Id, Status.Rechazado, "historial todos=si: " + refusal);
+            if (scope == null) return Response.Fail(request.Id, Status.Rejected, "historial todos=si: " + refusal);
             var (page, total) = _history.Query(scope, Arg.GetString(a, "estado"), Arg.GetString(a, "tipo"), Arg.GetString(a, "sesion"), since, Arg.GetString(a, "q"),
                 (int)(Arg.GetLong(a, "pagina") ?? 1), (int)(Arg.GetLong(a, "por_pagina") ?? 20));
-            var datos = new Dictionary<string, object>
+            var data = new Dictionary<string, object>
             {
                 ["total"] = (long)total,
                 ["ambito"] = wantAll ? "all sessions (authorized by the user)" : "own (this session and this agent)",
                 ["cols"] = new List<object> { "job_id", "tipo", "estado", "ms", "reintento", "fin", "error" },
-                ["rows"] = page.Select(r => (object)new List<object> { r.JobId, r.Kind, r.Estado, r.Ms, r.Retry, r.FinishedUtc.ToString("o", CultureInfo.InvariantCulture), r.Error }).ToList(),
+                ["rows"] = page.Select(r => (object)new List<object> { r.JobId, r.Kind, r.State, r.Ms, r.Retry, r.FinishedUtc.ToString("o", CultureInfo.InvariantCulture), r.Error }).ToList(),
                 ["en_curso"] = _jobs.ForOwner(session.Id, agentId).Where(j => !j.IsFinal).Select(j => (object)j.Progress()).ToList(),
                 ["reintento_significa"] = "reintentable = nothing was applied; reconciliar_antes = uncertain or partial result: check the model before repeating; " +
                                           "revisar_diferencias = applied but does not match the request: review or reconcile, do not repeat",
             };
-            if (_history.LoadErrors.Count > 0) datos["avisos_historial"] = _history.LoadErrors.Cast<object>().ToList();
-            return new Response { Id = request.Id, Datos = datos };
+            if (_history.LoadErrors.Count > 0) data["avisos_historial"] = _history.LoadErrors.Cast<object>().ToList();
+            return new Response { Id = request.Id, Data = data };
         }
 
         private static Response CoverageCheck(Request request)
@@ -118,8 +118,8 @@ namespace Bimbridge.Addin.Revit
             if (id != null)
             {
                 var c = idx.Get(id);
-                return c == null ? Response.Fail(request.Id, Status.Invalido, "capability does not exist: " + id)
-                                 : new Response { Id = request.Id, Datos = Engine.Coverage.CapabilityIndex.Contract(c) };
+                return c == null ? Response.Fail(request.Id, Status.Invalid, "capability does not exist: " + id)
+                                 : new Response { Id = request.Id, Data = Engine.Coverage.CapabilityIndex.Contract(c) };
             }
             var q = new Engine.Coverage.CapabilityQuery
             {
@@ -132,7 +132,7 @@ namespace Bimbridge.Addin.Revit
             return new Response
             {
                 Id = request.Id,
-                Datos = new Dictionary<string, object>
+                Data = new Dictionary<string, object>
                 {
                     ["total"] = (long)total, ["pagina"] = (long)Math.Max(1, q.Page), ["catalogo"] = idx.Version,
                     ["cols"] = Engine.Coverage.CapabilityIndex.RowColumns, ["rows"] = page.Select(c => (object)Engine.Coverage.CapabilityIndex.Row(c)).ToList(),
@@ -144,26 +144,26 @@ namespace Bimbridge.Addin.Revit
         private async Task<Response> CopyMonitorCheck(Session session, Request request, CancellationToken ct)
         {
             var link = Arg.GetString(request.Args, "vinculo");
-            if (string.IsNullOrWhiteSpace(link)) return Response.Fail(request.Id, Status.Invalido, "copy_monitor: missing vinculo (name or id of the link instance)");
+            if (string.IsNullOrWhiteSpace(link)) return Response.Fail(request.Id, Status.Invalid, "copy_monitor: missing vinculo (name or id of the link instance)");
             var phase = (Arg.GetString(request.Args, "fase") ?? "preflight").Trim().ToLowerInvariant();
-            if (phase != "preflight" && phase != "verificar") return Response.Fail(request.Id, Status.Invalido, "copy_monitor fase: preflight or verificar");
+            if (phase != "preflight" && phase != "verificar") return Response.Fail(request.Id, Status.Invalid, "copy_monitor fase: preflight or verificar");
             var maps = new List<TypeMapping>();
             if (request.Args.TryGetValue("mapeo", out var m) && m != null)
             {
-                if (!(m is Dictionary<string, object> md)) return Response.Fail(request.Id, Status.Invalido, "copy_monitor mapeo: {\"Family: Source type\": \"Family: Target type\"}");
+                if (!(m is Dictionary<string, object> md)) return Response.Fail(request.Id, Status.Invalid, "copy_monitor mapeo: {\"Family: Source type\": \"Family: Target type\"}");
                 maps.AddRange(md.Select(kv => new TypeMapping { Source = kv.Key.Trim(), Target = Convert.ToString(kv.Value, CultureInfo.InvariantCulture)?.Trim() }));
             }
             maps.AddRange(Arg.GetStringList(request.Args, "excluir").Select(x => new TypeMapping { Source = x.Trim(), Excluded = true }));
             var duplicate = maps.GroupBy(x => x.Source, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
             if (duplicate != null)
-                return Response.Fail(request.Id, Status.Invalido, "copy_monitor: source type «" + duplicate.Key + "» appears more than once in mapeo/excluir");
+                return Response.Fail(request.Id, Status.Invalid, "copy_monitor: source type «" + duplicate.Key + "» appears more than once in mapeo/excluir");
 
             var probe = new CopyMonitorProbe(link, Arg.GetString(request.Args, "categoria"));
             var sw = Stopwatch.StartNew();
             var result = await RunMain((app, watch, budget) => probe.Step(app, watch, budget, _tracker),
                 highPriority: true, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!result.Ok) return FromWork(request.Id, result);
-            if (probe.Error != null) return Response.Fail(request.Id, Status.Invalido, probe.Error);
+            if (probe.Error != null) return Response.Fail(request.Id, Status.Invalid, probe.Error);
 
             var setName = "cm_antes_" + probe.LinkInstanceId.ToString(CultureInfo.InvariantCulture);
 
@@ -179,7 +179,7 @@ namespace Bimbridge.Addin.Revit
             Evidence Ev(string kind, ProofLevel lvl, string source, string detail) => new Evidence { Kind = kind, Level = lvl, Source = source, Detail = detail, AtUtc = DateTime.UtcNow };
             WorkflowReceipt receipt;
             try { receipt = phase == "preflight" ? store.Begin(NativeCapabilities.CopyMonitorFixtures, attemptKey, corr, out _) : store.Load(attemptKey); }
-            catch (Exception ex) when (ex is InvalidOperationException || ex is TimeoutException) { return Response.Fail(request.Id, Status.Conflicto, "copy_monitor: " + ex.Message); }
+            catch (Exception ex) when (ex is InvalidOperationException || ex is TimeoutException) { return Response.Fail(request.Id, Status.Conflict, "copy_monitor: " + ex.Message); }
             // AUD-20: what this attempt expects, from what is seen NOW. Frozen in preflight; compared against the frozen copy in verificar.
             var mappingGiven = request.Args.ContainsKey("mapeo") || request.Args.ContainsKey("excluir");
             var now = new CopyMonitorExpectations
@@ -187,7 +187,7 @@ namespace Bimbridge.Addin.Revit
                 HostIdentity = probe.DocumentIdentity, LinkIdentity = probe.LinkIdentity, LinkRevision = probe.LinkRevision, Category = probe.Category,
                 Transform = probe.Transform, Mappings = maps, Source = probe.Source,
             };
-            var datos = new Dictionary<string, object>
+            var data = new Dictionary<string, object>
             {
                 ["vinculo"] = probe.LinkName, ["vinculo_id"] = probe.LinkInstanceId,
                 ["transformacion"] = new Dictionary<string, object>
@@ -208,46 +208,46 @@ namespace Bimbridge.Addin.Revit
                 CopyMonitorFlow.Result frozenP;
                 try { frozenP = CopyMonitorFlow.Freeze(store, attemptKey, now, probe.Host.Select(h => h.Id)); }
                 catch (Exception ex) when (ex is InvalidOperationException || ex is TimeoutException || ex is System.IO.InvalidDataException || ex is System.IO.IOException)
-                { return Response.Fail(request.Id, Status.Conflicto, "copy_monitor: " + ex.Message); }
+                { return Response.Fail(request.Id, Status.Conflict, "copy_monitor: " + ex.Message); }
                 var baseline = frozenP.Baseline;
                 var baselineCreated = frozenP.Created;
-                datos["expectativas"] = new Dictionary<string, object> { ["huella"] = frozenP.Frozen.Fingerprint, ["huella_origen"] = frozenP.Frozen.SourceFingerprint, ["congeladas"] = baseline.CreatedUtc.ToString("o", CultureInfo.InvariantCulture) };
-                if (frozenP.Differences.Count > 0) datos["cambios_desde_el_preflight"] = frozenP.Differences.Cast<object>().ToList();
+                data["expectativas"] = new Dictionary<string, object> { ["huella"] = frozenP.Frozen.Fingerprint, ["huella_origen"] = frozenP.Frozen.SourceFingerprint, ["congeladas"] = baseline.CreatedUtc.ToString("o", CultureInfo.InvariantCulture) };
+                if (frozenP.Differences.Count > 0) data["cambios_desde_el_preflight"] = frozenP.Differences.Cast<object>().ToList();
                 if (frozenP.Conflict)
                     return new Response
                     {
-                        Id = request.Id, Estado = Status.Conflicto, Rev = probe.Rev, Datos = datos,
-                        Aviso = "This attempt already froze other expectations and conditions are now different (" + string.Join("; ", frozenP.Differences) + "). They are not replaced: " +
+                        Id = request.Id, State = Status.Conflict, Rev = probe.Rev, Data = data,
+                        Warning = "This attempt already froze other expectations and conditions are now different (" + string.Join("; ", frozenP.Differences) + "). They are not replaced: " +
                                 "if you want the original target, restore the conditions; if the target changed, start a new attempt with another clave=.",
                     };
                 var baseSet = new HashSet<long>(baseline.Ids);
-                var nuevos = probe.Host.Count(h => !baseSet.Contains(h.Id));
-                datos["inventario_inicial"] = new Dictionary<string, object>
+                var newCount = probe.Host.Count(h => !baseSet.Contains(h.Id));
+                data["inventario_inicial"] = new Dictionary<string, object>
                 {
                     ["elementos"] = (long)baseline.Ids.Count, ["creado"] = baseline.CreatedUtc.ToString("o", CultureInfo.InvariantCulture), ["sha256"] = baseline.Sha256,
-                    ["conservado"] = !baselineCreated, ["elementos_nuevos_desde_entonces"] = (long)nuevos,
+                    ["conservado"] = !baselineCreated, ["elementos_nuevos_desde_entonces"] = (long)newCount,
                 };
-                if (!baselineCreated) datos["aviso_inventario"] = "this attempt's initial inventory is kept (not overwritten); to start from scratch use another clave=";
+                if (!baselineCreated) data["aviso_inventario"] = "this attempt's initial inventory is kept (not overwritten); to start from scratch use another clave=";
                 // Session convenience (not the evidence): the previous ids as a named set.
                 session.Sets.Save(setName, baseline.Ids, TargetId, TargetTitle);
-                datos["conjunto_antes"] = "$" + setName;
+                data["conjunto_antes"] = "$" + setName;
                 var year = int.TryParse(probe.RevitVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out var y) ? y : 0;
                 if (year >= 2022 && year <= 2027)
                 {
                     // No authorized UI executor (this add-in has none): the truthful path is the manual handoff.
                     var cap = NativeCapabilities.Describe(NativeCapabilities.CopyMonitorFixtures, year, new ClientEnvironment());
-                    datos["capacidad"] = cap.ToJson();
+                    data["capacidad"] = cap.ToJson();
                 }
-                datos["pasos_manuales"] = NativeCapabilities.CopyMonitorManualSteps(probe.LinkName,
+                data["pasos_manuales"] = NativeCapabilities.CopyMonitorManualSteps(probe.LinkName,
                     maps.Where(x => !x.Excluded).Select(x => x.Source + " → " + x.Target).Concat(maps.Where(x => x.Excluded).Select(x => x.Source + " → do not copy")), false).Cast<object>().ToList();
-                datos["siguiente"] = "after Finish in Revit: check name=copy_monitor vinculo=" + probe.LinkInstanceId + " fase=verificar (same mapeo/excluir and clave)";
+                data["siguiente"] = "after Finish in Revit: check name=copy_monitor vinculo=" + probe.LinkInstanceId + " fase=verificar (same mapeo/excluir and clave)";
                 if (receipt.State == WorkflowState.preflight)
                 {
                     receipt = store.Record(attemptKey, Ev(EvidenceKind.PreflightPassed, ProofLevel.observed, "addin", probe.Source.Count + " source devices"));
                     // This add-in has no UI executor: the truthful path is the manual handoff (never re-PostCommand).
                     receipt = store.Record(attemptKey, Ev(EvidenceKind.NoUiExecutor, ProofLevel.observed, "addin", "no authorized UI executor"));
                 }
-                else datos["aviso_intento"] = "the attempt already exists in " + receipt.State + ": not repeated; continue with fase=verificar or use another clave";
+                else data["aviso_intento"] = "the attempt already exists in " + receipt.State + ": not repeated; continue with fase=verificar or use another clave";
             }
             else
             {
@@ -255,31 +255,31 @@ namespace Bimbridge.Addin.Revit
                 ReceiptStore.Baseline baseline;
                 try { baseline = store.LoadBaseline(attemptKey); }
                 catch (Exception ex) when (ex is System.IO.InvalidDataException || ex is TimeoutException || ex is System.IO.IOException)
-                { return Response.Fail(request.Id, Status.Conflicto, "copy_monitor verificar: " + ex.Message); }
+                { return Response.Fail(request.Id, Status.Conflict, "copy_monitor verificar: " + ex.Message); }
                 if (baseline == null)
-                    return Response.Fail(request.Id, Status.Invalido, "copy_monitor verificar: no initial inventory for this attempt (document, link and clave): run fase=preflight before copying");
+                    return Response.Fail(request.Id, Status.Invalid, "copy_monitor verificar: no initial inventory for this attempt (document, link and clave): run fase=preflight before copying");
                 if (baseline.DocumentIdentity != probe.DocumentIdentity || baseline.LinkIdentity != probe.LinkIdentity)
-                    return Response.Fail(request.Id, Status.Conflicto, "copy_monitor verificar: the initial inventory belongs to another document or link");
+                    return Response.Fail(request.Id, Status.Conflict, "copy_monitor verificar: the initial inventory belongs to another document or link");
                 // AUD-20: verified against the FROZEN expectations. If the conditions that define the target changed, conflict.
                 CopyMonitorFlow.Result frozenV;
                 try { frozenV = CopyMonitorFlow.Load(store, attemptKey, now, mappingGiven); }
                 catch (Exception ex) when (ex is System.IO.InvalidDataException || ex is TimeoutException || ex is System.IO.IOException)
-                { return Response.Fail(request.Id, Status.Conflicto, "copy_monitor verificar: " + ex.Message); }
-                datos["expectativas"] = new Dictionary<string, object> { ["huella"] = frozenV.Frozen.Fingerprint, ["huella_origen"] = frozenV.Frozen.SourceFingerprint, ["congeladas"] = baseline.CreatedUtc.ToString("o", CultureInfo.InvariantCulture) };
-                if (frozenV.Differences.Count > 0) datos["cambios_desde_el_preflight"] = frozenV.Differences.Cast<object>().ToList();
+                { return Response.Fail(request.Id, Status.Conflict, "copy_monitor verificar: " + ex.Message); }
+                data["expectativas"] = new Dictionary<string, object> { ["huella"] = frozenV.Frozen.Fingerprint, ["huella_origen"] = frozenV.Frozen.SourceFingerprint, ["congeladas"] = baseline.CreatedUtc.ToString("o", CultureInfo.InvariantCulture) };
+                if (frozenV.Differences.Count > 0) data["cambios_desde_el_preflight"] = frozenV.Differences.Cast<object>().ToList();
                 if (frozenV.Conflict)
                     return new Response
                     {
-                        Id = request.Id, Estado = Status.Conflicto, Rev = probe.Rev, Datos = datos,
-                        Aviso = "Not verified: conditions changed since the preflight (" + string.Join("; ", frozenV.Differences.Where(CopyMonitorExpectations.Blocking)) + "). " +
+                        Id = request.Id, State = Status.Conflict, Rev = probe.Rev, Data = data,
+                        Warning = "Not verified: conditions changed since the preflight (" + string.Join("; ", frozenV.Differences.Where(CopyMonitorExpectations.Blocking)) + "). " +
                                 "The original expectations are not replaced. Reconcile: restore the conditions and verify again, or start a new attempt with another clave=.",
                     };
-                datos["inventario_inicial"] = new Dictionary<string, object> { ["elementos"] = (long)baseline.Ids.Count, ["creado"] = baseline.CreatedUtc.ToString("o", CultureInfo.InvariantCulture), ["sha256"] = baseline.Sha256 };
+                data["inventario_inicial"] = new Dictionary<string, object> { ["elementos"] = (long)baseline.Ids.Count, ["creado"] = baseline.CreatedUtc.ToString("o", CultureInfo.InvariantCulture), ["sha256"] = baseline.Sha256 };
                 var beforeSet = new HashSet<long>(baseline.Ids);
                 var hostBefore = probe.Host.Where(h => beforeSet.Contains(h.Id)).ToList();
                 var report = CopyMonitorVerifier.Verify(frozenV.Frozen.Source, hostBefore, probe.Host, frozenV.Frozen.Transform, frozenV.Frozen.Mappings, probe.LinkInstanceId);
-                foreach (var kv in report) datos[kv.Key] = kv.Value;
-                if (receipt == null) datos["aviso_intento"] = "no receipt for this attempt (preflight on another machine or with another clave): verification not recorded";
+                foreach (var kv in report) data[kv.Key] = kv.Value;
+                if (receipt == null) data["aviso_intento"] = "no receipt for this attempt (preflight on another machine or with another clave): verification not recorded";
                 else
                 {
                     var res = Arg.GetString(report, "resultado");
@@ -290,16 +290,16 @@ namespace Bimbridge.Addin.Revit
                         {
                             if (WorkflowMachine.Next(receipt, Ev(kind, ProofLevel.verified, "verifier", res), out var why) != null)
                                 receipt = store.Record(attemptKey, Ev(kind, ProofLevel.verified, "verifier", res));
-                            else datos["aviso_intento"] = why;
+                            else data["aviso_intento"] = why;
                         }
-                        catch (Exception ex) when (ex is InvalidOperationException || ex is TimeoutException) { datos["aviso_intento"] = ex.Message; }
+                        catch (Exception ex) when (ex is InvalidOperationException || ex is TimeoutException) { data["aviso_intento"] = ex.Message; }
                     }
                 }
-                datos["nota"] = "source→copy relationship inferred by type and position: GetMonitoredLinkElementIds returns link instances, not source devices";
+                data["nota"] = "source→copy relationship inferred by type and position: GetMonitoredLinkElementIds returns link instances, not source devices";
             }
-            if (receipt != null) datos["recibo"] = new Dictionary<string, object> { ["clave_intento"] = attemptKey, ["estado"] = receipt.State.ToString(), ["prueba"] = receipt.Proof.ToString() };
-            datos["ms"] = sw.ElapsedMilliseconds;
-            return new Response { Id = request.Id, Rev = probe.Rev, Datos = datos };
+            if (receipt != null) data["recibo"] = new Dictionary<string, object> { ["clave_intento"] = attemptKey, ["estado"] = receipt.State.ToString(), ["prueba"] = receipt.Proof.ToString() };
+            data["ms"] = sw.ElapsedMilliseconds;
+            return new Response { Id = request.Id, Rev = probe.Rev, Data = data };
         }
     }
 }

@@ -88,11 +88,37 @@ namespace Bimbridge.Tests
             BuildOldLayout();
             MigrateAndInstall();
             var recipe = File.ReadAllText(Path.Combine(_p.Home, "recetas", "mia.cs"));
-            Assert.Contains(": Bimbridge.Addin.Scripting.Receta", recipe);
+            Assert.Contains(": Bimbridge.Addin.Scripting.Recipe {", recipe);
             Assert.Contains("// Bimbridge.Engine", recipe);
             Assert.DoesNotContain(LegacyMigration.LegacyFolder, recipe);
             Assert.Equal("return 1;\n", File.ReadAllText(Path.Combine(_p.Home, "scripts", "ok.cs")));
             Assert.Contains(LegacyMigration.LegacyNamespacePrefix, File.ReadAllText(Path.Combine(_p.Home, "tareas", "t2", "receta.cs")));
+        }
+
+        [Fact]
+        public void RewritesOldScriptingApiNames()
+        {
+            // Test data: a recipe written against the pre-rename (Spanish) scripting API.
+            var old = "public class X : Receta {\n" +
+                      "    public override string Descripcion => \"Ejecutar\";\n" +
+                      "    public override PoliticaTx Transaccion => PoliticaTx.Lectura;\n" +
+                      "    public override IEnumerable<string> Entradas => new[] { \"nivel\" };\n" +
+                      "    public override void Preparar(ScriptContext ctx) { base.Preparar(ctx); }\n" +
+                      "    public override IEnumerable<Unidad> Unidades(ScriptContext ctx) { yield return new Unidad(\"k\", null); yield return Unidad.Guardar(); }\n" +
+                      "    public override object Ejecutar(ScriptContext ctx, Unidad u) { if (u.Clave == \"\") ctx.Omitir(\"x\"); ctx.Excepcion(\"m\"); ctx.Artefacto(\"a\", \"b\"); return Bim.Montaje.Vista3D(ctx.Doc); }\n" +
+                      "    public override Verificacion Verificar(ScriptContext ctx, Unidad u) => Verificacion.NoAplicada;\n" +
+                      "    public override object Postcondicion(ScriptContext ctx) => null;\n}\n";
+            var expected = "public class X : Recipe {\n" +
+                      "    public override string Description => \"Ejecutar\";\n" +
+                      "    public override TxPolicy Transaction => TxPolicy.ReadOnly;\n" +
+                      "    public override IEnumerable<string> Inputs => new[] { \"nivel\" };\n" +
+                      "    public override void Prepare(ScriptContext ctx) { base.Prepare(ctx); }\n" +
+                      "    public override IEnumerable<Unit> Units(ScriptContext ctx) { yield return new Unit(\"k\", null); yield return Unit.Save(); }\n" +
+                      "    public override object Run(ScriptContext ctx, Unit u) { if (u.Key == \"\") ctx.Skip(\"x\"); ctx.Exception(\"m\"); ctx.Artifact(\"a\", \"b\"); return Bim.Mounting.View3D(ctx.Doc); }\n" +
+                      "    public override Verification Verify(ScriptContext ctx, Unit u) => Verification.NotApplied;\n" +
+                      "    public override object Postcondition(ScriptContext ctx) => null;\n}\n";
+            Assert.Equal(expected, LegacyMigration.RewriteScriptText(old));
+            Assert.Equal(expected, LegacyMigration.RewriteScriptText(expected));
         }
 
         [Fact]

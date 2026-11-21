@@ -59,9 +59,9 @@ namespace Bimbridge.Tests
         [InlineData(Wire.OpTask, "reconciliar", OpSemantics.Kind.Write)]
         [InlineData(Wire.OpTask, "inventar", OpSemantics.Kind.Invalid)]
         [InlineData(Wire.OpDoc, "guardar", OpSemantics.Kind.Write)]
-        public void Classify_SameSemanticsEverywhere(string op, string accion, OpSemantics.Kind kind)
+        public void Classify_SameSemanticsEverywhere(string op, string action, OpSemantics.Kind kind)
         {
-            Assert.Equal(kind, OpSemantics.Classify(op, new Dictionary<string, object> { ["accion"] = accion }, out _));
+            Assert.Equal(kind, OpSemantics.Classify(op, new Dictionary<string, object> { ["accion"] = action }, out _));
         }
 
         [Fact]
@@ -116,8 +116,8 @@ namespace Bimbridge.Tests
                 new DocResolver.Candidate { Id = "d1", Key = "archivo:c:\\a\\family.rfa", Title = "Family.rfa", Path = @"C:\a\Family.rfa" },
                 new DocResolver.Candidate { Id = "d2", Key = "archivo:c:\\b\\family.rfa", Title = "Family", Path = @"C:\b\Family.rfa", Active = true },
             };
-            Assert.Equal(-1, DocResolver.Find(snap, "family", out var err, out var amb));
-            Assert.True(amb);
+            Assert.Equal(-1, DocResolver.Find(snap, "family", out var err, out var ambiguous));
+            Assert.True(ambiguous);
             Assert.Contains("d1", err);
             Assert.Contains("d2", err);
             Assert.Equal(1, DocResolver.Find(snap, @"c:/b/./FAMILY.rfa", out _, out _));
@@ -167,7 +167,7 @@ namespace Bimbridge.Tests
             var j = Journal();
             j.Begin("k", "d", Wire.OpExec, "h", null, "s");
             j.LinkJob("k", "d", "J-42");
-            j.Complete("k", "d", Status.EnProceso, null);
+            j.Complete("k", "d", Status.InProgress, null);
             var b = j.Begin("k", "d", Wire.OpExec, "h", null, "s2");
             Assert.Equal(OperationJournal.BeginKind.Running, b.Kind);
             Assert.Equal("J-42", j.RunningJob("k", "d"));
@@ -180,20 +180,20 @@ namespace Bimbridge.Tests
         [InlineData("desconocido")]
         [InlineData("error")]
         [InlineData("cancelado")]
-        public void PartialOrUnknown_RequiresExplicitReconcile_AndKeepsAttempts(string estado)
+        public void PartialOrUnknown_RequiresExplicitReconcile_AndKeepsAttempts(string status)
         {
             var path = Tmp();
             var j = Journal(path);
             j.Begin("k", "d", Wire.OpExec, "h", null, "s");
-            j.Complete("k", "d", estado, null);
+            j.Complete("k", "d", status, null);
             Assert.Equal(OperationJournal.BeginKind.Interrupted, j.Begin("k", "d", Wire.OpExec, "h", null, "s2").Kind);
             Assert.Equal(OperationJournal.BeginKind.New, j.Begin("k", "d", Wire.OpExec, "h", null, "s2", OperationJournal.ReconcileMode.NotApplied).Kind);
             j.Complete("k", "d", Status.Ok, null);
             // Another process reads the same journal: two attempts with their history.
             var r = Journal(path).Get("k", "d");
             Assert.Equal(2, r.Attempts.Count);
-            Assert.Equal(estado, r.Attempts[0].Estado);
-            Assert.Equal(Status.Ok, r.Attempts[1].Estado);
+            Assert.Equal(status, r.Attempts[0].State);
+            Assert.Equal(Status.Ok, r.Attempts[1].State);
         }
 
         [Fact]
@@ -201,7 +201,7 @@ namespace Bimbridge.Tests
         {
             var j = Journal();
             j.Begin("k", "d", Wire.OpExec, "h", null, "s");
-            j.Complete("k", "d", Status.Revertido, null);
+            j.Complete("k", "d", Status.RolledBack, null);
             Assert.Equal(OperationJournal.BeginKind.New, j.Begin("k", "d", Wire.OpExec, "h", null, "s").Kind);
         }
 

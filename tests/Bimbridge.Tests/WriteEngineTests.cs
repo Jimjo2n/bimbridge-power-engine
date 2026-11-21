@@ -91,7 +91,7 @@ namespace Bimbridge.Tests
                 Assert.NotNull(Json.Parse(i.Example)); // each example is valid JSON
                 OpSpec.Parse(Json.ParseObject(i.Example.Replace("\"@2\"", "\"10\"").Replace("\"@1\"", "\"11\""))); // and passes validation
             }
-            Assert.Equal("Colocar", OpCatalog.NameOf("place"));
+            Assert.Equal("Place", OpCatalog.NameOf("place"));
         }
 
         [Fact]

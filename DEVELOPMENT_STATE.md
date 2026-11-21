@@ -16,7 +16,7 @@ The implementation uses C# for the Revit integration and orchestration, Rust for
 - Windows installer, backup and recovery procedures.
 - Operational status panel and session metrics.
 
-See [architecture](docs/0.9.0/POWER_ENGINE_ARCHITECTURE.md), [capabilities](docs/MATRIZ_CAPACIDADES.md) and [architecture decisions](docs/0.9.0/ARCHITECTURE_DECISIONS.md).
+See [architecture](docs/0.9.0/POWER_ENGINE_ARCHITECTURE.md), [capabilities](docs/CAPABILITY_MATRIX.md) and [architecture decisions](docs/0.9.0/ARCHITECTURE_DECISIONS.md).
 
 ## Validation
 

@@ -13,8 +13,8 @@ namespace Bimbridge.Addin.Scripting
     /// <summary>
     /// BIM helpers for scripts and recipes (0.6.0, milestone D). They are ready-made functions over the public Revit API: they do not limit what the
     /// script can do (it still has doc, the full API and ctx), they only save repeated code and return compact results in mm.
-    /// Nothing here opens transactions: the ones that write (Grupos.Componer/CambiarTipo, Vistas.AplicarRango/FiltroPorCategoria) are called
-    /// inside the engine's transaction (exec with writes or a PorUnidad recipe).
+    /// Nothing here opens transactions: the ones that write (Groups.Compose/ChangeType, Views.ApplyRange/FilterByCategory) are called
+    /// inside the engine's transaction (exec with writes or a PerUnit recipe).
     /// </summary>
     public static class Bim
     {
@@ -40,14 +40,14 @@ namespace Bimbridge.Addin.Scripting
         // =====================================================================================================
         // GROUPS
         // =====================================================================================================
-        public static class Grupos
+        public static class Groups
         {
             /// <summary>
             /// What is inside a group, with positions relative to its origin (mm, without the group rotation): lets you compare
             /// instances of the same type even when rotated. "miembros_espejados" counts the FamilyInstances with Mirrored=true
             /// (the API does not expose whether the whole group is mirrored).
             /// </summary>
-            public static Dictionary<string, object> Inspeccionar(Group g)
+            public static Dictionary<string, object> Inspect(Group g)
             {
                 var doc = g.Document;
                 var o = (g.Location as LocationPoint)?.Point ?? XYZ.Zero;
@@ -79,7 +79,7 @@ namespace Bimbridge.Addin.Scripting
             }
 
             /// <summary>Stable signature of a member: category|type|relative position rounded to 10 mm. Used to match members across types.</summary>
-            public static string Firma(Group g, Element m)
+            public static string Signature(Group g, Element m)
             {
                 var o = (g.Location as LocationPoint)?.Point ?? XYZ.Zero;
                 var rot = (g.Location as LocationPoint)?.Rotation ?? 0;
@@ -90,20 +90,20 @@ namespace Bimbridge.Addin.Scripting
             }
 
             /// <summary>Instances of a group type (by name or id).</summary>
-            public static IList<Group> Instancias(Document doc, string nombreTipo) =>
-                new FilteredElementCollector(doc).OfClass(typeof(Group)).Cast<Group>().Where(x => x.GroupType?.Name == nombreTipo).ToList();
+            public static IList<Group> Instances(Document doc, string typeName) =>
+                new FilteredElementCollector(doc).OfClass(typeof(Group)).Cast<Group>().Where(x => x.GroupType?.Name == typeName).ToList();
 
             /// <summary>Creates a group with those elements and, if a name is given, renames its type (fails if a type with that name already exists).</summary>
-            public static Group Componer(Document doc, IEnumerable<ElementId> ids, string nombreTipo = null)
+            public static Group Compose(Document doc, IEnumerable<ElementId> ids, string typeName = null)
             {
                 var list = ids.ToList();
                 if (list.Count == 0) throw new ArgumentException("there are no elements to group");
                 var g = doc.Create.NewGroup(list);
-                if (!string.IsNullOrEmpty(nombreTipo))
+                if (!string.IsNullOrEmpty(typeName))
                 {
-                    if (new FilteredElementCollector(doc).OfClass(typeof(GroupType)).Any(t => t.Name == nombreTipo && t.Id != g.GroupType.Id))
-                        throw new ArgumentException("a group type already exists: '" + nombreTipo + "'");
-                    g.GroupType.Name = nombreTipo;
+                    if (new FilteredElementCollector(doc).OfClass(typeof(GroupType)).Any(t => t.Name == typeName && t.Id != g.GroupType.Id))
+                        throw new ArgumentException("a group type already exists: '" + typeName + "'");
+                    g.GroupType.Name = typeName;
                 }
                 return g;
             }
@@ -112,49 +112,49 @@ namespace Bimbridge.Addin.Scripting
             /// Changes the type of a group and checks that it did not move or rotate. Returns the member matching by signature
             /// (before→after) and the unmatched ones, so the recipe decides (no correspondence is invented).
             /// </summary>
-            public static Dictionary<string, object> CambiarTipo(Group g, GroupType nuevo)
+            public static Dictionary<string, object> ChangeType(Group g, GroupType newType)
             {
-                if (nuevo == null) throw new ArgumentNullException(nameof(nuevo));
+                if (newType == null) throw new ArgumentNullException(nameof(newType));
                 var doc = g.Document;
                 var lp0 = g.Location as LocationPoint;
                 var o0 = lp0?.Point; var r0 = lp0?.Rotation ?? 0;
                 var before = g.GetMemberIds().Select(doc.GetElement).Where(m => m != null && !(m is Group))
-                    .GroupBy(m => Firma(g, m)).ToDictionary(x => x.Key, x => x.Select(m => L(m.Id)).ToList());
-                var anterior = g.GroupType?.Name;
-                g.GroupType = nuevo;
+                    .GroupBy(m => Signature(g, m)).ToDictionary(x => x.Key, x => x.Select(m => L(m.Id)).ToList());
+                var previous = g.GroupType?.Name;
+                g.GroupType = newType;
                 doc.Regenerate();
                 var lp1 = g.Location as LocationPoint;
                 var moved = o0 != null && lp1 != null ? lp1.Point.DistanceTo(o0) * Ft : 0;
                 var turned = lp1 != null ? Math.Abs(lp1.Rotation - r0) * 180 / Math.PI : 0;
                 var after = g.GetMemberIds().Select(doc.GetElement).Where(m => m != null && !(m is Group))
-                    .GroupBy(m => Firma(g, m)).ToDictionary(x => x.Key, x => x.Select(m => L(m.Id)).ToList());
-                var pares = before.Keys.Intersect(after.Keys).Select(k => new object[] { k, before[k], after[k] }).ToList();
+                    .GroupBy(m => Signature(g, m)).ToDictionary(x => x.Key, x => x.Select(m => L(m.Id)).ToList());
+                var pairs = before.Keys.Intersect(after.Keys).Select(k => new object[] { k, before[k], after[k] }).ToList();
                 return new Dictionary<string, object>
                 {
-                    ["grupo"] = L(g.Id), ["anterior"] = anterior, ["nuevo"] = g.GroupType?.Name, ["ok"] = g.GroupType?.Id == nuevo.Id,
+                    ["grupo"] = L(g.Id), ["anterior"] = previous, ["nuevo"] = g.GroupType?.Name, ["ok"] = g.GroupType?.Id == newType.Id,
                     ["desplazado_mm"] = Math.Round(moved, 1), ["girado_grados"] = Math.Round(turned, 3),
-                    ["emparejados"] = pares.Count, ["solo_antes"] = before.Keys.Except(after.Keys).ToList(), ["solo_despues"] = after.Keys.Except(before.Keys).ToList(),
+                    ["emparejados"] = pairs.Count, ["solo_antes"] = before.Keys.Except(after.Keys).ToList(), ["solo_despues"] = after.Keys.Except(before.Keys).ToList(),
                 };
             }
 
             /// <summary>Do all instances of the type have the same composition (signatures)? Lists the ones that differ (excluded members, etc.).</summary>
-            public static Dictionary<string, object> VerificarComposicion(Document doc, string nombreTipo)
+            public static Dictionary<string, object> VerifyComposition(Document doc, string typeName)
             {
-                var inst = Instancias(doc, nombreTipo);
-                var sigs = inst.ToDictionary(x => L(x.Id), x => string.Join(";", x.GetMemberIds().Select(doc.GetElement).Where(m => m != null).Select(m => Firma(x, m)).OrderBy(s => s, StringComparer.Ordinal)));
+                var inst = Instances(doc, typeName);
+                var sigs = inst.ToDictionary(x => L(x.Id), x => string.Join(";", x.GetMemberIds().Select(doc.GetElement).Where(m => m != null).Select(m => Signature(x, m)).OrderBy(s => s, StringComparer.Ordinal)));
                 var mode = sigs.Values.GroupBy(s => s).OrderByDescending(x => x.Count()).FirstOrDefault()?.Key;
                 var diff = sigs.Where(kv => kv.Value != mode).Select(kv => kv.Key).ToList();
-                return new Dictionary<string, object> { ["tipo"] = nombreTipo, ["instancias"] = inst.Count, ["distintas"] = diff, ["coherente"] = diff.Count == 0 };
+                return new Dictionary<string, object> { ["tipo"] = typeName, ["instancias"] = inst.Count, ["distintas"] = diff, ["coherente"] = diff.Count == 0 };
             }
         }
 
         // =====================================================================================================
         // MOUNTING
         // =====================================================================================================
-        public static class Montaje
+        public static class Mounting
         {
             /// <summary>Extents of the real body (mm, without "Light Source"): [zmin, zmax, fuente]. If there are no solids it uses the bounding box and says so.</summary>
-            public static Dictionary<string, object> Cuerpo(Element e)
+            public static Dictionary<string, object> Body(Element e)
             {
                 var solids = new List<Solid>();
                 Bodies.CollectSolids(e.get_Geometry(Bodies.NewOptions()), solids, e.Document, new[] { "Light Source" });
@@ -166,29 +166,29 @@ namespace Bimbridge.Addin.Scripting
             }
 
             /// <summary>First 3D view that is not a template and has no section box (ReferenceIntersector needs it).</summary>
-            public static View3D Vista3D(Document doc) =>
+            public static View3D View3D(Document doc) =>
                 new FilteredElementCollector(doc).OfClass(typeof(View3D)).Cast<View3D>().Where(v => !v.IsTemplate)
                     .OrderBy(v => v.IsSectionBoxActive ? 1 : 0).FirstOrDefault();
 
             /// <summary>
-            /// Finds the body's support with a ray from the body base in <paramref name="direccion"/> ("arriba" | "abajo"),
+            /// Finds the body's support with a ray from the body base in <paramref name="direction"/> ("arriba" | "abajo"),
             /// also inside links. Classifies: al_ras (|clearance| ≤ tol), empotrado (the support cuts the body), separado (positive
             /// clearance: may be correct if pendant-mounted; the reviewer decides), sin_referencia (nothing within maxMm). Moves nothing.
             /// </summary>
-            public static Dictionary<string, object> Soporte(Element e, View3D vista, string direccion = "arriba", double maxMm = 3000, double tolMm = 3,
-                IEnumerable<BuiltInCategory> categorias = null)
+            public static Dictionary<string, object> Support(Element e, View3D view, string direction = "arriba", double maxMm = 3000, double tolMm = 3,
+                IEnumerable<BuiltInCategory> categories = null)
             {
                 var doc = e.Document;
-                vista = vista ?? Vista3D(doc) ?? throw new InvalidOperationException("there is no non-template 3D view to cast rays");
-                var body = Cuerpo(e);
+                view = view ?? View3D(doc) ?? throw new InvalidOperationException("there is no non-template 3D view to cast rays");
+                var body = Body(e);
                 if (body == null) return new Dictionary<string, object> { ["id"] = L(e.Id), ["clase"] = "sin_cuerpo" };
-                var up = direccion != "abajo";
-                var cats = (categorias ?? new[] { BuiltInCategory.OST_Floors, BuiltInCategory.OST_Ceilings, BuiltInCategory.OST_Roofs, BuiltInCategory.OST_StructuralFraming,
+                var up = direction != "abajo";
+                var cats = (categories ?? new[] { BuiltInCategory.OST_Floors, BuiltInCategory.OST_Ceilings, BuiltInCategory.OST_Roofs, BuiltInCategory.OST_StructuralFraming,
                     BuiltInCategory.OST_Stairs, BuiltInCategory.OST_Ramps, BuiltInCategory.OST_GenericModel }).ToList();
                 // The filter must also accept the link instance; the category of what is found inside the link is checked afterwards.
                 ElementFilter f = new LogicalOrFilter(new ElementMulticategoryFilter(cats), new ElementClassFilter(typeof(RevitLinkInstance)));
                 f = new LogicalAndFilter(f, new ExclusionFilter(new List<ElementId> { e.Id }));
-                var ri = new ReferenceIntersector(f, FindReferenceTarget.Face, vista) { FindReferencesInRevitLinks = true };
+                var ri = new ReferenceIntersector(f, FindReferenceTarget.Face, view) { FindReferencesInRevitLinks = true };
                 var min = (double[])body["min"]; var max = (double[])body["max"];
                 var cx = (min[0] + max[0]) / 2 / Ft; var cy = (min[1] + max[1]) / 2 / Ft;
                 var zmin = (double)body["zmin"] / Ft; var zmax = (double)body["zmax"] / Ft;
@@ -212,10 +212,10 @@ namespace Bimbridge.Addin.Scripting
                     else hit = host;
                     if (hit == null) continue;
                     var gap = (h.Proximity - height) * Ft;
-                    var clase = Math.Abs(gap) <= tolMm ? "al_ras" : gap < 0 ? "empotrado" : "separado";
+                    var cls = Math.Abs(gap) <= tolMm ? "al_ras" : gap < 0 ? "empotrado" : "separado";
                     return new Dictionary<string, object>
                     {
-                        ["id"] = L(e.Id), ["clase"] = clase, ["holgura_mm"] = Math.Round(gap, 1), ["soporte"] = L(hit.Id), ["soporte_uid"] = hit.UniqueId,
+                        ["id"] = L(e.Id), ["clase"] = cls, ["holgura_mm"] = Math.Round(gap, 1), ["soporte"] = L(hit.Id), ["soporte_uid"] = hit.UniqueId,
                         ["soporte_cat"] = hit.Category?.Name, ["vinculo"] = link, ["cuerpo"] = body["fuente"], ["direccion"] = up ? "arriba" : "abajo",
                         ["regla"] = "vertical ray from the center of the body footprint; tolerance " + tolMm + " mm",
                     };
@@ -224,7 +224,7 @@ namespace Bimbridge.Addin.Scripting
             }
 
             /// <summary>Revit Transform (feet) → engine Xform (mm) to use ManifestQc/transformations without Revit.</summary>
-            public static Xform Transformacion(Transform t) => new Xform
+            public static Xform Transformation(Transform t) => new Xform
             {
                 X = new[] { t.BasisX.X, t.BasisX.Y, t.BasisX.Z }, Y = new[] { t.BasisY.X, t.BasisY.Y, t.BasisY.Z },
                 Z = new[] { t.BasisZ.X, t.BasisZ.Y, t.BasisZ.Z }, O = new[] { t.Origin.X * Ft, t.Origin.Y * Ft, t.Origin.Z * Ft },
@@ -234,13 +234,13 @@ namespace Bimbridge.Addin.Scripting
         // =====================================================================================================
         // VIEWS
         // =====================================================================================================
-        public static class Vistas
+        public static class Views
         {
             private static readonly PlanViewPlane[] Planes = { PlanViewPlane.TopClipPlane, PlanViewPlane.CutPlane, PlanViewPlane.BottomClipPlane, PlanViewPlane.ViewDepthPlane };
             private static string PlaneName(PlanViewPlane p) => p == PlanViewPlane.TopClipPlane ? "superior" : p == PlanViewPlane.CutPlane ? "corte" : p == PlanViewPlane.BottomClipPlane ? "inferior" : "profundidad";
 
             /// <summary>View range: per plane, level + offset and absolute elevation (mm, project elevation). "ilimitado" when applicable.</summary>
-            public static Dictionary<string, object> Rango(ViewPlan v)
+            public static Dictionary<string, object> Range(ViewPlan v)
             {
                 var doc = v.Document;
                 var r = v.GetViewRange();
@@ -266,22 +266,22 @@ namespace Bimbridge.Addin.Scripting
             /// Changes a range plane ("superior"|"corte"|"inferior"|"profundidad") to level + offset (mm). Fails with a clear message if a
             /// template controls the range. Requires a transaction.
             /// </summary>
-            public static void AplicarRango(ViewPlan v, string plano, Level nivel, double desfaseMm)
+            public static void ApplyRange(ViewPlan v, string plane, Level level, double offsetMm)
             {
-                var p = Planes.FirstOrDefault(x => PlaneName(x) == plano);
-                if (PlaneName(p) != plano) throw new ArgumentException("plano must be superior, corte, inferior or profundidad");
+                var p = Planes.FirstOrDefault(x => PlaneName(x) == plane);
+                if (PlaneName(p) != plane) throw new ArgumentException("plane must be superior, corte, inferior or profundidad");
                 var tid = v.ViewTemplateId;
                 if (tid != ElementId.InvalidElementId && v.Document.GetElement(tid) is View t
                     && !t.GetNonControlledTemplateParameterIds().Contains(new ElementId(BuiltInParameter.PLAN_VIEW_RANGE)))
                     throw new InvalidOperationException("the template '" + t.Name + "' controls the view range of '" + v.Name + "'");
                 var r = v.GetViewRange();
-                r.SetLevelId(p, nivel.Id);
-                r.SetOffset(p, desfaseMm / Ft);
+                r.SetLevelId(p, level.Id);
+                r.SetOffset(p, offsetMm / Ft);
                 v.SetViewRange(r);
             }
 
             /// <summary>Which parameters the view template controls and which it does not (names), to know what can be changed in the view.</summary>
-            public static Dictionary<string, object> CompararPlantilla(View v)
+            public static Dictionary<string, object> CompareTemplate(View v)
             {
                 var doc = v.Document;
                 if (!(doc.GetElement(v.ViewTemplateId) is View t)) return new Dictionary<string, object> { ["vista"] = v.Name, ["plantilla"] = null };
@@ -306,7 +306,7 @@ namespace Bimbridge.Addin.Scripting
             /// The view's plan regions are listed, but their range is not readable through the public API: if the element falls inside one,
             /// the range verdict is marked as not checkable.
             /// </summary>
-            public static Dictionary<string, object> PorQueNoSeVe(View v, Element e)
+            public static Dictionary<string, object> WhyNotVisible(View v, Element e)
             {
                 var doc = v.Document;
                 var f = new VisibilityQc.Facts();
@@ -358,15 +358,15 @@ namespace Bimbridge.Addin.Scripting
                     }
                     catch (Exception) { f.InsideCrop = null; }
                 }
-                var regiones = new List<long>();
+                var regions = new List<long>();
                 if (v is ViewPlan vp)
                 {
                     f.PlanKind = vp.ViewType == ViewType.CeilingPlan ? "rcp" : vp.ViewType == ViewType.FloorPlan || vp.ViewType == ViewType.EngineeringPlan ? "planta" : null;
-                    var rg = Rango(vp);
-                    double? cota(string k) => rg.TryGetValue(k, out var x) && x is Dictionary<string, object> d && d.TryGetValue("cota_mm", out var c) && c is double cd ? cd : (double?)null;
-                    f.Top = cota("superior"); f.Cut = cota("corte"); f.Bottom = cota("inferior"); f.Depth = cota("profundidad");
+                    var rg = Range(vp);
+                    double? elevation(string k) => rg.TryGetValue(k, out var x) && x is Dictionary<string, object> d && d.TryGetValue("cota_mm", out var c) && c is double cd ? cd : (double?)null;
+                    f.Top = elevation("superior"); f.Cut = elevation("corte"); f.Bottom = elevation("inferior"); f.Depth = elevation("profundidad");
                     f.RangeSource = "view range";
-                    var body = Montaje.Cuerpo(e);
+                    var body = Mounting.Body(e);
                     if (body != null) { f.ZMin = (double)body["zmin"]; f.ZMax = (double)body["zmax"]; }
                     try
                     {
@@ -374,23 +374,23 @@ namespace Bimbridge.Addin.Scripting
                         foreach (var pr in new FilteredElementCollector(doc, v.Id).OfCategory(BuiltInCategory.OST_PlanRegion).WhereElementIsNotElementType())
                         {
                             var bb = pr.get_BoundingBox(v);
-                            if (ept != null && bb != null && ept.X >= bb.Min.X && ept.X <= bb.Max.X && ept.Y >= bb.Min.Y && ept.Y <= bb.Max.Y) regiones.Add(L(pr.Id));
+                            if (ept != null && bb != null && ept.X >= bb.Min.X && ept.X <= bb.Max.X && ept.Y >= bb.Min.Y && ept.Y <= bb.Max.Y) regions.Add(L(pr.Id));
                         }
                     }
                     catch (Exception) { }
-                    if (regiones.Count > 0)
+                    if (regions.Count > 0)
                     {
-                        notes.Add("falls inside the box of plan region(s) " + string.Join(", ", regiones) + ": their range is not readable through the public API; the view range verdict may not apply");
+                        notes.Add("falls inside the box of plan region(s) " + string.Join(", ", regions) + ": their range is not readable through the public API; the view range verdict may not apply");
                         f.RangeSource = "view range (a plan region overlaps: check by hand)";
                     }
                 }
                 var reasons = VisibilityQc.Explain(f, out var notCheckable);
-                if (regiones.Count > 0) foreach (var r in reasons.Where(x => x.Code == "rango_de_vista")) r.Certain = false;
+                if (regions.Count > 0) foreach (var r in reasons.Where(x => x.Code == "rango_de_vista")) r.Certain = false;
                 return new Dictionary<string, object>
                 {
                     ["vista"] = v.Name, ["id"] = L(e.Id), ["visible_segun_api"] = reasons.Count == 0,
                     ["causas"] = reasons.Select(x => x.ToString()).ToList(), ["no_comprobable"] = notCheckable.Concat(notes).ToList(),
-                    ["cuerpo_mm"] = f.ZMin.HasValue ? new[] { f.ZMin.Value, f.ZMax.Value } : null, ["regiones_de_plano"] = regiones,
+                    ["cuerpo_mm"] = f.ZMin.HasValue ? new[] { f.ZMin.Value, f.ZMax.Value } : null, ["regiones_de_plano"] = regions,
                 };
             }
 
@@ -406,32 +406,32 @@ namespace Bimbridge.Addin.Scripting
             /// View filter "text parameter = value" for some categories. If one with that name already exists it is returned untouched.
             /// Requires a transaction.
             /// </summary>
-            public static ParameterFilterElement FiltroPorCategoria(Document doc, string nombre, IEnumerable<BuiltInCategory> categorias, BuiltInParameter parametro, string valor)
+            public static ParameterFilterElement FilterByCategory(Document doc, string name, IEnumerable<BuiltInCategory> categories, BuiltInParameter parameter, string value)
             {
-                var existing = new FilteredElementCollector(doc).OfClass(typeof(ParameterFilterElement)).Cast<ParameterFilterElement>().FirstOrDefault(x => x.Name == nombre);
+                var existing = new FilteredElementCollector(doc).OfClass(typeof(ParameterFilterElement)).Cast<ParameterFilterElement>().FirstOrDefault(x => x.Name == name);
                 if (existing != null) return existing;
-                var cats = categorias.Select(c => new ElementId(c)).ToList();
-                var pid = new ElementId(parametro);
+                var cats = categories.Select(c => new ElementId(c)).ToList();
+                var pid = new ElementId(parameter);
 #if REVIT2023_OR_GREATER
-                var rule = ParameterFilterRuleFactory.CreateEqualsRule(pid, valor);
+                var rule = ParameterFilterRuleFactory.CreateEqualsRule(pid, value);
 #else
-                var rule = ParameterFilterRuleFactory.CreateEqualsRule(pid, valor, false);
+                var rule = ParameterFilterRuleFactory.CreateEqualsRule(pid, value, false);
 #endif
-                return ParameterFilterElement.Create(doc, nombre, cats, new ElementParameterFilter(rule));
+                return ParameterFilterElement.Create(doc, name, cats, new ElementParameterFilter(rule));
             }
         }
 
         // =====================================================================================================
         // MANIFEST (one-to-one QC against an expected list)
         // =====================================================================================================
-        public static class Manifiesto
+        public static class Manifest
         {
             /// <summary>Converts model elements to what ManifestQc compares (mm, rotation from BasisX, level, tags, group).</summary>
-            public static List<ManifestQc.Actual> Juntar(Document doc, IEnumerable<Element> elems, View vistaEtiquetas = null)
+            public static List<ManifestQc.Actual> Collect(Document doc, IEnumerable<Element> elems, View tagView = null)
             {
                 var list = elems.Where(x => x != null).ToList();
                 var tagCount = new Dictionary<ElementId, int>();
-                var tags = vistaEtiquetas != null ? new FilteredElementCollector(doc, vistaEtiquetas.Id).OfClass(typeof(IndependentTag)) : new FilteredElementCollector(doc).OfClass(typeof(IndependentTag));
+                var tags = tagView != null ? new FilteredElementCollector(doc, tagView.Id).OfClass(typeof(IndependentTag)) : new FilteredElementCollector(doc).OfClass(typeof(IndependentTag));
                 foreach (IndependentTag t in tags)
                 {
                     ICollection<ElementId> ids;
@@ -468,11 +468,11 @@ namespace Bimbridge.Addin.Scripting
             }
 
             /// <summary>Full QC: reads the manifest (ManifestQc.Parse JSON), compares and returns the result.</summary>
-            public static ManifestQc.Result Qc(Document doc, string manifestJson, IEnumerable<Element> elems, View vistaEtiquetas = null)
+            public static ManifestQc.Result Qc(Document doc, string manifestJson, IEnumerable<Element> elems, View tagView = null)
             {
                 var json = Bimbridge.Protocol.Json.ParseObject(manifestJson);
                 var expected = ManifestQc.Parse(json, out var opt);
-                return ManifestQc.Run(expected, Juntar(doc, elems, vistaEtiquetas), opt);
+                return ManifestQc.Run(expected, Collect(doc, elems, tagView), opt);
             }
         }
     }

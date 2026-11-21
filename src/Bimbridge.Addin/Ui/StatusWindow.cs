@@ -52,9 +52,9 @@ namespace Bimbridge.Addin.Ui
         }
         /// <summary>#5 (0.9.1): filter for the long-operation history (null = all).</summary>
         private string _opsFilter;
-        private static readonly (string Label, string Estado)[] OpsFilters =
+        private static readonly (string Label, string State)[] OpsFilters =
         {
-            ("All", null), ("With differences", Status.ConDiferencias), ("Uncertain", Status.Desconocido), ("Errors", Status.Error), ("Cancelled", Status.Cancelado), ("Conflicts", Status.Conflicto),
+            ("All", null), ("With differences", Status.CompletedWithDifferences), ("Uncertain", Status.Unknown), ("Errors", Status.Error), ("Cancelled", Status.Cancelled), ("Conflicts", Status.Conflict),
         };
         private readonly Button _pause;
         private readonly DispatcherTimer _timer;
@@ -104,7 +104,7 @@ namespace Bimbridge.Addin.Ui
             var ops = new StackPanel();
             ops.Children.Add(_opsHead);
             var seg = Theme.Segmented(OpsFilters.Select(f => f.Label).ToArray(), OpsFilters[0].Label,
-                label => { _opsFilter = OpsFilters.First(f => f.Label == label).Estado; Refresh(true); });
+                label => { _opsFilter = OpsFilters.First(f => f.Label == label).State; Refresh(true); });
             // Same RadioButtons in a WrapPanel so the six filters fit in narrow windows.
             var filters = new WrapPanel { Margin = new Thickness(0, 12, 0, 6) };
             KeyboardNavigation.SetTabNavigation(filters, KeyboardNavigationMode.Once);
@@ -444,7 +444,7 @@ namespace Bimbridge.Addin.Ui
                            : r.Retry == "revisar_diferencias" ? " · REVIEW: applied but does not match what was requested" : " · CHECK the model before repeating";
                 _opsList.Children.Add(new TextBlock
                 {
-                    Text = r.FinishedUtc.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture) + " · " + r.JobId + " · " + r.Kind + " · " + r.Estado + " · " + FormatMs(r.Ms) + advice +
+                    Text = r.FinishedUtc.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture) + " · " + r.JobId + " · " + r.Kind + " · " + r.State + " · " + FormatMs(r.Ms) + advice +
                            (string.IsNullOrEmpty(r.Error) ? "" : " · " + r.Error),
                     TextWrapping = TextWrapping.Wrap, FontSize = 12, Foreground = Theme.B(bad ? Theme.Darken(Theme.Amber, 0.75) : Theme.Ink), Margin = new Thickness(2, 1, 0, 1),
                 });
@@ -577,7 +577,7 @@ namespace Bimbridge.Addin.Ui
         private static string Str(Dictionary<string, object> e, string k) =>
             e.TryGetValue(k, out var v) && v != null ? Convert.ToString(v, CultureInfo.InvariantCulture) : null;
 
-        private static bool IsError(string estado) => estado == Status.Error || estado == Status.Desconocido;
+        private static bool IsError(string status) => status == Status.Error || status == Status.Unknown;
 
         private static string FormatMs(long ms) => ms < 1000 ? ms + " ms" : (ms / 1000.0).ToString("0.0", CultureInfo.InvariantCulture) + " s";
 
@@ -597,7 +597,7 @@ namespace Bimbridge.Addin.Ui
             var author = Str(e, "autor") ?? "";
             var agent = Str(e, "agente");
             var op = Str(e, "op") ?? "";
-            var estado = Str(e, "estado") ?? "";
+            var status = Str(e, "estado") ?? "";
             var ms = e.TryGetValue("ms", out var m) ? Convert.ToInt64(m, CultureInfo.InvariantCulture) : 0;
             DateTime t;
             DateTime.TryParse(Str(e, "t"), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out t);
@@ -616,7 +616,7 @@ namespace Bimbridge.Addin.Ui
             Grid.SetColumn(chip, 1);
             grid.Children.Add(chip);
 
-            var (text, color) = Describe(op, estado, ms);
+            var (text, color) = Describe(op, status, ms);
             var doc = Str(e, "doc");
             var tb = new TextBlock { Text = text + (doc != null ? " · " + doc : ""), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = Theme.B(color) };
             Grid.SetColumn(tb, 2);
@@ -624,14 +624,14 @@ namespace Bimbridge.Addin.Ui
             return grid;
         }
 
-        private static (string, Color) Describe(string op, string estado, long ms)
+        private static (string, Color) Describe(string op, string status, long ms)
         {
             var dur = ms > 0 ? " (" + FormatMs(ms) + ")" : "";
-            if (estado == Status.RevitOcupado) return ("Revit was busy; the agent can retry", Theme.Darken(Theme.Amber, 0.75));
-            if (estado == Status.Desconocido) return (op + ": UNKNOWN result, reconciliation required" + dur, Theme.Darken(Theme.Red, 0.8));
-            if (estado == Status.Rechazado && op != "commit") return (op + " rejected (pause, permissions or block)", Theme.Darken(Theme.Red, 0.8));
-            if (estado == Status.Invalido) return (op + ": malformed request; how to fix it was explained", Theme.Muted);
-            if (estado == Status.Error) return (op + ": error; see log", Theme.Darken(Theme.Red, 0.8));
+            if (status == Status.RevitBusy) return ("Revit was busy; the agent can retry", Theme.Darken(Theme.Amber, 0.75));
+            if (status == Status.Unknown) return (op + ": UNKNOWN result, reconciliation required" + dur, Theme.Darken(Theme.Red, 0.8));
+            if (status == Status.Rejected && op != "commit") return (op + " rejected (pause, permissions or block)", Theme.Darken(Theme.Red, 0.8));
+            if (status == Status.Invalid) return (op + ": malformed request; how to fix it was explained", Theme.Muted);
+            if (status == Status.Error) return (op + ": error; see log", Theme.Darken(Theme.Red, 0.8));
             switch (op)
             {
                 case "conectar": return ("Connected", Theme.Ink);
@@ -642,22 +642,22 @@ namespace Bimbridge.Addin.Ui
                 case "sets": return ("Reviewed its sets", Theme.Ink);
                 case "plan": return ("Prepared a plan" + dur, Theme.Ink);
                 case "job": return ("Checked a job or plan", Theme.Muted);
-                case "exec": return ("Dynamic C# " + estado + dur, Theme.Ink);
+                case "exec": return ("Dynamic C# " + status + dur, Theme.Ink);
                 case "commit":
-                    if (estado == Status.Retenido) return ("Left a change in the queue", Theme.Darken(Theme.Amber, 0.75));
-                    if (estado == Status.Ok) return ("Applied a change" + dur, Theme.Darken(Theme.Green, 0.8));
-                    if (estado == PlanStatus.Ensayado) return ("Trial: applied, verified and rolled back" + dur, Theme.Darken(Theme.Green, 0.8));
-                    if (estado == Status.Conflicto) return ("Change not applied: the model had changed", Theme.Darken(Theme.Amber, 0.75));
-                    return ("Change not applied (" + estado + ")", Theme.Darken(Theme.Red, 0.8));
+                    if (status == Status.Held) return ("Left a change in the queue", Theme.Darken(Theme.Amber, 0.75));
+                    if (status == Status.Ok) return ("Applied a change" + dur, Theme.Darken(Theme.Green, 0.8));
+                    if (status == PlanStatus.Trialed) return ("Trial: applied, verified and rolled back" + dur, Theme.Darken(Theme.Green, 0.8));
+                    if (status == Status.Conflict) return ("Change not applied: the model had changed", Theme.Darken(Theme.Amber, 0.75));
+                    return ("Change not applied (" + status + ")", Theme.Darken(Theme.Red, 0.8));
                 case "aplicar_cola":
-                    if (estado == PlanStatus.Aplicado) return ("You applied a plan from the queue" + dur, Theme.Darken(Theme.Green, 0.8));
-                    if (estado == PlanStatus.Conflicto) return ("A queued plan was skipped: the model had changed", Theme.Darken(Theme.Amber, 0.75));
-                    return ("Queued plan: " + estado, Theme.Darken(Theme.Red, 0.8));
-                case "retener": return (estado == "si" ? "Turned on Hold mode" : "Went back to Live mode", Theme.Ink);
-                case "pausar": return (estado == "si" ? "Paused the AI" : "Resumed the AI", Theme.Ink);
+                    if (status == PlanStatus.Applied) return ("You applied a plan from the queue" + dur, Theme.Darken(Theme.Green, 0.8));
+                    if (status == PlanStatus.Conflict) return ("A queued plan was skipped: the model had changed", Theme.Darken(Theme.Amber, 0.75));
+                    return ("Queued plan: " + status, Theme.Darken(Theme.Red, 0.8));
+                case "retener": return (status == "si" ? "Turned on Hold mode" : "Went back to Live mode", Theme.Ink);
+                case "pausar": return (status == "si" ? "Paused the AI" : "Resumed the AI", Theme.Ink);
                 case "descartar":
                 case "descartar_cola": return ("Discarded changes from the queue", Theme.Muted);
-                default: return (op + " · " + estado + dur, Theme.Muted);
+                default: return (op + " · " + status + dur, Theme.Muted);
             }
         }
 
@@ -671,7 +671,7 @@ namespace Bimbridge.Addin.Ui
                 var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
                 var recent = Runtime.Journal?.Recent(200) ?? new List<Dictionary<string, object>>();
                 File.WriteAllLines(Path.Combine(dir, "actividad_" + stamp + ".jsonl"), recent.Select(e => Json.Write(e)));
-                var csv = new StringBuilder("t,agente,cliente,op,estado,ms,doc,traza\n");
+                var csv = new StringBuilder("t,agente,cliente,op,status,ms,doc,traza\n");
                 foreach (var e in recent)
                     csv.Append(string.Join(",", new[] { "t", "agente", "cliente", "op", "estado", "ms", "doc", "traza" }.Select(k => Csv(Str(e, k))))).Append('\n');
                 File.WriteAllText(Path.Combine(dir, "actividad_" + stamp + ".csv"), csv.ToString(), new UTF8Encoding(true));

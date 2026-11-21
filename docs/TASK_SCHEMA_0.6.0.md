@@ -52,7 +52,7 @@ Unit: `pendiente, en_curso, confirmada, revertida, conflicto, parcial, desconoci
 
 1. If it recorded created elements and **all** their UniqueIds exist → `confirmada`.
 2. If none exists and the file was reopened (another generation) → `pendiente` (it runs again).
-3. Otherwise, the recipe's `Verificar` (Aplicada / NoAplicada).
+3. Otherwise, the recipe's `Verify` (Applied / NotApplied).
 4. If the recipe does not know: inference only when it is safe — the unit started in a generation and **there was no save** of that generation after its `inicio` → the work was lost with the crash → `pendiente`.
 5. Otherwise `desconocida`: requires `tarea reconciliar decision=…` (the client or the user decides; never the engine).
 

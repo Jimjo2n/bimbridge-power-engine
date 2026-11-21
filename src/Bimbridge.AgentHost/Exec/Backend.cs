@@ -32,15 +32,15 @@ namespace Bimbridge.AgentHost
     public enum Effect
     {
         /// <summary>The full effect of this operation is committed in the model.</summary>
-        Observado,
+        Observed,
         /// <summary>There is no effect of this operation in the model: it can run without duplicating.</summary>
-        NoObservado,
+        NotObserved,
         /// <summary>There is an effect, but it does not cover what the operation asks for now (e.g. the targets changed).</summary>
-        Parcial,
+        Partial,
         /// <summary>Cannot be known (unreadable store, effect applied more than once…).</summary>
-        Incierto,
+        Uncertain,
         /// <summary>There is no effect and no targets either: the operation would select an empty set.</summary>
-        SinObjetivos,
+        NoTargets,
     }
 
     public sealed class Observation
@@ -53,7 +53,21 @@ namespace Bimbridge.AgentHost
         public string Detail;
     }
 
-    public enum PostState { Satisfechas, NoSatisfechas, NoEvaluables }
+    public enum PostState { Satisfied, NotSatisfied, NotEvaluable }
+
+    /// <summary>Journal tokens for <see cref="Effect"/> and <see cref="PostState"/>: persisted values, kept as written by older versions.</summary>
+    public static class JournalTokens
+    {
+        public static string Of(Effect e) => e switch
+        {
+            Effect.Observed => "Observado", Effect.NotObserved => "NoObservado", Effect.Partial => "Parcial",
+            Effect.Uncertain => "Incierto", Effect.NoTargets => "SinObjetivos", _ => e.ToString(),
+        };
+        public static string Of(PostState s) => s switch
+        {
+            PostState.Satisfied => "Satisfechas", PostState.NotSatisfied => "NoSatisfechas", PostState.NotEvaluable => "NoEvaluables", _ => s.ToString(),
+        };
+    }
 
     /// <summary>Postcondition check against the AUTHORITATIVE model state (not against what the executor said).</summary>
     public sealed class PostcheckResult

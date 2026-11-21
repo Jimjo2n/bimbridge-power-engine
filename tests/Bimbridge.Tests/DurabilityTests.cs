@@ -37,7 +37,7 @@ namespace Bimbridge.Tests
             var j2 = new OperationJournal(path);
             var again = j2.Begin("k1", "d1", Wire.OpCommit, h, "tareaA", "s3");
             Assert.Equal(OperationJournal.BeginKind.Completed, again.Kind);
-            Assert.Equal(Status.Ok, again.Previous.Estado);
+            Assert.Equal(Status.Ok, again.Previous.State);
             // The same key in another document is a different operation.
             Assert.Equal(OperationJournal.BeginKind.New, j2.Begin("k1", "d2", Wire.OpCommit, h, "tareaA", "s3").Kind);
         }
@@ -65,7 +65,7 @@ namespace Bimbridge.Tests
             var h1b = OperationJournal.HashArgs("exec", new Dictionary<string, object> { ["codigo"] = "a", [Wire.KeyArg] = "otra" });
             Assert.Equal(h1, h1b); // the key and the task do not count toward the fingerprint
             j.Begin("k", "d", "exec", h1, null, "s");
-            j.Complete("k", "d", Status.Revertido, null);
+            j.Complete("k", "d", Status.RolledBack, null);
             Assert.Equal(OperationJournal.BeginKind.Mismatch, j.Begin("k", "d", "exec", h2, null, "s").Kind);
             // 0.6.0 (H03): only a CONFIRMED rollback allows retrying with the same content; a bare "error" requires reconciliation
             // (see TransportRegressionTests.PartialCommitErrorMustRequireReconciliationBeforeRetry).
@@ -106,10 +106,10 @@ namespace Bimbridge.Tests
         {
             var props = File.ReadAllText(Path.Combine(FindRoot(), "Directory.Build.props"));
             var version = System.Text.RegularExpressions.Regex.Match(props, "<Version>([^<]+)</Version>").Groups[1].Value;
-            var doc = Path.Combine(FindRoot(), "docs", "MATRIZ_CAPACIDADES.md");
+            var doc = Path.Combine(FindRoot(), "docs", "CAPABILITY_MATRIX.md");
             // Regenerate: BIMBRIDGE_GEN_MATRIZ=1 dotnet test --filter Capabilities_DocMatchesCode
             if (Environment.GetEnvironmentVariable("BIMBRIDGE_GEN_MATRIZ") == "1") File.WriteAllText(doc, Capabilities.Markdown(version));
-            Assert.True(File.Exists(doc), "docs/MATRIZ_CAPACIDADES.md is missing");
+            Assert.True(File.Exists(doc), "docs/CAPABILITY_MATRIX.md is missing");
             Assert.Equal(Capabilities.Markdown(version).Replace("\r\n", "\n"), File.ReadAllText(doc).Replace("\r\n", "\n"));
             var fam = Capabilities.ForDoc("familia", 2024).Select(r => (string)((object[])r)[0]).ToList();
             Assert.Contains("fam conector", fam);
@@ -122,13 +122,13 @@ namespace Bimbridge.Tests
         {
             var fx = new List<LightingAudit.Fixture> { new LightingAudit.Fixture { Id = 1, Level = "L1" }, new LightingAudit.Fixture { Id = 2, Level = "L1" } };
             var tags = new List<LightingAudit.Tag> { new LightingAudit.Tag { Id = 10, ViewId = 5, Tagged = new long[] { 1 } } };
-            var uno = LightingAudit.Summarize(fx, tags, null, out _, tagRule: "uno");
-            Assert.Equal(false, uno["cumple_regla"]);
-            var ninguno = LightingAudit.Summarize(fx, tags, null, out var sets, tagRule: "ninguno");
-            Assert.Equal(false, ninguno["cumple_regla"]);
+            var one = LightingAudit.Summarize(fx, tags, null, out _, tagRule: "uno");
+            Assert.Equal(false, one["cumple_regla"]);
+            var none = LightingAudit.Summarize(fx, tags, null, out var sets, tagRule: "ninguno");
+            Assert.Equal(false, none["cumple_regla"]);
             Assert.Equal(new long[] { 10 }, sets["$tags_de_luminarias"]);
-            var ninguno0 = LightingAudit.Summarize(fx, new List<LightingAudit.Tag>(), null, out _, tagRule: "ninguno");
-            Assert.Equal(true, ninguno0["cumple_regla"]);
+            var noneEmpty = LightingAudit.Summarize(fx, new List<LightingAudit.Tag>(), null, out _, tagRule: "ninguno");
+            Assert.Equal(true, noneEmpty["cumple_regla"]);
             Assert.Throws<ArgumentException>(() => LightingAudit.Summarize(fx, tags, null, out _, tagRule: "dos"));
         }
 

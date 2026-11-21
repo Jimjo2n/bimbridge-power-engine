@@ -2,11 +2,11 @@
 // Acceptance 0.9.0 (N9-05): conduit runs of a level with their connectors, for the three-layer network analysis
 // (geometric continuity, physical connection, proximity). READ ONLY (exec modo consulta). args={"nivel":"Level 1"}
 // Returns [{"id","a":[x,y,z],"b":[x,y,z],"diam","sistema","con_a","con_b"}] in feet; con_* = id of the connected element or null.
-var nivel = args.ContainsKey("nivel") ? Convert.ToString(args["nivel"]) : null;
-var tramos = new List<object>();
+var level = args.ContainsKey("nivel") ? Convert.ToString(args["nivel"]) : null;
+var runs = new List<object>();
 foreach (var c in new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Conduit).WhereElementIsNotElementType().OfType<MEPCurve>())
 {
-    if (nivel != null && (doc.GetElement(c.ReferenceLevel?.Id ?? ElementId.InvalidElementId) as Level)?.Name != nivel) continue;
+    if (level != null && (doc.GetElement(c.ReferenceLevel?.Id ?? ElementId.InvalidElementId) as Level)?.Name != level) continue;
     var l = (c.Location as LocationCurve)?.Curve as Line;
     if (l == null) continue;
     var a = l.GetEndPoint(0); var b = l.GetEndPoint(1);
@@ -21,11 +21,11 @@ foreach (var c in new FilteredElementCollector(doc).OfCategory(BuiltInCategory.O
         return null;
     }
     var d = c.get_Parameter(BuiltInParameter.RBS_CONDUIT_DIAMETER_PARAM)?.AsDouble() ?? 0;
-    tramos.Add(new Dictionary<string, object>
+    runs.Add(new Dictionary<string, object>
     {
         ["id"] = ctx.Long(c.Id).ToString(System.Globalization.CultureInfo.InvariantCulture), ["a"] = new List<object> { a.X, a.Y, a.Z }, ["b"] = new List<object> { b.X, b.Y, b.Z },
         ["diam"] = d, ["sistema"] = c.LookupParameter("Service Type")?.AsString(), ["con_a"] = Other(a), ["con_b"] = Other(b),
     });
 }
-var ruta = ctx.Artefacto("conduits_090.json", Bimbridge.Protocol.Json.Write(tramos));
-return new { tramos = tramos.Count, ruta };
+var path = ctx.Artifact("conduits_090.json", Bimbridge.Protocol.Json.Write(runs));
+return new { tramos = runs.Count, ruta = path };

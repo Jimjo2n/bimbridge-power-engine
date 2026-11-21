@@ -432,7 +432,7 @@ def tables(args, paths):
     raw, _, _ = _raw_pages(path)
     sel = _page_sel(args, len(raw))
     it, layout = _open_pages(path, pages=sel)
-    res, descartadas = [], []
+    res, discarded = [], []
     for k, pg in enumerate(it):
         r = raw[sel[k] - 1]
         fr = Frame(pg.width, pg.height, r["userunit"], r["rotate"], r["mediabox"])
@@ -449,7 +449,7 @@ def tables(args, paths):
             ys, xs = t["ys"], t["xs"]
             row_h = sorted(ys[i] - ys[i + 1] for i in range(len(ys) - 1))
             if row_h and row_h[len(row_h) // 2] > float(args.get("max_alto_fila_pt", 54.0)) and not args.get("incluir_rejillas"):
-                descartadas.append(fr.to_visible({"pagina": sel[k], "bbox": [_r(xs[0]), _r(ys[-1]), _r(xs[-1]), _r(ys[0])],
+                discarded.append(fr.to_visible({"pagina": sel[k], "bbox": [_r(xs[0]), _r(ys[-1]), _r(xs[-1]), _r(ys[0])],
                                     "motivo": "rows of %.0f pt: probably a drawing grid, not a table" % row_h[len(row_h) // 2]}))
                 continue
             cells = []
@@ -467,7 +467,7 @@ def tables(args, paths):
             title.sort(key=lambda w: w["bbox"][0])
             res.append(fr.to_visible({"pagina": sel[k], "bbox": [_r(v) for v in bbox], "filas": len(cells), "columnas": len(cells[0]) if cells else 0,
                         "celdas": cells, "titulo": " ".join(w["texto"] for w in title) or None, "metodo": "reglas", "confianza": 0.85}))
-    return {"sha256": sha256_file(path), "tablas": res, "descartadas": descartadas, "clase": "extraccion_estructural"}
+    return {"sha256": sha256_file(path), "tablas": res, "descartadas": discarded, "clase": "extraccion_estructural"}
 
 
 def _grid_tables(hs, vs, tol=1.5):
@@ -629,7 +629,7 @@ def symbols(args, paths):
         # that the legend does not assign to another signature -> medium-confidence candidate; the rest of the group, ambiguous.
         legend_codes = {v["codigo"] for v in legend.values()}
         rest = {}
-        for firma, group in unclassified.items():
+        for signature_key, group in unclassified.items():
             labels = [e["rotulo"] for e in group if e["rotulo"]]
             top = max(set(labels), key=labels.count) if labels else None
             if top and top not in legend_codes and len(group) >= 3 and labels.count(top) >= 0.8 * len(group) and CODE_RX.match(top):
@@ -642,7 +642,7 @@ def symbols(args, paths):
                         e["codigo"] = top; e["confianza"] = 0.3; e["motivo"] = "group labeled \"%s\" but this shape does not have that label" % top
                         amb.append(e)
             else:
-                rest[firma] = len(group)
+                rest[signature_key] = len(group)
         unclassified = rest
         page = {"pagina": num, "marco": fr.json(), "leyenda": [dict(v, firma=k) for k, v in legend.items()], "candidatos": cands,
                 "ambiguos": amb, "sin_leyenda": [{"firma": k, "cantidad": v} for k, v in sorted(unclassified.items())],

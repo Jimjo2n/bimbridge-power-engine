@@ -67,9 +67,9 @@ fn run(job: &str, a: &Value) -> PeResult<Value> {
         }
         "duplicates" => {
             let dim = dimension(a)?;
-            let puntos = points(a, "puntos", dim)?;
-            let mut out = vec![0; puntos.len() / dim];
-            duplicates(&puntos, dim, number(a, "tol")?, &mut out, &cancel)?;
+            let pts = points(a, "puntos", dim)?;
+            let mut out = vec![0; pts.len() / dim];
+            duplicates(&pts, dim, number(a, "tol")?, &mut out, &cancel)?;
             Ok(json!({"grupo": out}))
         }
         "segment_contacts" => {
@@ -94,7 +94,7 @@ fn run(job: &str, a: &Value) -> PeResult<Value> {
 }
 
 fn fail(id: &Value, code: &str, error: &str) -> Value {
-    json!({"pe": PROTOCOL, "id": id, "codigo": code, "error": error})
+    json!({"pe": PROTOCOL, "id": id, "code": code, "error": error})
 }
 
 fn respond(req: &Value) -> Value {
@@ -103,12 +103,12 @@ fn respond(req: &Value) -> Value {
         return fail(id, "VERSION_INCOMPATIBLE", "contract other than pe=1");
     }
     let args = &req["args"];
-    let job = req["trabajo"].as_str().unwrap_or_default();
+    let job = req["job"].as_str().unwrap_or_default();
     if job == "hola" {
         if args["pe_min"].as_u64().unwrap_or(1) > 1 || args["pe_max"].as_u64().unwrap_or(1) < 1 {
             return fail(id, "VERSION_INCOMPATIBLE", "only contract pe=1");
         }
-        return json!({"pe": PROTOCOL, "id": id, "codigo": "OK", "resultado":
+        return json!({"pe": PROTOCOL, "id": id, "code": "OK", "result":
             {"motor": "rust_geometry_engine", "version": VERSION, "pe": PROTOCOL, "capacidades": JOBS}});
     }
     if !JOBS.contains(&job) {
@@ -121,8 +121,8 @@ fn respond(req: &Value) -> Value {
         return fail(id, "ERROR_INTERNO", "engine panic");
     };
     match outcome {
-        Ok(result) => json!({"pe": PROTOCOL, "id": id, "codigo": "OK", "resultado": result,
-            "telemetria": {"motor_ms": started.elapsed().as_secs_f64() * 1000.}}),
+        Ok(result) => json!({"pe": PROTOCOL, "id": id, "code": "OK", "result": result,
+            "telemetry": {"motor_ms": started.elapsed().as_secs_f64() * 1000.}}),
         Err(PeError::Invalid(msg)) => fail(id, "INVALIDO", &msg),
         Err(PeError::Cancelled) => fail(id, "CANCELADO", "job cancelled"),
     }
@@ -142,7 +142,7 @@ fn main() -> io::Result<()> {
             return output.flush();
         }
         let response = match serde_json::from_slice::<Value>(&line) {
-            Ok(req) if req["trabajo"] == "salir" => return Ok(()),
+            Ok(req) if req["job"] == "salir" => return Ok(()),
             Ok(req) => respond(&req),
             Err(_) => fail(&Value::Null, "INVALIDO", "unreadable JSON"),
         };

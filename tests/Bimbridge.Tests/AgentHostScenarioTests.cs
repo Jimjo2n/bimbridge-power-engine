@@ -46,7 +46,7 @@ namespace Bimbridge.Tests
             string Pending(int k)
             {
                 var st = AH.Read(state, out var vp, out _);
-                return vp.Order.Where(id => vp.ById[id].Writes && !skip.Contains(id) && st.Ops[id].State == OpState.Validada).Skip(k).First();
+                return vp.Order.Where(id => vp.ById[id].Writes && !skip.Contains(id) && st.Ops[id].State == OpState.Validated).Skip(k).First();
             }
             var faults = new List<Func<string>>
             {
@@ -69,7 +69,7 @@ namespace Bimbridge.Tests
                 processes++;
                 var st = AH.Read(state, out var vplan, out var diags);
                 Assert.NotNull(st);
-                var verified = st.Ops.Where(kv => kv.Value.State == OpState.Verificada).Select(kv => kv.Key).ToHashSet();
+                var verified = st.Ops.Where(kv => kv.Value.State == OpState.Verified).Select(kv => kv.Key).ToHashSet();
                 Log("$ agenthost ejecutar … [BIMBRIDGE_AH_FAULT=" + fault + "] → code " + r.Code + (r.Killed ? " (SIGKILL)" : "") + "\n  " + r.Out.Trim().Replace("\n", "\n  ") +
                     "\n  after the crash: " + Compact.Summary(vplan, st));
                 Assert.True(r.Killed, "should have died at " + fault + ": " + r);
@@ -88,38 +88,38 @@ namespace Bimbridge.Tests
             var final = AH.Read(state, out var plan, out _);
             var fresh = DurableSimModel.Open(model);
             Assert.Equal(1000, plan.Ops.Count);
-            Assert.Subset(final.Ops.Where(kv => kv.Value.State == OpState.Verificada).Select(kv => kv.Key).ToHashSet(), verifiedBefore);
+            Assert.Subset(final.Ops.Where(kv => kv.Value.State == OpState.Verified).Select(kv => kv.Key).ToHashSet(), verifiedBefore);
             // 1. nothing repeated: each write has at most one transaction; non-empty verified ones, exactly one
             foreach (var op in plan.Ops.Where(o => o.Writes))
             {
                 var n = fresh.TxFor(op.Id, hash).Count;
                 Assert.InRange(n, 0, 1);
-                if (final.Ops[op.Id].State == OpState.Verificada && !Ids(spec, "vacio_permitido").Contains(op.Id)) Assert.Equal(1, n);
+                if (final.Ops[op.Id].State == OpState.Verified && !Ids(spec, "vacio_permitido").Contains(op.Id)) Assert.Equal(1, n);
             }
             // 2. dependencies respected: no operation started before its dependencies were verified
             var journal = AH.Journal(state);
             var verifiedAt = new Dictionary<string, long>();
-            foreach (var j in journal.Where(x => Arg.GetString(x, "a") == OpState.Verificada)) verifiedAt[Arg.GetString(j, "op")] = Arg.GetLong(j, "seq").Value;
-            foreach (var j in journal.Where(x => Arg.GetString(x, "a") == OpState.EnEjecucion))
+            foreach (var j in journal.Where(x => Arg.GetString(x, "a") == OpState.Verified)) verifiedAt[Arg.GetString(j, "op")] = Arg.GetLong(j, "seq").Value;
+            foreach (var j in journal.Where(x => Arg.GetString(x, "a") == OpState.Running))
                 foreach (var d in plan.ById[Arg.GetString(j, "op")].DependsOn)
                     Assert.True(verifiedAt.TryGetValue(d, out var vs) && vs < Arg.GetLong(j, "seq"), "dependency " + d + " not verified before starting " + Arg.GetString(j, "op"));
             // 3. verification failures are not successes
-            Assert.All(Ids(spec, "esperado_erroneo"), id => { Assert.Equal(OpState.Fallida, final.Ops[id].State); Assert.Equal(ErrorClass.Verificacion, final.Ops[id].Error); });
-            Assert.Equal(OpState.Fallida, final.Ops[(string)spec["qc_desviado"]].State);
-            Assert.All(Ids(spec, "rechazadas"), id => Assert.Equal(ErrorClass.Rechazo, final.Ops[id].Error));
-            Assert.All(Ids(spec, "transitorias_ok"), id => Assert.Equal(OpState.Verificada, final.Ops[id].State));
-            Assert.All(Ids(spec, "transitorias_ko"), id => Assert.Equal(ErrorClass.Transitorio, final.Ops[id].Error));
-            Assert.All(Ids(spec, "vacio_permitido"), id => Assert.Equal(OpState.Verificada, final.Ops[id].State));
-            Assert.All(Ids(spec, "vacio_no_permitido"), id => Assert.Equal(ErrorClass.SinObjetivos, final.Ops[id].Error));
+            Assert.All(Ids(spec, "esperado_erroneo"), id => { Assert.Equal(OpState.Failed, final.Ops[id].State); Assert.Equal(ErrorClass.Verification, final.Ops[id].Error); });
+            Assert.Equal(OpState.Failed, final.Ops[(string)spec["qc_desviado"]].State);
+            Assert.All(Ids(spec, "rechazadas"), id => Assert.Equal(ErrorClass.BackendRejection, final.Ops[id].Error));
+            Assert.All(Ids(spec, "transitorias_ok"), id => Assert.Equal(OpState.Verified, final.Ops[id].State));
+            Assert.All(Ids(spec, "transitorias_ko"), id => Assert.Equal(ErrorClass.Transient, final.Ops[id].Error));
+            Assert.All(Ids(spec, "vacio_permitido"), id => Assert.Equal(OpState.Verified, final.Ops[id].State));
+            Assert.All(Ids(spec, "vacio_no_permitido"), id => Assert.Equal(ErrorClass.NoTargets, final.Ops[id].Error));
             Assert.DoesNotContain(final.Ops.Values, o => !OpState.IsFinal(o.State));
             // 4. the report (another process) identifies everything unresolved
             var rep = AH.Run(null, null, "estado", state, "informe");
             Log("$ agenthost estado <estado> informe\n  " + rep.Out.Trim());
             var repJ = Json.ParseObject(rep.Out.Trim().Split('\n').Last());
-            var unresolved = final.Ops.Count(kv => kv.Value.State != OpState.Verificada);
+            var unresolved = final.Ops.Count(kv => kv.Value.State != OpState.Verified);
             Assert.Equal((long)unresolved, Arg.GetLong(repJ, "sin_resolver"));
             var detail = Json.ParseObject(File.ReadAllText(Arg.GetString(repJ, "detalle")));
-            Assert.Equal(final.Ops.Where(kv => kv.Value.State != OpState.Verificada).Select(kv => kv.Key).OrderBy(x => x),
+            Assert.Equal(final.Ops.Where(kv => kv.Value.State != OpState.Verified).Select(kv => kv.Key).OrderBy(x => x),
                          ((List<object>)detail["sin_resolver"]).Select(x => Arg.GetString((Dictionary<string, object>)x, "id")).OrderBy(x => x));
             var exc = AH.Run(null, null, "estado", state, "excepciones");
             Log("$ agenthost estado <estado> excepciones\n  " + exc.Out.Trim().Replace("\n", "\n  "));

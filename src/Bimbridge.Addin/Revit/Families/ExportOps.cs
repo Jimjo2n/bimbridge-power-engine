@@ -20,7 +20,7 @@ namespace Bimbridge.Addin.Revit.Families
         private static string Folder(IDictionary<string, object> a)
         {
             var folder = Environment.ExpandEnvironmentVariables(Arg.GetString(a, "carpeta") ?? Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
-            if (!Path.IsPathRooted(folder)) throw new OpFail(Status.Invalido, "carpeta= needs a full path");
+            if (!Path.IsPathRooted(folder)) throw new OpFail(Status.Invalid, "carpeta= needs a full path");
             Directory.CreateDirectory(folder);
             return folder;
         }
@@ -31,14 +31,14 @@ namespace Bimbridge.Addin.Revit.Families
             if (string.IsNullOrWhiteSpace(name)) name = fallback + "_" + DateTime.Now.ToString("yyyy-MM-dd_HHmm", CultureInfo.InvariantCulture);
             name = string.Concat(name.Split(Path.GetInvalidFileNameChars())).Trim();
             if (name.EndsWith(ext, StringComparison.OrdinalIgnoreCase)) name = name.Substring(0, name.Length - ext.Length);
-            if (name.Length == 0) throw new OpFail(Status.Invalido, "invalid nombre=");
+            if (name.Length == 0) throw new OpFail(Status.Invalid, "invalid nombre=");
             return name;
         }
 
         private static void NotExisting(string target, IDictionary<string, object> a)
         {
             if (File.Exists(target) && !(Arg.GetBool(a, "sobrescribir") ?? false))
-                throw new OpFail(Status.NecesitaUsuario, target + " already exists; pass sobrescribir=si or a different nombre=");
+                throw new OpFail(Status.NeedsUser, target + " already exists; pass sobrescribir=si or a different nombre=");
         }
 
         /// <summary>IFC versions accepted by short name (those that exist in IFCVersion in 2022–2026).</summary>
@@ -49,13 +49,13 @@ namespace Bimbridge.Addin.Revit.Families
                 case "ifc2x3": case "2x3": return IFCVersion.IFC2x3CV2;
                 case "ifc4": case "ifc4rv": case "4": return IFCVersion.IFC4RV;
                 case "ifc4dtv": return IFCVersion.IFC4DTV;
-                default: throw new OpFail(Status.Invalido, "version: ifc2x3 (default), ifc4 (reference view) or ifc4dtv");
+                default: throw new OpFail(Status.Invalid, "version: ifc2x3 (default), ifc4 (reference view) or ifc4dtv");
             }
         }
 
         public static Dictionary<string, object> Ifc(Document doc, IDictionary<string, object> a, DocOps.Pending pend, List<string> diffs)
         {
-            if (doc.IsFamilyDocument) throw new OpFail(Status.NoSoportado, "doc ifc exports projects");
+            if (doc.IsFamilyDocument) throw new OpFail(Status.NotSupported, "doc ifc exports projects");
             var folder = Folder(a);
             var name = FileName(a, doc.Title, ".ifc");
             var target = Path.Combine(folder, name + ".ifc");
@@ -67,7 +67,7 @@ namespace Bimbridge.Addin.Revit.Families
             {
                 view = long.TryParse(viewArg, NumberStyles.Integer, CultureInfo.InvariantCulture, out var vid) ? doc.GetElement(Ids.ToId(vid)) as View
                        : new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>().FirstOrDefault(v => !v.IsTemplate && string.Equals(v.Name, viewArg, StringComparison.OrdinalIgnoreCase));
-                if (view == null) throw new OpFail(Status.Invalido, "view does not exist: '" + viewArg + "'");
+                if (view == null) throw new OpFail(Status.Invalid, "view does not exist: '" + viewArg + "'");
                 o.FilterViewId = view.Id;
             }
             pend.StartUtc = DateTime.UtcNow;
@@ -90,10 +90,10 @@ namespace Bimbridge.Addin.Revit.Families
 
         public static Dictionary<string, object> ScheduleCsv(Document doc, IDictionary<string, object> a, DocOps.Pending pend, List<string> diffs)
         {
-            var spec = Arg.GetString(a, "tabla") ?? throw new OpFail(Status.Invalido, "doc tabla_csv needs tabla= (schedule name or id)");
+            var spec = Arg.GetString(a, "tabla") ?? throw new OpFail(Status.Invalid, "doc tabla_csv needs tabla= (schedule name or id)");
             var vs = long.TryParse(spec, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) ? doc.GetElement(Ids.ToId(id)) as ViewSchedule
                      : new FilteredElementCollector(doc).OfClass(typeof(ViewSchedule)).Cast<ViewSchedule>().FirstOrDefault(v => !v.IsTemplate && string.Equals(v.Name, spec, StringComparison.OrdinalIgnoreCase));
-            if (vs == null) throw new OpFail(Status.Invalido, "schedule does not exist: '" + spec + "'");
+            if (vs == null) throw new OpFail(Status.Invalid, "schedule does not exist: '" + spec + "'");
             var folder = Folder(a);
             var name = FileName(a, vs.Name, ".csv");
             var target = Path.Combine(folder, name + ".csv");

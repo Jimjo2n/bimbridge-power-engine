@@ -30,7 +30,7 @@ namespace Bimbridge.AgentHost
         private ChainLog _log;
         private readonly Faults _faults;
         public readonly Dictionary<string, OpRecord> Ops = new Dictionary<string, OpRecord>(StringComparer.Ordinal);
-        public string PlanState { get; private set; } = PlanRunState.Activo;
+        public string PlanState { get; private set; } = PlanRunState.Active;
         public long Fencing { get; private set; }
         public long Seq => _log.LastSeq;
         /// <summary>Changes in order (seq, op, new state, error) for incremental queries.</summary>
@@ -133,12 +133,12 @@ namespace Bimbridge.AgentHost
                 {
                     if (f != Fencing) { diags.Add(Diagnostic.Error("escritor_obsoleto", where + ": written with fencing " + f + " when the current owner had " + Fencing)); return false; }
                     var op = Arg.GetString(r, "op");
-                    var de = Arg.GetString(r, "de");
+                    var from = Arg.GetString(r, "de");
                     var a = Arg.GetString(r, "a");
                     if (op == null || !Ops.TryGetValue(op, out var rec)) { diags.Add(Diagnostic.Error("operacion_desconocida", where + ": " + op)); return false; }
-                    if (!OpState.IsValid(de) || !OpState.IsValid(a)) { diags.Add(Diagnostic.Error("estado_desconocido", where + ": " + de + " → " + a)); return false; }
-                    if (rec.State != de) { diags.Add(Diagnostic.Error("transicion_inconsistente", where + ": " + op + " was in " + rec.State + ", the line says " + de)); return false; }
-                    if (!OpState.IsLegal(de, a)) { diags.Add(Diagnostic.Error("transicion_ilegal", where + ": " + op + " " + de + " → " + a)); return false; }
+                    if (!OpState.IsValid(from) || !OpState.IsValid(a)) { diags.Add(Diagnostic.Error("estado_desconocido", where + ": " + from + " → " + a)); return false; }
+                    if (rec.State != from) { diags.Add(Diagnostic.Error("transicion_inconsistente", where + ": " + op + " was in " + rec.State + ", the line says " + from)); return false; }
+                    if (!OpState.IsLegal(from, a)) { diags.Add(Diagnostic.Error("transicion_ilegal", where + ": " + op + " " + from + " → " + a)); return false; }
                     ApplyTransition(rec, r, seq);
                     Changes.Add((seq, op, a, rec.Error));
                     return true;
@@ -148,7 +148,7 @@ namespace Bimbridge.AgentHost
                     if (f != Fencing) { diags.Add(Diagnostic.Error("escritor_obsoleto", where)); return false; }
                     var acc = Arg.GetString(r, "accion");
                     if (Array.IndexOf(PlanActions, acc) < 0) { diags.Add(Diagnostic.Error("accion_desconocida", where + ": " + acc)); return false; }
-                    PlanState = acc == "pausar" ? PlanRunState.Pausado : acc == "cancelar" ? PlanRunState.Cancelado : PlanRunState.Activo;
+                    PlanState = acc == "pausar" ? PlanRunState.Paused : acc == "cancelar" ? PlanRunState.Cancelled : PlanRunState.Active;
                     return true;
                 }
                 case "nota":
@@ -200,7 +200,7 @@ namespace Bimbridge.AgentHost
         {
             if (Array.IndexOf(PlanActions, action) < 0) throw new ArgumentException(action);
             _log.Append(new Dictionary<string, object> { ["ev"] = "plan", ["f"] = Fencing, ["accion"] = action, ["t"] = Home.Now() });
-            PlanState = action == "pausar" ? PlanRunState.Pausado : action == "cancelar" ? PlanRunState.Cancelado : PlanRunState.Activo;
+            PlanState = action == "pausar" ? PlanRunState.Paused : action == "cancelar" ? PlanRunState.Cancelled : PlanRunState.Active;
         }
 
         public void Note(string op, string text, Dictionary<string, object> data = null)

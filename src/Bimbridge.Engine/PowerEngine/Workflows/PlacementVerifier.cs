@@ -54,7 +54,7 @@ namespace BimBridge.PowerEngine.Workflows
             };
             var gate = IndependentVerifier.CheckIndependence(ind, out var proof);
             if (gate.HasValue)
-                return new Dictionary<string, object> { ["estado"] = gate.Value.Estado, ["motivo"] = gate.Value.Motivo, ["nota"] = "no QA/QC verdict is issued without an independent source" };
+                return new Dictionary<string, object> { ["estado"] = gate.Value.State, ["motivo"] = gate.Value.Reason, ["nota"] = "no QA/QC verdict is issued without an independent source" };
 
             var diffs = new Dictionary<string, List<Dictionary<string, object>>>(StringComparer.Ordinal);
             void Add(string kind, Dictionary<string, object> d) { if (!diffs.TryGetValue(kind, out var l)) diffs[kind] = l = new List<Dictionary<string, object>>(); l.Add(d); }

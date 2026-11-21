@@ -43,14 +43,14 @@ namespace Bimbridge.Engine
             }
         }
 
-        public void Log(string author, string op, string estado, long elapsedMs, Dictionary<string, object> extra = null)
+        public void Log(string author, string op, string status, long elapsedMs, Dictionary<string, object> extra = null)
         {
             var e = new Dictionary<string, object>
             {
                 ["t"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture),
                 ["autor"] = author,
                 ["op"] = op,
-                ["estado"] = estado,
+                ["estado"] = status,
                 ["ms"] = elapsedMs,
             };
             if (extra != null) foreach (var kv in extra) e[kv.Key] = kv.Value;

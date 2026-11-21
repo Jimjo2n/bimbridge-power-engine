@@ -68,8 +68,8 @@ namespace Bimbridge.Engine
         /// without a result, or with a result that was not confirmed, it stays unknown.
         /// </summary>
         public static string StatusAfterDisposeError(string status) =>
-            status == PlanStatus.Aplicado || status == PlanStatus.Revertido || status == PlanStatus.Ensayado || status == PlanStatus.Conflicto
-                ? status : Status.Desconocido;
+            status == PlanStatus.Applied || status == PlanStatus.RolledBack || status == PlanStatus.Trialed || status == PlanStatus.Conflict
+                ? status : Status.Unknown;
 
         /// <summary>
         /// Functional trial failure: elements created and later deleted by the same plan must not be counted as missing.

@@ -22,7 +22,7 @@ namespace Bimbridge.Engine
         /// <summary>Authorized task (tarea=…). A job with a task continues even if the connection drops, and another connection with the same task can query it.</summary>
         public string Task;
         public string Kind;
-        public string Status = JobStatus.EnProceso;
+        public string Status = JobStatus.InProgress;
         public DateTime CreatedUtc;
         public DateTime? FinishedUtc;
         public Dictionary<string, object> Result;
@@ -43,15 +43,15 @@ namespace Bimbridge.Engine
         /// <summary>The Task doing the work (to wait for its end without polling).</summary>
         public System.Threading.Tasks.Task Work;
 
-        public bool IsFinal => Status != JobStatus.EnProceso;
+        public bool IsFinal => Status != JobStatus.InProgress;
 
         /// <summary>Response status at the end (ok, completado_con_diferencias, aplicado_error_resultado, parcial…).</summary>
-        public string FinalEstado;
+        public string FinalState;
 
         /// <summary>Status the AI sees: en_proceso while it runs; at the end, the real status (never "ok" for a failure).</summary>
-        public string Estado => Status == JobStatus.EnProceso ? Bimbridge.Protocol.Status.EnProceso
-            : Status == JobStatus.Listo ? (FinalEstado ?? Bimbridge.Protocol.Status.Ok)
-            : (ErrorStatus ?? (Status == JobStatus.Cancelado ? Bimbridge.Protocol.Status.Cancelado : Bimbridge.Protocol.Status.Error));
+        public string State => Status == JobStatus.InProgress ? Bimbridge.Protocol.Status.InProgress
+            : Status == JobStatus.Done ? (FinalState ?? Bimbridge.Protocol.Status.Ok)
+            : (ErrorStatus ?? (Status == JobStatus.Cancelled ? Bimbridge.Protocol.Status.Cancelled : Bimbridge.Protocol.Status.Error));
 
         internal List<Action<Job>> FinalHandlers = new List<Action<Job>>();
 
@@ -70,10 +70,10 @@ namespace Bimbridge.Engine
 
     public static class JobStatus
     {
-        public const string EnProceso = "en_proceso";
-        public const string Listo = "listo";
+        public const string InProgress = "en_proceso";
+        public const string Done = "listo";
         public const string Error = "error";
-        public const string Cancelado = "cancelado";
+        public const string Cancelled = "cancelado";
     }
 
     public sealed class JobStore
@@ -113,7 +113,7 @@ namespace Bimbridge.Engine
             lock (_lock) return _jobs.TryGetValue(id.Trim(), out var j) ? j : null;
         }
 
-        public void Complete(Job j, Dictionary<string, object> result, string estado = null)
+        public void Complete(Job j, Dictionary<string, object> result, string status = null)
         {
             lock (_lock)
             {
@@ -122,9 +122,9 @@ namespace Bimbridge.Engine
                 // AUD-18: the final status is decided HERE, before notifying anyone (the response, a later job query and the history see
                 // the same thing). A result with verification differences never ends up as "ok", even if the caller passes no status
                 // or passes "ok" by mistake.
-                j.FinalEstado = HasDifferences(result) && (estado == null || estado == Bimbridge.Protocol.Status.Ok)
-                    ? Bimbridge.Protocol.Status.ConDiferencias : estado;
-                j.Status = JobStatus.Listo;
+                j.FinalState = HasDifferences(result) && (status == null || status == Bimbridge.Protocol.Status.Ok)
+                    ? Bimbridge.Protocol.Status.CompletedWithDifferences : status;
+                j.Status = JobStatus.Done;
                 j.FinishedUtc = _now();
             }
             FireFinal(j);
@@ -139,8 +139,8 @@ namespace Bimbridge.Engine
             lock (_lock)
             {
                 if (j.IsFinal) return;
-                j.Status = status == JobStatus.Cancelado ? JobStatus.Cancelado : JobStatus.Error;
-                j.ErrorStatus = status == JobStatus.Cancelado ? Bimbridge.Protocol.Status.Cancelado : status;
+                j.Status = status == JobStatus.Cancelled ? JobStatus.Cancelled : JobStatus.Error;
+                j.ErrorStatus = status == JobStatus.Cancelled ? Bimbridge.Protocol.Status.Cancelled : status;
                 j.Error = error;
                 j.FinishedUtc = _now();
             }
@@ -201,12 +201,12 @@ namespace Bimbridge.Engine
                 if (t.IsFaulted)
                 {
                     var ex = t.Exception?.GetBaseException();
-                    Fail(j, ex is OperationCanceledException ? JobStatus.Cancelado : Bimbridge.Protocol.Status.Desconocido,
+                    Fail(j, ex is OperationCanceledException ? JobStatus.Cancelled : Bimbridge.Protocol.Status.Unknown,
                         "the job ended with an unhandled exception (" + (ex?.GetType().Name ?? "?") + ": " + ex?.Message +
                         "); it is unknown what was applied: reconcile before repeating");
                 }
-                else if (t.IsCanceled) Fail(j, JobStatus.Cancelado, "cancelled");
-                else if (!j.IsFinal) Fail(j, Bimbridge.Protocol.Status.Desconocido, "the job ended without recording its result; reconcile before repeating");
+                else if (t.IsCanceled) Fail(j, JobStatus.Cancelled, "cancelled");
+                else if (!j.IsFinal) Fail(j, Bimbridge.Protocol.Status.Unknown, "the job ended without recording its result; reconcile before repeating");
             }, TaskScheduler.Default);
         }
 

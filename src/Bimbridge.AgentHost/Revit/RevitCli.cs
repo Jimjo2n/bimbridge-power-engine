@@ -55,7 +55,7 @@ namespace Bimbridge.AgentHost
                 case "nrt07":
                     return Nrt07(a);
                 case "campana080":
-                    return Campana080(a);
+                    return RunCampaign080(a);
             }
             Console.Error.WriteLine("usage: revit instancias | identidad --revit-pid N | nrt04 --revit-pid N --salida DIR --categoria C --ids a,b,c --parametro P --valor V [--negativo-modificado] [--aceptar-workshared-local]\n       revit nrt05 --revit-pid N --ruta-esperada C:\\...\\copia.rvt --autorizo-persistente --salida DIR --categoria C --ids a,b,c --parametro P [--valor V]");
             return 64;
@@ -117,13 +117,13 @@ namespace Bimbridge.AgentHost
                         ["f"] = new List<object> { "id", "cat", "fam", "type", "lvl", "host", param }, ["page_size"] = 100L,
                     }, false);
                     var c2 = link.Call(Wire.OpContext, new Dictionary<string, object>(), false);
-                    var d = r.Datos as Dictionary<string, object>;
+                    var d = r.Data as Dictionary<string, object>;
                     var rows = d != null && d.TryGetValue("rows", out var rv) ? rv : null;
                     var json = Json.Write(rows);
                     return new Dictionary<string, object>
                     {
-                        ["momento"] = label, ["estado"] = r.Estado, ["filas"] = rows, ["huella"] = Sha(json), ["rev"] = c2.Rev,
-                        ["modificado"] = (c2.Datos as Dictionary<string, object>)?.GetValueOrDefault("modificado"),
+                        ["momento"] = label, ["estado"] = r.State, ["filas"] = rows, ["huella"] = Sha(json), ["rev"] = c2.Rev,
+                        ["modificado"] = (c2.Data as Dictionary<string, object>)?.GetValueOrDefault("modificado"),
                     };
                 }
                 bool ValidSnapshot(Dictionary<string, object> snap, out string why)
@@ -193,13 +193,13 @@ namespace Bimbridge.AgentHost
                 {
                     // P0 (Codex): both paths must reject BEFORE opening any group, and the pending change and IsModified must stay intact.
                     var d0n = (Dictionary<string, object>)report["diario"];
-                    var nota = Convert.ToString(d0n.GetValueOrDefault("nota"), CultureInfo.InvariantCulture) + " " + Convert.ToString(d0n.GetValueOrDefault("error"), CultureInfo.InvariantCulture);
+                    var noteText = Convert.ToString(d0n.GetValueOrDefault("nota"), CultureInfo.InvariantCulture) + " " + Convert.ToString(d0n.GetValueOrDefault("error"), CultureInfo.InvariantCulture);
                     var commitCall = link.Calls.LastOrDefault(c => (string)c["op"] == Wire.OpCommit);
-                    checks["commit_ensayo_rechazado_por_guardia"] = (string)d0n["estado_op"] == OpState.Fallida && nota.Contains(Engine.TrialGuard.Code)
-                                                                   && commitCall != null && (string)commitCall["estado"] == Status.Rechazado;
+                    checks["commit_ensayo_rechazado_por_guardia"] = (string)d0n["estado_op"] == OpState.Failed && noteText.Contains(Engine.TrialGuard.Code)
+                                                                   && commitCall != null && (string)commitCall["estado"] == Status.Rejected;
                     var er = link.Call(Wire.OpExec, new Dictionary<string, object> { [Wire.DocArg] = ctx["doc"], ["modo"] = "ensayo", ["codigo"] = "return 0;" }, true);
-                    report["exec_ensayo"] = new Dictionary<string, object> { ["estado"] = er.Estado, ["aviso"] = er.Aviso };
-                    checks["exec_ensayo_rechazado_por_guardia"] = er.Estado == Status.Rechazado && (er.Aviso ?? "").Contains(Engine.TrialGuard.Code);
+                    report["exec_ensayo"] = new Dictionary<string, object> { ["estado"] = er.State, ["aviso"] = er.Warning };
+                    checks["exec_ensayo_rechazado_por_guardia"] = er.State == Status.Rejected && (er.Warning ?? "").Contains(Engine.TrialGuard.Code);
                     var postN = Snapshot("despues");
                     report["despues"] = postN;
                     checks["relectura_valida"] = ValidSnapshot(postN, out _);
@@ -219,10 +219,10 @@ namespace Bimbridge.AgentHost
                 // 6. independent re-read after the rollback
                 var post = Snapshot("despues");
                 report["despues"] = post;
-                var ctx2 = link.Call(Wire.OpContext, new Dictionary<string, object>(), false).Datos as Dictionary<string, object>;
+                var ctx2 = link.Call(Wire.OpContext, new Dictionary<string, object>(), false).Data as Dictionary<string, object>;
                 var d0 = (Dictionary<string, object>)report["diario"];
                 var ev = d0["evidencia"] as Dictionary<string, object>;
-                checks["estado_op_ensayada"] = (string)d0["estado_op"] == OpState.Ensayada;
+                checks["estado_op_ensayada"] = (string)d0["estado_op"] == OpState.Trialed;
                 checks["grupo_rolledback_literal"] = ev != null && Convert.ToString(ev.GetValueOrDefault("addin_grupo_estado"), CultureInfo.InvariantCulture) == "RolledBack";
                 checks["verificacion_temporal_addin"] = ev != null && ev.GetValueOrDefault("addin_temporal_ok") is bool t && t;
                 checks["restauracion_addin"] = ev != null && ev.GetValueOrDefault("addin_restauracion_ok") is bool ro && ro;
@@ -235,7 +235,7 @@ namespace Bimbridge.AgentHost
                 checks["modificado_sin_cambios"] = Equals(pre["modificado"], post["modificado"]);
                 checks["mismo_documento"] = ctx2 != null && Arg.GetString(ctx2, "clave_doc") == backend.DocKey && Arg.GetLong(ctx2, "pid") == pid;
                 checks["sin_guardar_ni_sync"] = !link.Calls.Any(c => (string)c["op"] == Wire.OpDoc);
-                checks["no_persistio_como_aplicado"] = (string)d0["estado_op"] != OpState.Verificada;
+                checks["no_persistio_como_aplicado"] = (string)d0["estado_op"] != OpState.Verified;
                 var pass = checks.Values.All(v => v is bool b && b);
                 report["resultado"] = pass ? "APROBADA" : "FALLIDA";
                 report["fin"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
@@ -258,12 +258,12 @@ namespace Bimbridge.AgentHost
             if (!(ctx.GetValueOrDefault("worksharing") is bool ws && ws)) return null;
             if (!accept) return "the document is workshared; NRT-04 only on a disposable local copy (the operator can accept a local copy with --aceptar-workshared-local)";
             bool Local(string p) => !string.IsNullOrWhiteSpace(p) && p.Length > 2 && char.IsLetter(p[0]) && p[1] == ':' && (p[2] == '\\' || p[2] == '/');
-            var ruta = ctx.GetValueOrDefault("ruta") as string;
+            var docPath = ctx.GetValueOrDefault("ruta") as string;
             var central = ctx.GetValueOrDefault("central") as string;
             if ((docKey ?? "").StartsWith("nube:", StringComparison.OrdinalIgnoreCase)) return "workshared in the cloud: not accepted even with --aceptar-workshared-local";
-            if (!Local(ruta)) return "workshared without a local drive path (" + (ruta ?? "empty") + "): not accepted";
+            if (!Local(docPath)) return "workshared without a local drive path (" + (docPath ?? "empty") + "): not accepted";
             if (!string.IsNullOrWhiteSpace(central) && !Local(central)) return "workshared with a non-local central (" + central + "): not accepted";
-            deviation = "local workshared document accepted by the operator (--aceptar-workshared-local); path " + ruta + "; central " + (central ?? "(none)") + "; trial with rollback only, no save or sync";
+            deviation = "local workshared document accepted by the operator (--aceptar-workshared-local); path " + docPath + "; central " + (central ?? "(none)") + "; trial with rollback only, no save or sync";
             return null;
         }
 }

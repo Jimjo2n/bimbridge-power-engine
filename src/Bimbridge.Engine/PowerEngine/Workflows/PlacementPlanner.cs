@@ -23,8 +23,8 @@ namespace BimBridge.PowerEngine.Workflows
     {
         public string Code;
         public string FamilyType;        // "Family: Type" as used by the place operation
-        public double? ElevFt;           // offset above the level; null = use Montaje
-        public string Montaje;           // "losa" (underside of what is above) or another place mode
+        public double? ElevFt;           // offset above the level; null = use Mounting
+        public string Mounting;           // "losa" (underside of what is above) or another place mode
         public string Workset;
         public string Host;              // required host (ceiling, wall, slab…) — declared constraint
         public bool Directional;         // if true, the symbol orientation matters (strips, sconces)
@@ -50,7 +50,7 @@ namespace BimBridge.PowerEngine.Workflows
 
     public sealed class PlacementItem
     {
-        public string Id, Code, FamilyType, Level, Workset, Host, Montaje, Estado, Motivo;
+        public string Id, Code, FamilyType, Level, Workset, Host, Mounting, State, Reason;
         public double X, Y, RotDeg, Confidence;
         public double? ElevFt;
         public double Px, Py; public int Page;
@@ -59,14 +59,14 @@ namespace BimBridge.PowerEngine.Workflows
             var d = new Dictionary<string, object>
             {
                 ["id"] = Id, ["codigo"] = Code, ["tipo"] = FamilyType, ["nivel"] = Level, ["xy_ft"] = new List<object> { R(X), R(Y) },
-                ["giro_deg"] = Math.Round(RotDeg, 3), ["confianza"] = Confidence, ["estado"] = Estado,
+                ["giro_deg"] = Math.Round(RotDeg, 3), ["confianza"] = Confidence, ["estado"] = State,
                 ["fuente"] = new Dictionary<string, object> { ["pagina"] = (long)Page, ["punto_pt"] = new List<object> { R(Px), R(Py) } },
             };
             if (ElevFt.HasValue) d["elev_ft"] = R(ElevFt.Value);
-            if (Montaje != null) d["montaje"] = Montaje;
+            if (Mounting != null) d["montaje"] = Mounting;
             if (Workset != null) d["ws"] = Workset;
             if (Host != null) d["anfitrion"] = Host;
-            if (Motivo != null) d["motivo"] = Motivo;
+            if (Reason != null) d["motivo"] = Reason;
             return d;
         }
         private static object R(double v) => Math.Round(v, 5);
@@ -74,7 +74,7 @@ namespace BimBridge.PowerEngine.Workflows
 
     public sealed class PlacementPlan
     {
-        public string Estado = "listo";
+        public string State = "listo";
         public RegistrationResult Registration;
         public List<PlacementItem> Place = new List<PlacementItem>();
         public List<PlacementItem> Ambiguous = new List<PlacementItem>();
@@ -85,7 +85,7 @@ namespace BimBridge.PowerEngine.Workflows
 
         public Dictionary<string, object> ToJson(bool items = true) => new Dictionary<string, object>
         {
-            ["estado"] = Estado, ["fuente"] = Source, ["huella_plan"] = Fingerprint,
+            ["estado"] = State, ["fuente"] = Source, ["huella_plan"] = Fingerprint,
             ["resumen"] = new Dictionary<string, object> { ["colocar"] = (long)Place.Count, ["ambiguos"] = (long)Ambiguous.Count, ["ya_existen"] = (long)AlreadyThere.Count, ["lotes"] = (long)Batches.Count },
             ["registro"] = Registration?.ToJson(),
             ["colocar"] = items ? Place.Select(p => (object)p.ToJson()).ToList() : null,
@@ -108,8 +108,8 @@ namespace BimBridge.PowerEngine.Workflows
         {
             var plan = new PlacementPlan { Registration = reg };
             plan.Source["id"] = o.SourceId; plan.Source["sha256"] = o.SourceSha256; plan.Source["revision"] = o.SourceRevision;
-            if (reg == null || !reg.Ok) { plan.Estado = "sin_registro"; return plan; }
-            if (string.IsNullOrWhiteSpace(o.Level)) { plan.Estado = "sin_nivel"; return plan; }
+            if (reg == null || !reg.Ok) { plan.State = "sin_registro"; return plan; }
+            if (string.IsNullOrWhiteSpace(o.Level)) { plan.State = "sin_nivel"; return plan; }
             var byCode = (rules ?? new List<TypeRule>()).GroupBy(r => r.Code ?? "", StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
             var regRot = reg.RotationDeg;
 
@@ -134,12 +134,12 @@ namespace BimBridge.PowerEngine.Workflows
                 else
                 {
                     var r = rule[0];
-                    it.FamilyType = r.FamilyType; it.ElevFt = r.ElevFt; it.Montaje = r.Montaje; it.Workset = r.Workset; it.Host = r.Host;
+                    it.FamilyType = r.FamilyType; it.ElevFt = r.ElevFt; it.Mounting = r.Mounting; it.Workset = r.Workset; it.Host = r.Host;
                     var rot = r.Directional ? Norm180(s.RotDeg + regRot) : 0.0;
                     it.RotDeg = Math.Abs(rot) < o.MinRotationDeg ? 0 : rot;
                     if (s.Confidence < o.MinConfidence) Amb(it, "confianza_baja", "confidence " + s.Confidence.ToString("0.##", CultureInfo.InvariantCulture) + " < " + o.MinConfidence.ToString("0.##", CultureInfo.InvariantCulture));
-                    else if (!it.ElevFt.HasValue && string.IsNullOrEmpty(it.Montaje)) Amb(it, "sin_altura", "the rule gives neither height nor mounting mode: nothing is invented");
-                    else it.Estado = "colocar";
+                    else if (!it.ElevFt.HasValue && string.IsNullOrEmpty(it.Mounting)) Amb(it, "sin_altura", "the rule gives neither height nor mounting mode: nothing is invented");
+                    else it.State = "colocar";
                 }
                 items.Add(it);
             }
@@ -163,7 +163,7 @@ namespace BimBridge.PowerEngine.Workflows
                 .Where(e => string.IsNullOrWhiteSpace(e.Level) || string.Equals(e.Level, o.Level, StringComparison.OrdinalIgnoreCase)).ToList();
             if (ex.Count > 0)
             {
-                var cand = items.Where(i => i.Estado == "colocar").ToList();
+                var cand = items.Where(i => i.State == "colocar").ToList();
                 var q = new double[cand.Count * 2];
                 for (var i = 0; i < cand.Count; i++) { q[2 * i] = cand[i].X; q[2 * i + 1] = cand[i].Y; }
                 var r = new double[ex.Count * 2];
@@ -182,18 +182,18 @@ namespace BimBridge.PowerEngine.Workflows
                         Amb(cand[i], "existente_compartido", "element " + e.Id + " matches more than one symbol");
                     else
                     {
-                        cand[i].Estado = "ya_existe";
-                        cand[i].Motivo = "element " + e.Id + " of the same type at " + nn.Dist[i].ToString("0.###", CultureInfo.InvariantCulture) + " ft";
+                        cand[i].State = "ya_existe";
+                        cand[i].Reason = "element " + e.Id + " of the same type at " + nn.Dist[i].ToString("0.###", CultureInfo.InvariantCulture) + " ft";
                     }
                 }
             }
 
-            plan.Place = items.Where(i => i.Estado == "colocar").ToList();
-            plan.Ambiguous = items.Where(i => i.Estado == "ambiguo").ToList();
-            plan.AlreadyThere = items.Where(i => i.Estado == "ya_existe").ToList();
+            plan.Place = items.Where(i => i.State == "colocar").ToList();
+            plan.Ambiguous = items.Where(i => i.State == "ambiguo").ToList();
+            plan.AlreadyThere = items.Where(i => i.State == "ya_existe").ToList();
 
             // 4) "place" batches: same type, level, mounting/elev, rotation and workset; ≤ BatchMax points; stable order
-            foreach (var g in plan.Place.GroupBy(i => (i.FamilyType, i.Level, i.Montaje, Elev: i.ElevFt.HasValue ? Math.Round(i.ElevFt.Value, 6) : (double?)null, Rot: Math.Round(i.RotDeg, 3), i.Workset, i.Host,
+            foreach (var g in plan.Place.GroupBy(i => (i.FamilyType, i.Level, i.Mounting, Elev: i.ElevFt.HasValue ? Math.Round(i.ElevFt.Value, 6) : (double?)null, Rot: Math.Round(i.RotDeg, 3), i.Workset, i.Host,
                                             Parameters: OpSemantics.Canonical(byCode[i.Code][0].Params)))
                                         .OrderBy(g => g.Key.FamilyType, StringComparer.Ordinal).ThenBy(g => g.Key.Rot))
             {
@@ -208,7 +208,7 @@ namespace BimBridge.PowerEngine.Workflows
                         ["puntos"] = chunk.Select(i => (object)new List<object> { Math.Round(i.X, 6), Math.Round(i.Y, 6) }).ToList(),
                         ["items_fuente"] = chunk.Select(i => (object)i.Id).ToList(),
                     };
-                    if (g.Key.Elev.HasValue) op["elev"] = g.Key.Elev.Value; else op["montaje"] = g.Key.Montaje;
+                    if (g.Key.Elev.HasValue) op["elev"] = g.Key.Elev.Value; else op["montaje"] = g.Key.Mounting;
                     if (Math.Abs(g.Key.Rot) > 0) op["rot"] = g.Key.Rot;
                     if (g.Key.Workset != null) op["ws"] = g.Key.Workset;
                     if (!string.IsNullOrWhiteSpace(g.Key.Host)) op["anfitrion"] = g.Key.Host;
@@ -217,7 +217,7 @@ namespace BimBridge.PowerEngine.Workflows
                 }
             }
             plan.Fingerprint = Fingerprint(plan.Place);
-            if (plan.Ambiguous.Count > 0) plan.Estado = plan.Place.Count > 0 ? "listo_con_ambiguedades" : "solo_ambiguedades";
+            if (plan.Ambiguous.Count > 0) plan.State = plan.Place.Count > 0 ? "listo_con_ambiguedades" : "solo_ambiguedades";
             return plan;
         }
 
@@ -255,7 +255,7 @@ namespace BimBridge.PowerEngine.Workflows
             return l;
         }
 
-        private static void Amb(PlacementItem it, string estado, string motivo) { it.Estado = "ambiguo"; it.Motivo = estado + ": " + motivo; }
+        private static void Amb(PlacementItem it, string status, string reason) { it.State = "ambiguo"; it.Reason = status + ": " + reason; }
 
         private static double Norm180(double a) { a %= 360; if (a > 180) a -= 360; if (a <= -180) a += 360; return a; }
     }

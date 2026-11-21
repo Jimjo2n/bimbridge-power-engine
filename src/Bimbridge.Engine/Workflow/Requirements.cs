@@ -14,28 +14,28 @@ namespace Bimbridge.Engine.Workflow
     /// </summary>
     public static class SourceKinds
     {
-        public const string Usuario = "instruccion_usuario", Transcripcion = "transcripcion", Demostracion = "demostracion", Plano = "plano",
-            Pdf = "pdf", Tabla = "tabla", Markup = "markup", Revision = "revision", DecisionProfesional = "decision_profesional",
-            Inferencia = "inferencia_agente", Modelo = "modelo", PlanEjecucion = "plan_ejecucion";
+        public const string User = "instruccion_usuario", Transcript = "transcripcion", Demonstration = "demostracion", Plan = "plano",
+            Pdf = "pdf", Table = "tabla", Markup = "markup", Revision = "revision", ProfessionalDecision = "decision_profesional",
+            Inference = "inferencia_agente", Model = "modelo", ExecutionPlan = "plan_ejecucion";
 
-        public static readonly string[] All = { Usuario, Transcripcion, Demostracion, Plano, Pdf, Tabla, Markup, Revision, DecisionProfesional, Inferencia, Modelo, PlanEjecucion };
+        public static readonly string[] All = { User, Transcript, Demonstration, Plan, Pdf, Table, Markup, Revision, ProfessionalDecision, Inference, Model, ExecutionPlan };
 
         /// <summary>0.9.0: kinds that are NEVER an independent source for QA: the model itself, the plan that built it, or an inference.</summary>
-        public static bool NeverIndependent(string kind) => kind == Inferencia || kind == Modelo || kind == PlanEjecucion;
+        public static bool NeverIndependent(string kind) => kind == Inference || kind == Model || kind == ExecutionPlan;
 
         /// <summary>Default authority (higher wins). An agent inference never beats a documented source.</summary>
         public static int DefaultAuthority(string kind)
         {
             switch (kind)
             {
-                case DecisionProfesional: return 90;
+                case ProfessionalDecision: return 90;
                 case Revision: return 80;
-                case Usuario: return 70;
-                case Plano: case Pdf: case Tabla: return 60;
+                case User: return 70;
+                case Plan: case Pdf: case Table: return 60;
                 case Markup: return 55;
-                case Demostracion: return 50;
-                case Transcripcion: return 40;
-                case Inferencia: return 10;
+                case Demonstration: return 50;
+                case Transcript: return 40;
+                case Inference: return 10;
                 default: return 0;
             }
         }
@@ -45,9 +45,9 @@ namespace Bimbridge.Engine.Workflow
     public static class Confidence
     {
         public const string Observed = "OBSERVED", Inferred = "INFERRED", Unknown = "UNKNOWN";
-        public const string Comprobado = "COMPROBADO", Reportado = "REPORTADO", Pendiente = "PENDIENTE", Bloqueado = "BLOQUEADO";
+        public const string Verified = "COMPROBADO", Reported = "REPORTADO", Pending = "PENDIENTE", Blocked = "BLOQUEADO";
         public static bool IsConfidence(string s) => s == Observed || s == Inferred || s == Unknown;
-        public static bool IsEvidence(string s) => s == Comprobado || s == Reportado || s == Pendiente || s == Bloqueado;
+        public static bool IsEvidence(string s) => s == Verified || s == Reported || s == Pending || s == Blocked;
     }
 
     public sealed class SourceRef
@@ -167,7 +167,7 @@ namespace Bimbridge.Engine.Workflow
             if (!SourceKinds.All.Contains(r.Source.Kind)) return r.Id + ": unknown source kind " + r.Source.Kind;
             if (string.IsNullOrWhiteSpace(r.Key)) return r.Id + ": the regulated key is missing";
             if (!Confidence.IsConfidence(r.Confidence)) return r.Id + ": confidence must be OBSERVED, INFERRED or UNKNOWN";
-            if (r.Source.Kind == SourceKinds.Inferencia && r.Confidence == Confidence.Observed) return r.Id + ": an agent inference cannot be declared OBSERVED";
+            if (r.Source.Kind == SourceKinds.Inference && r.Confidence == Confidence.Observed) return r.Id + ": an agent inference cannot be declared OBSERVED";
             foreach (var s in r.Supersedes) if (!_all.Any(x => x.Id == s)) return r.Id + ": replaces " + s + ", which does not exist";
             if (string.IsNullOrWhiteSpace(r.Scope)) r.Scope = "*";
             _all.Add(r);

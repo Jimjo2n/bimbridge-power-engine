@@ -120,7 +120,7 @@ namespace Bimbridge.Tests
             Assert.Equal(SnapshotLookup.Ok, store.Get(id, "s1", null, out _));
             now = now.AddMinutes(6);
             Assert.Equal(SnapshotLookup.Evicted, store.Get(id, "s1", null, out _));          // reported, not silently invalidated
-            Assert.Contains("vencido", store.EvictionReason(id, "s1"));
+            Assert.Contains("expired",store.EvictionReason(id, "s1"));
             Assert.Null(store.EvictionReason(id, "s2"));                                     // the reason is only given to the owner session
             Assert.Equal(0, store.Cells);
             Assert.Equal(0, store.EstimatedBytes);
@@ -176,7 +176,7 @@ namespace Bimbridge.Tests
             Assert.Equal(SnapshotLookup.Ok, store.Get(a, "s1", null, out _)); now = now.AddSeconds(1);   // a becomes the most recent
             var c = Put(store, "s3", "d1", 1, q, rows, () => 1); now = now.AddSeconds(1);                // exceeds d1: b is evicted (LRU of d1)
             Assert.Equal(SnapshotLookup.Evicted, store.Get(b, "s2", null, out _));
-            Assert.Contains("documento", store.EvictionReason(b, "s2"));
+            Assert.Contains("document", store.EvictionReason(b, "s2"));
             var d = Put(store, "s4", "d2", 1, q, rows, () => 1); now = now.AddSeconds(1);                // fits in the global limit (3)
             var e = Put(store, "s5", "d3", 1, q, rows, () => 1);                                         // exceeds the global limit: the LRU (a) is evicted
             Assert.Equal(SnapshotLookup.Evicted, store.Get(a, "s1", null, out _));

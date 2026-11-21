@@ -29,7 +29,7 @@ namespace Bimbridge.Tests
             Assert.Empty(FamilyPortAudit.Compare(source, project));
             project[0] = Port("desague", "DomesticColdWater", "entrada", 25);
             Assert.Collection(FamilyPortAudit.Compare(source, project),
-                row => Assert.Contains("sistema", row), row => Assert.Contains("flujo", row), row => Assert.Contains("radio", row));
+                row => Assert.Contains("sistema", row), row => Assert.Contains("flujo", row), row => Assert.Contains("radius", row));
             Assert.Contains("no placed instance", Assert.Single(FamilyPortAudit.Compare(source, null)));
         }
 

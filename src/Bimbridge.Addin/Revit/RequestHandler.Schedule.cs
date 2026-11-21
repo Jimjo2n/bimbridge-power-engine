@@ -17,10 +17,10 @@ namespace Bimbridge.Addin.Revit
         private async Task<Response> ScheduleCheck(Request request, CancellationToken ct)
         {
             var selector = Arg.GetString(request.Args, "tabla")?.Trim();
-            if (string.IsNullOrEmpty(selector)) return Response.Fail(request.Id, Status.Invalido, "give tabla= with the ID or exact name");
+            if (string.IsNullOrEmpty(selector)) return Response.Fail(request.Id, Status.Invalid, "give tabla= with the ID or exact name");
             ScheduleAudit audit;
             try { audit = new ScheduleAudit(request.Args); }
-            catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
+            catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalid, ex.Message); }
 
             Dictionary<string, object> data = null;
             string error = null;
@@ -87,12 +87,12 @@ namespace Bimbridge.Addin.Revit
                 return true;
             }, highPriority: false, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!work.Ok) return FromWork(request.Id, work);
-            if (error != null) return Response.Fail(request.Id, Status.Invalido, error);
+            if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
             var outcome = Arg.GetString(data, "resultado");
             return new Response
             {
-                Id = request.Id, Rev = revision, Datos = data,
-                Estado = outcome == "con_diferencias" || outcome == "no_evaluable" ? Status.ConDiferencias : Status.Ok,
+                Id = request.Id, Rev = revision, Data = data,
+                State = outcome == "con_diferencias" || outcome == "no_evaluable" ? Status.CompletedWithDifferences : Status.Ok,
             };
         }
     }

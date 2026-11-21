@@ -15,15 +15,15 @@ namespace Bimbridge.Engine.Coverage
     /// </summary>
     public static partial class CapabilityCatalog
     {
-        private static CapabilityEntry Unknown(string id, string dom, string sub, string es, string en, string op, string expected, string[] cmds, string pending, string prio = "P2") => new CapabilityEntry
+        private static CapabilityEntry Unknown(string id, string dom, string sub, string name, string nameEn, string op, string expected, string[] cmds, string pending, string prio = "P2") => new CapabilityEntry
         {
-            Id = id, Domain = dom, Subdomain = sub, Name = es, NameEn = en, Operation = op, Expected = expected, Strategy = "none",
+            Id = id, Domain = dom, Subdomain = sub, Name = name, NameEn = nameEn, Operation = op, Expected = expected, Strategy = "none",
             Status = CoverageStatus.UNKNOWN, PostableCommands = cmds ?? new string[0], Limitations = "research pending: " + pending, Priority = prio,
         };
 
-        private static CapabilityEntry NotApplicable(string id, string dom, string sub, string es, string en, string[] cmds, string why) => new CapabilityEntry
+        private static CapabilityEntry NotApplicable(string id, string dom, string sub, string name, string nameEn, string[] cmds, string why) => new CapabilityEntry
         {
-            Id = id, Domain = dom, Subdomain = sub, Name = es, NameEn = en, Operation = "UI", Expected = "not applicable: " + why, Strategy = "none", DocumentKind = "any",
+            Id = id, Domain = dom, Subdomain = sub, Name = name, NameEn = nameEn, Operation = "UI", Expected = "not applicable: " + why, Strategy = "none", DocumentKind = "any",
             Status = CoverageStatus.NOT_APPLICABLE, PostableCommands = cmds ?? new string[0], Limitations = why, Priority = "P3",
         };
 
