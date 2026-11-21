@@ -50,7 +50,7 @@ namespace Bimbridge.AgentHost
         public static readonly Dictionary<string, string> RecipeFor = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["set_parameter"] = "batch_parameter",
-            ["verify_qc"] = null,   // the recipe is the "recipe" parameter (qc_manifiesto | montaje_soportes)
+            ["verify_qc"] = null,   // the recipe is the "recipe" parameter (qc_manifest | mount_supports)
         };
 
         public RevitTaskAdapter(string docKey, string docPrint) { DocKey = docKey; DocPrint = docPrint; }
@@ -79,7 +79,7 @@ namespace Bimbridge.AgentHost
                     var name = "ah_" + op.Id.Substring(3, 12);
                     s.ResolveScope.Add(new Dictionary<string, object>
                     {
-                        ["tool_name"] = "query", ["category"] = op.ScopeValue("category"), ["level"] = op.ScopeValue("level"), ["save_as"] = name,
+                        ["tool"] = "query", ["category"] = op.ScopeValue("category"), ["level"] = op.ScopeValue("level"), ["save_as"] = name,
                     });
                     s.Args["sheet_set"] = "$" + name;
                     s.Args["parameter"] = op.Param("parameter");

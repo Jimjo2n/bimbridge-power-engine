@@ -443,7 +443,7 @@ namespace Bimbridge.Engine.Workflows
             if (!File.Exists(p)) return null;
             try
             {
-                var d = Json.ParseObject(File.ReadAllText(p, Encoding.UTF8));
+                var d = LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(p, Encoding.UTF8)));
                 if (Arg.GetString(d, "schema") != Baseline.Schema) throw new InvalidDataException("baseline inventory with unknown schema");
                 var b = new Baseline
                 {

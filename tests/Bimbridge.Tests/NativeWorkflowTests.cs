@@ -350,6 +350,31 @@ namespace Bimbridge.Tests
             Assert.Throws<InvalidDataException>(() => CopyMonitorExpectations.FromText(e.ToText().Replace("\"WC: A\"", "\"WC: C\"")));
         }
 
+        [Fact]
+        public void LegacyBaseline_WithSpanishKeys_IsStillReadable()
+        {
+            // A baseline frozen by 0.9.4: Spanish keys in the .inv and in the expectations text it carries (hash over that text).
+            var key = WorkflowReceipt.KeyFor("copy_monitor_fixtures", "doc-A", "link-1", "predeterminada");
+            var e = Expect(maps: new List<TypeMapping> { new TypeMapping { Source = "WC: B", Target = "WC: A" } });
+            var text = e.ToText();
+            foreach (var kv in new Dictionary<string, string> { ["schema"] = "esquema", ["host"] = "anfitrion", ["link"] = "vinculo", ["link_revision"] = "revision_vinculo",
+                         ["category"] = "categoria", ["transformation"] = "transformacion", ["mapping"] = "mapeo", ["origin"] = "origen", ["target"] = "destino",
+                         ["excluded"] = "excluido", ["origin_fingerprint"] = "huella_origen", ["fingerprint"] = "huella" })
+                text = text.Replace("\"" + kv.Key + "\":", "\"" + kv.Value + "\":");
+            Assert.DoesNotContain("\"schema\"", text);
+            var created = DateTime.UtcNow.ToString("o", System.Globalization.CultureInfo.InvariantCulture);
+            Directory.CreateDirectory(_dir);
+            File.WriteAllText(Path.Combine(_dir, key + ".inv"), Bimbridge.Protocol.Json.Write(new Dictionary<string, object>
+            {
+                ["esquema"] = ReceiptStore.Baseline.Schema, ["clave_intento"] = key, ["documento"] = "doc-A", ["vinculo"] = "link-1", ["ids"] = new List<object> { 7L },
+                ["sha256"] = ReceiptStore.Baseline.Hash(key, "doc-A", "link-1", new long[] { 7 }, text), ["creado"] = created, ["expectativas"] = text,
+            }));
+            var r = CopyMonitorFlow.Load(Store(), key, e, true);
+            Assert.False(r.Conflict, string.Join("; ", r.Differences));
+            Assert.Equal(e.Fingerprint, r.Frozen.Fingerprint);
+            Assert.Equal(new long[] { 7 }, r.Baseline.Ids);
+        }
+
         // ------------------------------------------------------------------ #23 capability matrix
 
         [Theory]

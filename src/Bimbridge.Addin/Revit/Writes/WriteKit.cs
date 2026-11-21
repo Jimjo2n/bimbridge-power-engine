@@ -188,7 +188,7 @@ namespace Bimbridge.Addin.Revit.Writes
                     if (v is string s2)
                     {
                         var t = s2.Trim().ToLowerInvariant();
-                        if (IsYesNo(p) && (t == "yes" || t == "yes" || t == "yes" || t == "true" || t == "1")) { value = 1L; return true; }
+                        if (IsYesNo(p) && (t == "yes" || LegacyAliases.IsLegacyYes(t) || t == "true" || t == "1")) { value = 1L; return true; }
                         if (IsYesNo(p) && (t == "no" || t == "false" || t == "0")) { value = 0L; return true; }
                         if (long.TryParse(t, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n)) { value = n; return true; }
                     }
@@ -206,7 +206,7 @@ namespace Bimbridge.Addin.Revit.Writes
                         return true;
                     }
                     var name = v == null ? "" : Convert.ToString(v, CultureInfo.InvariantCulture).Trim();
-                    if (name.Length == 0 || name.Equals("none", StringComparison.OrdinalIgnoreCase) || name.Equals("none", StringComparison.OrdinalIgnoreCase) || name.Equals("none", StringComparison.OrdinalIgnoreCase))
+                    if (name.Length == 0 || name.Equals("none", StringComparison.OrdinalIgnoreCase) || LegacyAliases.IsLegacyNone(name))
                     {
                         value = -1L; show = "none"; return true;
                     }

@@ -218,7 +218,7 @@ namespace Bimbridge.Tests
                 var diag = core.Diagnose();
                 foreach (var v in SetupCore.SupportedVersions)
                     Assert.Equal(true, ((System.Collections.Generic.Dictionary<string, object>)((System.Collections.Generic.Dictionary<string, object>)diag["addin"])[v])["match"]);
-                Assert.True(File.Exists(Path.Combine(_p.AddinsDir("2026"), "Bimbridge", "recipes", "tag_fixtures.cs")));
+                Assert.True(File.Exists(Path.Combine(_p.AddinsDir("2026"), "Bimbridge", "recipes", "tag_lights.cs")));
                 Assert.True(File.Exists(Path.Combine(_p.BinDir, "Bimbridge.AgentHost.exe")));
                 Assert.True(File.Exists(Path.Combine(_p.BinDir, "power_engine", "bimbridge-power-engine.exe")));
             }

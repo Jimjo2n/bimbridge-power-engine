@@ -77,6 +77,69 @@ namespace Bimbridge.Tests
         }
 
         [Fact]
+        public void UserValues_AreNeverTranslated_OnlyEnumLikeValuesAre()
+        {
+            var a = new Dictionary<string, object>
+            {
+                ["valor"] = "sí", ["sobrescribir"] = "si", ["sistema"] = "agua_fria",
+                ["ops"] = new List<object>
+                {
+                    new Dictionary<string, object> { ["op"] = "set_param", ["ids"] = "5", ["nombre"] = "Comments", ["valor"] = "Sí" },
+                    new Dictionary<string, object> { ["op"] = "view_set", ["ids"] = "5", ["plantilla"] = "Plano" },
+                },
+            };
+            LegacyAliases.NormalizeArgs(Wire.OpPlan, a);
+            Assert.Equal("sí", a["value"]);
+            Assert.Equal("yes", a["overwrite"]);
+            Assert.Equal("agua_fria", a["system"]);                    // a system type name outside connectors
+            var ops = ((List<object>)a["ops"]).Cast<Dictionary<string, object>>().ToList();
+            Assert.Equal("Sí", ops[0]["value"]);
+            Assert.Equal("Plano", ops[1]["template"]);                  // a view template name, not the legacy "plan"
+            // Connectors: system= and flujo= are enums of the connector.
+            var fam = new Dictionary<string, object> { ["sistema"] = "agua_fria", ["flujo"] = "entrada" };
+            LegacyAliases.NormalizeArgs(Wire.OpFam, fam);
+            Assert.Equal("cold_water", fam["system"]);
+            Assert.Equal("in", fam["flow"]);
+            // One-line commands: a legacy "sí" is a flag except where it is the user's text.
+            Assert.Equal("Sí", Command.Parse("set value=Sí").Args["value"]);
+            Assert.Equal("sí", Command.Parse("set valor=sí").Args["valor"]);
+            Assert.Equal(true, Command.Parse("doc save_as overwrite=si").Args["overwrite"]);
+        }
+
+        [Fact]
+        public void LegacyGeoCategories_Lengths_SetupSwitches_RecipeArgsAndManifests_AreRead()
+        {
+            var g = Bimbridge.Engine.Geo.GeoSpec.Parse(new Dictionary<string, object> { ["name"] = "montaje", ["against"] = "techos,vigas", ["cat"] = "luminarias" });
+            Assert.Equal("mounting", g.Recipe);
+            Assert.Equal(new[] { "Roofs", "StructuralFraming" }, g.Against);          // 0.9.3 "techos" meant Revit roofs
+            Assert.Equal(new[] { "LightingFixtures" }, g.Categories);
+            Assert.Equal(new[] { "Ceilings" }, Bimbridge.Engine.Geo.GeoSpec.ExpandCategories(new[] { "ceilings" }));
+
+            Assert.True(Lengths.TryParse("6 pulg", out var ft, out _));
+            Assert.Equal(0.5, ft, 6);
+
+            Assert.Equal("update", LegacyAliases.SetupSwitch("actualizar"));
+            Assert.Equal("levels=rpw", LegacyAliases.SetupSwitch("niveles=rpw"));
+            Assert.Equal("restore=c:\\x", LegacyAliases.SetupSwitch("restaurar=c:\\x"));
+            Assert.Equal("quiet", LegacyAliases.SetupSwitch("quiet"));
+
+            var args = new Dictionary<string, object> { ["vista"] = 12L, ["guardar"] = "si", ["parametro"] = "Comments", ["valor"] = "si", ["antes"] = "guardar" };
+            LegacyAliases.NormalizeRecipeArgs(args);
+            Assert.Equal(12L, args["view"]);
+            Assert.Equal("yes", args["save"]);
+            Assert.Equal("si", args["value"]);                                       // the value written to the model is the user's
+            Assert.Equal("save", args["before"]);
+
+            var m = Json.ParseObject("{\"tolerancias\":{\"giro\":5},\"elementos\":[{\"ref\":\"L-1\",\"x\":1,\"y\":2,\"giro\":90,\"nivel\":\"L1\",\"tipos\":[\"D\"],\"etiqueta\":true}]}");
+            var exp = Bimbridge.Engine.Qc.ManifestQc.Parse(m, out var opt);
+            Assert.Equal(5.0, opt.TolRot);
+            Assert.Equal(90.0, exp[0].RotDeg ?? 0);
+            Assert.Equal("L1", exp[0].Level);
+            Assert.Equal(new[] { "D" }, exp[0].Types);
+            Assert.True(exp[0].Tag == true);
+        }
+
+        [Fact]
         public void EnglishInput_IsLeftUntouched()
         {
             var a = new Dictionary<string, object> { ["code"] = "x", ["mode"] = "trial", ["key"] = "k", ["red"] = 1L };
@@ -105,8 +168,11 @@ namespace Bimbridge.Tests
             Assert.Equal(Status.Held, payload["status"]);
             Assert.Equal(1L, ((Dictionary<string, object>)payload["data"])["x"]);
             // The same key and operation after the upgrade is recognized as already done, not a different operation.
-            var b = j.Begin("k1", "d", Wire.OpExec, OperationJournal.HashArgs(Wire.OpExec, args), null, "s2", OperationJournal.ReconcileMode.None,
-                legacyHash: OperationJournal.LegacyHashArgs(Wire.OpExec, args));
+            // Real requests carry the control args (key, task): 0.9.4 stripped them under their old names, so they never enter the legacy fingerprint.
+            var withKey = new Dictionary<string, object>(args) { [Wire.KeyArg] = "k1", [Wire.TaskArg] = "t1" };
+            Assert.Equal(legacyHash, OperationJournal.LegacyHashArgs(Wire.OpExec, withKey));
+            var b = j.Begin("k1", "d", Wire.OpExec, OperationJournal.HashArgs(Wire.OpExec, withKey), null, "s2", OperationJournal.ReconcileMode.None,
+                legacyHash: OperationJournal.LegacyHashArgs(Wire.OpExec, withKey));
             Assert.Equal(OperationJournal.BeginKind.Completed, b.Kind);
             // A really different operation with the same key still conflicts.
             var other = new Dictionary<string, object> { ["code"] = "return 2;", ["mode"] = "run" };

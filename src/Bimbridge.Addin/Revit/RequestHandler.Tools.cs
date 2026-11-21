@@ -314,7 +314,7 @@ namespace Bimbridge.Addin.Revit
                 cap.Px = (int)px.Value;
             }
             var color = (Arg.GetString(request.Args, "color_by") ?? "").Trim().ToLowerInvariant();
-            if (color == "categories" || color == "categories" || color == "true" || color == "yes" || color == "yes") cap.ColorByCategory = true;
+            if (color == "categories" || color == "true" || color == "yes") cap.ColorByCategory = true;
             else if (color.Length > 0 && color != "no" && color != "false") return Response.Fail(request.Id, Status.Invalid, "color_by: categories (or nothing)");
 
             // resaltar: "$a" | "1,2,3" | "$a=rojo;$b=azul;123,456=#00AAFF"

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- chore(i18n)!: **everything is now English** — MCP commands and arguments, operation names and keys, enum values, statuses, response keys (`status`, `data`, `warning`), guides, errors, persisted keys and data folders (`tasks\`, `recipes\`, `operations\`…).
+  - **Spanish input is still accepted until 0.9.5** (one version, `LegacyAliases`): old commands, argument names and enum values are read as their English equivalents. Outputs are English only. User values (parameter values, names, text) are never translated: `set value=Sí` writes `Sí`.
+  - Data written by 0.9.3/0.9.4 stays readable in place (journals, tasks, receipts, Copy/Monitor baselines, grants, manifests, config.json); the installer moves the old folders to the English names. Hash-chained audit records are never rewritten and retries of keys recorded before the update are recognized as the same operation.
+  - Recipes renamed: `etiquetar_luces` → `tag_lights`, `parametro_por_lote` → `batch_parameter`, `qc_manifiesto` → `qc_manifest`, `montaje_soportes` → `mount_supports`, `exportar_laminas` → `export_sheets`. The old names and the old `args.*` input names of these installed recipes (`vista`, `parametro`, `valor`, `guardar=si`…) are accepted until 0.9.5.
+  - Scripting API renamed: `Receta` → `Recipe`, `PoliticaTx.PorUnidad/Ninguna/Lectura` → `TxPolicy.PerUnit/None/ReadOnly`, `Unidad` → `Unit`, `Verificacion` → `Verification`, `ctx.Omitir` → `ctx.Skip`, `ctx.Artefacto` → `ctx.Artifact`, `ctx.Excepcion` → `ctx.Exception`, `OmitirUnidad` → `SkipUnit`, overrides `Ejecutar/Preparar/Unidades/Verificar/Postcondicion` → `Run/Prepare/Units/Verify/Postcondition`, `Bim.Montaje` → `Bim.Mounting`, `Bim.Grupos` → `Bim.Groups`, `Bim.Vistas` → `Bim.Views`, `Bim.Manifiesto` → `Bim.Manifest`. Setup rewrites saved scripts and recipes in the migrated `recipes\` and `scripts\` folders.
+  - Installer switches are English (`/update`, `/uninstall`, `/replace`, `/removedata`, `/restore[=folder]`, `/levels=`, `/diagnostics`, `/allow-older`, `/apply-pending`); the old `/actualizar`, `/desinstalar`, `/reemplazar`, `/borrardatos`, `/restaurar`, `/niveles=`, `/diagnostico`, `/permitir-anterior`, `/aplicar-pendiente` still work until 0.9.5.
+  - Delivery confirmations take `origin=user:…` (`usuario:…` still accepted). Geo `against=techos` keeps meaning roofs; use `roofs` or `ceilings`.
+  - **What still breaks:** C# code sent inline by an agent (`code=`, `exec`) or loaded with `file=` from a folder the installer did not migrate must use the English scripting API. **Finish or cancel paused tasks before updating**: their saved recipe copy is bound to a hash and is not rewritten. **Finish in-flight AgentHost plans before updating** (alpha): `plan.json`/`model.json` written by 0.9.4 are not migrated.
+
 ## 0.9.4 experimental
 
 - chore(rename)!: the product, projects, namespaces, MCP server (`bimbridge`), environment variables (`BIMBRIDGE_*`) and data folders (`%LOCALAPPDATA%\Bimbridge`, `%APPDATA%\Bimbridge`) now use the BIMBRIDGE name. Environment variables also have English names: `BIMBRIDGE_PROFILE`, `BIMBRIDGE_AGENT`, `BIMBRIDGE_CONVERSATION`, `BIMBRIDGE_MODEL`, `BIMBRIDGE_REVIT_NATIVE`, `BIMBRIDGE_UPDATE_KEY` and the AgentHost test hooks `BIMBRIDGE_AH_FAULT`, `_FAULT_MODE`, `_FAULT_MARK`, `_DELAY`, `_LEASE_MS`, `_EVIDENCE`.

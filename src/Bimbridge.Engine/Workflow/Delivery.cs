@@ -29,7 +29,7 @@ namespace Bimbridge.Engine.Workflow
         /// <summary>
         /// 0.9.0 (P0): critical milestones. Their receipt requires the model revision and provenance: "origin" (which operation or person
         /// produced it) and "evidence" = VERIFIED (observed by BIMBRIDGE). A REPORTED result never closes a critical milestone,
-        /// except the delivery confirmation, which is a statement by a person ("origin" = "usuario:…").
+        /// except the delivery confirmation, which is a statement by a person ("origin" = "user:…").
         /// </summary>
         public static readonly HashSet<string> Critical = new HashSet<string>
         {
@@ -112,7 +112,7 @@ namespace Bimbridge.Engine.Workflow
                 var ev = Arg.GetString(r.Data, "evidence");
                 if (r.Stage == DeliveryStages.DeliveryConfirmed)
                 {
-                    if (!origin.StartsWith("usuario:", StringComparison.OrdinalIgnoreCase)) return r.Stage + ": the delivery confirmation is given by a person (origin=user:…), not the agent";
+                    if (!origin.StartsWith("user:", StringComparison.OrdinalIgnoreCase) && !origin.StartsWith(LegacyAliases.UserOriginPrefix, StringComparison.OrdinalIgnoreCase)) return r.Stage + ": the delivery confirmation is given by a person (origin=user:…), not the agent";
                 }
                 else if (ev != Confidence.Verified)
                     return r.Stage + ": the evidence is " + (ev ?? "(not stated)") + "; a critical milestone requires VERIFIED (observed by BIMBRIDGE), not a reported result";

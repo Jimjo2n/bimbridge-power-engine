@@ -8,7 +8,7 @@ namespace BimBridge.PowerEngine.Workflows
 {
     public sealed class RiserNode
     {
-        public string Id, Label, Kind;   // Kind: panel | dispositivo | union | terminal
+        public string Id, Label, Kind;   // Kind: panel | device | junction | terminal
         public string Level; public double LevelElevFt;
         public bool Terminal => Kind == "terminal" || Kind == "device";
     }
@@ -45,7 +45,7 @@ namespace BimBridge.PowerEngine.Workflows
             (int[] Component, int[] Degree) C(int[] e) => engine != null ? engine.Components(idx.Count, e) : GeometryKernels.Components(idx.Count, e);
             var all = C(Flat(good));
             var phys = C(Flat(good.Where(e => e.Kind == "physical" && !string.IsNullOrEmpty(e.PhysicalId))));
-            var diagramOnly = good.Where(e => e.Kind != "physical" || string.IsNullOrEmpty(e.PhysicalId)).Select(e => (object)new Dictionary<string, object> { ["de"] = e.From, ["a"] = e.To, ["label"] = e.Label }).ToList();
+            var diagramOnly = good.Where(e => e.Kind != "physical" || string.IsNullOrEmpty(e.PhysicalId)).Select(e => (object)new Dictionary<string, object> { ["from"] = e.From, ["to"] = e.To, ["label"] = e.Label }).ToList();
             var open = byId.Values.Where(v => all.Degree[idx[v.Id]] <= 1 && !v.Terminal && v.Kind != "panel").Select(v => (object)v.Id).ToList();
             var isolated = byId.Values.Where(v => all.Degree[idx[v.Id]] == 0).Select(v => (object)v.Id).ToList();
             var missing = (expectedBranches ?? Enumerable.Empty<(string, string)>())

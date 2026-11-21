@@ -231,7 +231,7 @@ namespace Bimbridge.Addin.Revit.Families
                 case "out":  return (int)FlowDirectionType.Out;
                 case "bidirectional":  case "both": return (int)FlowDirectionType.Bidirectional;
                 case "": return null;
-                default: throw new OpFail(Status.Invalid, "workflow must be in, out or bidirectional");
+                default: throw new OpFail(Status.Invalid, "flow must be in, out or bidirectional");
             }
         }
 
@@ -261,7 +261,7 @@ namespace Bimbridge.Addin.Revit.Families
             var dim = Bip(c, BuiltInParameter.FAMILY_ROUNDCONNECTOR_DIMENSIONTYPE);
             if (dim != null && dim.HasValue) d["dimension"] = dim.AsValueString() ?? dim.AsInteger().ToString(CultureInfo.InvariantCulture);
             var flow = FlowParam(c);
-            if (flow != null && flow.HasValue) d["workflow"] = FlowName(flow.AsInteger());
+            if (flow != null && flow.HasValue) d["flow"] = FlowName(flow.AsInteger());
             try { d["primary"] = c.IsPrimary; } catch (Exception) { }
             // Associations with family parameters (if a parameter controls the radius, change it there, not on the connector).
             var fm = doc.FamilyManager;
@@ -373,7 +373,7 @@ namespace Bimbridge.Addin.Revit.Families
                         try { cd["direction"] = D(c.CoordinateSystem.BasisZ); } catch (Exception) { }
                         try { cd["shape"] = c.Shape.ToString(); } catch (Exception) { }
                         try { if (c.Shape == ConnectorProfileType.Round) cd["radius_mm"] = Mm(c.Radius); } catch (Exception) { }
-                        try { cd["workflow"] = FlowName((int)c.Direction); } catch (Exception) { }
+                        try { cd["flow"] = FlowName((int)c.Direction); } catch (Exception) { }
                         try
                         {
                             var system = c.Domain switch
@@ -476,7 +476,7 @@ namespace Bimbridge.Addin.Revit.Families
                     Kind = (Arg.GetString(a, "type") ?? "pipe").Trim().ToLowerInvariant(),
                     System = Arg.GetString(a, "system"),
                     Face = Arg.GetString(a, "face"),
-                    Flow = FlowValue(Arg.GetString(a, "workflow")),
+                    Flow = FlowValue(Arg.GetString(a, "flow")),
                     DimType = Arg.GetString(a, "dimension"),
                     Adopt = Arg.GetBool(a, "adopt") ?? true,
                 };
@@ -654,7 +654,7 @@ namespace Bimbridge.Addin.Revit.Families
             var flow = FlowParam(ce);
             if (q.Flow.HasValue)
             {
-                if (flow == null || flow.IsReadOnly) diffs.Add("workflow: the connector has no editable flow parameter");
+                if (flow == null || flow.IsReadOnly) diffs.Add("flow: the connector has no editable flow parameter");
                 else
                 {
                     FamilyParameter assoc = null;
@@ -782,7 +782,7 @@ namespace Bimbridge.Addin.Revit.Families
                             break;
                         case StorageType.Integer:
                             var low = value.Trim().ToLowerInvariant();
-                            var iv = low == "yes" || low == "yes" || low == "true" ? 1 : low == "no" || low == "false" ? 0 : int.Parse(value, CultureInfo.InvariantCulture);
+                            var iv = low == "yes" || LegacyAliases.IsLegacyYes(low) || low == "true" ? 1 : low == "no" || low == "false" ? 0 : int.Parse(value, CultureInfo.InvariantCulture);
                             fm.Set(fp, iv);
                             break;
                         case StorageType.String: fm.Set(fp, value); break;

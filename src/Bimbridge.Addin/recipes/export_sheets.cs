@@ -2,7 +2,8 @@
 // Recipe shipped with BIMBRIDGE - Power Engine (since 0.6.0). Exports a sheet set to PDF as verifiable barriers: optionally saves
 // (or syncs) first, then exports. Barriers only run when everything before them is committed; the PDF is kept as an
 // artifact with SHA-256 and an approximate page count. Does not change the model content.
-// args: conjunto (ViewSheetSet name) or hojas (list of numbers), carpeta, nombre, antes (nada|guardar|sync, default nada).
+// args: sheet_set (ViewSheetSet name) or sheets (list of numbers), folder, name, before (nothing|save|sync, default nothing),
+// combine, overwrite, color. The 0.9.4 names (conjunto, hojas, carpeta, nombre, antes=nada|guardar) are accepted until 0.9.5.
 public class ExportSheets : Recipe
 {
     public override string Version => "1";

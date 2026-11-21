@@ -163,8 +163,8 @@ namespace Bimbridge.Addin.Revit
                 {
                     var dec = (Arg.GetString(a, "decision") ?? "").Trim().ToLowerInvariant();
                     bool applied;
-                    if (dec == "applied" || dec == "applied" || dec == "yes") applied = true;
-                    else if (dec == "not_applied" || dec == "not_applied" || dec == "no") applied = false;
+                    if (dec == "applied" || dec == "yes") applied = true;
+                    else if (dec == "not_applied" || dec == "no") applied = false;
                     else return Response.Fail(request.Id, Status.Invalid, "reconcile needs decision=applied (already in the model: not repeated) or decision=not_applied (it will run on resume)");
                     var err = _taskMgr.Reconcile(id, Arg.GetStringList(a, "keys"), applied, Arg.GetString(a, "note"), who);
                     if (err != null) return Response.Fail(request.Id, BusyOrInvalid(id), err);
@@ -291,6 +291,7 @@ namespace Bimbridge.Addin.Revit
             }
 
             var userArgs = a.TryGetValue("args", out var ua) && ua is Dictionary<string, object> ud ? ud : new Dictionary<string, object>(StringComparer.Ordinal);
+            if (installedRecipe) LegacyAliases.NormalizeRecipeArgs(userArgs);   // 0.9.4 input names of our own recipes; user recipes keep theirs
             var policy = PolicyFrom(a, onlyGiven: false);
             if (refs.Count > 0) policy["refs"] = refs.Cast<object>().ToList();
             // Capabilities the units need (barriers are checked when reached): validated at every execution point.

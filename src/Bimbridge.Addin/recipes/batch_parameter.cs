@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Recipe shipped with BIMBRIDGE - Power Engine (since 0.6.0). Sets an INSTANCE parameter to a value on a list of elements, one per unit:
 // resumable, without duplicates (skipped if it already has the value) and with verification after a crash.
-// args: ids (list of ElementId) or conjunto ("$name" of a saved set), parametro (visible name), valor (text; for
-// length parameters it is used as in the UI, e.g. "2400 mm"), guardar_al_final (si/no, default no).
+// args: ids (list of ElementId) or sheet_set ("$name" of a saved set), parameter (visible name), value (text; for
+// length parameters it is used as in the UI, e.g. "2400 mm"), save_at_end (yes/no, default no).
+// The 0.9.4 names (conjunto, parametro, valor, guardar_al_final) are accepted until 0.9.5.
 public class BatchParameter : Recipe
 {
     public override string Version => "1";

@@ -109,7 +109,7 @@ namespace Bimbridge.Protocol
             ["checkpoint_esquema"] = "checkpoint_schema", ["checkpoint_ilegible"] = "checkpoint_unreadable",
             ["checkpoint_invalido"] = "checkpoint_invalid", ["checkpoint_otra_historia"] = "checkpoint_other_history", ["choque"] = "clash",
             ["choque_no_evaluable"] = "clash_not_evaluable", ["choque_real"] = "real_clash", ["choques"] = "clashes", ["cian"] = "cyan",
-            ["cielos"] = "ceilings_alt", ["cierre_ms"] = "close_ms", ["cifrado"] = "encrypted", ["circuito"] = "circuit", ["circulo"] = "circle",
+            ["cielos"] = "ceilings", ["cierre_ms"] = "close_ms", ["cifrado"] = "encrypted", ["circuito"] = "circuit", ["circulo"] = "circle",
             ["cita"] = "quote", ["clase"] = "class", ["clase_esperada"] = "expected_class", ["clasificacion"] = "classification", ["clave"] = "key",
             ["clave_conector"] = "connector_key", ["clave_desconocida"] = "unknown_key", ["clave_doc"] = "doc_key",
             ["clave_idempotencia"] = "idempotency_key", ["clave_intento"] = "attempt_key", ["clave_vinculada"] = "linked_key", ["claves"] = "keys",
@@ -423,7 +423,7 @@ namespace Bimbridge.Protocol
             ["protocolo"] = "protocol_info", ["prototipo"] = "prototype", ["proximidad"] = "proximity", ["proyecto"] = "project",
             ["prueba"] = "test", ["prueba_"] = "test_", ["pruebas"] = "tests_list", ["publicar"] = "publish",
             ["puede_tener_efectos"] = "may_have_effects", ["puente"] = "bridge", ["puente_ipc_total_ms"] = "bridge_ipc_total_ms",
-            ["puerto"] = "port", ["puertos_fisicos"] = "physical_ports", ["pulg"] = "in_unit", ["punto"] = "point",
+            ["puerto"] = "port", ["puertos_fisicos"] = "physical_ports", ["punto"] = "point",
             ["punto_origen"] = "origin_point", ["punto_pt"] = "point_pt", ["puntos"] = "points",
             ["python_arranque_y_primer_trabajo_ms"] = "python_startup_and_first_job_ms", ["qc_desviaciones"] = "qc_deviations",
             ["qc_desviado"] = "qc_deviated", ["qc_ejecutado_con_evidencia"] = "qc_run_with_evidence", ["qc_final"] = "final_qc",
@@ -608,6 +608,12 @@ namespace Bimbridge.Protocol
 
         public static bool IsLegacy(string s) => s != null && Tokens.ContainsKey(s);
 
+        /// <summary>The legacy "yes" ("si"/"sí", any case) of boolean flags and yes/no parameters. Callers decide whether the value is a flag.</summary>
+        public static bool IsLegacyYes(string s) => s != null && (s.Equals("si", StringComparison.OrdinalIgnoreCase) || s.Equals("sí", StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>The legacy "none" ("ninguna"/"ninguno", any case) of template=, scope_box= and element-pointing parameter values.</summary>
+        public static bool IsLegacyNone(string s) => s != null && (s.Equals("ninguna", StringComparison.OrdinalIgnoreCase) || s.Equals("ninguno", StringComparison.OrdinalIgnoreCase));
+
         /// <summary>Frame keys of Request/Response: English name → legacy name.</summary>
         public static readonly IReadOnlyDictionary<string, string> FrameKeys = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -627,6 +633,20 @@ namespace Bimbridge.Protocol
         public static string GetString(IDictionary<string, object> o, string key) =>
             TryGet(o, key, out var v) && v != null ? v as string ?? Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture) : null;
 
+        /// <summary>
+        /// Legacy category shorthands in geo cat=/against= values → the English shorthand. Differs from <see cref="Tokens"/> on purpose:
+        /// in 0.9.3 "techos" meant Revit Roofs (Ceilings were "cielos"/"plafones").
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, string> CategoryAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["losas"] = "slabs", ["pisos"] = "floors", ["vigas"] = "beams", ["columnas"] = "columns", ["rampas"] = "ramps", ["escaleras"] = "stairs",
+            ["techos"] = "roofs", ["cubiertas"] = "roofs", ["cielos"] = "ceilings", ["plafones"] = "ceiling_panels", ["muros"] = "walls",
+            ["genericos"] = "generic", ["luminarias"] = "fixtures", ["estructura"] = "structure",
+        };
+
+        /// <summary>0.9.4 prefix of a person's statement in a delivery receipt (now "user:").</summary>
+        public const string UserOriginPrefix = "usuario:";
+
         /// <summary>The bridge's old command-line switch for the full profile.</summary>
         public const string FullProfileSwitch = "--completo";
 
@@ -635,8 +655,8 @@ namespace Bimbridge.Protocol
         /// <summary>Arguments whose string values are enum-like tokens (mapped through <see cref="Tokens"/>).</summary>
         private static readonly HashSet<string> ValueKeys = new HashSet<string>(StringComparer.Ordinal)
         {
-            "action", "mode", "tx", "kind", "side", "links", "system", "flow", "dimension", "all_types", "create", "data_type", "overwrite",
-            "decision", "reconcile", "at_end", "on_error", "color_by", "detail", "template", "mount", "option", "recipe", "save", "discard",
+            "action", "mode", "tx", "kind", "side", "links", "flow", "dimension", "all_types", "create", "data_type", "overwrite",
+            "decision", "reconcile", "at_end", "on_error", "color_by", "detail", "mount", "option", "recipe", "save", "discard",
             "new", "combine", "order", "views", "scope", "profile", "runner", "orientation", "phase", "status",
         };
 
@@ -656,7 +676,8 @@ namespace Bimbridge.Protocol
         private static Dictionary<string, string> KeyOverrides(string op, string opName)
         {
             if (op == Wire.OpExec) return new Dictionary<string, string>(StringComparer.Ordinal) { ["guardar"] = "save_as" };
-            if (op == Wire.OpFam || op == Wire.OpDoc) return new Dictionary<string, string>(StringComparer.Ordinal) { ["en"] = "into" };
+            if (op == Wire.OpFam) return new Dictionary<string, string>(StringComparer.Ordinal) { ["en"] = "into", ["flujo"] = "flow" };   // connector flow, not a workflow
+            if (op == Wire.OpDoc) return new Dictionary<string, string>(StringComparer.Ordinal) { ["en"] = "into" };
             if (opName == "view_create") return new Dictionary<string, string>(StringComparer.Ordinal) { ["origen"] = "source" };
             return null;
         }
@@ -673,6 +694,8 @@ namespace Bimbridge.Protocol
             if (a == null) return;
             RenameKeys(a, KeyOverrides(op, null));
             MapValues(a, null);
+            // Connector system= is an enum (cold_water, drain...); elsewhere system= names the user's system type and is never rewritten.
+            if (op == Wire.OpFam && a.TryGetValue("system", out var sys) && sys is string ss) a["system"] = MapValue("system", ss);
             if (op == Wire.OpExec && a.TryGetValue("name", out var n) && n is string ns && string.Equals(ns.Trim(), "lista", StringComparison.OrdinalIgnoreCase)) a["name"] = "list";
             if (a.TryGetValue("ops", out var ops) && ops is List<object> list)
                 foreach (var o in list) if (o is IDictionary<string, object> d) NormalizeOp(d);
@@ -687,6 +710,21 @@ namespace Bimbridge.Protocol
             MapValues(d, opName);
             foreach (var k in d.Keys.ToList())
                 if (!Opaque.Contains(k) && d[k] is IDictionary<string, object> child) RenameKeys(child, null);
+        }
+
+        /// <summary>Enum-like inputs of the INSTALLED recipes (save=si, before=guardar, direction=arriba...).</summary>
+        private static readonly string[] RecipeEnumArgs = { "save", "save_at_end", "before", "direction" };
+
+        /// <summary>
+        /// args= of an INSTALLED recipe (whose input names this project owns): 0.9.4 names (vista, parametro, valor, guardar, ...) and the
+        /// few enum-like values are renamed. Values such as valor= are never rewritten. Never call it for user or external recipes.
+        /// </summary>
+        public static void NormalizeRecipeArgs(IDictionary<string, object> args)
+        {
+            if (args == null) return;
+            RenameKeys(args, null);
+            foreach (var k in RecipeEnumArgs)
+                if (args.TryGetValue(k, out var v) && v is string s) args[k] = IsLegacyYes(s.Trim()) ? "yes" : MapValue(k, s);
         }
 
         /// <summary>Legacy tokens that are also English words: accepted as verbs, never renamed as keys.</summary>
@@ -709,12 +747,9 @@ namespace Bimbridge.Protocol
             {
                 var v = d[k];
                 var enumLike = ValueKeys.Contains(k) || (k == "type" && opName == "view_create");
-                if (v is string s)
-                {
-                    var t = s.Trim();
-                    if (t == "si" || t == "sí") d[k] = "yes";
-                    else if (enumLike) d[k] = MapValue(k, s);
-                }
+                // Only enum-like values are mapped: value=, text=, name=... are the user's and are never rewritten (value=Sí stays "Sí").
+                if (v is string s && enumLike) d[k] = IsLegacyYes(s.Trim()) ? "yes" : MapValue(k, s);
+                else if (v is string ts && k == "template" && IsLegacyNone(ts.Trim())) d[k] = "none";   // any other template= is a view template NAME
                 else if (enumLike && v is List<object> l)
                     for (var i = 0; i < l.Count; i++) if (l[i] is string li) l[i] = MapValue(k, li);
             }
@@ -835,7 +870,8 @@ namespace Bimbridge.Protocol
                     foreach (var kv in d)
                     {
                         var k = Reverse.Value.TryGetValue(kv.Key, out var lk) ? lk : kv.Key;
-                        o[k] = Opaque.Contains(kv.Key) ? kv.Value : ToLegacy(kv.Value, ValueKeys.Contains(kv.Key) || kv.Key == "type", depth + 1);
+                        // template/system are no longer mapped on input but 0.9.4 clients sent them in Spanish (ninguna, agua_fria...).
+                        o[k] = Opaque.Contains(kv.Key) ? kv.Value : ToLegacy(kv.Value, ValueKeys.Contains(kv.Key) || kv.Key == "type" || kv.Key == "template" || kv.Key == "system", depth + 1);
                     }
                     return o;
                 case List<object> list: return list.Select(x => ToLegacy(x, enumLike, depth + 1)).ToList();
@@ -869,6 +905,24 @@ namespace Bimbridge.Protocol
         /// </summary>
         /// <summary>Installer switch an add-in up to 0.9.3 passes to the (new) installer of a staged ZIP update.</summary>
         public const string ApplyPendingSwitch = "aplicar-pendiente";
+
+        private static readonly Dictionary<string, string> SetupSwitches = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["actualizar"] = "update", ["desinstalar"] = "uninstall", ["reemplazar"] = "replace", ["borrardatos"] = "removedata", ["restaurar"] = "restore",
+            ["niveles"] = "levels", ["diagnostico"] = "diagnostics", ["diagnóstico"] = "diagnostics", ["permitir-anterior"] = "allow-older",
+            [ApplyPendingSwitch] = "apply-pending",
+        };
+
+        /// <summary>
+        /// Installer switch (lower case, without the leading / or -) as English: the 0.9.4 names used by IT scripts and by older add-ins
+        /// launching a new installer are mapped, "name=value" keeps its value. Any other switch is returned unchanged.
+        /// </summary>
+        public static string SetupSwitch(string low)
+        {
+            if (low == null) return null;
+            var eq = low.IndexOf('=');
+            return SetupSwitches.TryGetValue(eq < 0 ? low : low.Substring(0, eq), out var en) ? en + (eq < 0 ? "" : low.Substring(eq)) : low;
+        }
 
         /// <summary>Plan entry keys of view graphic overrides in held plans written by 0.9.3 and earlier.</summary>
         public static string EntryKey(string key) =>

@@ -449,7 +449,11 @@ namespace Bimbridge.Tests
             var dir = Path.Combine(ScriptingTests.RepoRoot, "src", "Bimbridge.Addin", "recipes");
             var files = Directory.GetFiles(dir, "*.cs").OrderBy(f => f).ToList();
             Assert.Equal(5, files.Count);
-            var expectRead = new HashSet<string> { "export_sheets", "mounting_supports", "qc_manifest" };
+            var expectRead = new HashSet<string> { "export_sheets", "mount_supports", "qc_manifest" };
+            // File names are the recipe names the guide, the IR validator and the AgentHost adapter use.
+            Assert.Equal(new[] { "batch_parameter", "export_sheets", "mount_supports", "qc_manifest", "tag_lights" }, files.Select(Path.GetFileNameWithoutExtension).ToArray());
+            Assert.Equal("tag_lights", Bimbridge.Protocol.LegacyAliases.Token("etiquetar_luces"));
+            Assert.Equal("mount_supports", Bimbridge.Protocol.LegacyAliases.Token("montaje_soportes"));
             foreach (var f in files)
             {
                 var code = File.ReadAllText(f);

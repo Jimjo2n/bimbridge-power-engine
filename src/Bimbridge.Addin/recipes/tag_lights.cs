@@ -2,8 +2,9 @@
 // Recipe shipped with BIMBRIDGE - Power Engine (since 0.6.0). One tag per fixture in ONE view (rule "exactly one tag per fixture"):
 // one unit per fixture visible in the view; if it already has a tag in that view it is skipped (no duplicates on resume or repeat).
 // Ends by saving (barrier) and, if sheets are requested, exporting the PDF. The postcondition lists fixtures with 0 or more than 1 tag.
-// args: vista (ElementId of the view), tipo_etiqueta (ElementId of the tag type; optional: by category),
-//       guardar (si|no, default si), pdf_hojas (list of sheet numbers, optional), pdf_carpeta, pdf_nombre.
+// args: view (ElementId of the view), tag_type_name (tag type; optional: by category),
+//       save (yes|no, default yes), pdf_sheets (list of sheet numbers, optional), pdf_folder, pdf_name.
+//       The 0.9.4 names (vista, tipo_etiqueta, guardar=si|no, pdf_hojas, pdf_carpeta, pdf_nombre) are accepted until 0.9.5.
 public class TagFixtures : Recipe
 {
     public override string Version => "1";

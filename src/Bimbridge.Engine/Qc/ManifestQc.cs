@@ -263,11 +263,12 @@ namespace Bimbridge.Engine.Qc
         // ---------------- manifest from JSON ----------------
 
         /// <summary>
-        /// Reads a manifest: {"tolerances":{xy,z,giro,simetria,ambiguedad,duplicado,mismo_nivel},"elements":[{ref,x,y,z,giro,nivel,tipos,
-        /// etiqueta,grupo,montaje,fuente,no_confirmado}]} (mm and degrees).
+        /// Reads a manifest: {"tolerances":{xy,z,rotation,symmetry,ambiguity,duplicate,same_level},"elements":[{ref,x,y,z,rotation,level,types,
+        /// tag,group,mounting,source,not_committed}]} (mm and degrees). Manifests written for 0.9.4 (Spanish keys) are read too.
         /// </summary>
         public static List<Expected> Parse(Dictionary<string, object> json, out Options options)
         {
+            LegacyAliases.NormalizeRecord(json);
             options = new Options();
             if (json.TryGetValue("tolerances", out var tv) && tv is Dictionary<string, object> t)
             {

@@ -58,7 +58,7 @@ namespace Bimbridge.Engine
                     case "cm": feet = v * 10 / MmPerFoot; break;
                     case "m": feet = v * 1000 / MmPerFoot; break;
                     case "in":
-                    case "in_unit": feet = v / 12.0; break;
+                    case "pulg": feet = v / 12.0; break; // Spanish "inches": a unit users type, not a legacy key
                     default: feet = v; break;
                 }
                 return Finite(feet, out error);

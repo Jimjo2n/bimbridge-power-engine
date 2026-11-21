@@ -176,8 +176,10 @@ namespace Bimbridge.Tests
             return r;
         }
 
-        [Fact]
-        public void Delivery_CriticalReceipts_NeedRevisionOriginAndObservedEvidence()
+        [Theory]
+        [InlineData("user:operator")]
+        [InlineData("usuario:operator")]   // 0.9.4 prefix, accepted until 0.9.5
+        public void Delivery_CriticalReceipts_NeedRevisionOriginAndObservedEvidence(string person)
         {
             var t = new DeliveryTrack("e1", "archivo:c:\\a.rvt", new[] { DeliveryStages.Exported, DeliveryStages.ArtifactVerified, DeliveryStages.DeliveryConfirmed });
             Assert.Contains("without a model revision", t.Record(R(DeliveryStages.Exported, null, ("file", "a.pdf"), ("sha256", Sha('a')), ("origin", "export"), ("evidence", Confidence.Verified))));
@@ -189,7 +191,7 @@ namespace Bimbridge.Tests
             Assert.Null(t.Record(R(DeliveryStages.ArtifactVerified, "r5", ("file", "a.pdf"), ("sha256", Sha('a')), ("pages", 3), ("origin", "pdf_info"), ("evidence", Confidence.Verified))));
             // delivery is confirmed by a person, not by the agent
             Assert.Contains("person", t.Record(R(DeliveryStages.DeliveryConfirmed, "r5", ("confirms", "ok"), ("origin", "agent"))));
-            Assert.Null(t.Record(R(DeliveryStages.DeliveryConfirmed, "r5", ("confirms", "ok"), ("origin", "usuario:operator"))));
+            Assert.Null(t.Record(R(DeliveryStages.DeliveryConfirmed, "r5", ("confirms", "ok"), ("origin", person))));
             Assert.True(t.Complete);
         }
 

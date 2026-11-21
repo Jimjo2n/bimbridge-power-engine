@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Recipe shipped with BIMBRIDGE - Power Engine (since 0.6.0). One-to-one QC of a manifest (expected list of positions, types, heights, tags)
 // against the model elements. Read-only. Leaves a CSV with all deviations as a task artifact.
-// args: manifiesto (JSON text, or path to a .json), categoria (BuiltInCategory, default OST_LightingFixtures),
-// nivel (optional: only that level), vista_etiquetas (optional: id of the view where tags are counted).
+// args: manifest (JSON text, or path to a .json), category (BuiltInCategory, default OST_LightingFixtures),
+// level (optional: only that level), tags_view (optional: id of the view where tags are counted).
+// The 0.9.4 names (manifiesto, categoria, nivel, vista_etiquetas) and Spanish manifest keys are accepted until 0.9.5.
 // Manifest format: {"tolerances":{"xy":150,"z":25,"rotation":2},"elements":[{"ref":"L-001","x":..,"y":..,"z":..,"types":["D"],"tag":true}]}
 public class QcManifest : Recipe
 {

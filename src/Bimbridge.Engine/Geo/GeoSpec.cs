@@ -60,7 +60,7 @@ namespace Bimbridge.Engine.Geo
         public static readonly string[] DefaultClash = { "Floors", "StructuralFraming", "StructuralColumns", "Walls", "Roofs", "Ramps", "Stairs" };
         public static readonly string[] DefaultNear = { "StructuralColumns", "Columns", "StructuralFraming" };
 
-        /// <summary>Legacy Spanish category aliases accepted as input (the AI or operator may use them).</summary>
+        /// <summary>Category shorthands accepted as input (the AI or operator may use them); legacy Spanish ones go through LegacyAliases.CategoryAliases first.</summary>
         public static readonly Dictionary<string, string[]> Aliases = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
         {
             ["slabs"] = new[] { "Floors" },
@@ -69,9 +69,8 @@ namespace Bimbridge.Engine.Geo
             ["columns"] = new[] { "StructuralColumns", "Columns" },
             ["ramps"] = new[] { "Ramps" },
             ["stairs"] = new[] { "Stairs" },
-            ["ceilings"] = new[] { "Roofs" },
             ["roofs"] = new[] { "Roofs" },
-            ["ceilings_alt"] = new[] { "Ceilings" },
+            ["ceilings"] = new[] { "Ceilings" },
             ["ceiling_panels"] = new[] { "Ceilings" },
             ["walls"] = new[] { "Walls" },
             ["generic"] = new[] { "GenericModel" },
@@ -81,7 +80,7 @@ namespace Bimbridge.Engine.Geo
 
         public static GeoSpec Parse(IDictionary<string, object> a)
         {
-            var g = new GeoSpec { Recipe = (Arg.GetString(a, "name") ?? Arg.GetString(a, "recipe") ?? "").Trim().ToLowerInvariant() };
+            var g = new GeoSpec { Recipe = LegacyAliases.Token((Arg.GetString(a, "name") ?? Arg.GetString(a, "recipe") ?? "").Trim().ToLowerInvariant()) };
             if (g.Recipe == "clearance" || g.Recipe == "clearance_up") g.Recipe = "clearance";
             if (g.Recipe == "mount" || g.Recipe == "mount_check") g.Recipe = "mounting";
             if (g.Recipe == "clash") g.Recipe = "clashes";
@@ -90,7 +89,6 @@ namespace Bimbridge.Engine.Geo
             if (g.Recipe == "level" || g.Recipe == "level_resolve") g.Recipe = "actual_level";
             if (g.Recipe == "room" || g.Recipe == "room_at") g.Recipe = "room";
             if (g.Recipe == "view_range" || g.Recipe == "view_check") g.Recipe = "view_range";
-            if (g.Recipe == "duplicates") g.Recipe = "duplicates";
             if (g.Recipe == "index" || g.Recipe == "geo_index") g.Recipe = "index";
             if (Array.IndexOf(Recipes, g.Recipe) < 0)
                 throw new QueryException("geo: name must be " + string.Join(", ", Recipes));
@@ -114,8 +112,8 @@ namespace Bimbridge.Engine.Geo
             g.IncludeHost = Arg.GetBool(a, "host") ?? true;
 
             var side = (Arg.GetString(a, "side") ?? "up").Trim().ToLowerInvariant();
-            if (side == "up" || side == "up") g.Up = true;
-            else if (side == "down" || side == "down") g.Up = false;
+            if (side == "up") g.Up = true;
+            else if (side == "down") g.Up = false;
             else throw new QueryException("side: up (default) or down");
 
             g.Points = (int)(Arg.GetLong(a, "points") ?? (g.Recipe == "clearance" ? 1 : 9));
@@ -168,7 +166,8 @@ namespace Bimbridge.Engine.Geo
             var list = new List<string>();
             foreach (var n in names)
             {
-                if (Aliases.TryGetValue(n.Trim(), out var mapped)) list.AddRange(mapped);
+                var k = LegacyAliases.CategoryAliases.TryGetValue(n.Trim(), out var en) ? en : n.Trim();
+                if (Aliases.TryGetValue(k, out var mapped)) list.AddRange(mapped);
                 else list.Add(n.Trim());
             }
             return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();

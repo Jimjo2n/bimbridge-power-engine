@@ -618,7 +618,12 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>The fingerprint 0.9.3 and earlier computed for the same operation (legacy argument names and values). Remove after 0.9.5.</summary>
-        public static string LegacyHashArgs(string op, IDictionary<string, object> args, string resolvedContent = null) =>
-            HashArgs(LegacyAliases.LegacyOp(op), (IDictionary<string, object>)LegacyAliases.ToLegacy(args ?? new Dictionary<string, object>()), resolvedContent);
+        public static string LegacyHashArgs(string op, IDictionary<string, object> args, string resolvedContent = null)
+        {
+            // Control args (key, task, ...) were stripped by 0.9.4 under their old names: strip the English ones before translating back.
+            var content = (args ?? new Dictionary<string, object>()).Where(kv => !OpSemantics.ControlArgs.Contains(kv.Key))
+                .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+            return HashArgs(LegacyAliases.LegacyOp(op), (IDictionary<string, object>)LegacyAliases.ToLegacy(content), resolvedContent);
+        }
     }
 }

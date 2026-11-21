@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Recipe shipped with BIMBRIDGE - Power Engine (since 0.6.0). Classifies the mounting of each element against its real support (also in links):
 // al_ras, empotrado, separado or sin_referencia, with the clearance in mm. Read-only: moves nothing.
-// args: categoria (default OST_LightingFixtures), nivel (optional), direccion (arriba|abajo, default arriba),
-// tol_mm (3), max_mm (3000), lote (elements per unit, 50).
+// args: category (default OST_LightingFixtures), level (optional), direction (up|down, default up),
+// tol_mm (3), max_mm (3000), batch (elements per unit, 50). The 0.9.4 names (categoria, nivel, direccion=arriba|abajo, lote) are accepted until 0.9.5.
 public class MountingSupports : Recipe
 {
     public override string Version => "1";

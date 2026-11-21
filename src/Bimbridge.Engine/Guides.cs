@@ -67,7 +67,7 @@ namespace Bimbridge.Engine
             "1. revit \"fam info family=X\" (types, parameters, formulas, connectors) and \"fam faces family=X\" (planar faces element:n with normal and center).\n" +
             "2. act \"open family=X\" → dN handle of the RFA (reuses the open one).\n" +
             "3. act \"connector name=cold system=cold face=812:3 radius=6.5mm doc=dN\" (radius or diameter ALWAYS with a unit; none is assumed). " +
-            "Searches by name (connector description), adopts an unnamed one on that face or creates it; never duplicates. workflow=in|out|bidirectional only if it was decided.\n" +
+            "Searches by name (connector description), adopts an unnamed one on that face or creates it; never duplicates. flow=in|out|bidirectional only if it was decided.\n" +
             "4. act \"param name=X value=6.5mm\" | formula= | create=type|instance data_type=length | associate=elem:CONNECTOR_RADIUS. If a family parameter drives " +
             "the radius, it is reported as pending: the association is not broken.\n" +
             "5. act \"save doc=dN\" and \"load en=d1 doc=dN overwrite=values\": reloads into the project and re-reads the connectors from the instances.\n" +

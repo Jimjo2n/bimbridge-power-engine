@@ -94,7 +94,8 @@ namespace Bimbridge.Engine.Workflows
         {
             try
             {
-                var d = Json.ParseObject(text);
+                // Baselines frozen by 0.9.3/0.9.4 carry Spanish keys; normalized on read only (the stored text is never rewritten).
+                var d = LegacyAliases.NormalizeRecord(Json.ParseObject(text));
                 if (Arg.GetString(d, "schema") != Schema) throw new System.IO.InvalidDataException("expectations with unknown schema");
                 var t = (Dictionary<string, object>)d["transformation"];
                 var e = new CopyMonitorExpectations

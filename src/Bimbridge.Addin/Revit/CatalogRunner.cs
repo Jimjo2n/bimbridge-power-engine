@@ -49,9 +49,7 @@ namespace Bimbridge.Addin.Revit
         public CatalogRunner(IDictionary<string, object> a)
         {
             _kind = (Arg.GetString(a, "kind") ?? "summary").Trim().ToLowerInvariant();
-            if (_kind == "categories") _kind = "categories";
-            if (_kind == "sheets" || _kind == "sheets") _kind = "sheets";
-            if (_kind == "links" || _kind == "links") _kind = "links";
+            _kind = LegacyAliases.Token(_kind);
             if (Array.IndexOf(Kinds, _kind) < 0) { Error = "kind: " + string.Join(", ", Kinds); return; }
             _cats = Arg.GetStringList(a, "cat");
             _lvls = Arg.GetStringList(a, "lvl");

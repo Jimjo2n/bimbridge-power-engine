@@ -80,7 +80,9 @@ namespace Bimbridge.Engine
             {
                 try { return Bimbridge.Protocol.Json.Parse(v); } catch (Exception) { /* plain text as is */ }
             }
-            if (v == "true" || v == "yes" || v == "yes") return true;
+            var ek = Bimbridge.Protocol.LegacyAliases.Token(key);
+            var userValue = ek == "value" || ek == "text" || ek == "name";   // the user's text: a legacy "sí" is not a flag there
+            if (v == "true" || v == "yes" || (!userValue && Bimbridge.Protocol.LegacyAliases.IsLegacyYes(v))) return true;
             if (v == "false" || v == "no") return false;
             if (key != "ids" && key != "lvl" && key != "type" && key != "name" && key != "value"
                 && long.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out var l)) return l;

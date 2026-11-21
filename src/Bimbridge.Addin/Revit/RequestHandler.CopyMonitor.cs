@@ -169,7 +169,7 @@ namespace Bimbridge.Addin.Revit
 
             // AUD-07: persistent attempt receipt (idempotent by document + link + client key), shared across processes.
             var store = new ReceiptStore(Home.Sub("workflows"));
-            var attemptKey = WorkflowReceipt.KeyFor(NativeCapabilities.CopyMonitorFixtures, probe.DocumentIdentity, probe.LinkIdentity, Arg.GetString(request.Args, "key") ?? "default_value");
+            var attemptKey = WorkflowReceipt.KeyFor(NativeCapabilities.CopyMonitorFixtures, probe.DocumentIdentity, probe.LinkIdentity, Arg.GetString(request.Args, "key") ?? "predeterminada"); // feeds an attempt hash, do not translate
             var c = Correlation.Current;
             var corr = new WorkflowCorrelation
             {

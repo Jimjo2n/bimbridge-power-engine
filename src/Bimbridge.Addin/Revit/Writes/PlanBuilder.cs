@@ -957,7 +957,7 @@ namespace Bimbridge.Addin.Revit.Writes
             if (a.ContainsKey("template"))
             {
                 var n = Arg.GetString(a, "template");
-                if (n == null || n.Equals("none", StringComparison.OrdinalIgnoreCase) || n.Equals("none", StringComparison.OrdinalIgnoreCase)) noTpl = true;
+                if (n == null || n.Equals("none", StringComparison.OrdinalIgnoreCase) || LegacyAliases.IsLegacyNone(n)) noTpl = true;
                 else tpl = ctx.Model.FindTemplate(n, "view_set");
             }
             Dictionary<string, object> range = null;
@@ -970,7 +970,7 @@ namespace Bimbridge.Addin.Revit.Writes
                     var lname = Convert.ToString(pair[0], CultureInfo.InvariantCulture).Trim();
                     Lengths.TryFeet(pair[1], out var off, out _);
                     long lid;
-                    switch (lname.ToLowerInvariant())
+                    switch (LegacyAliases.Token(lname.ToLowerInvariant()))   // 0.9.4 actual/arriba/abajo/ilimitado; a level name is used as given
                     {
                         case "current": lid = -101; break;
                         case "up": lid = -102; break;
@@ -995,7 +995,7 @@ namespace Bimbridge.Addin.Revit.Writes
             if (a.ContainsKey("scope_box"))
             {
                 var n = Arg.GetString(a, "scope_box");
-                if (n == null || n.Equals("none", StringComparison.OrdinalIgnoreCase) || n.Equals("none", StringComparison.OrdinalIgnoreCase)) noScope = true;
+                if (n == null || n.Equals("none", StringComparison.OrdinalIgnoreCase) || LegacyAliases.IsLegacyNone(n)) noScope = true;
                 else
                 {
                     var hits = new FilteredElementCollector(ctx.Doc).OfCategory(BuiltInCategory.OST_VolumeOfInterest).WhereElementIsNotElementType()
