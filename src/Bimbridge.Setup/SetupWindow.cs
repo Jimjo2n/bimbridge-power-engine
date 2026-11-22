@@ -56,7 +56,7 @@ namespace Bimbridge.Setup
                 if (_applyingInstallation) e.Cancel = true;
                 else _installationWait?.Cancel();
             };
-            try { Window.Icon = Icons.Status(Theme.Red, 32); } catch (Exception) { }
+            try { Window.Icon = Icons.Status(Theme.Action, 32); } catch (Exception) { }
 
             var root = new DockPanel();
             var header = Theme.Header(

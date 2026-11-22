@@ -199,23 +199,4 @@ namespace Bimbridge.Addin.Ui
             catch (JournalUnavailableException ex) { Runtime.Log("AUDIT not written (" + op + "): " + ex.Message); }
         }
     }
-
-    /// <summary>"Block C# code injection": one persistent control. It applies to new requests.</summary>
-    [Transaction(TransactionMode.ReadOnly)]
-    public sealed class TrustCommand : IExternalCommand
-    {
-        public Result Execute(ExternalCommandData data, ref string message, ElementSet elements)
-        {
-            if (!Guard.Ready()) return Result.Cancelled;
-            // Allowing widens what the AI can do: the same confirmation as Settings. Blocking does not ask.
-            if (Runtime.BlockDynamicCode && !Runtime.ConfirmAllowDynamicCode()) return Result.Cancelled;
-            if (!Runtime.ToggleBlockDynamicCode(out var error))
-            {
-                TaskDialog.Show(Bimbridge.Protocol.Brand.Product, "Could not save the change to config.json, so it was not applied.\n\n" + error);
-                return Result.Failed;
-            }
-            Runtime.OnIdling(data.Application);
-            return Result.Succeeded;
-        }
-    }
 }

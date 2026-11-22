@@ -14,7 +14,7 @@ Download the Windows installer or update ZIP from [GitHub Releases](https://gith
 
 Launch the Windows installer and choose the target versions and MCP clients. If Revit is open, the installer waits for you to close every Revit window before copying files. You can cancel during the wait. For online prereleases, enable experimental versions in BIMBRIDGE. For an update ZIP, use the ribbon's ZIP update action and review the signature status shown by the updater.
 
-The product is named BIMBRIDGE – Power Engine. Assemblies, folders, the MCP server name (`bimbridge`) and environment variables (`BIMBRIDGE_*`) all use that name. Setup moves an installation made under the former name automatically: data, configuration, the Revit add-in, Claude Code and Codex registrations. The add-in GUID is unchanged.
+The product is named BIMBRIDGE. Assemblies, folders, the MCP server name (`bimbridge`) and environment variables (`BIMBRIDGE_*`) all use that name. Setup moves an installation made under the former name automatically: data, configuration, the Revit add-in, Claude Code and Codex registrations. The add-in GUID is unchanged.
 
 ## Worker setup
 

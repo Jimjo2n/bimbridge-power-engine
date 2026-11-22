@@ -24,6 +24,7 @@ namespace Bimbridge.Addin.Ui
 
         public Result Execute(ExternalCommandData data, ref string message, ElementSet elements)
         {
+            if (!Guard.Ready()) return Result.Cancelled;
             var uidoc = data.Application.ActiveUIDocument;
             var doc = uidoc?.Document;
             var picked = uidoc?.Selection.GetElementIds();
@@ -53,7 +54,7 @@ namespace Bimbridge.Addin.Ui
             return Result.Succeeded;
         }
 
-        /// <summary>Ribbon icon: selection frame (black corner brackets) around a brand-red element, on the 32×32 canvas of <see cref="Icons"/>.</summary>
+        /// <summary>Ribbon icon: selection frame (black corner brackets) around a grey element, on the 32×32 canvas of <see cref="Icons"/>.</summary>
         public static System.Windows.Media.ImageSource Icon(int size)
         {
             var visual = new System.Windows.Media.DrawingVisual();
@@ -67,7 +68,8 @@ namespace Bimbridge.Addin.Ui
                     dc.DrawLine(pen, c, new System.Windows.Point(c.X + dx, c.Y));
                     dc.DrawLine(pen, c, new System.Windows.Point(c.X, c.Y + dy));
                 }
-                dc.DrawRoundedRectangle(Theme.B(Theme.Red), null, new System.Windows.Rect(10, 10, 12, 12), 2, 2);
+                // Not red: on the ribbon red means "needs attention" (paused, waiting).
+                dc.DrawRoundedRectangle(Theme.B(Theme.Slate), null, new System.Windows.Rect(10, 10, 12, 12), 2, 2);
                 dc.Pop();
             }
             var bmp = new System.Windows.Media.Imaging.RenderTargetBitmap(size, size, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);

@@ -338,7 +338,8 @@ namespace Bimbridge.Engine
             using (var sha = System.Security.Cryptography.SHA256.Create())
             {
                 var h = sha.ComputeHash(Encoding.UTF8.GetBytes((doc ?? "") + "|" + string.Join(",", arr)));
-                name = SelectionPrefix + BitConverter.ToString(h, 0, 3).Replace("-", "").ToLowerInvariant();
+                // 6 bytes: a collision would silently repoint an older reference to other elements, so keep it practically impossible.
+                name = SelectionPrefix + BitConverter.ToString(h, 0, 6).Replace("-", "").ToLowerInvariant();
             }
             lock (PinnedLock)
             {
@@ -350,6 +351,18 @@ namespace Bimbridge.Engine
                 Pinned[name] = new Entry { Ids = arr.ToArray(), Doc = doc, DocTitle = docTitle };
             }
             return name;
+        }
+
+        /// <summary>Forgets the selections of a document that was closed (its handle is never reused in this Revit run).</summary>
+        public static void UnpinDoc(string doc)
+        {
+            if (doc == null) return;
+            lock (PinnedLock)
+            {
+                var gone = new List<string>();
+                foreach (var kv in Pinned) if (string.Equals(kv.Value.Doc, doc, StringComparison.OrdinalIgnoreCase)) gone.Add(kv.Key);
+                foreach (var k in gone) Pinned.Remove(k);
+            }
         }
 
         /// <summary>Ids are listed inline only up to this count; beyond it the reference alone keeps the pasted text short.</summary>
@@ -405,7 +418,10 @@ namespace Bimbridge.Engine
             {
                 if (!Find(Normalize(name), out var e))
                 {
-                    error = "set " + name + " does not exist; use sets to see the saved ones";
+                    error = Normalize(name).StartsWith(SelectionPrefix, StringComparison.OrdinalIgnoreCase)
+                        ? "Revit selection reference " + Normalize(name) + " is no longer available (Revit was restarted or it is old). " +
+                          "Ask the user to select the elements again and press Copy selection ID on the BIMBRIDGE tab."
+                        : "set " + name + " does not exist; use sets to see the saved ones";
                     return false;
                 }
                 if (doc != null && e.Doc != null && !string.Equals(doc, e.Doc, StringComparison.OrdinalIgnoreCase))

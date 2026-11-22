@@ -25,6 +25,18 @@ namespace Bimbridge.Tests
         }
 
         [Fact]
+        public void Reference_Has12HexChars_AndExpiredOneTellsTheAiWhatToAsk()
+        {
+            var r = NamedSets.Pin(new long[] { 4242 }, "d9", "Tower B");
+            Assert.Matches("^\\$sel-[0-9a-f]{12}$", r);
+
+            NamedSets.UnpinDoc("d9");   // document closed (or Revit restarted: same effect)
+            Assert.False(new NamedSets().TryGet(r, "d9", out _, out var error));
+            Assert.Contains("no longer available", error);
+            Assert.Contains("Copy selection ID", error);
+        }
+
+        [Fact]
         public void PinnedSelection_RejectedInAnotherDocument()
         {
             var r = NamedSets.Pin(new long[] { 77 }, "d1", "Tower A");

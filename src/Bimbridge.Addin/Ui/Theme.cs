@@ -532,7 +532,7 @@ namespace Bimbridge.Addin.Ui
                 case Kind.DangerSolid: bg = Red; fg = White; border = Red; hover = Darken(Red, 0.88); break;
                 case Kind.Danger: bg = White; fg = Red; border = Color.FromRgb(0xEE, 0xC2, 0xC6); hover = Color.FromRgb(0xFD, 0xF1, 0xF2); break;
                 case Kind.Quiet: bg = Colors.Transparent; fg = ActionHover; border = Colors.Transparent; hover = Sunken; break;
-                default: bg = White; fg = Ink; border = Color.FromRgb(0xD5, 0xDA, 0xE3); hover = Color.FromRgb(0xF3, 0xF5, 0xF8); break;
+                default: bg = White; fg = Ink; border = Color.FromRgb(0xD6, 0xD6, 0xDA); hover = Color.FromRgb(0xF3, 0xF3, 0xF4); break;
             }
 
             var template = new ControlTemplate(typeof(Button));
@@ -549,7 +549,7 @@ namespace Bimbridge.Addin.Ui
             template.VisualTree = bd;
             var over = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
             over.Setters.Add(new Setter(Border.BackgroundProperty, B(hover), "bd"));
-            if (kind == Kind.Secondary) over.Setters.Add(new Setter(Border.BorderBrushProperty, B(Color.FromRgb(0xC4, 0xCB, 0xD6)), "bd"));
+            if (kind == Kind.Secondary) over.Setters.Add(new Setter(Border.BorderBrushProperty, B(Color.FromRgb(0xC6, 0xC6, 0xCB)), "bd"));
             template.Triggers.Add(over);
             var off = new Trigger { Property = UIElement.IsEnabledProperty, Value = false };
             if (kind != Kind.Quiet)
@@ -601,7 +601,7 @@ namespace Bimbridge.Addin.Ui
             ind.SetValue(FrameworkElement.HeightProperty, 18.0);
             ind.SetValue(Border.CornerRadiusProperty, new CornerRadius(radio ? 9 : 5));
             ind.SetValue(Border.BorderThicknessProperty, new Thickness(1.5));
-            ind.SetValue(Border.BorderBrushProperty, B(Color.FromRgb(0xB8, 0xC0, 0xCC)));
+            ind.SetValue(Border.BorderBrushProperty, B(Color.FromRgb(0xBA, 0xBA, 0xC0)));
             ind.SetValue(Border.BackgroundProperty, B(White));
             ind.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Top);
             ind.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 1, 0, 0));
@@ -633,7 +633,7 @@ namespace Bimbridge.Addin.Ui
             t.VisualTree = bd;
 
             var over = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
-            over.Setters.Add(new Setter(Border.BorderBrushProperty, B(Color.FromRgb(0xC4, 0xCB, 0xD6)), "bd"));
+            over.Setters.Add(new Setter(Border.BorderBrushProperty, B(Color.FromRgb(0xC6, 0xC6, 0xCB)), "bd"));
             t.Triggers.Add(over);
             var on = new Trigger { Property = ToggleButton.IsCheckedProperty, Value = true };
             on.Setters.Add(new Setter(Border.BorderBrushProperty, B(ActionHover), "bd"));

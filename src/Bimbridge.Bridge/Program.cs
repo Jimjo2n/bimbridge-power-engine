@@ -19,6 +19,7 @@ namespace Bimbridge.Bridge
             "Tools to read and, if the user enabled it, change the open Revit model. Start with revit_context and catalog. " +
             "Use query with group_by or count for summaries and request rows only when needed; several reads at once with batch. " +
             "Save results with save_as and reuse them with ids=$name instead of repeating ids. " +
+            "$sel-xxxxxxxxxxxx = elements the user selected in Revit (Copy selection ID button): use it wherever ids or a set are accepted. " +
             "To see a view use capture (color_by=categories tells lighting fixtures apart from receptacles and switches); to point elements out to the user, show. " +
             "To change something: plan → commit (typed, one Undo), exec (C# against the Revit API) or fam/doc_op (families, connectors, save, sync, PDF). " +
             "If the user authorized the task, apply without asking for confirmation per batch; otherwise show the diff before the commit. key= avoids repeating a write. " +

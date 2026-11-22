@@ -300,14 +300,24 @@ namespace Bimbridge.Addin.Revit.Families
         /// temp file, opens it in the background (no UI, not activated), reads (id, parameter) and closes it without saving; deletes the copy.
         /// Local non-workshared files only. Does not modify the open document or the original file.
         /// </summary>
-        public static Dictionary<string, object> VerifyOnDisk(UIApplication app, Document doc, IDictionary<string, object> a)
+        public static Dictionary<string, object> VerifyOnDisk(UIApplication app, Document doc, IDictionary<string, object> a, NamedSets sets, string docHandle)
         {
             var path = doc.PathName;
             if (string.IsNullOrEmpty(path) || IsCloud(doc) || !File.Exists(path)) throw new OpFail(Status.NotSupported, "verify_disk: only an already saved local .rvt");
             if (doc.IsWorkshared) throw new OpFail(Status.NotSupported, "verify_disk: not used on workshared documents");
             if (doc.IsModified) throw new OpFail(Status.NeedsUser, "verify_disk: the document has unsaved changes; what is on disk is not what you see");
             var param = Arg.GetString(a, "parameter") ?? throw new OpFail(Status.Invalid, "verify_disk needs parameter=");
-            var ids = Arg.GetStringList(a, "ids").Select(x => long.Parse(x, CultureInfo.InvariantCulture)).ToList();
+            var ids = new List<long>();
+            foreach (var raw in Arg.GetStringList(a, "ids"))
+            {
+                if (raw.StartsWith("$", StringComparison.Ordinal))
+                {
+                    if (!sets.TryGet(raw, docHandle, out var arr, out var err)) throw new OpFail(Status.Invalid, err);
+                    ids.AddRange(arr);
+                }
+                else if (long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var one)) ids.Add(one);
+                else throw new OpFail(Status.Invalid, "verify_disk: '" + raw + "' is neither an id nor a set ($name)");
+            }
             if (ids.Count < 1 || ids.Count > 200) throw new OpFail(Status.Invalid, "verify_disk: between 1 and 200 ids");
             // beta1 run1 (2026-10-28): Revit keeps the active .rvt open; File.OpenRead/File.Copy fail with IOException.
             // It is read ONCE with read/write sharing: the hash and the copy come from the same bytes.

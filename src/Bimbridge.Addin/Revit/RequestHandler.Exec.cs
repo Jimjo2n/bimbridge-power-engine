@@ -1062,7 +1062,7 @@ namespace Bimbridge.Addin.Revit
                             case "ifc": data = ExportOps.Ifc(doc, a, pend, diffs); break;
                             case "schedule_csv": data = ExportOps.ScheduleCsv(doc, a, pend, diffs); break;
                             case "close": data = DocOps.Close(app, doc, a); break;
-                            case "verify_disk": data = DocOps.VerifyOnDisk(app, doc, a); break;
+                            case "verify_disk": data = DocOps.VerifyOnDisk(app, doc, a, session.Sets, DocRegistry.Instance.IdOf(doc)); break;
                         }
                     }
                     catch (OpFail ex) { fail = ex.Message; failStatus = ex.State; }

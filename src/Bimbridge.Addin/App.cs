@@ -95,6 +95,7 @@ namespace Bimbridge.Addin
                 _tracker.DocumentHandleClosed += handle =>
                 {
                     foreach (var s in sessions.All()) s.Sets.RemoveDoc(handle);
+                    NamedSets.UnpinDoc(handle);
                 };
 
                 var handler = new RequestHandler(_main, _tracker, config, revitVersion, addinVersion, plans, hold, pause);
@@ -205,13 +206,7 @@ namespace Bimbridge.Addin
                     "Review what the AI's tasks ask to do and authorize it or not.",
                     "A task that modifies the model, saves, syncs or exports needs your permission for THAT task and THAT document, for 8 hours. " +
                     "The AI can ask for it but cannot grant it. You can also revoke active permissions here.",
-                    Icons.Status(Theme.Slate, 32), Icons.Status(Theme.Slate, 16), anyTime: false)) as PushButton;
-                Runtime.TrustButton = sec.AddItem(Btn("BimbridgeTrust", "Block\nC# injection", typeof(TrustCommand),
-                    "Block or allow the AI to run dynamic C# code (exec).",
-                    "By default the authorized local AI can run dynamic C#, audited. Press to block it: every new exec request is rejected. " +
-                    "To allow it again, press it again and confirm (No by default). " +
-                    "The change is saved in config.json. It does not stop what is already running inside Revit. Typed operations (plan/commit) remain available.",
-                    Icons.Mode(false, 32), Icons.Mode(false, 16))) as PushButton;
+                    Icons.Journal(32), Icons.Journal(16), anyTime: false)) as PushButton;
 
                 var help = app.CreateRibbonPanel(TabName, "Help");
                 help.AddItem(Btn("BimbridgeSettings", "Settings", typeof(SettingsCommand),

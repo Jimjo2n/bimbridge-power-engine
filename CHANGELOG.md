@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- feat(ui): **Copy selection ID** ribbon button. Select elements in Revit, press it and paste into Claude or Codex: the text names the document, the categories and the ids, and gives a `$sel-xxxxxxxxxxxx` reference that every BIMBRIDGE command accepts (queries, plans, geo, audits, tools) from any conversation while Revit is open. An expired reference tells the AI to ask you to copy it again.
+- feat(ui): brand palette red, black and white (black actions, red mark and destructive actions, neutral grays); the product is shown as just "BIMBRIDGE" in Revit, the installer and the MCP server.
+- feat(ui): "Authorize tasks" shows how many requests are waiting; the duplicate "Block C# injection" ribbon button is removed (the control stays in Settings, with confirmation).
 - chore(i18n)!: **everything is now English** — MCP commands and arguments, operation names and keys, enum values, statuses, response keys (`status`, `data`, `warning`), guides, errors, persisted keys and data folders (`tasks\`, `recipes\`, `operations\`…).
   - **Spanish input is still accepted until 0.9.5** (one version, `LegacyAliases`): old commands, argument names and enum values are read as their English equivalents. Outputs are English only. User values (parameter values, names, text) are never translated: `set value=Sí` writes `Sí`.
   - Data written by 0.9.3/0.9.4 stays readable in place (journals, tasks, receipts, Copy/Monitor baselines, grants, manifests, config.json); the installer moves the old folders to the English names. Hash-chained audit records are never rewritten and retries of keys recorded before the update are recognized as the same operation.
