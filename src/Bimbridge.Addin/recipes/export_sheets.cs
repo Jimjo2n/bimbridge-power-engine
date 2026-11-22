@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Recipe shipped with BIMBRIDGE - Power Engine (since 0.6.0). Exports a sheet set to PDF as verifiable barriers: optionally saves
+// Recipe shipped with BIMBRIDGE (since 0.6.0). Exports a sheet set to PDF as verifiable barriers: optionally saves
 // (or syncs) first, then exports. Barriers only run when everything before them is committed; the PDF is kept as an
 // artifact with SHA-256 and an approximate page count. Does not change the model content.
 // args: sheet_set (ViewSheetSet name) or sheets (list of numbers), folder, name, before (nothing|save|sync, default nothing),

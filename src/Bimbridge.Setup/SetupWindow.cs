@@ -47,7 +47,7 @@ namespace Bimbridge.Setup
             _installed = _core.ReadInstalled();
             _uninstallMode = uninstallMode;
 
-            Window = Theme.NewWindow(_uninstallMode ? "Uninstall BIMBRIDGE - Power Engine" : "Install BIMBRIDGE - Power Engine", 640, 720);
+            Window = Theme.NewWindow(_uninstallMode ? "Uninstall BIMBRIDGE" : "Install BIMBRIDGE", 640, 720);
             Window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             Window.ShowInTaskbar = true;
             Window.MinHeight = 560;
@@ -77,7 +77,7 @@ namespace Bimbridge.Setup
             DockPanel.SetDock(_footer, Dock.Bottom);
             root.Children.Add(_footer);
 
-            _banner = Theme.Notice("", Theme.NavySoft, out _bannerText);
+            _banner = Theme.Notice("", Theme.ActionHover, out _bannerText);
             _banner.Visibility = Visibility.Collapsed;
 
             _scroll = Theme.Scroll(null);
@@ -104,7 +104,7 @@ namespace Bimbridge.Setup
             var body = new StackPanel();
             PutBanner(body);
             if (_installed != null)
-                ShowBanner("Version " + _installed.ProductVersion + " is already installed. You can change the options and click Update.", Theme.NavySoft);
+                ShowBanner("Version " + _installed.ProductVersion + " is already installed. You can change the options and click Update.", Theme.ActionHover);
 
             // 1. Revit
             var revit = new StackPanel();
@@ -231,11 +231,11 @@ namespace Bimbridge.Setup
         private void ShowDone(List<string> versions, string levels, string warning)
         {
             var body = new StackPanel();
-            body.Children.Add(Hero(Theme.Green, "Done", "BIMBRIDGE - Power Engine is installed."));
+            body.Children.Add(Hero(Theme.Green, "Done", "BIMBRIDGE is installed."));
             var steps = new StackPanel();
             steps.Children.Add(Theme.Section("What's next"));
             steps.Children.Add(Step("1", OpenRevitText(versions) + ". If it asks about the unsigned add-in, choose \"Always Load\"."));
-            steps.Children.Add(Step("2", "You will see the BIMBRIDGE tab. The Power Engine | Status button turns green when an AI connects."));
+            steps.Children.Add(Step("2", "You will see the BIMBRIDGE tab. The Status button turns green when an AI connects."));
             steps.Children.Add(Step("3", "In Claude or Codex ask, for example: \"How many lighting fixtures are there per level in the open model?\""));
             body.Children.Add(Theme.Card(steps));
 
@@ -243,7 +243,7 @@ namespace Bimbridge.Setup
             done.Children.Add(Theme.Section("What was done"));
             foreach (var l in _log) done.Children.Add(Did(l));
             done.Children.Add(Did("AI permissions: " + SetupCore.LevelsText(levels)));
-            done.Children.Add(Did("Listed in Settings > Apps as \"BIMBRIDGE - Power Engine\" so you can remove it whenever you want"));
+            done.Children.Add(Did("Listed in Settings > Apps as \"BIMBRIDGE\" so you can remove it whenever you want"));
             body.Children.Add(Theme.Card(done));
             if (warning != null) { PutBanner(body, 0); ShowBanner(warning, Theme.Amber); }
 
@@ -269,7 +269,7 @@ namespace Bimbridge.Setup
             var body = new StackPanel();
             PutBanner(body);
             var s = new StackPanel();
-            s.Children.Add(Theme.Section("Remove BIMBRIDGE - Power Engine from this computer?", "Removes the Revit add-in, the connection to Claude and Codex, and the bridge. Your models are not touched."));
+            s.Children.Add(Theme.Section("Remove BIMBRIDGE from this computer?", "Removes the Revit add-in, the connection to Claude and Codex, and the bridge. Your models are not touched."));
             _removeData = Theme.Choice(new CheckBox(), "Also delete my data", "Logs, the queue of pending changes and the configuration.");
             _removeData.Margin = new Thickness(0, 12, 0, 0);
             s.Children.Add(_removeData);
@@ -308,7 +308,7 @@ namespace Bimbridge.Setup
             if (error != null) { ShowUninstallForm(); ShowBanner(error, Theme.Red); return; }
 
             var body = new StackPanel();
-            body.Children.Add(Hero(Theme.Slate, "Uninstalled", "BIMBRIDGE - Power Engine was removed from this computer."));
+            body.Children.Add(Hero(Theme.Slate, "Uninstalled", "BIMBRIDGE was removed from this computer."));
             _scroll.Content = body;
             Theme.Enter(body);
             SetFooter("", null, Btn("Close", Theme.Kind.Primary, () => { Platform.DeleteSetupCopyLater(_paths); Window.Close(); }));

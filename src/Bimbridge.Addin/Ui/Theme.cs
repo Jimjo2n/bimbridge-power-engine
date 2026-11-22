@@ -15,26 +15,30 @@ namespace Bimbridge.Addin.Ui
 {
     /// <summary>
     /// Shared visual system for the installer and the add-in windows (all in code, no XAML, so it builds the same on
-    /// net48, net8 and net10). Light, calm surfaces, navy as the action color and red only as a brand accent;
-    /// green, amber and red for states. Minimal, purposeful motion: press feedback, entry of screens whose content
-    /// changes (occasional) and nothing on what repeats many times a day. Honors Windows "reduce animations".
+    /// net48, net8 and net10). Brand palette: red, black and white. Light neutral surfaces, black as the action color,
+    /// brand red for the mark and destructive actions; green, amber and red for states (always with words).
+    /// Minimal, purposeful motion: press feedback, entry of screens whose content changes (occasional) and nothing
+    /// on what repeats many times a day. Honors Windows "reduce animations".
     /// </summary>
     internal static class Theme
     {
         // ---------------- Color ----------------
-        public static readonly Color Navy = Color.FromRgb(0x0E, 0x24, 0x47);
-        public static readonly Color NavySoft = Color.FromRgb(0x24, 0x3B, 0x63);
-        public static readonly Color Red = Color.FromRgb(0xC8, 0x1E, 0x2B);
-        public static readonly Color Green = Color.FromRgb(0x16, 0x83, 0x52);
-        public static readonly Color Amber = Color.FromRgb(0xB9, 0x70, 0x08);
-        public static readonly Color Slate = Color.FromRgb(0x64, 0x6E, 0x80);
-        public static readonly Color Ink = Color.FromRgb(0x14, 0x1A, 0x26);
-        public static readonly Color Muted = Color.FromRgb(0x5B, 0x65, 0x76);
-        public static readonly Color Line = Color.FromRgb(0xE3, 0xE7, 0xEE);
-        public static readonly Color Page = Color.FromRgb(0xF5, 0xF6, 0xF8);
+        /// <summary>Action color (primary buttons, selection, focus ring, icon bodies).</summary>
+        public static readonly Color Action = Color.FromRgb(0x14, 0x14, 0x16);
+        public static readonly Color ActionHover = Color.FromRgb(0x2E, 0x2E, 0x33);
+        /// <summary>Brand red: the mark, destructive actions and the error state.</summary>
+        public static readonly Color Red = Color.FromRgb(0xCE, 0x0B, 0x35);
+        public static readonly Color RedDeep = Color.FromRgb(0xAF, 0x00, 0x2E);
+        public static readonly Color Green = Color.FromRgb(0x1C, 0x7F, 0x4E);
+        public static readonly Color Amber = Color.FromRgb(0xB2, 0x6A, 0x00);
+        public static readonly Color Slate = Color.FromRgb(0x6B, 0x6B, 0x73);
+        public static readonly Color Ink = Color.FromRgb(0x11, 0x11, 0x13);
+        public static readonly Color Muted = Color.FromRgb(0x5E, 0x5E, 0x66);
+        public static readonly Color Line = Color.FromRgb(0xE5, 0xE5, 0xE8);
+        public static readonly Color Page = Color.FromRgb(0xF6, 0xF6, 0xF7);
         public static readonly Color White = Colors.White;
         /// <summary>Sunken surface (reading areas, code, row backgrounds on mouse hover).</summary>
-        public static readonly Color Sunken = Color.FromRgb(0xEE, 0xF1, 0xF5);
+        public static readonly Color Sunken = Color.FromRgb(0xEF, 0xEF, 0xF1);
 
         public static SolidColorBrush B(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
         public static SolidColorBrush Tint(Color c, byte alpha = 0x22) => B(Color.FromArgb(alpha, c.R, c.G, c.B));
@@ -48,7 +52,7 @@ namespace Bimbridge.Addin.Ui
         /// <summary>Radius of buttons, notices, sunken areas and segments.</summary>
         public const double RadiusSmall = 8;
         /// <summary>Single product-name eyebrow used in headers.</summary>
-        public const string ProductEyebrow = "BIMBRIDGE · Power Engine";
+        public const string ProductEyebrow = "BIMBRIDGE";
 
         // ---------------- Motion ----------------
         /// <summary>Windows with animations off or high contrast: no movement (feedback stays immediate).</summary>
@@ -114,7 +118,7 @@ namespace Bimbridge.Addin.Ui
         public static Style FocusRing => FocusRingFor(RadiusSmall);
 
         /// <summary>
-        /// Visible focus ring (2 px navy, 3 px outside the control) concentric with a control of radius <paramref name="radius"/>:
+        /// Visible focus ring (2 px black, 3 px outside the control) concentric with a control of radius <paramref name="radius"/>:
         /// the ring uses radius + 3 so the gap is the same at the corners.
         /// </summary>
         public static Style FocusRingFor(double radius)
@@ -122,7 +126,7 @@ namespace Bimbridge.Addin.Ui
             if (_focus.TryGetValue(radius, out var cached)) return cached;
             var t = new ControlTemplate();
             var r = new FrameworkElementFactory(typeof(Rectangle));
-            r.SetValue(Shape.StrokeProperty, B(Navy));
+            r.SetValue(Shape.StrokeProperty, B(Action));
             r.SetValue(Shape.StrokeThicknessProperty, 2.0);
             r.SetValue(Rectangle.RadiusXProperty, radius + 3);
             r.SetValue(Rectangle.RadiusYProperty, radius + 3);
@@ -159,18 +163,18 @@ namespace Bimbridge.Addin.Ui
             return w;
         }
 
-        /// <summary>Brand mark: rounded navy square with the bridge (two piers and the red deck).</summary>
+        /// <summary>Brand mark: rounded brand-red square with the white bridge (deck and two piers).</summary>
         public static UIElement BrandMark(double size = 36)
         {
             var g = new Grid { Width = size, Height = size };
-            g.Children.Add(new Border { CornerRadius = new CornerRadius(size * 0.26), Background = B(Navy) });
+            g.Children.Add(new Border { CornerRadius = new CornerRadius(size * 0.26), Background = B(Red) });
             var c = new Canvas { Width = 20, Height = 20, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, RenderTransform = new ScaleTransform(size / 36.0, size / 36.0), RenderTransformOrigin = new Point(0.5, 0.5) };
             void Rect(double x, double y, double w, double h, Color col)
             {
                 var r = new Rectangle { Width = w, Height = h, Fill = B(col), RadiusX = 1, RadiusY = 1 };
                 Canvas.SetLeft(r, x); Canvas.SetTop(r, y); c.Children.Add(r);
             }
-            Rect(1, 6, 18, 3.2, Red);           // deck
+            Rect(1, 6, 18, 3.2, White);         // deck
             Rect(3.5, 9.2, 2.6, 9, White);      // pier
             Rect(13.9, 9.2, 2.6, 9, White);     // pier
             Rect(1, 2, 18, 1.6, Tint(White, 0x88).Color);
@@ -209,7 +213,7 @@ namespace Bimbridge.Addin.Ui
             Grid.SetColumn(left, 1);
             grid.Children.Add(left);
 
-            pillText = new TextBlock { FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = B(NavySoft) };
+            pillText = new TextBlock { FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = B(ActionHover) };
             pill = new Border
             {
                 CornerRadius = new CornerRadius(999),
@@ -276,12 +280,12 @@ namespace Bimbridge.Addin.Ui
             return g;
         }
 
-        /// <summary>Step number (1, 2, 3…): 22 px navy-tinted circle. The single style for sections and step lists.</summary>
+        /// <summary>Step number (1, 2, 3…): 22 px ink-tinted circle. The single style for sections and step lists.</summary>
         public static Border StepBadge(string n) => new Border
         {
-            Width = 22, Height = 22, CornerRadius = new CornerRadius(11), Background = Tint(Navy, 0x18),
+            Width = 22, Height = 22, CornerRadius = new CornerRadius(11), Background = Tint(Action, 0x18),
             VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left,
-            Child = new TextBlock { Text = n, FontSize = 11.5, FontWeight = FontWeights.SemiBold, Foreground = B(Navy), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+            Child = new TextBlock { Text = n, FontSize = 11.5, FontWeight = FontWeights.SemiBold, Foreground = B(Action), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
         };
 
         public static Border Chip(string text, Color color)
@@ -398,12 +402,12 @@ namespace Bimbridge.Addin.Ui
             Child = child,
         };
 
-        /// <summary>Thin progress bar (4 px, navy on sunken). Indeterminate only while real work is happening.</summary>
+        /// <summary>Thin progress bar (4 px, black on sunken). Indeterminate only while real work is happening.</summary>
         public static ProgressBar ProgressLine(bool indeterminate = true) => new ProgressBar
         {
             IsIndeterminate = indeterminate,
             Height = 4,
-            Foreground = B(Navy),
+            Foreground = B(Action),
             Background = B(Sunken),
             BorderThickness = new Thickness(0),
         };
@@ -524,10 +528,10 @@ namespace Bimbridge.Addin.Ui
             Color bg, fg, border, hover;
             switch (kind)
             {
-                case Kind.Primary: bg = Navy; fg = White; border = Navy; hover = NavySoft; break;
+                case Kind.Primary: bg = Action; fg = White; border = Action; hover = ActionHover; break;
                 case Kind.DangerSolid: bg = Red; fg = White; border = Red; hover = Darken(Red, 0.88); break;
                 case Kind.Danger: bg = White; fg = Red; border = Color.FromRgb(0xEE, 0xC2, 0xC6); hover = Color.FromRgb(0xFD, 0xF1, 0xF2); break;
-                case Kind.Quiet: bg = Colors.Transparent; fg = NavySoft; border = Colors.Transparent; hover = Sunken; break;
+                case Kind.Quiet: bg = Colors.Transparent; fg = ActionHover; border = Colors.Transparent; hover = Sunken; break;
                 default: bg = White; fg = Ink; border = Color.FromRgb(0xD5, 0xDA, 0xE3); hover = Color.FromRgb(0xF3, 0xF5, 0xF8); break;
             }
 
@@ -574,7 +578,7 @@ namespace Bimbridge.Addin.Ui
 
         /// <summary>
         /// Selectable option as a card (over a real RadioButton or CheckBox: keyboard, group and IsChecked keep working).
-        /// Checked: navy border and a faintly tinted background; circular (radio) or square (checkbox) indicator on the left.
+        /// Checked: black border and a faintly tinted background; circular (radio) or square (checkbox) indicator on the left.
         /// </summary>
         public static T Choice<T>(T toggle, string title, string hint) where T : ToggleButton
         {
@@ -632,10 +636,10 @@ namespace Bimbridge.Addin.Ui
             over.Setters.Add(new Setter(Border.BorderBrushProperty, B(Color.FromRgb(0xC4, 0xCB, 0xD6)), "bd"));
             t.Triggers.Add(over);
             var on = new Trigger { Property = ToggleButton.IsCheckedProperty, Value = true };
-            on.Setters.Add(new Setter(Border.BorderBrushProperty, B(NavySoft), "bd"));
-            on.Setters.Add(new Setter(Border.BackgroundProperty, Tint(Navy, 0x0F), "bd"));
-            on.Setters.Add(new Setter(Border.BackgroundProperty, B(Navy), "ind"));
-            on.Setters.Add(new Setter(Border.BorderBrushProperty, B(Navy), "ind"));
+            on.Setters.Add(new Setter(Border.BorderBrushProperty, B(ActionHover), "bd"));
+            on.Setters.Add(new Setter(Border.BackgroundProperty, Tint(Action, 0x0F), "bd"));
+            on.Setters.Add(new Setter(Border.BackgroundProperty, B(Action), "ind"));
+            on.Setters.Add(new Setter(Border.BorderBrushProperty, B(Action), "ind"));
             on.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Visible, "mark"));
             t.Triggers.Add(on);
             var off = new Trigger { Property = UIElement.IsEnabledProperty, Value = false };

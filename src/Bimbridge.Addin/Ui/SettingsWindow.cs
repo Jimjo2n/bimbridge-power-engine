@@ -231,21 +231,21 @@ namespace Bimbridge.Addin.Ui
             return s;
         }
 
-        /// <summary>Ribbon icon: navy gear with a white center, on the 32×32 canvas of <see cref="Icons"/>.</summary>
+        /// <summary>Ribbon icon: black gear with a white center, on the 32×32 canvas of <see cref="Icons"/>.</summary>
         public static ImageSource Icon(int size)
         {
             var visual = new DrawingVisual();
             using (var dc = visual.RenderOpen())
             {
                 dc.PushTransform(new ScaleTransform(size / 32.0, size / 32.0));
-                var navy = Theme.B(Theme.Navy);
+                var ink = Theme.B(Theme.Action);
                 for (var a = 0; a < 360; a += 45)
                 {
                     dc.PushTransform(new RotateTransform(a, 16, 16));
-                    dc.DrawRoundedRectangle(navy, null, new Rect(13, 2, 6, 8), 1.5, 1.5);
+                    dc.DrawRoundedRectangle(ink, null, new Rect(13, 2, 6, 8), 1.5, 1.5);
                     dc.Pop();
                 }
-                dc.DrawEllipse(navy, null, new Point(16, 16), 10.5, 10.5);
+                dc.DrawEllipse(ink, null, new Point(16, 16), 10.5, 10.5);
                 dc.DrawEllipse(Theme.B(Theme.White), null, new Point(16, 16), 4.5, 4.5);
                 dc.Pop();
             }

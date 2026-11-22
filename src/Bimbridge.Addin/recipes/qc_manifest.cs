@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Recipe shipped with BIMBRIDGE - Power Engine (since 0.6.0). One-to-one QC of a manifest (expected list of positions, types, heights, tags)
+// Recipe shipped with BIMBRIDGE (since 0.6.0). One-to-one QC of a manifest (expected list of positions, types, heights, tags)
 // against the model elements. Read-only. Leaves a CSV with all deviations as a task artifact.
 // args: manifest (JSON text, or path to a .json), category (BuiltInCategory, default OST_LightingFixtures),
 // level (optional: only that level), tags_view (optional: id of the view where tags are counted).

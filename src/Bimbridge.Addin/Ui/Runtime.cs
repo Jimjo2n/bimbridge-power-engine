@@ -258,7 +258,7 @@ namespace Bimbridge.Addin.Ui
                     RibbonMotion.Play(StatusButton, "status|" + from + ">" + c, _shownStatus != null, (t, s) => Icons.Status(from, c, t, s), s => Icons.Status(c, s));
                     _shownStatus = c;
                 }
-                StatusButton.ItemText = "Power Engine\n" + (paused ? "Status · paused" : sessions == 0 ? "Status · no AI" : "Status · " + sessions + " AI");
+                StatusButton.ItemText = "Status\n" + (paused ? "paused" : sessions == 0 ? "no AI" : sessions + " AI");
             }
             if (TrustButton != null)
             {

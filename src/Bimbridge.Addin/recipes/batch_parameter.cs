@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Recipe shipped with BIMBRIDGE - Power Engine (since 0.6.0). Sets an INSTANCE parameter to a value on a list of elements, one per unit:
+// Recipe shipped with BIMBRIDGE (since 0.6.0). Sets an INSTANCE parameter to a value on a list of elements, one per unit:
 // resumable, without duplicates (skipped if it already has the value) and with verification after a crash.
 // args: ids (list of ElementId) or sheet_set ("$name" of a saved set), parameter (visible name), value (text; for
 // length parameters it is used as in the UI, e.g. "2400 mm"), save_at_end (yes/no, default no).

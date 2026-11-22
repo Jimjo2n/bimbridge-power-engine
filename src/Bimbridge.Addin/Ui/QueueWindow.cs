@@ -181,7 +181,7 @@ namespace Bimbridge.Addin.Ui
         {
             var selected = _cards.Where(c => c.Pending && c.Selected).ToList();
             if (selected.Count == 0) return;
-            var r = TaskDialog.Show("BIMBRIDGE - Power Engine", "Discard " + (selected.Count == 1 ? "1 plan" : selected.Count + " plans") + " without applying?\nThe AI will see that you discarded them.",
+            var r = TaskDialog.Show("BIMBRIDGE", "Discard " + (selected.Count == 1 ? "1 plan" : selected.Count + " plans") + " without applying?\nThe AI will see that you discarded them.",
                 TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No, TaskDialogResult.No);
             if (r != TaskDialogResult.Yes) return;
             foreach (var c in selected)
@@ -269,7 +269,7 @@ namespace Bimbridge.Addin.Ui
                 Root = Theme.Card(grid);
             }
 
-            public void ShowRunning() => SetChip("Applying…", Theme.NavySoft);
+            public void ShowRunning() => SetChip("Applying…", Theme.ActionHover);
 
             public void ShowResult(string status, string detail)
             {

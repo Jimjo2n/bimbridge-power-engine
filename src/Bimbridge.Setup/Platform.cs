@@ -156,7 +156,7 @@ namespace Bimbridge.Setup
             if (SetupPaths.IsSandbox) return;
             using (var k = Registry.CurrentUser.CreateSubKey(UninstallKey))
             {
-                k.SetValue("DisplayName", "BIMBRIDGE - Power Engine");
+                k.SetValue("DisplayName", "BIMBRIDGE");
                 k.SetValue("DisplayVersion", ProductVersion);
                 k.SetValue("Publisher", "BIMBRIDGE");
                 k.SetValue("DisplayIcon", p.SetupCopy + ",0");

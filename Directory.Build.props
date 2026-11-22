@@ -4,7 +4,7 @@
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <Company>BIMBRIDGE</Company>
-    <Product>BIMBRIDGE - Power Engine</Product>
+    <Product>BIMBRIDGE</Product>
     <Version>0.9.4</Version>
     <InformationalVersion>0.9.4</InformationalVersion>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>

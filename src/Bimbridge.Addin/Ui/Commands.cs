@@ -18,7 +18,7 @@ namespace Bimbridge.Addin.Ui
         public static bool Ready()
         {
             if (Runtime.Ready) return true;
-            TaskDialog.Show("BIMBRIDGE - Power Engine", "The MCP is turned off.\n\nCheck %APPDATA%\\Bimbridge\\config.json (enabled) or the log %LOCALAPPDATA%\\Bimbridge\\addin.log.");
+            TaskDialog.Show("BIMBRIDGE", "The MCP is turned off.\n\nCheck %APPDATA%\\Bimbridge\\config.json (enabled) or the log %LOCALAPPDATA%\\Bimbridge\\addin.log.");
             return false;
         }
     }
@@ -69,7 +69,7 @@ namespace Bimbridge.Addin.Ui
         {
             if (!Guard.Ready()) return Result.Cancelled;
             var doc = data.Application.ActiveUIDocument?.Document;
-            if (doc == null) { TaskDialog.Show("BIMBRIDGE - Power Engine", "Open a model to see its change queue."); return Result.Cancelled; }
+            if (doc == null) { TaskDialog.Show("BIMBRIDGE", "Open a model to see its change queue."); return Result.Cancelled; }
             var key = DocumentTracker.KeyOf(doc);
             Runtime.Plans.LoadPersisted(key);
             new QueueWindow(data.Application, doc, Runtime.Plans.Held(key)).ShowDialog();
@@ -133,12 +133,12 @@ namespace Bimbridge.Addin.Ui
         {
             if (!Guard.Ready()) return Result.Cancelled;
             var g = Runtime.Grants;
-            if (g == null) { TaskDialog.Show("BIMBRIDGE - Power Engine", "The authorization store is unavailable: tasks that write stay blocked."); return Result.Cancelled; }
+            if (g == null) { TaskDialog.Show("BIMBRIDGE", "The authorization store is unavailable: tasks that write stay blocked."); return Result.Cancelled; }
             var who = Environment.UserName + " (Revit dialog)";
             var pending = g.PendingRequests();
             foreach (var r in pending)
             {
-                var td = new TaskDialog("BIMBRIDGE - Power Engine — authorize task")
+                var td = new TaskDialog("BIMBRIDGE — authorize task")
                 {
                     MainInstruction = "Authorize the task «" + r.Task + "»?",
                     MainContent = "Asks to: " + string.Join(", ", r.Capabilities.Select(Describe)) + "\n" +
@@ -160,8 +160,8 @@ namespace Bimbridge.Addin.Ui
             if (pending.Count == 0)
             {
                 var live = g.All().Where(x => x.ValidAt(DateTime.UtcNow)).ToList();
-                if (live.Count == 0) { TaskDialog.Show("BIMBRIDGE - Power Engine", "There are no pending requests and no active permissions."); return Result.Succeeded; }
-                var td = new TaskDialog("BIMBRIDGE - Power Engine — active permissions")
+                if (live.Count == 0) { TaskDialog.Show("BIMBRIDGE", "There are no pending requests and no active permissions."); return Result.Succeeded; }
+                var td = new TaskDialog("BIMBRIDGE — active permissions")
                 {
                     MainInstruction = live.Count + " active permissions",
                     MainContent = string.Join("\n", live.Take(12).Select(x => "• " + x.Task + ": " + string.Join(", ", x.Capabilities.Select(Describe)) + " (expires " + x.Expires.Substring(0, 16).Replace('T', ' ') + " UTC)")),

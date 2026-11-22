@@ -45,7 +45,7 @@ namespace Bimbridge.Addin.Revit
         /// <summary>Must be called from OnStartup (valid API context).</summary>
         public void Create() { _event = ExternalEvent.Create(this); }
 
-        public string GetName() => "BIMBRIDGE - Power Engine";
+        public string GetName() => "BIMBRIDGE";
 
         /// <summary>
         /// Runs a resumable job on the Revit thread. <paramref name="step"/> receives the UIApplication, the visit clock

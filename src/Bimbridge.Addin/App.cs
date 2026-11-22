@@ -173,7 +173,7 @@ namespace Bimbridge.Addin
                 }
 
                 var conn = app.CreateRibbonPanel(TabName, "Connection");
-                Runtime.StatusButton = conn.AddItem(Btn("BimbridgeStatus", "Power Engine\nStatus", typeof(StatusCommand),
+                Runtime.StatusButton = conn.AddItem(Btn("BimbridgeStatus", "Status\nno AI", typeof(StatusCommand),
                     "See which AIs are connected, what they can do and what they did.",
                     "Green: at least one AI is connected. Grey: waiting for Claude or Codex to connect. Red: the AI is paused.",
                     Icons.Status(Theme.Slate, 32), Icons.Status(Theme.Slate, 16))) as PushButton;
@@ -181,6 +181,14 @@ namespace Bimbridge.Addin
                     "Stop the AI instantly. Press it again to resume.",
                     "While paused, Revit rejects every AI request (reads and changes). The AI is told that you paused it.",
                     Icons.Pause(false, 32), Icons.Pause(false, 16))) as PushButton;
+
+                var selection = app.CreateRibbonPanel(TabName, "Selection");
+                CopySelectionCommand.Button = selection.AddItem(Btn("BimbridgeCopySelection", "Copy\nselection ID", typeof(CopySelectionCommand),
+                    "Copy a reference to the selected elements to paste into your AI conversation.",
+                    "Select elements (for example 3 conduits and a receptacle), press this button and paste into Claude or Codex. " +
+                    "The pasted text tells the AI which elements you mean ($sel-…), so you can say \"move these\" or \"check these\" without listing ids. " +
+                    "Works in any conversation while this Revit is open.",
+                    CopySelectionCommand.Icon(32), CopySelectionCommand.Icon(16), anyTime: false)) as PushButton;
 
                 var changes = app.CreateRibbonPanel(TabName, "AI changes");
                 Runtime.ModeButton = changes.AddItem(Btn("BimbridgeMode", "Mode\nLive", typeof(ModeCommand),

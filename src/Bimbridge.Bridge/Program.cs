@@ -68,7 +68,7 @@ namespace Bimbridge.Bridge
             var mcp = builder.Services
                 .AddMcpServer(o =>
                 {
-                    o.ServerInfo = new ModelContextProtocol.Protocol.Implementation { Name = "BIMBRIDGE - Power Engine", Version = Version };
+                    o.ServerInfo = new ModelContextProtocol.Protocol.Implementation { Name = "BIMBRIDGE", Version = Version };
                     o.ServerInstructions = full ? Instructions : CompactTools.Instructions;
                 })
                 .WithStdioServerTransport()

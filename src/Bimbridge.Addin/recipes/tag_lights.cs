@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Recipe shipped with BIMBRIDGE - Power Engine (since 0.6.0). One tag per fixture in ONE view (rule "exactly one tag per fixture"):
+// Recipe shipped with BIMBRIDGE (since 0.6.0). One tag per fixture in ONE view (rule "exactly one tag per fixture"):
 // one unit per fixture visible in the view; if it already has a tag in that view it is skipped (no duplicates on resume or repeat).
 // Ends by saving (barrier) and, if sheets are requested, exporting the PDF. The postcondition lists fixtures with 0 or more than 1 tag.
 // args: view (ElementId of the view), tag_type_name (tag type; optional: by category),

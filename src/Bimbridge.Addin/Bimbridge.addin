@@ -5,7 +5,7 @@
 -->
 <RevitAddIns>
   <AddIn Type="Application">
-    <Name>BIMBRIDGE - Power Engine</Name>
+    <Name>BIMBRIDGE</Name>
     <Assembly>Bimbridge\Bimbridge.Addin.dll</Assembly>
     <AddInId>6F1C2B7E-4D0A-4E8B-9C3D-1A2B3C4D5E6F</AddInId>
     <FullClassName>Bimbridge.Addin.App</FullClassName>

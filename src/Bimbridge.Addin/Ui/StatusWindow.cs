@@ -22,7 +22,7 @@ using Typography = System.Windows.Documents.Typography;
 namespace Bimbridge.Addin.Ui
 {
     /// <summary>
-    /// "BIMBRIDGE - Power Engine" control center (modeless): summary, named agents, attributed activity, safety and recovery,
+    /// "BIMBRIDGE" control center (modeless): summary, named agents, attributed activity, safety and recovery,
     /// performance and export. It only reads in-memory state and the queue on disk; it never calls the Revit API or holds Document/Element,
     /// so it can stay open while you work. It redraws at most every 1.5 s and only if something changed.
     /// </summary>
@@ -612,7 +612,7 @@ namespace Bimbridge.Addin.Ui
 
             var human = author == VersionRegistry.HumanAuthor;
             var who = human ? "You" : agent ?? Theme.ClientName(Str(e, "client") ?? author) + " (unnamed)";
-            var chip = Theme.Chip(who, human ? Theme.Navy : Theme.ClientColor(Str(e, "client") ?? author));
+            var chip = Theme.Chip(who, human ? Theme.Action : Theme.ClientColor(Str(e, "client") ?? author));
             Grid.SetColumn(chip, 1);
             grid.Children.Add(chip);
 
