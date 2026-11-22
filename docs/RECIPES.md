@@ -29,6 +29,22 @@ public class MyRecipe : Recipe
 - Memory: `ctx.Decision(text)`, `ctx.Exception(reason, detail)`, `ctx.Artifact(name, content)` (with SHA-256).
 - `Bim.*` helpers (mm): `Groups` (Inspect, Signature, Compose, ChangeType, VerifyComposition, Instances), `Mounting` (Body, Support, View3D, Transformation), `Views` (Range, ApplyRange, CompareTemplate, WhyNotVisible, FilterByCategory), `Manifest` (Collect, Qc). Those that write are called inside the engine's transaction.
 
+## Updating a recipe written for 0.9.x
+
+The scripting API is English since 0.9.5. Bundled recipes are already updated, and the installer rewrites the namespace of recipes saved in your data folder, but the member names in your own recipes must be renamed by hand (or ask the AI agent to do it with this table). Recipes that still use the old names fail to compile with a clear error; nothing runs.
+
+| 0.9.x | Now |
+| --- | --- |
+| `Receta` | `Recipe` |
+| `Unidad`, `u.Clave`, `u.Datos` | `Unit`, `u.Key`, `u.Data` |
+| `Unidad.Guardar()` | `Unit.Save()` |
+| `Descripcion`, `Entradas`, `Transaccion` | `Description`, `Inputs`, `Transaction` |
+| `PoliticaTx.PorUnidad` | `TxPolicy.PerUnit` |
+| `Preparar`, `Unidades`, `Ejecutar`, `Verificar`, `Postcondicion` | `Prepare`, `Units`, `Run`, `Verify`, `Postcondition` |
+| `Verificacion.Aplicada / NoAplicada / Desconocida` | `Verification.Applied / NotApplied / Unknown` |
+| `OmitirUnidad`, `ctx.Omitir` | `SkipUnit`, `ctx.Skip` |
+| `Bim.Grupos`, `Bim.Montaje`, `Bim.Vistas`, `Bim.Manifiesto` | `Bim.Groups`, `Bim.Mounting`, `Bim.Views`, `Bim.Manifest` |
+
 ## Bundled
 
 | Recipe | What it does | Inputs | Transaction |
