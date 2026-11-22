@@ -260,7 +260,7 @@ namespace Bimbridge.AgentHost
             bool Local(string p) => !string.IsNullOrWhiteSpace(p) && p.Length > 2 && char.IsLetter(p[0]) && p[1] == ':' && (p[2] == '\\' || p[2] == '/');
             var docPath = ctx.GetValueOrDefault("path") as string;
             var central = ctx.GetValueOrDefault("central") as string;
-            if ((docKey ?? "").StartsWith("nube:", StringComparison.OrdinalIgnoreCase)) return "workshared in the cloud: not accepted even with --aceptar-workshared-local";
+            if ((docKey ?? "").StartsWith("cloud:", StringComparison.OrdinalIgnoreCase)) return "workshared in the cloud: not accepted even with --aceptar-workshared-local";
             if (!Local(docPath)) return "workshared without a local drive path (" + (docPath ?? "empty") + "): not accepted";
             if (!string.IsNullOrWhiteSpace(central) && !Local(central)) return "workshared with a non-local central (" + central + "): not accepted";
             deviation = "local workshared document accepted by the operator (--aceptar-workshared-local); path " + docPath + "; central " + (central ?? "(none)") + "; trial with rollback only, no save or sync";

@@ -209,6 +209,8 @@ namespace Bimbridge.Engine.Tasks
             if (o.TryGetValue("last_save", out var lp) && lp is Dictionary<string, object> lpd) r.LastPersist = PersistEvidence.FromJson(lpd);
             if (o.TryGetValue("save_by_generation", out var gv) && gv is Dictionary<string, object> gd) r.PersistedAt = gd;
             if (o.TryGetValue("policy", out var pv) && pv is Dictionary<string, object> pd) r.Policy = pd;
+            // Policies stored by 0.9.3/0.9.4 hold legacy values (continuar, guardar, ninguna, lectura, dejar).
+            foreach (var k in new[] { "on_error", "tx", "warnings", "at_end" }) Bimbridge.Protocol.LegacyAliases.NormalizeTokenList(r.Policy, k);
             if (o.TryGetValue("metrics", out var mv) && mv is Dictionary<string, object> md) r.Metrics = md;
             if (o.TryGetValue("postcondition", out var qv) && qv is Dictionary<string, object> qd) r.Postcondition = qd;
             return r;

@@ -38,6 +38,8 @@ namespace Bimbridge.Engine.Qa
                 }
                 return result;
             }
+            // previous= may be a members_snapshot from a 0.9.3/0.9.4 run (legacy keys such as "firma").
+            foreach (var row in before) if (row is Dictionary<string, object> legacy) LegacyAliases.NormalizeRecord(legacy);
             var old = Read(before);
             var newer = Read(after);
             var byUid = newer.ToDictionary(x => x.Uid, StringComparer.Ordinal);

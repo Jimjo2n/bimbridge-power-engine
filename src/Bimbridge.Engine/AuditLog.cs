@@ -449,12 +449,14 @@ namespace Bimbridge.Engine
             string intent = null;
             foreach (var raw in ReadLinesShared(path))
             {
-                if (raw.IndexOf("\"attempt_id\"", StringComparison.Ordinal) < 0 && (intent == null || raw.IndexOf(intent, StringComparison.Ordinal) < 0))
+                // Lines written by 0.9.3/0.9.4 hold the legacy key "intento_id" (normalized only after parsing).
+                if (raw.IndexOf("\"attempt_id\"", StringComparison.Ordinal) < 0 && raw.IndexOf("\"intento_id\"", StringComparison.Ordinal) < 0 &&
+                    (intent == null || raw.IndexOf(intent, StringComparison.Ordinal) < 0))
                     continue;
                 Dictionary<string, object> entry;
                 try { entry = LegacyAliases.NormalizeRecord(Json.ParseObject(raw)); }
                 catch (FormatException) { continue; }
-                var op = Arg.GetString(entry, "op");
+                var op = LegacyAliases.Token(Arg.GetString(entry, "op"));
                 if (op != "commit" && op != "apply_queue") continue;
                 var candidate = Arg.GetString(entry, "intent");
                 if (candidate == null) continue;
@@ -492,7 +494,7 @@ namespace Bimbridge.Engine
             {
                 Dictionary<string, object> o;
                 try { o = LegacyAliases.NormalizeRecord(Json.ParseObject(raw)); } catch (FormatException) { continue; }
-                if (Arg.GetString(o, "op") == "quarantine" && o.TryGetValue("pending_intents", out var ip) && ip is List<object> carried)
+                if (LegacyAliases.Token(Arg.GetString(o, "op")) == "quarantine" && o.TryGetValue("pending_intents", out var ip) && ip is List<object> carried)
                 {
                     // rc3: what was pending in a set-aside chain stays pending (it is not hidden by quarantining the chain).
                     foreach (var c in carried.OfType<Dictionary<string, object>>())

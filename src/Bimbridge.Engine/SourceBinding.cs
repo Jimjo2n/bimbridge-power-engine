@@ -37,6 +37,27 @@ namespace Bimbridge.Engine
         public static string RegistrationFingerprint(double[] matrix) =>
             matrix == null ? "" : Home.Sha256Hex(string.Join(",", matrix.Select(v => Math.Round(v, 9).ToString("R", System.Globalization.CultureInfo.InvariantCulture))), 24);
 
+        /// <summary>
+        /// FROZEN hash literals: the 0.9.3/0.9.4 key names (and enum values) that fed the token and the src- key. Hashing through them keeps
+        /// the key of a batch committed before the English rename, so re-running the same source on that document is not placed twice.
+        /// Never change these strings.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, string> FrozenOpKeys = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [OpField] = "origen", ["points"] = "puntos", ["source_items"] = "items_fuente", ["mounting"] = "montaje", ["host"] = "anfitrion",
+        };
+
+        private static readonly Dictionary<string, Dictionary<string, string>> FrozenValues = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal)
+        {
+            ["mounting"] = new Dictionary<string, string>(StringComparer.Ordinal) { ["slab"] = "losa", ["floor"] = "piso" },
+            ["status"] = new Dictionary<string, string>(StringComparer.Ordinal) { ["to_place"] = "para_colocar", ["reuse_to_verify"] = "reutilizacion_por_verificar" },
+            ["class"] = new Dictionary<string, string>(StringComparer.Ordinal) { ["panel"] = "tablero", ["hvac_disconnect"] = "desconectivo_hvac" },
+        };
+
+        /// <summary>Copy of <paramref name="d"/> with its keys (and the frozen enum values) in the hashed 0.9.4 form. Only for hashing.</summary>
+        public static Dictionary<string, object> Frozen(IDictionary<string, object> d, IReadOnlyDictionary<string, string> keys) =>
+            LegacyAliases.Frozen(d, keys, FrozenValues);
+
         public sealed class Bound
         {
             public string Token, Key, Hash;
@@ -61,7 +82,7 @@ namespace Bimbridge.Engine
             if (!token.StartsWith(TokenPrefix, StringComparison.Ordinal) || token.Length != TokenPrefix.Length + 40 || token.Skip(TokenPrefix.Length).Any(c => !Uri.IsHexDigit(c)))
                 throw new QueryException("plan: " + OpField + "= is not a valid origin token; use the operations exactly as the source workflow returned them");
             // Canonical content: any change in an operation (a point, a type) changes the fingerprint and the key.
-            var canon = string.Join("\n", ops.Select(o => OpSemantics.Canonical(o)));
+            var canon = string.Join("\n", ops.Select(o => OpSemantics.Canonical(Frozen(o, FrozenOpKeys))));
             var hash = Home.Sha256Hex(token + "\n" + canon, 32);
             return new Bound { Token = token, Hash = "src:" + hash, Key = "src-" + hash.Substring(0, 24), Ops = ops.Count };
         }

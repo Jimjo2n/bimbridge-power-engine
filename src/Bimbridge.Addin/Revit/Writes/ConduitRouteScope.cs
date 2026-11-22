@@ -39,7 +39,7 @@ namespace Bimbridge.Addin.Revit.Writes
                         adjacency[id].Add(Ids.ToLong(reference.Owner.Id));
                     else
                         boundaries.Add((port.Origin, reference == null ? null : FingerprintPort(reference)));
-                    portDetails.Add(new object[] { FingerprintPort(port), reference == null ? null : FingerprintPort(reference) });
+                    portDetails.Add(new object[] { Frozen(FingerprintPort(port)), reference == null ? null : Frozen(FingerprintPort(reference)) });
                 }
                 snapshot.Add(new object[]
                 {
@@ -92,6 +92,14 @@ namespace Bimbridge.Addin.Revit.Writes
 
         private static ConnectorManager Manager(Element e) => e is MEPCurve curve ? curve.ConnectorManager :
             (e as FamilyInstance)?.MEPModel?.ConnectorManager;
+
+        /// <summary>FROZEN hash literals: the 0.9.4 port keys the run fingerprint of held plans was computed with. Never change these strings.</summary>
+        private static readonly IReadOnlyDictionary<string, string> FrozenKeys = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["connector"] = "conector", ["domain"] = "dominio", ["shape"] = "forma", ["radius"] = "radio",
+        };
+
+        private static Dictionary<string, object> Frozen(Dictionary<string, object> port) => LegacyAliases.Frozen(port, FrozenKeys);
 
         private static Dictionary<string, object> FingerprintPort(Connector c)
         {

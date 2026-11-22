@@ -50,7 +50,7 @@ namespace BimBridge.PowerEngine.Workflows
             var ind = new IndependentVerifier.Input
             {
                 ExpectedSource = expectedSource, BuildSources = (buildSources ?? new List<SourceRef>()).ToList(), BuildPlanFingerprint = buildPlanFingerprint,
-                Expected = expected.Select(e => new IndependentVerifier.Item { Key = e.Key, X = e.X, Y = e.Y, Attrs = { ["type"] = e.FamilyType ?? "" } }).ToList(),
+                Expected = expected.Select(e => new IndependentVerifier.Item { Key = e.Key, X = e.X, Y = e.Y, Attrs = { [PlacementPlanner.FingerprintTypeAttr] = e.FamilyType ?? "" } }).ToList(),
             };
             var gate = IndependentVerifier.CheckIndependence(ind, out var proof);
             if (gate.HasValue)

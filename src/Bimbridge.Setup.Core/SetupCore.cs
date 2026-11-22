@@ -381,7 +381,7 @@ namespace Bimbridge.Setup
                         else if (!string.Equals(FileSha(path), Convert.ToString(kv.Value), StringComparison.OrdinalIgnoreCase)) diff.Add(kv.Key + " changed");
                     }
                 var pending = Directory.Exists(Path.Combine(dir, "Bimbridge"))
-                    && Directory.GetFiles(Path.Combine(dir, "Bimbridge"), "*" + Updates.LeftoverMark + "*", SearchOption.AllDirectories).Length > 0;
+                    && Updates.Leftovers(Path.Combine(dir, "Bimbridge"), SearchOption.AllDirectories).Length > 0;
                 years[v] = new Dictionary<string, object>
                 {
                     ["files"] = n, ["match"] = files == null ? (object)"no hash record (install older than 0.6.0)" : diff.Count == 0,
@@ -396,7 +396,7 @@ namespace Bimbridge.Setup
             res["bridge"] = new Dictionary<string, object>
             {
                 ["exists"] = bridgeOk, ["matches"] = bridgeMatch,
-                ["restart_pending"] = Directory.Exists(_p.BinDir) && Directory.GetFiles(_p.BinDir, "*" + Updates.LeftoverMark + "*").Length > 0,
+                ["restart_pending"] = Directory.Exists(_p.BinDir) && Updates.Leftovers(_p.BinDir, SearchOption.TopDirectoryOnly).Length > 0,
             };
             var loaded = new List<object>();
             var inst = Path.Combine(_p.Home, "instances");

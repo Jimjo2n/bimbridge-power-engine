@@ -394,7 +394,8 @@ namespace Bimbridge.Setup
             UpdateConfig.Load(UpdateConfig.DefaultPath, out var keys, out var policy);
             host.Keys = () => keys;
             host.Policy = () => policy;
-            var r = PendingApplier.Run(paths.UpdatesDir, host, TimeSpan.FromHours(24));
+            // A 0.9.x add-in stages under the legacy updates folder (not migrated yet: Revit may still be open here).
+            var r = PendingApplier.Run(Bimbridge.Protocol.LegacyAliases.ResolveExisting(paths.Home, paths.UpdatesDir), host, TimeSpan.FromHours(24));
             var status = Convert.ToString(r["status"]);
             return Report(paths, status == "applied_verified" ? 0 : 1, "ZIP: " + status + " — " + r["message"]);
         }

@@ -51,7 +51,7 @@ namespace BimBridge.PowerEngine
             Calibration cal = null;
             var calPath = LegacyAliases.ResolveExisting(baseDir, Path.Combine(baseDir, "power_engine", "calibration.json"));
             if (File.Exists(calPath))
-                try { cal = Calibration.FromJson(Json.ParseObject(File.ReadAllText(calPath))); } catch (Exception) { cal = null; /* broken file → default values */ }
+                try { cal = Calibration.FromJson(LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(calPath)))); } catch (Exception) { cal = null; /* broken file → default values */ }
             return new PowerEngineOptions
             {
                 Calibration = cal ?? Calibration.Default(),
@@ -67,6 +67,11 @@ namespace BimBridge.PowerEngine
             var c = Command.Parse(line);
             if (c == null) return Err("empty command", Help);
             LegacyAliases.NormalizeArgs(null, c.Args);   // 0.9.3 (Spanish) verbs and argument names are still accepted
+            // ...also the keys inside the structured inputs this project owns; names, types, codes and headers stay as given.
+            foreach (var k in new[] { "anchors", "items", "grids", "existing", "pdf_edges", "columns", "expected" }) LegacyAliases.NormalizeRows(c.Args, k);
+            LegacyAliases.NormalizeRows(c.Args, "rules", "class", "mounting");
+            LegacyAliases.NormalizeRows(c.Args, "decisions", "decision");
+            LegacyAliases.NormalizeTokenList(c.Args, "include");
             try
             {
                 switch (LegacyAliases.Token(c.Verb))

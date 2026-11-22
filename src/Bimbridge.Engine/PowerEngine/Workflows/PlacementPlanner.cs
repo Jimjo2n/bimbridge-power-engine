@@ -226,7 +226,10 @@ namespace BimBridge.PowerEngine.Workflows
         /// does not share the plan ids, so an accurate match is not mistaken for a copy.</summary>
         public static string Fingerprint(IEnumerable<PlacementItem> items) =>
             Bimbridge.Engine.Workflow.IndependentVerifier.Fingerprint(items.Select(i => new Bimbridge.Engine.Workflow.IndependentVerifier.Item
-            { Key = i.Id, X = i.X, Y = i.Y, Attrs = { ["type"] = i.FamilyType ?? "" } }));
+            { Key = i.Id, X = i.X, Y = i.Y, Attrs = { [FingerprintTypeAttr] = i.FamilyType ?? "" } }));
+
+        /// <summary>FROZEN hash literal (0.9.4 name): feeds the plan fingerprint and the source-bound key. Never change it.</summary>
+        public const string FingerprintTypeAttr = "tipo";
 
         public static string StableId(string sourceSha, int page, double px, double py, string code) =>
             "pl-" + Home.Sha256Hex((sourceSha ?? "") + "|" + page.ToString(CultureInfo.InvariantCulture) + "|" + Math.Round(px * 8).ToString(CultureInfo.InvariantCulture) + "|" +

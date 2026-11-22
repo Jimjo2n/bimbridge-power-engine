@@ -131,8 +131,15 @@ namespace Bimbridge.Addin.Revit.Writes
                 });
         }
 
+        /// <summary>FROZEN hash literals: the 0.9.4 member keys the fingerprint of held plans was computed with. Never change these strings.</summary>
+        private static readonly IReadOnlyDictionary<string, string> FrozenKeys = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["type"] = "tipo", ["level"] = "nivel", ["host"] = "anfitrion", ["hand"] = "mano", ["facing"] = "frente", ["mirrored"] = "espejo", ["ends"] = "extremos",
+        };
+
         private static string Fingerprint(Group group, Dictionary<string, object> members) =>
             Home.Sha256Hex(OpSemantics.Canonical(new object[] { group.UniqueId, Ids.ToLong(group.GetTypeId()),
-                (long)group.WorksetId.IntegerValue, WriteKit.Loc(group), WriteKit.Rot(group), members }));
+                (long)group.WorksetId.IntegerValue, WriteKit.Loc(group), WriteKit.Rot(group),
+                members.ToDictionary(kv => kv.Key, kv => (object)LegacyAliases.Frozen((Dictionary<string, object>)kv.Value, FrozenKeys)) }));
     }
 }

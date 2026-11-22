@@ -17,6 +17,8 @@ namespace Bimbridge.Addin.Revit
         internal static Dictionary<string, object> ValidatePreset(object value)
         {
             if (!(value is Dictionary<string, object> preset)) throw new QueryException("pdf_preset requires a JSON object");
+            // Sets saved by 0.9.3/0.9.4 (and old input) use legacy keys (papel, combinar...) and values (ajustar, gris).
+            LegacyAliases.NormalizeRows(new Dictionary<string, object> { ["p"] = preset }, "p", "zoom", "color");
             foreach (var item in preset)
             {
                 var valid = item.Key switch

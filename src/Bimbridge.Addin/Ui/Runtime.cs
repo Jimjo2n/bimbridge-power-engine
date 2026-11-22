@@ -89,7 +89,7 @@ namespace Bimbridge.Addin.Ui
             try
             {
                 if (System.IO.File.Exists(UiPrefsPath) && Bimbridge.Protocol.Json.Parse(System.IO.File.ReadAllText(UiPrefsPath)) is Dictionary<string, object> d && Bimbridge.Protocol.LegacyAliases.NormalizeRecord(d) != null)
-                    Theme.ReduceMotionOverride = d.TryGetValue("motion", out var m) && "reduced".Equals(m as string, StringComparison.Ordinal);
+                    Theme.ReduceMotionOverride = d.TryGetValue("motion", out var m) && "reduced".Equals(Bimbridge.Protocol.LegacyAliases.Token(m as string), StringComparison.Ordinal);   // 0.9.3: reducido
             }
             catch (Exception) { } // unreadable or corrupt: automatic motion (follows Windows)
         }

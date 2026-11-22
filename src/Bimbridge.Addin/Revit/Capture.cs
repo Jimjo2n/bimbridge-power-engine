@@ -527,7 +527,8 @@ namespace Bimbridge.Addin.Revit
         {
             c = null; name = s;
             if (string.IsNullOrWhiteSpace(s)) return false;
-            if (Named.TryGetValue(s.Trim(), out var rgb)) { c = new Color(rgb.r, rgb.g, rgb.b); name = s.Trim().ToLowerInvariant(); return true; }
+            var key = Bimbridge.Protocol.LegacyAliases.Token(s.Trim().ToLowerInvariant());   // 0.9.3 color names (rojo, azul...)
+            if (Named.TryGetValue(key, out var rgb)) { c = new Color(rgb.r, rgb.g, rgb.b); name = key; return true; }
             if (WriteKit.TryColor(s, out c)) { name = s.Trim().ToUpperInvariant(); return true; }
             return false;
         }

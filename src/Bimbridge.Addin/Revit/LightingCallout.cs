@@ -67,8 +67,16 @@ namespace Bimbridge.Addin.Revit
             var schema = Schema.Lookup(SchemaId);
             if (schema == null) return null;
             var entity = note.GetEntity(schema);
-            return entity.IsValid() ? Json.ParseObject(entity.Get<string>(schema.GetField(Field))) : null;
+            // Notes written by 0.9.3/0.9.4 hold legacy keys (punto_origen, codigo_param...): read as English, the entity is never rewritten.
+            return entity.IsValid() ? LegacyAliases.NormalizeRecord(Json.ParseObject(entity.Get<string>(schema.GetField(Field)))) : null;
         }
+
+        /// <summary>FROZEN hash literals: the 0.9.4 config key names the callout fingerprints were computed with. Never change these strings.</summary>
+        private static readonly IReadOnlyDictionary<string, string> FrozenKeys = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["origin_point"] = "punto_origen", ["source_type"] = "tipo_origen", ["code_param"] = "codigo_param", ["height_param"] = "altura_param",
+            ["subtract_type_param"] = "descontar_tipo_param", ["bold"] = "negrita", ["underline"] = "subrayado",
+        };
 
         internal static void Write(TextNote note, Dictionary<string, object> config, XYZ point, string typeUid)
         {
@@ -98,13 +106,13 @@ namespace Bimbridge.Addin.Revit
         }
 
         internal static string Fingerprint(Dictionary<string, object> config, string text, XYZ point, string typeUid) =>
-            Home.Sha256Hex(OpSemantics.Canonical(new object[] { config, text, Vector(point), typeUid }));
+            Home.Sha256Hex(OpSemantics.Canonical(new object[] { LegacyAliases.Frozen(config, FrozenKeys), text, Vector(point), typeUid }));
 
         internal static string NoteFingerprint(TextNote note, Dictionary<string, object> config, string source) =>
             NoteFingerprint(note.Text, note.Coord, config, source);
 
         internal static string NoteFingerprint(string text, XYZ location, Dictionary<string, object> config, string source) =>
-            Home.Sha256Hex(OpSemantics.Canonical(new object[] { config, text, Vector(location), source }));
+            Home.Sha256Hex(OpSemantics.Canonical(new object[] { LegacyAliases.Frozen(config, FrozenKeys), text, Vector(location), source }));
 
         internal static Dictionary<string, object> WithSource(Dictionary<string, object> config, XYZ point, string typeUid) =>
             new Dictionary<string, object>(config) { ["origin_point"] = Vector(point), ["source_type"] = typeUid };

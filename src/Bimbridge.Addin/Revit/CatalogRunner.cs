@@ -520,7 +520,7 @@ namespace Bimbridge.Addin.Revit
 
         public static ViewType? ParseViewType(string s)
         {
-            switch ((s ?? "").Trim().ToLowerInvariant())
+            switch (LegacyAliases.Token((s ?? "").Trim().ToLowerInvariant()))   // 0.9.3 names (planta, techo, seccion...)
             {
                 case "plan": case "floorplan":  return ViewType.FloorPlan;
                 case "rcp": case "ceiling": case "ceilingplan": return ViewType.CeilingPlan;

@@ -18,6 +18,7 @@ namespace Bimbridge.Addin.Revit
         private async Task<Response> TerminalCheck(Request request, CancellationToken ct, bool equipment = false)
         {
             var scope = equipment ? "equipment" : "terminals";
+            LegacyAliases.NormalizeRows(request.Args, scope, "class");   // 0.9.3 spec keys (tipo, nivel, sentido, tramo_id, ...)
             if (!request.Args.TryGetValue(scope, out var raw) || !(raw is List<object> input) ||
                 input.Count == 0 || input.Count > 200 || input.Any(x => x is not Dictionary<string, object>))
                 return Response.Fail(request.Id, Status.Invalid, scope + " requires 1 to 200 objects with the markup expectations");

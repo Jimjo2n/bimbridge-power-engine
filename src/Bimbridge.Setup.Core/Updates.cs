@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using Bimbridge.Protocol;
 
 namespace Bimbridge.Setup
 {
@@ -108,7 +109,7 @@ namespace Bimbridge.Setup
             if (!name.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase)) return null;
             var ext = Path.GetExtension(file).ToLowerInvariant();
             if (ext != ".exe" && ext != ".zip") return null;
-            if (name.IndexOf(LeftoverMark, StringComparison.OrdinalIgnoreCase) >= 0) return null;
+            if (IsLeftover(name)) return null;
 
             FileInfo info;
             try { info = new FileInfo(file); } catch (Exception) { return null; }
@@ -172,7 +173,16 @@ namespace Bimbridge.Setup
                         .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        /// <summary>Deletes what was left renamed as *.viejo-* when replacing files in use (they are no longer in use after a restart).</summary>
+        /// <summary>The leftover mark and the one 0.9.3/0.9.4 used (files they set aside are still cleaned up and recognized).</summary>
+        public static readonly string[] LeftoverMarks = { LeftoverMark, LegacyAliases.LeftoverMark };
+
+        public static bool IsLeftover(string name) => LeftoverMarks.Any(m => name.IndexOf(m, StringComparison.OrdinalIgnoreCase) >= 0);
+
+        /// <summary>Files under <paramref name="dir"/> set aside with any leftover mark.</summary>
+        public static string[] Leftovers(string dir, SearchOption option) =>
+            LeftoverMarks.SelectMany(m => Directory.GetFiles(dir, "*" + m + "*", option)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+        /// <summary>Deletes what was left renamed as *.old-* when replacing files in use (they are no longer in use after a restart).</summary>
         public static int DeleteLeftovers(IEnumerable<string> dirs)
         {
             var n = 0;
@@ -180,7 +190,7 @@ namespace Bimbridge.Setup
             {
                 if (!Directory.Exists(d)) continue;
                 string[] files;
-                try { files = Directory.GetFiles(d, "*" + LeftoverMark + "*", SearchOption.AllDirectories); }
+                try { files = Leftovers(d, SearchOption.AllDirectories); }
                 catch (Exception) { continue; }
                 foreach (var f in files) if (TryDelete(f)) n++;
             }

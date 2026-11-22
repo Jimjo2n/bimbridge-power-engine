@@ -48,7 +48,19 @@ namespace Bimbridge.Addin.Revit.Writes
             };
         }
 
-        internal static string Fingerprint(Element element) => Home.Sha256Hex(OpSemantics.Canonical(Inspect(element)));
+        /// <summary>FROZEN hash literals: the 0.9.4 keys the original_signature of held plans was computed with. Never change these strings.</summary>
+        private static readonly IReadOnlyDictionary<string, string> FrozenKeys = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["view_id"] = "vista_id", ["type_id"] = "tipo_id", ["references"] = "referencias", ["linked_id"] = "vinculado_id",
+            ["stable"] = "estable", ["presentation"] = "presentacion",
+        };
+
+        internal static string Fingerprint(Element element)
+        {
+            var d = Inspect(element);
+            d["references"] = ((IEnumerable<Dictionary<string, object>>)d["references"]).Select(r => (object)LegacyAliases.Frozen(r, FrozenKeys)).ToList();
+            return Home.Sha256Hex(OpSemantics.Canonical(LegacyAliases.Frozen(d, FrozenKeys)));
+        }
 
         internal static List<Reference> ResolveTargets(Document doc, Element original, Dictionary<string, object> data)
         {

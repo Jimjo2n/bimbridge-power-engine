@@ -344,7 +344,7 @@ namespace Bimbridge.Addin.Revit
             var frame = Arg.GetString(request.Args, "framing");
             if (!string.IsNullOrWhiteSpace(frame))
             {
-                if (frame.Trim().Equals("highlighted", StringComparison.OrdinalIgnoreCase)) cap.FrameIds = cap.Groups.SelectMany(g => g.Ids).Distinct().ToList();
+                if (LegacyAliases.Token(frame.Trim().ToLowerInvariant()) == "highlighted") cap.FrameIds = cap.Groups.SelectMany(g => g.Ids).Distinct().ToList();
                 else
                 {
                     cap.FrameIds = ResolveIds(session, new Dictionary<string, object> { ["ids"] = frame }, "ids", out var err);

@@ -74,10 +74,10 @@ namespace Bimbridge.Tests
             Assert.Null(lab.DenyRequest("query", Permissions.Read, "archivo:" + Path.Combine(LabDir, "copy.rvt"), CapabilityStates.Experimental));
             Assert.NotNull(lab.DenyRequest("query", Permissions.Read, "archivo:" + Path.Combine(Path.GetTempPath(), "other", "x.rvt"), CapabilityStates.Available));
             Assert.NotNull(lab.DenyRequest("query", Permissions.Read, "archivo:" + Path.Combine(LabDir, "..", "outside.rvt"), CapabilityStates.Available));
-            Assert.NotNull(lab.DenyRequest("query", Permissions.Read, "nube:abc/def", CapabilityStates.Available));
+            Assert.NotNull(lab.DenyRequest("query", Permissions.Read, "cloud:abc/def", CapabilityStates.Available));
             Assert.NotNull(lab.DenyRequest("query", Permissions.Read, "archivo:\\\\server\\share\\x.rvt", CapabilityStates.Available));
             // what does not touch a document: context, catalog, no document
-            Assert.Null(lab.DenyRequest(Wire.OpContext, Permissions.Read, "nube:abc/def", CapabilityStates.Available));
+            Assert.Null(lab.DenyRequest(Wire.OpContext, Permissions.Read, "cloud:abc/def", CapabilityStates.Available));
             Assert.Null(lab.DenyRequest("query", Permissions.Read, null, CapabilityStates.Available));
             // lab without folders = nothing
             Assert.NotNull(ProfilePolicy.Parse("lab", null, false, null).DenyRequest("query", Permissions.Read, "archivo:" + Path.Combine(LabDir, "c.rvt"), CapabilityStates.Available));

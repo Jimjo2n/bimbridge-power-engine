@@ -658,6 +658,7 @@ namespace Bimbridge.Protocol
             "action", "mode", "tx", "kind", "side", "links", "flow", "dimension", "all_types", "create", "data_type", "overwrite",
             "decision", "reconcile", "at_end", "on_error", "color_by", "detail", "mount", "option", "recipe", "save", "discard",
             "new", "combine", "order", "views", "scope", "profile", "runner", "orientation", "phase", "status",
+            "mounting", "tags", "keep", "precedence", "warnings",
         };
 
         /// <summary>Values whose meaning depends on the argument (the generic token means something else there).</summary>
@@ -670,6 +671,7 @@ namespace Bimbridge.Protocol
         private static readonly HashSet<string> Opaque = new HashSet<string>(StringComparer.Ordinal)
         {
             "args", "params", "values", "data", "result", "expected", "where", "fields", "ids", "refs", "docs", "evidence",
+            "rules",   // group_variant rules={"<fixture type name>": "<new type>"}
         };
 
         /// <summary>Argument names that only mean something else for one tool or operation.</summary>
@@ -710,6 +712,32 @@ namespace Bimbridge.Protocol
             MapValues(d, opName);
             foreach (var k in d.Keys.ToList())
                 if (!Opaque.Contains(k) && d[k] is IDictionary<string, object> child) RenameKeys(child, null);
+        }
+
+        /// <summary>
+        /// The object (or each object of the list) under <paramref name="key"/>, whose keys this project owns (power workflow anchors, items,
+        /// rules, riser edges, audit specs...): legacy keys renamed and the values of <paramref name="enumKeys"/> mapped. Every other value
+        /// (names, types, codes, column headers, text) is the user's and is never rewritten.
+        /// </summary>
+        public static void NormalizeRows(IDictionary<string, object> a, string key, params string[] enumKeys)
+        {
+            if (a == null || !a.TryGetValue(key, out var v)) return;
+            var rows = v is IDictionary<string, object> one ? new List<object> { one } : v as List<object>;
+            if (rows == null) return;
+            foreach (var item in rows)
+            {
+                if (!(item is IDictionary<string, object> d)) continue;
+                RenameKeys(d, null);
+                foreach (var k in enumKeys) if (d.TryGetValue(k, out var x) && x is string s) d[k] = MapValue(k, s);
+            }
+        }
+
+        /// <summary>A list (or comma-separated string) of enum-like tokens under <paramref name="key"/> (include=[texto,...]), mapped in place.</summary>
+        public static void NormalizeTokenList(IDictionary<string, object> a, string key)
+        {
+            if (a == null || !a.TryGetValue(key, out var v)) return;
+            if (v is string s) a[key] = MapValue(key, s);
+            else if (v is List<object> l) for (var i = 0; i < l.Count; i++) if (l[i] is string li) l[i] = MapValue(key, li);
         }
 
         /// <summary>Enum-like inputs of the INSTALLED recipes (save=si, before=guardar, direction=arriba...).</summary>
@@ -879,6 +907,20 @@ namespace Bimbridge.Protocol
             }
         }
 
+        /// <summary>
+        /// Copy of <paramref name="d"/> with its keys renamed by <paramref name="keys"/> (English → the FROZEN 0.9.4 name) and, for the keys in
+        /// <paramref name="values"/>, its string values mapped the same way. Only to feed a hash that stored data was computed with.
+        /// </summary>
+        public static Dictionary<string, object> Frozen(IDictionary<string, object> d, IReadOnlyDictionary<string, string> keys,
+            IReadOnlyDictionary<string, Dictionary<string, string>> values = null)
+        {
+            var o = new Dictionary<string, object>(StringComparer.Ordinal);
+            foreach (var kv in d)
+                o[keys.TryGetValue(kv.Key, out var lk) ? lk : kv.Key] =
+                    values != null && kv.Value is string s && values.TryGetValue(kv.Key, out var vm) && vm.TryGetValue(s, out var lv) ? lv : kv.Value;
+            return o;
+        }
+
         public static string LegacyOp(string op) => op == Wire.OpTask ? "tarea" : op;
 
         // ---------------- data folders ----------------
@@ -935,6 +977,9 @@ namespace Bimbridge.Protocol
         public const string UpdateManifestName = "bimbridge-actualizacion.json";
         public const string UpdateSignatureName = "bimbridge-actualizacion.firma";
         public const string UpdateSchema = "bimbridge.actualizacion/1";
+
+        /// <summary>Mark of files and folders set aside while in use, up to 0.9.4 (now ".old-").</summary>
+        public const string LeftoverMark = ".viejo-";
 
         /// <summary>Suffix of the audit chain head file up to 0.9.3 (now ".head").</summary>
         public const string AuditHeadSuffix = ".cabeza";

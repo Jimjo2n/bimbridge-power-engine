@@ -218,6 +218,14 @@ namespace Bimbridge.Addin.Revit
 
         private static readonly string[] PolicyKeys = { "save_every", "at_end", "on_error", "batch_max", "warnings", "tx" };
 
+        /// <summary>FROZEN hash literals: 0.9.4 capability names in the task content fingerprint. Never change these strings.</summary>
+        private static readonly Dictionary<string, string> FrozenCapabilities = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [Capability.Modify] = "revit_modificar", [Capability.Save] = "revit_guardar", [Capability.Export] = "revit_exportar",
+            [Capability.FileWrite] = "archivo_escritura", [Capability.ReconcileNotApplied] = "reconciliar_no_aplicada",
+            [Capability.ExternalRecipe] = "receta_externa",
+        };
+
         private static Dictionary<string, object> PolicyFrom(IDictionary<string, object> a, bool onlyGiven)
         {
             var p = new Dictionary<string, object>(StringComparer.Ordinal);
@@ -303,10 +311,11 @@ namespace Bimbridge.Addin.Revit
             requires = requires.Distinct().ToList();
             policy["requires"] = requires.Cast<object>().ToList();
             if (requested.Count > 0) policy["requested"] = requested.Cast<object>().ToList();
+            // FROZEN hash literals (0.9.4 key and capability names): re-sending task start for a task created by 0.9.x is not "other content".
             var content = OpSemantics.Canonical(new Dictionary<string, object>
             {
-                ["recipe"] = recipeHash, ["args"] = userArgs, ["doc"] = target.Key, ["doc_fingerprint"] = target.Print ?? "", ["refs"] = refs.Cast<object>().ToList(),
-                ["requires"] = requires.Cast<object>().ToList(),
+                ["receta"] = recipeHash, ["args"] = userArgs, ["doc"] = target.Key, ["huella_doc"] = target.Print ?? "", ["refs"] = refs.Cast<object>().ToList(),
+                ["requiere"] = requires.Select(r => (object)(FrozenCapabilities.TryGetValue(r, out var legacy) ? legacy : r)).ToList(),
             });
             var draft = new TaskRecord
             {

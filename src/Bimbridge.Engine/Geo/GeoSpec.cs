@@ -131,7 +131,8 @@ namespace Bimbridge.Engine.Geo
             g.SameType = Arg.GetBool(a, "same_type") ?? true;
             g.Views = Arg.GetString(a, "views");
             if (g.Recipe == "view_range" && string.IsNullOrWhiteSpace(g.Views)) g.Views = "rcp";
-            g.Source = (Arg.GetString(a, "source") ?? "both").Trim().ToLowerInvariant();
+            // 0.9.3 values (ambos/espacios/cuartos) are read here: source= is not mapped globally (view_create source= is a view name).
+            g.Source = LegacyAliases.Token((Arg.GetString(a, "source") ?? "both").Trim().ToLowerInvariant());
             if (g.Source != "both" && g.Source != "spaces" && g.Source != "rooms")
                 throw new QueryException("source: both (default), spaces (host MEP spaces) or rooms (architecture link rooms)");
 
@@ -142,7 +143,8 @@ namespace Bimbridge.Engine.Geo
             g.PageSize = (int)(Arg.GetLong(a, "page_size") ?? 100);
             if (g.Page < 1) throw new QueryException("page starts at 1");
             if (g.PageSize < 1 || g.PageSize > QuerySpec.MaxPageSize) throw new QueryException("page_size between 1 and " + QuerySpec.MaxPageSize);
-            g.Only = Arg.GetString(a, "only");
+            // "solo" is never renamed as a key (it is also an English word), so the 0.9.3 name and its values are read here.
+            g.Only = LegacyAliases.Token((Arg.GetString(a, "only") ?? Arg.GetString(a, "solo"))?.Trim().ToLowerInvariant());
             g.Rebuild = Arg.GetBool(a, "rebuild") ?? false;
             g.SurfaceReference = Arg.GetBool(a, "references") ?? false;
             g.ExcludeSubcategories = Arg.GetStringList(a, "sub_exclude");

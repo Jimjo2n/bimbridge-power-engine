@@ -132,8 +132,9 @@ namespace Bimbridge.AgentHost
                 {
                     if (f != Fencing) { diags.Add(Diagnostic.Error("stale_writer", where + ": written with fencing " + f + " when the current owner had " + Fencing)); return false; }
                     var op = Arg.GetString(r, "op");
-                    var from = Arg.GetString(r, "de");
-                    var a = Arg.GetString(r, "a");
+                    // 0.9.3/0.9.4 lines hold legacy state values (validada, en_ejecucion...); the hash was verified over the raw line.
+                    var from = LegacyAliases.Token(Arg.GetString(r, "de"));
+                    var a = LegacyAliases.Token(Arg.GetString(r, "a"));
                     if (op == null || !Ops.TryGetValue(op, out var rec)) { diags.Add(Diagnostic.Error("unknown_operation", where + ": " + op)); return false; }
                     if (!OpState.IsValid(from) || !OpState.IsValid(a)) { diags.Add(Diagnostic.Error("unknown_status", where + ": " + from + " → " + a)); return false; }
                     if (rec.State != from) { diags.Add(Diagnostic.Error("inconsistent_transition", where + ": " + op + " was in " + rec.State + ", the line says " + from)); return false; }
@@ -145,7 +146,7 @@ namespace Bimbridge.AgentHost
                 case "plan":
                 {
                     if (f != Fencing) { diags.Add(Diagnostic.Error("stale_writer", where)); return false; }
-                    var acc = Arg.GetString(r, "action");
+                    var acc = LegacyAliases.Token(Arg.GetString(r, "action"));
                     if (Array.IndexOf(PlanActions, acc) < 0) { diags.Add(Diagnostic.Error("unknown_action", where + ": " + acc)); return false; }
                     PlanState = acc == "pause" ? PlanRunState.Paused : acc == "cancel" ? PlanRunState.Cancelled : PlanRunState.Active;
                     return true;
@@ -160,12 +161,12 @@ namespace Bimbridge.AgentHost
 
         private static void ApplyTransition(OpRecord rec, Dictionary<string, object> r, long seq)
         {
-            rec.State = Arg.GetString(r, "a");
+            rec.State = LegacyAliases.Token(Arg.GetString(r, "a"));
             rec.LastSeq = seq;
             var att = Arg.GetLong(r, "attempt"); if (att != null) rec.Attempt = (int)att.Value;
             if (r.TryGetValue("res", out var res) && res is Dictionary<string, object> rd) rec.Result = rd;
             if (r.TryGetValue("evid", out var ev) && ev is Dictionary<string, object> ed) rec.Evidence = ed;
-            rec.Error = Arg.GetString(r, "err");
+            rec.Error = LegacyAliases.Token(Arg.GetString(r, "err"));
             rec.Note = Arg.GetString(r, "note");
         }
 

@@ -172,7 +172,7 @@ namespace Bimbridge.AgentHost
                 if (Arg.GetBool(d, "worksharing") != false) { error = "persistent rejected: the document is workshared"; return null; }
                 if (Arg.GetBool(d, "read_only") != false) { error = "persistent rejected: read-only document"; return null; }
                 var docPath = Arg.GetString(d, "path") ?? "";
-                if (docPath.Length == 0 || docPath.StartsWith("BIM 360", StringComparison.OrdinalIgnoreCase) || docPath.StartsWith("Autodesk Docs", StringComparison.OrdinalIgnoreCase) || b.DocKey.StartsWith("nube:", StringComparison.OrdinalIgnoreCase))
+                if (docPath.Length == 0 || docPath.StartsWith("BIM 360", StringComparison.OrdinalIgnoreCase) || docPath.StartsWith("Autodesk Docs", StringComparison.OrdinalIgnoreCase) || b.DocKey.StartsWith("cloud:", StringComparison.OrdinalIgnoreCase))
                 { error = "persistent rejected: the document is not a local file (" + docPath + ")"; return null; }
                 if (Arg.GetBool(d, "hold") != false || (Arg.GetLong(d, "held_queue") ?? 0) > 0)
                 { error = "persistent rejected: Hold/queue active in Revit (the user would apply the change later; it cannot be reconciled)"; return null; }

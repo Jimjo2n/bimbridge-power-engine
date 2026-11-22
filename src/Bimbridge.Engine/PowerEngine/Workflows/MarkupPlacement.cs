@@ -117,10 +117,15 @@ namespace BimBridge.PowerEngine.Workflows
                 operations.Add(operation);
             }
             var plans = new List<object>();
-            var fingerprint = Home.Sha256Hex(OpSemantics.Canonical(new object[] { rows, operations }));
+            // Hashed in the frozen 0.9.4 form (keys, values and kind literal) so a batch committed before the rename keeps its key.
+            var fingerprint = Home.Sha256Hex(OpSemantics.Canonical(new object[]
+            {
+                rows.Cast<Dictionary<string, object>>().Select(r => SourceBinding.Frozen(r, FrozenRowKeys)).ToList(),
+                operations.Select(o => SourceBinding.Frozen(o, SourceBinding.FrozenOpKeys)).ToList(),
+            }));
             for (var start = 0; start < operations.Count; start += OpSpec.MaxOps)
             {
-                var token = SourceBinding.Token(equipment ? "equipment" : "terminals", sourceId, sourceSha, null,
+                var token = SourceBinding.Token(equipment ? "equipos" : "terminales", sourceId, sourceSha, null,
                     SourceBinding.RegistrationFingerprint(registration.M), fingerprint, plans.Count + 1);
                 var batch = operations.Skip(start).Take(OpSpec.MaxOps).ToList();
                 foreach (var operation in batch)
@@ -135,6 +140,14 @@ namespace BimBridge.PowerEngine.Workflows
             result["plans"] = plans;
             return result;
         }
+
+        /// <summary>FROZEN hash literals: 0.9.4 names of the row keys that feed the plan fingerprint. Never change these strings.</summary>
+        private static readonly IReadOnlyDictionary<string, string> FrozenRowKeys = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["level"] = "nivel", ["point_pt"] = "punto_pt", ["type"] = "tipo", ["direction"] = "sentido", ["direction_parameter"] = "parametro_sentido",
+            ["scope"] = "ambito", ["zone"] = "zona", ["code"] = "codigo", ["class"] = "clase", ["evidence"] = "evidencia", ["rotation_deg"] = "giro_deg",
+            ["status"] = "estado",
+        };
 
         private static Dictionary<(string Scope, string Code), (string Role, string Type)> EquipmentRules(List<object> values)
         {

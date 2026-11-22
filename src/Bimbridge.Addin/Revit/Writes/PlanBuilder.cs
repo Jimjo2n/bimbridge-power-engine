@@ -342,7 +342,7 @@ namespace Bimbridge.Addin.Revit.Writes
         {
             var lvl = ctx.Model.FindLevel(Arg.GetString(op.Args, "level"), "set_level");
             var keep = (Arg.GetString(op.Args, "keep") ?? "position").Trim().ToLowerInvariant();
-            if (keep != "position" && keep != "position" && keep != "offset") throw new QueryException("set_level keep: position (default) or offset");
+            if (keep != "position" && keep != "offset") throw new QueryException("set_level keep: position (default) or offset");
             var keepPosition = keep != "offset";
             foreach (var e in Editable(ctx, ids, c))
             {

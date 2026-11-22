@@ -197,7 +197,7 @@ namespace Bimbridge.Addin.Revit.Families
                 PaperFormat = paper,
                 ZoomType = (Arg.GetString(a, "zoom") ?? "adjust") == "100" ? ZoomType.Zoom : ZoomType.FitToPage,
                 PaperPlacement = PaperPlacementType.Center,
-                ColorDepth = (Arg.GetString(a, "color") ?? "color") == "gray" ? ColorDepthType.GrayScale : ColorDepthType.Color,
+                ColorDepth = LegacyAliases.Token(Arg.GetString(a, "color") ?? "color") == "gray" ? ColorDepthType.GrayScale : ColorDepthType.Color,
                 AlwaysUseRaster = Arg.GetBool(a, "raster") ?? false,
                 RasterQuality = RasterQualityType.High,
                 HideReferencePlane = true,

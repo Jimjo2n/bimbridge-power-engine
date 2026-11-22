@@ -17,6 +17,7 @@ namespace Bimbridge.Addin.Revit
         {
             var viewId = Arg.GetLong(request.Args, "view");
             var style = Arg.GetString(request.Args, "style");
+            LegacyAliases.NormalizeRows(request.Args, "expected_drawing");   // 0.9.3 edge keys (puntos, rotulo, ...)
             if (!viewId.HasValue || viewId <= 0 || string.IsNullOrWhiteSpace(style) ||
                 !request.Args.TryGetValue("expected_drawing", out var value) || value is not List<object> rows ||
                 rows.Count == 0 || rows.Count > 2000 || rows.Any(r => r is not Dictionary<string, object>))

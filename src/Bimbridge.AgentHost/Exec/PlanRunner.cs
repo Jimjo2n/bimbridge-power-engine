@@ -39,6 +39,9 @@ namespace Bimbridge.AgentHost
             try { o = Json.ParseObject(File.ReadAllText(path)); }
             catch (Exception ex) when (ex is FormatException || ex is IOException) { diags.Add(Diagnostic.Error("plan_unreadable", ex.Message)); return null; }
             if (!(o.TryGetValue("plan", out var p) && p is Dictionary<string, object> pd)) { diags.Add(Diagnostic.Error("plan_unreadable", "no plan field")); return null; }
+            // Owner decision: 0.9.x plan folders are not migrated (their op ids and plan hash cover the legacy vocabulary).
+            if (pd.Keys.Any(LegacyAliases.IsLegacy))
+            { diags.Add(Diagnostic.Error("plan_legacy_format", "this plan folder was written by 0.9.x and is not migrated; submit the plan again")); return null; }
             var errs = IrValidator.Validate(PlanDraft.FromJson(pd), out var vp);
             if (errs.Count > 0) { diags.Add(Diagnostic.Error("saved_plan_invalid", string.Join("; ", errs.Take(5)))); return null; }
             if (Arg.GetString(o, "hash") != vp.Hash) { diags.Add(Diagnostic.Error("plan_tampered", "saved hash " + Arg.GetString(o, "hash") + " ≠ content " + vp.Hash)); return null; }

@@ -82,7 +82,7 @@ namespace Bimbridge.Engine
             out Dictionary<string, long[]> setsToSave,
             ICollection<long> allFixtureIds = null, IList<string> levels = null, string tagRule = "one")
         {
-            tagRule = (tagRule ?? "one").Trim().ToLowerInvariant();
+            tagRule = Bimbridge.Protocol.LegacyAliases.Token((tagRule ?? "one").Trim().ToLowerInvariant());   // 0.9.3: uno/ninguno/ignorar
             if (tagRule != "one" && tagRule != "none" && tagRule != "ignore")
                 throw new ArgumentException("tags must be one, none or ignore");
             setsToSave = new Dictionary<string, long[]>(StringComparer.Ordinal);

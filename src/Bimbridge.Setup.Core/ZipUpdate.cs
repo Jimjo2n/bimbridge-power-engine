@@ -90,7 +90,7 @@ namespace Bimbridge.Setup
                 StagedDir = Arg.GetString(o, "folder"), Installer = Arg.GetString(o, "installer"), InstallerSha256 = Arg.GetString(o, "installer_sha256"),
                 ZipSha256 = Arg.GetString(o, "zip_sha256"), KeyId = Arg.GetString(o, "key"), Signed = Arg.GetBool(o, "signed") ?? false,
                 AllowOlder = Arg.GetBool(o, "allow_downgrade") ?? false, State = Arg.GetString(o, "status"), ConfirmedBy = Arg.GetString(o, "confirmed_by"),
-                Profile = Arg.GetString(o, "profile") ?? ProfilePolicy.Production,
+                Profile = LegacyAliases.Token(Arg.GetString(o, "profile")) ?? ProfilePolicy.Production,   // 0.9.4 staged "laboratorio"
             };
             DateTime.TryParse(Arg.GetString(o, "created_utc"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out p.CreatedUtc);
             if (o.TryGetValue("files", out var a) && a is Dictionary<string, object> f)

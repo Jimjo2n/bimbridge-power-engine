@@ -416,18 +416,46 @@ namespace Bimbridge.Engine
             return t;
         }
 
-        public static PlanEntry FromJson(Dictionary<string, object> o) => new PlanEntry
+        /// <summary>
+        /// Entry key of a stored plan. Parameter ops key their entries by the user's Revit parameter name, which is never translated; only
+        /// the 0.9.3 set_values type entry ("type" spelled in the legacy vocabulary) is mapped.
+        /// shortcut: a set_values on a parameter literally named like the legacy type key reads back as a type change; needs a plan format marker to tell apart.
+        /// </summary>
+        private static string StoredKey(string op, string key)
         {
-            Id = Arg.GetLong(o, "id") ?? 0,
-            Op = Arg.GetString(o, "op"),
-            Key = LegacyAliases.EntryKey(Arg.GetString(o, "key")),
-            Before = Arg.GetString(o, "before"),
-            After = Arg.GetString(o, "after"),
-            Target = o.TryGetValue("target", out var t) ? LegacyTargetValues(Arg.GetString(o, "op"), t) : null,
-            OpIndex = (int)(Arg.GetLong(o, "n") ?? 0),
-            Show = Arg.GetString(o, "show"),
-            Ref = (int)(Arg.GetLong(o, "ref") ?? 0),
-        };
+            if (op == "set_param" || op == "set_type_param") return key;
+            if (op == "set_values") return LegacyAliases.Token(key) == "type" ? "type" : key;
+            return LegacyAliases.EntryKey(key);
+        }
+
+        /// <summary>Values that 0.9.3 stored for view_set detail (fino/medio/bajo) and template/scope_box "none" (ninguna).</summary>
+        private static string StoredValue(string key, string v)
+        {
+            if (v == null) return null;
+            var t = LegacyAliases.Token(v);
+            if (key == "detail") return t == "low" ? "coarse" : t == "fine" || t == "medium" ? t : v;
+            if (key == "template" || key == "scope_box") return t == "none" ? "none" : v;
+            return v;
+        }
+
+        public static PlanEntry FromJson(Dictionary<string, object> o)
+        {
+            var op = Arg.GetString(o, "op");
+            var key = StoredKey(op, Arg.GetString(o, "key"));
+            var target = o.TryGetValue("target", out var t) ? LegacyTargetValues(op, t) : null;
+            return new PlanEntry
+            {
+                Id = Arg.GetLong(o, "id") ?? 0,
+                Op = op,
+                Key = key,
+                Before = StoredValue(key, Arg.GetString(o, "before")),
+                After = StoredValue(key, Arg.GetString(o, "after")),
+                Target = target is string ts ? StoredValue(key, ts) : target,
+                OpIndex = (int)(Arg.GetLong(o, "n") ?? 0),
+                Show = Arg.GetString(o, "show"),
+                Ref = (int)(Arg.GetLong(o, "ref") ?? 0),
+            };
+        }
 
         /// <summary>
         /// Are two canonical values the same? Equal text, or the same numbers separated by , | ; = + and spaces with a difference

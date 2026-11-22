@@ -184,6 +184,7 @@ namespace Bimbridge.Addin.Revit
         private static List<(long Id, long Link)> RouteGeometryIds(Dictionary<string, object> args, string key)
         {
             if (!args.TryGetValue(key, out var value)) return new List<(long, long)>();
+            LegacyAliases.NormalizeRows(args, key);   // 0.9.3 {id, vinculo}
             if (!(value is List<object> list)) throw new QueryException(key + " requires a list of {id,link?}");
             return list.Select(x => x is Dictionary<string, object> item && Arg.GetLong(item, "id") is long id && id > 0 &&
                 (!item.ContainsKey("link") || (Arg.GetLong(item, "link") is long link && link > 0))

@@ -37,7 +37,7 @@ namespace Bimbridge.Tests
         [Theory]
         [InlineData("BIM 360://Proyecto/a.rvt", null, "archivo:x")]
         [InlineData("Autodesk Docs://P/a.rvt", null, "archivo:x")]
-        [InlineData("C:\\a.rvt", null, "nube:abc")]
+        [InlineData("C:\\a.rvt", null, "cloud:abc")]   // the prefix DocIdentity.Cloud emits
         [InlineData("\\\\servidor\\c\\a.rvt", null, "archivo:x")]
         [InlineData("C:\\a.rvt", "\\\\servidor\\central.rvt", "archivo:x")]
         [InlineData("C:\\a.rvt", "Autodesk Docs://P/central.rvt", "archivo:x")]

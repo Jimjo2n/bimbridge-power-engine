@@ -517,7 +517,7 @@ namespace Bimbridge.Addin.Revit
 
         private async Task<Response> Check(Session session, Request request, CancellationToken ct)
         {
-            var name = (Arg.GetString(request.Args, "name") ?? "").ToLowerInvariant();
+            var name = LegacyAliases.Token((Arg.GetString(request.Args, "name") ?? "").ToLowerInvariant());   // 0.9.3 check names from non-bridge clients
             if (name == "copy_monitor") return await CopyMonitorCheck(session, request, ct).ConfigureAwait(false);
             if (name == "coverage") return CoverageCheck(request);
             if (name == "history") return HistoryCheck(session, request);
@@ -534,7 +534,7 @@ namespace Bimbridge.Addin.Revit
             if (name != "lighting_audit")
                 return Response.Fail(request.Id, Status.Invalid, "available checks: lighting_audit, schedule_audit, view_audit, callouts_audit, terminals_audit, equipment_audit, route_audit, groups_audit, annotations_audit, riser_geometry, copy_monitor, coverage, history, model_health");
 
-            var tagRule = Arg.GetString(request.Args, "tags") ?? "one";
+            var tagRule = LegacyAliases.Token(Arg.GetString(request.Args, "tags") ?? "one");
             if (tagRule != "one" && tagRule != "none" && tagRule != "ignore")
                 return Response.Fail(request.Id, Status.Invalid, "tags must be one (one tag per fixture), none (no tags) or ignore");
             List<ManifestQc.Expected> inventory = null;
@@ -1179,7 +1179,7 @@ namespace Bimbridge.Addin.Revit
                     return Response.Fail(request.Id, Status.Invalid, "job attempt_id only accepts a status query.");
                 return ReadWriteReceipt(session, request.Id, attempt);
             }
-            var jop = (Arg.GetString(request.Args, "op") ?? "status").Trim().ToLowerInvariant();
+            var jop = LegacyAliases.Token((Arg.GetString(request.Args, "op") ?? "status").Trim().ToLowerInvariant());   // 0.9.3: pendientes, reconciliar...
             if (jop == "pending_items" || jop == "reconcile") return await ReconcileJob(session, request, jop, ct).ConfigureAwait(false);
             var jobId = Arg.GetString(request.Args, "job_id");
             if (!string.IsNullOrEmpty(jobId))
