@@ -245,7 +245,7 @@ namespace Bimbridge.Addin.Ui
             _recheck.IsEnabled = !on;
             foreach (var b in Descendants<Button>(_body)) b.IsEnabled = !on;
             _win.Cursor = on ? System.Windows.Input.Cursors.Wait : null;
-            if (on) Banner(text, Theme.NavySoft);
+            if (on) Banner(text, Theme.ActionHover);
             else _banner.Visibility = Visibility.Collapsed;
         }
 

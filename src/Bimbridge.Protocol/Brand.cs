@@ -9,7 +9,7 @@ namespace Bimbridge.Protocol
     /// </summary>
     public static class Brand
     {
-        public const string Product = "BIMBRIDGE - Power Engine";
+        public const string Product = "BIMBRIDGE";
         public const string Short = "BIMBRIDGE";
         public const string Subtitle = "MCP • AgentHost • Revit Automation";
         /// <summary>Transaction prefix in the Revit history (Undo).</summary>

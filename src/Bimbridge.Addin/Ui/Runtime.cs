@@ -42,7 +42,7 @@ namespace Bimbridge.Addin.Ui
         public static DateTime StartedUtc = DateTime.UtcNow;
         /// <summary>Compatibility: full execution profile when code is not blocked.</summary>
         public static bool TrustedExecActive => !BlockDynamicCode;
-        public static PushButton TrustButton, AuthorizeButton;
+        public static PushButton AuthorizeButton;
 
         /// <summary>Toggles the block and persists it. If it cannot be saved, it does not change (and says so).</summary>
         public static bool ToggleBlockDynamicCode(out string error)
@@ -224,6 +224,13 @@ namespace Bimbridge.Addin.Ui
             var sessions = Sessions?.Count ?? 0;
             var paused = Pause.On;
             var hold = Hold.On;
+            // Pending authorization requests live on disk: list the folder at most every 2 s, never per idle tick.
+            if (unchecked(Environment.TickCount - _pendingCheckedAt) > 2000 || _pendingCheckedAt == 0)
+            {
+                _pendingCheckedAt = Environment.TickCount;
+                var p = Grants?.PendingCount() ?? 0;
+                if (p != _pending) { _pending = p; _dirty = true; }
+            }
             if (!_dirty && key == _lastDocKey && _lastVisual != null && _lastVisual.StartsWith(sessions + "|" + paused + "|" + hold + "|", StringComparison.Ordinal)) return;
             _dirty = false;
             if (key != null && key != _lastDocKey)
@@ -235,7 +242,7 @@ namespace Bimbridge.Addin.Ui
             ActiveDocTitle = doc?.Title;
             var n = key == null ? 0 : Plans.Held(key).Count;
             HeldCount = n;
-            var visual = sessions + "|" + paused + "|" + hold + "|" + n + "|" + BlockDynamicCode;
+            var visual = sessions + "|" + paused + "|" + hold + "|" + n + "|" + BlockDynamicCode + "|" + _pending;
             if (visual == _lastVisual) return;
             _lastVisual = visual;
             try { UpdateRibbon(sessions, paused, hold, n); } catch (Exception ex) { Log("Ribbon: " + ex.Message); }
@@ -243,7 +250,8 @@ namespace Bimbridge.Addin.Ui
 
         // Last state drawn on each button: the image is only touched (and animated) when its own state changes. null = not painted yet.
         private static System.Windows.Media.Color? _shownStatus;
-        private static bool? _shownTrust, _shownPaused, _shownHold;
+        private static bool? _shownPaused, _shownHold;
+        private static int _pending, _pendingCheckedAt;
         private static int? _shownHeld;
 
         private static void UpdateRibbon(int sessions, bool paused, bool hold, int held)
@@ -258,17 +266,12 @@ namespace Bimbridge.Addin.Ui
                     RibbonMotion.Play(StatusButton, "status|" + from + ">" + c, _shownStatus != null, (t, s) => Icons.Status(from, c, t, s), s => Icons.Status(c, s));
                     _shownStatus = c;
                 }
-                StatusButton.ItemText = "Power Engine\n" + (paused ? "Status · paused" : sessions == 0 ? "Status · no AI" : "Status · " + sessions + " AI");
+                StatusButton.ItemText = "Status\n" + (paused ? "paused" : sessions == 0 ? "no AI" : sessions + " AI");
             }
-            if (TrustButton != null)
+            if (AuthorizeButton != null)
             {
-                var block = BlockDynamicCode;
-                if (_shownTrust != block)
-                {
-                    RibbonMotion.Play(TrustButton, "mode|" + block, _shownTrust != null, (t, s) => Icons.Mode(block, t, s), s => Icons.Mode(block, s));
-                    _shownTrust = block;
-                }
-                TrustButton.ItemText = block ? "Dynamic C#\nblocked" : "Block\nC# injection";
+                // The one place where the AI waits for the user: show that something is waiting.
+                AuthorizeButton.ItemText = _pending == 0 ? "Authorize\ntasks" : "Authorize\n" + _pending + " waiting";
             }
             if (PauseButton != null)
             {

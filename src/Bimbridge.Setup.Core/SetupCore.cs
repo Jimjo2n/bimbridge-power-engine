@@ -91,7 +91,7 @@ namespace Bimbridge.Setup
     }
 
     /// <summary>
-    /// Installs, updates and uninstalls BIMBRIDGE - Power Engine for the current user, without administrator permissions:
+    /// Installs, updates and uninstalls BIMBRIDGE for the current user, without administrator permissions:
     ///   add-in  → %APPDATA%\Autodesk\Revit\Addins\&lt;version&gt;\Bimbridge.addin + Bimbridge\
     ///   bridge  → %LOCALAPPDATA%\Bimbridge\bin\Bimbridge.Bridge.exe
     ///   config  → %APPDATA%\Bimbridge\config.json (only "levels" changes; the rest is kept)

@@ -214,7 +214,7 @@ namespace Bimbridge.Bridge
                 }
 
                 if (candidates.Count == 0)
-                    return Response.Fail(0, Status.RevitUnavailable, "No open Revit has the BIMBRIDGE - Power Engine add-in loaded.");
+                    return Response.Fail(0, Status.RevitUnavailable, "No open Revit has the BIMBRIDGE add-in loaded.");
 
                 string lastError = null;
                 foreach (var (pipeName, d) in candidates)

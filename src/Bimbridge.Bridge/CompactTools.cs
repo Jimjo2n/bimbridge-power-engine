@@ -27,7 +27,8 @@ namespace Bimbridge.Bridge
             "Revit is open (projects and families, handle doc=dN). Read with revit (one-line commands; several lines = in parallel). Change with " +
             "plan→commit (typed, one Undo), exec (C# against the Revit API) or act (families, connectors, save, sync, PDF). " +
             "If the user authorized the task, apply without asking for confirmation per batch. Use other tools the user authorizes if something is not covered. " +
-            "User pause: stop. held: waiting in the Revit queue, do not repeat. key= prevents repeating a write. Help: revit \"guide\". Documents and geometry without Revit (PDF, DOCX, plan–model registration → ops): power \"cap\".";
+            "User pause: stop. held: waiting in the Revit queue, do not repeat. key= prevents repeating a write. Help: revit \"guide\". Documents and geometry without Revit (PDF, DOCX, plan–model registration → ops): power \"cap\". " +
+            "$sel-xxxxxxxxxxxx = elements the user selected in Revit (Copy selection ID button): use it wherever ids or a set are accepted.";
 
         private static readonly TimeSpan ReadTimeout = TimeSpan.FromSeconds(60);
         private static readonly TimeSpan WriteTimeout = TimeSpan.FromSeconds(180);

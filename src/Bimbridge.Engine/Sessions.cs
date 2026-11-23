@@ -320,12 +320,88 @@ namespace Bimbridge.Engine
             }
         }
 
+        // Selections the user copies from Revit ("Copy selection ID"): process-wide, so any session (any AI conversation) resolves them.
+        private static readonly object PinnedLock = new object();
+        private static readonly Dictionary<string, Entry> Pinned = new Dictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Queue<string> PinnedOrder = new Queue<string>();
+        public const string SelectionPrefix = "$sel-";
+
+        /// <summary>
+        /// Registers the user's Revit selection and returns its reference ($sel-xxxxxx). The same elements in the same document
+        /// always get the same reference. Keeps the latest <see cref="MaxSets"/> selections for the life of the Revit process.
+        /// </summary>
+        public static string Pin(IEnumerable<long> ids, string doc, string docTitle)
+        {
+            var arr = new List<long>(ids);
+            arr.Sort();
+            string name;
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            {
+                var h = sha.ComputeHash(Encoding.UTF8.GetBytes((doc ?? "") + "|" + string.Join(",", arr)));
+                // 6 bytes: a collision would silently repoint an older reference to other elements, so keep it practically impossible.
+                name = SelectionPrefix + BitConverter.ToString(h, 0, 6).Replace("-", "").ToLowerInvariant();
+            }
+            lock (PinnedLock)
+            {
+                if (!Pinned.ContainsKey(name))
+                {
+                    PinnedOrder.Enqueue(name);
+                    while (PinnedOrder.Count > MaxSets) Pinned.Remove(PinnedOrder.Dequeue());
+                }
+                Pinned[name] = new Entry { Ids = arr.ToArray(), Doc = doc, DocTitle = docTitle };
+            }
+            return name;
+        }
+
+        /// <summary>Forgets the selections of a document that was closed (its handle is never reused in this Revit run).</summary>
+        public static void UnpinDoc(string doc)
+        {
+            if (doc == null) return;
+            lock (PinnedLock)
+            {
+                var gone = new List<string>();
+                foreach (var kv in Pinned) if (string.Equals(kv.Value.Doc, doc, StringComparison.OrdinalIgnoreCase)) gone.Add(kv.Key);
+                foreach (var k in gone) Pinned.Remove(k);
+            }
+        }
+
+        /// <summary>Ids are listed inline only up to this count; beyond it the reference alone keeps the pasted text short.</summary>
+        public const int MaxInlineIds = 60;
+
+        /// <summary>
+        /// Text the user pastes into an AI conversation. It must stand on its own for an AI that has never seen it: what it is,
+        /// where, what kinds, and how to use it. Example: BIMBRIDGE selection $sel-3fa91c: 4 elements in Revit document "Tower A"
+        /// (d1). Conduits ×3 [1201, 1202, 1203]; Electrical Fixtures ×1 [1350]. Refer to them as $sel-3fa91c in any BIMBRIDGE
+        /// command (for example ids=$sel-3fa91c).
+        /// </summary>
+        public static string DescribeSelection(string reference, string docTitle, string handle, IList<Tuple<string, List<long>>> groups)
+        {
+            var total = 0;
+            foreach (var g in groups) total += g.Item2.Count;
+            var inline = total <= MaxInlineIds;
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var parts = new List<string>();
+            foreach (var g in groups)
+                parts.Add(g.Item1 + " ×" + g.Item2.Count.ToString("N0", inv) + (inline ? " [" + string.Join(", ", g.Item2) + "]" : ""));
+            return "BIMBRIDGE selection " + reference + ": " + total.ToString("N0", inv) + (total == 1 ? " element" : " elements") +
+                   " in Revit document \"" + docTitle + "\"" + (handle != null ? " (" + handle + ")" : "") + ". " + string.Join("; ", parts) + "." +
+                   (inline ? "" : " Element ids are omitted to keep this short.") +
+                   " Refer to them as " + reference + " in any BIMBRIDGE command (for example ids=" + reference + ").";
+        }
+
+        /// <summary>Session set first, then a selection pinned by the user. Call inside <c>_lock</c>.</summary>
+        private bool Find(string key, out Entry e)
+        {
+            if (_sets.TryGetValue(key, out e)) return true;
+            lock (PinnedLock) return Pinned.TryGetValue(key, out e);
+        }
+
         /// <summary>Without checking the document (only for listings and compatibility).</summary>
         public bool TryGet(string name, out long[] ids)
         {
             lock (_lock)
             {
-                if (_sets.TryGetValue(Normalize(name), out var e)) { ids = e.Ids; return true; }
+                if (Find(Normalize(name), out var e)) { ids = e.Ids; return true; }
                 ids = null;
                 return false;
             }
@@ -340,9 +416,12 @@ namespace Bimbridge.Engine
             error = null;
             lock (_lock)
             {
-                if (!_sets.TryGetValue(Normalize(name), out var e))
+                if (!Find(Normalize(name), out var e))
                 {
-                    error = "set " + name + " does not exist; use sets to see the saved ones";
+                    error = Normalize(name).StartsWith(SelectionPrefix, StringComparison.OrdinalIgnoreCase)
+                        ? "Revit selection reference " + Normalize(name) + " is no longer available (Revit was restarted or it is old). " +
+                          "Ask the user to select the elements again and press Copy selection ID on the BIMBRIDGE tab."
+                        : "set " + name + " does not exist; use sets to see the saved ones";
                     return false;
                 }
                 if (doc != null && e.Doc != null && !string.Equals(doc, e.Doc, StringComparison.OrdinalIgnoreCase))
@@ -359,7 +438,7 @@ namespace Bimbridge.Engine
         /// <summary>Document the set belongs to (null if unknown).</summary>
         public string DocOf(string name)
         {
-            lock (_lock) return _sets.TryGetValue(Normalize(name), out var e) ? e.Doc : null;
+            lock (_lock) return Find(Normalize(name), out var e) ? e.Doc : null;
         }
 
         public bool Remove(string name)

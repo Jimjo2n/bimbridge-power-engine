@@ -518,6 +518,13 @@ namespace Bimbridge.Addin.Revit
         private async Task<Response> Check(Session session, Request request, CancellationToken ct)
         {
             var name = LegacyAliases.Token((Arg.GetString(request.Args, "name") ?? "").ToLowerInvariant());   // 0.9.3 check names from non-bridge clients
+            // Every audit takes ids=$set (including a $sel-… the user copied from Revit): expand it once, before dispatching.
+            if (request.Args.ContainsKey("ids") && Arg.GetStringList(request.Args, "ids").Any(s => s.TrimStart().StartsWith("$", StringComparison.Ordinal)))
+            {
+                var expanded = ResolveIds(session, request.Args, "ids", out var idsError);
+                if (expanded == null) return Response.Fail(request.Id, Status.Invalid, idsError);
+                request.Args["ids"] = string.Join(",", expanded);
+            }
             if (name == "copy_monitor") return await CopyMonitorCheck(session, request, ct).ConfigureAwait(false);
             if (name == "coverage") return CoverageCheck(request);
             if (name == "history") return HistoryCheck(session, request);

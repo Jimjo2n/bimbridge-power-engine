@@ -95,6 +95,7 @@ namespace Bimbridge.Addin
                 _tracker.DocumentHandleClosed += handle =>
                 {
                     foreach (var s in sessions.All()) s.Sets.RemoveDoc(handle);
+                    NamedSets.UnpinDoc(handle);
                 };
 
                 var handler = new RequestHandler(_main, _tracker, config, revitVersion, addinVersion, plans, hold, pause);
@@ -173,7 +174,7 @@ namespace Bimbridge.Addin
                 }
 
                 var conn = app.CreateRibbonPanel(TabName, "Connection");
-                Runtime.StatusButton = conn.AddItem(Btn("BimbridgeStatus", "Power Engine\nStatus", typeof(StatusCommand),
+                Runtime.StatusButton = conn.AddItem(Btn("BimbridgeStatus", "Status\nno AI", typeof(StatusCommand),
                     "See which AIs are connected, what they can do and what they did.",
                     "Green: at least one AI is connected. Grey: waiting for Claude or Codex to connect. Red: the AI is paused.",
                     Icons.Status(Theme.Slate, 32), Icons.Status(Theme.Slate, 16))) as PushButton;
@@ -181,6 +182,14 @@ namespace Bimbridge.Addin
                     "Stop the AI instantly. Press it again to resume.",
                     "While paused, Revit rejects every AI request (reads and changes). The AI is told that you paused it.",
                     Icons.Pause(false, 32), Icons.Pause(false, 16))) as PushButton;
+
+                var selection = app.CreateRibbonPanel(TabName, "Selection");
+                CopySelectionCommand.Button = selection.AddItem(Btn("BimbridgeCopySelection", "Copy\nselection ID", typeof(CopySelectionCommand),
+                    "Copy a reference to the selected elements to paste into your AI conversation.",
+                    "Select elements (for example 3 conduits and a receptacle), press this button and paste into Claude or Codex. " +
+                    "The pasted text tells the AI which elements you mean ($sel-…), so you can say \"move these\" or \"check these\" without listing ids. " +
+                    "Works in any conversation while this Revit is open.",
+                    CopySelectionCommand.Icon(32), CopySelectionCommand.Icon(16), anyTime: false)) as PushButton;
 
                 var changes = app.CreateRibbonPanel(TabName, "AI changes");
                 Runtime.ModeButton = changes.AddItem(Btn("BimbridgeMode", "Mode\nLive", typeof(ModeCommand),
@@ -197,13 +206,7 @@ namespace Bimbridge.Addin
                     "Review what the AI's tasks ask to do and authorize it or not.",
                     "A task that modifies the model, saves, syncs or exports needs your permission for THAT task and THAT document, for 8 hours. " +
                     "The AI can ask for it but cannot grant it. You can also revoke active permissions here.",
-                    Icons.Status(Theme.Slate, 32), Icons.Status(Theme.Slate, 16), anyTime: false)) as PushButton;
-                Runtime.TrustButton = sec.AddItem(Btn("BimbridgeTrust", "Block\nC# injection", typeof(TrustCommand),
-                    "Block or allow the AI to run dynamic C# code (exec).",
-                    "By default the authorized local AI can run dynamic C#, audited. Press to block it: every new exec request is rejected. " +
-                    "To allow it again, press it again and confirm (No by default). " +
-                    "The change is saved in config.json. It does not stop what is already running inside Revit. Typed operations (plan/commit) remain available.",
-                    Icons.Mode(false, 32), Icons.Mode(false, 16))) as PushButton;
+                    Icons.Journal(32), Icons.Journal(16), anyTime: false)) as PushButton;
 
                 var help = app.CreateRibbonPanel(TabName, "Help");
                 help.AddItem(Btn("BimbridgeSettings", "Settings", typeof(SettingsCommand),

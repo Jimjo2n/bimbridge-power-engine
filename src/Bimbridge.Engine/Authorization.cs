@@ -355,6 +355,14 @@ namespace Bimbridge.Engine
             return r;
         }
 
+        /// <summary>Number of pending requests without reading them (cheap enough for the ribbon refresh).</summary>
+        public int PendingCount()
+        {
+            try { return Directory.Exists(_requests) ? Directory.GetFiles(_requests, "*.json").Length : 0; }
+            catch (IOException) { return 0; }
+            catch (UnauthorizedAccessException) { return 0; }
+        }
+
         public List<GrantRequest> PendingRequests()
         {
             var res = new List<GrantRequest>();

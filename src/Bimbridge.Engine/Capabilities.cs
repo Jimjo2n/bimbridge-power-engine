@@ -105,7 +105,7 @@ namespace Bimbridge.Engine
         public static string Markdown(string version)
         {
             var sb = new StringBuilder();
-            sb.Append("# Capability matrix — BIMBRIDGE - Power Engine ").Append(version).Append("\n\n");
+            sb.Append("# Capability matrix — BIMBRIDGE ").Append(version).Append("\n\n");
             sb.Append("Generated from `src/Bimbridge.Engine/Capabilities.cs` (a test checks that it matches). ");
             sb.Append("*Evidence* column: what was actually checked. What is new in 0.6.0 has not yet run inside Revit: ");
             sb.Append("it is compiled for 2022–2027 and tested without Revit; the native test is `tools/acceptance/PROCEDURE_0.6.0.md`.\n\n");

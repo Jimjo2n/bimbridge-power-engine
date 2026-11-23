@@ -10,7 +10,7 @@ namespace Bimbridge.Addin.Ui
     /// <summary>
     /// Ribbon icons drawn in code (vector, crisp at 16 and 32 px), with no image files.
     /// Each icon is drawn on a 32×32 canvas and scaled. Straight edges fall on even coordinates so that
-    /// they line up with whole pixels both at 32 px and at 16 px (scale 0.5). Brand palette: navy, white and states.
+    /// they line up with whole pixels both at 32 px and at 16 px (scale 0.5). Brand palette: black, white, brand red and states.
     /// </summary>
     internal static class Icons
     {
@@ -35,13 +35,13 @@ namespace Bimbridge.Addin.Ui
         // Monitor: "the connection with the AI".
         private static void Monitor(DrawingContext dc)
         {
-            Fill(dc, Theme.Navy, Rounded(2, 4, 24, 18, 3));
+            Fill(dc, Theme.Action, Rounded(2, 4, 24, 18, 3));
             Fill(dc, Theme.Sunken, Rounded(4, 6, 20, 14, 1.5));
             // "AI" strokes inside the monitor
-            Fill(dc, Theme.NavySoft, Rounded(8, 10, 8, 2, 1));
-            Fill(dc, Theme.NavySoft, Rounded(8, 14, 12, 2, 1));
-            Fill(dc, Theme.Navy, Rounded(12, 22, 4, 4, 0));
-            Fill(dc, Theme.Navy, Rounded(8, 26, 12, 2, 1));
+            Fill(dc, Theme.ActionHover, Rounded(8, 10, 8, 2, 1));
+            Fill(dc, Theme.ActionHover, Rounded(8, 14, 12, 2, 1));
+            Fill(dc, Theme.Action, Rounded(12, 22, 4, 4, 0));
+            Fill(dc, Theme.Action, Rounded(8, 26, 12, 2, 1));
         }
 
         // Pause <-> resume: each bar morphs into one half of the triangle (vertex to vertex).
@@ -155,7 +155,7 @@ namespace Bimbridge.Addin.Ui
         {
             Fill(dc, Color.FromArgb(0x66, Theme.Slate.R, Theme.Slate.G, Theme.Slate.B), Rounded(8, 4, 18, 6, 2));
             Fill(dc, Theme.Slate, Rounded(6, 8, 20, 8, 2));
-            Fill(dc, Theme.Navy, Rounded(4, 14, 22, 14, 3));
+            Fill(dc, Theme.Action, Rounded(4, 14, 22, 14, 3));
             Fill(dc, Theme.White, Rounded(8, 18, 12, 2, 1));
             Fill(dc, Theme.White, Rounded(8, 22, 8, 2, 1));
             if (count > 0)
@@ -186,20 +186,20 @@ namespace Bimbridge.Addin.Ui
 
         public static ImageSource Journal(int size) => Render(size, dc =>
         {
-            Fill(dc, Theme.Navy, Rounded(6, 2, 20, 28, 3));
+            Fill(dc, Theme.Action, Rounded(6, 2, 20, 28, 3));
             Fill(dc, Theme.White, Rounded(8, 4, 16, 24, 1.5));
-            for (var y = 10; y <= 22; y += 4) Fill(dc, Theme.NavySoft, Rounded(12, y, y > 20 ? 6 : 8, 2, 1));
+            for (var y = 10; y <= 22; y += 4) Fill(dc, Theme.ActionHover, Rounded(12, y, y > 20 ? 6 : 8, 2, 1));
         });
 
         public static ImageSource Folder(int size) => Render(size, dc =>
         {
             Fill(dc, Theme.Slate, Rounded(2, 6, 12, 6, 2));
-            Fill(dc, Theme.Navy, Rounded(2, 10, 28, 18, 3));
+            Fill(dc, Theme.Action, Rounded(2, 10, 28, 18, 3));
         });
 
         public static ImageSource Help(int size) => Render(size, dc =>
         {
-            dc.DrawEllipse(Theme.B(Theme.Navy), null, new Point(16, 16), 14, 14);
+            dc.DrawEllipse(Theme.B(Theme.Action), null, new Point(16, 16), 14, 14);
             var ft = new FormattedText("?", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
                 new Typeface(Theme.Font, FontStyles.Normal, FontWeights.Bold, FontStretches.Normal), 19, Theme.B(Theme.White), 1.0);
             dc.DrawText(ft, new Point(Math.Round(16 - ft.Width / 2), Math.Round(16 - ft.Height / 2)));
@@ -211,7 +211,7 @@ namespace Bimbridge.Addin.Ui
         /// <summary>Update transition frame (t in [0,1]): the badge appears growing from 0.85 to 1 and fading in (never from 0). t = 1 is the still icon.</summary>
         public static ImageSource Update(int state, double t, int size) => Render(size, dc =>
         {
-            var pen = new Pen(Theme.B(Theme.Navy), 3.4) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+            var pen = new Pen(Theme.B(Theme.Action), 3.4) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
             // ~300° arc around (15,17), radius 10
             var g = new StreamGeometry();
             using (var ctx = g.Open())
@@ -230,7 +230,7 @@ namespace Bimbridge.Addin.Ui
                 ctx.LineTo(new Point(18.6, 12.2), true, false);
             }
             head.Freeze();
-            dc.DrawGeometry(Theme.B(Theme.Navy), null, head);
+            dc.DrawGeometry(Theme.B(Theme.Action), null, head);
             if (state > 0)
             {
                 var c = state == 1 ? Theme.Green : Theme.Amber;
