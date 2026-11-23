@@ -8,7 +8,7 @@
 
 ## Get BIMBRIDGE for Windows
 
-**[Download the latest Setup](https://github.com/Jimjo2n/bimbridge-power-engine/releases/latest)** · [Release notes and SHA-256](https://github.com/Jimjo2n/bimbridge-power-engine/releases/tag/v0.9.4) · [All releases](https://github.com/Jimjo2n/bimbridge-power-engine/releases) · [Full tool matrix](docs/CAPABILITY_MATRIX.md)
+**[Download the latest Setup](https://github.com/Jimjo2n/bimbridge-power-engine/releases/latest)** · [Release notes and SHA-256](https://github.com/Jimjo2n/bimbridge-power-engine/releases/tag/v0.9.5) · [All releases](https://github.com/Jimjo2n/bimbridge-power-engine/releases) · [Full tool matrix](docs/CAPABILITY_MATRIX.md)
 
 | Revit build targets | Add-in runtime |
 | --- | --- |

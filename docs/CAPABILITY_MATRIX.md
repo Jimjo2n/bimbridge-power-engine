@@ -1,4 +1,4 @@
-# Capability matrix — BIMBRIDGE 0.9.4
+# Capability matrix — BIMBRIDGE 0.9.5
 
 Generated from `src/Bimbridge.Engine/Capabilities.cs` (a test checks that it matches). *Evidence* column: what was actually checked. What is new in 0.6.0 has not yet run inside Revit: it is compiled for 2022–2027 and tested without Revit; the native test is `tools/acceptance/PROCEDURE_0.6.0.md`.
 

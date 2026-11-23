@@ -5,8 +5,8 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Company>BIMBRIDGE</Company>
     <Product>BIMBRIDGE</Product>
-    <Version>0.9.4</Version>
-    <InformationalVersion>0.9.4</InformationalVersion>
+    <Version>0.9.5</Version>
+    <InformationalVersion>0.9.5</InformationalVersion>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <!-- Issue #7: a task without await or supervision loses its exceptions; treated as a compile error. -->
     <WarningsAsErrors>$(WarningsAsErrors);CS4014</WarningsAsErrors>

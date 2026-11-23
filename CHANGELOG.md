@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.5 experimental
 
 - feat(ui): **Copy selection ID** ribbon button. Select elements in Revit, press it and paste into Claude or Codex: the text names the document, the categories and the ids, and gives a `$sel-xxxxxxxxxxxx` reference that every BIMBRIDGE command accepts (queries, plans, geo, audits, tools) from any conversation while Revit is open. An expired reference tells the AI to ask you to copy it again.
 - feat(ui): brand palette red, black and white (black actions, red mark and destructive actions, neutral grays); the product is shown as just "BIMBRIDGE" in Revit, the installer and the MCP server.
