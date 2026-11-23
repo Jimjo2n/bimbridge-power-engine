@@ -10,9 +10,9 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Diario de auditoría JSONL (sección 14). Se escribe en un hilo de fondo, así que
-    /// registrar una llamada no cuesta nada al hilo de Revit (problema D6 de pyRevit).
-    /// Un archivo por día; se borran los de más de N días al arrancar.
+    /// JSONL audit journal (section 14). Written on a background thread, so
+    /// recording a call costs the Revit thread nothing (pyRevit problem D6).
+    /// One file per day; files older than N days are deleted at startup.
     /// </summary>
     public sealed class Journal : IDisposable
     {
@@ -43,14 +43,14 @@ namespace Bimbridge.Engine
             }
         }
 
-        public void Log(string author, string op, string estado, long elapsedMs, Dictionary<string, object> extra = null)
+        public void Log(string author, string op, string status, long elapsedMs, Dictionary<string, object> extra = null)
         {
             var e = new Dictionary<string, object>
             {
                 ["t"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture),
-                ["autor"] = author,
+                ["author"] = author,
                 ["op"] = op,
-                ["estado"] = estado,
+                ["status"] = status,
                 ["ms"] = elapsedMs,
             };
             if (extra != null) foreach (var kv in extra) e[kv.Key] = kv.Value;
@@ -59,17 +59,17 @@ namespace Bimbridge.Engine
                 _recent.AddLast(e);
                 if (_recent.Count > RecentMax) _recent.RemoveFirst();
             }
-            // TELEMETRÍA: si la cola se llena se pierde la línea antes que bloquear a Revit, pero se CUENTA.
-            // Lo que debe quedar sí o sí va por AuditLog (síncrono, encadenado, falla visible).
+            // TELEMETRY: if the queue fills up the line is dropped rather than blocking Revit, but it is COUNTED.
+            // Anything that must be kept no matter what goes through AuditLog (synchronous, chained, visible failure).
             if (!_queue.TryAdd(Json.Write(e))) Interlocked.Increment(ref _dropped);
         }
 
         private long _dropped, _writeErrors;
-        /// <summary>Líneas de telemetría perdidas (cola llena) y errores de escritura. Se muestran en el diagnóstico.</summary>
+        /// <summary>Dropped telemetry lines (queue full) and write errors. Shown in diagnostics.</summary>
         public long Dropped => Interlocked.Read(ref _dropped);
         public long WriteErrors => Interlocked.Read(ref _writeErrors);
 
-        /// <summary>Últimas entradas en memoria (para la herramienta "journal").</summary>
+        /// <summary>Latest in-memory entries (for the "journal" tool).</summary>
         public List<Dictionary<string, object>> Recent(int max)
         {
             lock (_recentLock)

@@ -7,45 +7,45 @@ using Bimbridge.Protocol;
 
 namespace Bimbridge.Engine.Tasks
 {
-    /// <summary>Estados de una tarea (§3.2). El estado de la conexión es otra cosa: una tarea sigue aunque el cliente se desconecte.</summary>
+    /// <summary>Task states (§3.2). The connection state is something else: a task continues even if the client disconnects.</summary>
     public static class TaskState
     {
-        public const string Preparada = "preparada";
-        public const string EnCola = "en_cola";
-        public const string Ejecutando = "ejecutando";
-        public const string EsperandoContexto = "esperando_contexto";
-        public const string Aplicada = "aplicada";
-        public const string AplicadaConDiferencias = "aplicada_con_diferencias";
-        /// <summary>Se detuvo con unidades confirmadas y otras fallidas o sin hacer: lo confirmado sigue aplicado y se lista.</summary>
-        public const string Parcial = "parcial";
-        /// <summary>El proceso que la corría ya no está (Revit cerrado, add-in descargado): reanudar reconcilia y continúa.</summary>
-        public const string Interrumpida = "interrumpida";
-        public const string CancelacionSolicitada = "cancelacion_solicitada";
-        public const string Cancelada = "cancelada";
+        public const string Prepared = "prepared";
+        public const string Queued = "queued";
+        public const string Running = "running_now";
+        public const string WaitingContext = "waiting_for_context";
+        public const string Applied = "applied";
+        public const string AppliedWithDifferences = "applied_with_differences";
+        /// <summary>Stopped with some units committed and others failed or not done: what was committed stays applied and is listed.</summary>
+        public const string Partial = "partial";
+        /// <summary>The process that was running it is gone (Revit closed, add-in unloaded): resume reconciles and continues.</summary>
+        public const string Interrupted = "interrupted";
+        public const string CancelRequested = "cancellation_requested";
+        public const string Cancelled = "cancelled";
 
-        public static bool IsFinal(string s) => s == Aplicada || s == AplicadaConDiferencias || s == Cancelada;
-        public static bool IsActive(string s) => s == EnCola || s == Ejecutando || s == EsperandoContexto || s == CancelacionSolicitada;
+        public static bool IsFinal(string s) => s == Applied || s == AppliedWithDifferences || s == Cancelled;
+        public static bool IsActive(string s) => s == Queued || s == Running || s == WaitingContext || s == CancelRequested;
     }
 
-    /// <summary>Estados de una unidad de trabajo.</summary>
+    /// <summary>States of a work unit.</summary>
     public static class UnitState
     {
-        public const string Pendiente = "pendiente";
-        /// <summary>Se registró su inicio y no consta su final (ventana commit→diario): se verifica al reanudar.</summary>
-        public const string EnCurso = "en_curso";
-        public const string Confirmada = "confirmada";
-        /// <summary>Falló y se revirtió (confirmado): no quedó nada; se reintenta al reanudar.</summary>
-        public const string Revertida = "revertida";
-        /// <summary>Sus precondiciones no se cumplen (alguien cambió los elementos): no se aplicó; se replanifica al reanudar.</summary>
-        public const string Conflicto = "conflicto";
-        /// <summary>Error con cambios confirmados (transacciones propias): reconciliar antes de seguir.</summary>
-        public const string Parcial = "parcial";
-        public const string Desconocida = "desconocida";
-        /// <summary>La receta decidió no hacer nada (ya estaba bien, excepción declarada).</summary>
-        public const string Omitida = "omitida";
+        public const string Pending = "pending";
+        /// <summary>Its start was recorded and its end is not on record (commit→journal window): verified on resume.</summary>
+        public const string InProgress = "running";
+        public const string Committed = "committed";
+        /// <summary>Failed and was rolled back (confirmed): nothing was left; retried on resume.</summary>
+        public const string RolledBack = "reverted";
+        /// <summary>Its preconditions are not met (someone changed the elements): not applied; replanned on resume.</summary>
+        public const string Conflict = "conflict";
+        /// <summary>Error with committed changes (own transactions): reconcile before continuing.</summary>
+        public const string Partial = "partial";
+        public const string Unknown = "unknown";
+        /// <summary>The recipe decided to do nothing (already correct, declared exception).</summary>
+        public const string Skipped = "skipped_unit";
 
-        public static bool IsDone(string s) => s == Confirmada || s == Omitida;
-        public static bool NeedsReconcile(string s) => s == EnCurso || s == Parcial || s == Desconocida;
+        public static bool IsDone(string s) => s == Committed || s == Skipped;
+        public static bool NeedsReconcile(string s) => s == InProgress || s == Partial || s == Unknown;
     }
 
     public sealed class TaskDoc
@@ -58,17 +58,17 @@ namespace Bimbridge.Engine.Tasks
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["clave"] = Key, ["huella"] = Print, ["generacion"] = Generation, ["handle"] = Handle, ["titulo"] = Title,
+            ["key"] = Key, ["fingerprint"] = Print, ["generation"] = Generation, ["handle"] = Handle, ["title"] = Title,
         };
 
         public static TaskDoc FromJson(Dictionary<string, object> o) => o == null ? null : new TaskDoc
         {
-            Key = Arg.GetString(o, "clave"), Print = Arg.GetString(o, "huella"), Generation = Arg.GetString(o, "generacion"),
-            Handle = Arg.GetString(o, "handle"), Title = Arg.GetString(o, "titulo"),
+            Key = Arg.GetString(o, "key"), Print = Arg.GetString(o, "fingerprint"), Generation = Arg.GetString(o, "generation"),
+            Handle = Arg.GetString(o, "handle"), Title = Arg.GetString(o, "title"),
         };
     }
 
-    /// <summary>Evidencia de que el documento quedó persistido (guardado o sincronizado) tras la unidad número <see cref="Seq"/>.</summary>
+    /// <summary>Evidence that the document was persisted (saved or synced) after unit number <see cref="Seq"/>.</summary>
     public sealed class PersistEvidence
     {
         public string Kind; // guardar | sync | guardado_externo
@@ -82,20 +82,20 @@ namespace Bimbridge.Engine.Tasks
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["tipo"] = Kind, ["t"] = When, ["seq"] = Seq, ["generacion"] = Generation, ["archivo"] = File, ["bytes"] = Bytes, ["mtime"] = Mtime, ["sha256"] = Sha,
+            ["type"] = Kind, ["t"] = When, ["seq"] = Seq, ["generation"] = Generation, ["file"] = File, ["bytes"] = Bytes, ["mtime"] = Mtime, ["sha256"] = Sha,
         };
 
         public static PersistEvidence FromJson(Dictionary<string, object> o) => o == null ? null : new PersistEvidence
         {
-            Kind = Arg.GetString(o, "tipo"), When = Arg.GetString(o, "t"), Seq = Arg.GetLong(o, "seq") ?? 0, Generation = Arg.GetString(o, "generacion"),
-            File = Arg.GetString(o, "archivo"), Bytes = Arg.GetLong(o, "bytes") ?? 0, Mtime = Arg.GetString(o, "mtime"), Sha = Arg.GetString(o, "sha256"),
+            Kind = Arg.GetString(o, "type"), When = Arg.GetString(o, "t"), Seq = Arg.GetLong(o, "seq") ?? 0, Generation = Arg.GetString(o, "generation"),
+            File = Arg.GetString(o, "file"), Bytes = Arg.GetLong(o, "bytes") ?? 0, Mtime = Arg.GetString(o, "mtime"), Sha = Arg.GetString(o, "sha256"),
         };
     }
 
     /// <summary>
-    /// Memoria persistente de una tarea (§3.3): objetivo, alcance, receta y versión, parámetros, documentos, progreso, decisiones,
-    /// excepciones, artefactos, evidencia de guardado y resumen de continuación. Se guarda en tareas\&lt;id&gt;\tarea.json (escritura atómica);
-    /// las unidades van aparte (unidades.jsonl) para no reescribir miles de filas en cada checkpoint.
+    /// Persistent memory of a task (§3.3): target, scope, recipe and version, parameters, documents, progress, decisions,
+    /// exceptions, artifacts, save evidence and continuation summary. Stored in tareas\&lt;id&gt;\tarea.json (atomic write);
+    /// units are kept separately (unidades.jsonl) so thousands of rows are not rewritten at each checkpoint.
     /// </summary>
     public sealed class TaskRecord
     {
@@ -111,7 +111,7 @@ namespace Bimbridge.Engine.Tasks
         public string ContentHash;
         public Dictionary<string, object> Args = new Dictionary<string, object>(StringComparer.Ordinal);
         public List<TaskDoc> Docs = new List<TaskDoc>();
-        public string State = TaskState.Preparada;
+        public string State = TaskState.Prepared;
         public string Reason;
         public string Created;
         public string Updated;
@@ -130,21 +130,21 @@ namespace Bimbridge.Engine.Tasks
         public string Summary;
         public List<string> Clients = new List<string>();
         /// <summary>
-        /// Último guardado/sincronización registrado en CADA generación del documento (generación → hora UTC ISO). Permite inferir con
-        /// seguridad, tras reabrir, que una unidad empezada después del último guardado de su generación se perdió con el cierre.
+        /// Last save/sync recorded in EACH generation of the document (generation → ISO UTC time). Allows safely inferring,
+        /// after reopening, that a unit started after the last save of its generation was lost on close.
         /// </summary>
         public Dictionary<string, object> PersistedAt = new Dictionary<string, object>(StringComparer.Ordinal);
 
         public TaskDoc MainDoc => Docs.FirstOrDefault();
 
-        /// <summary>Sólo en memoria: false si el último checkpoint no llegó a disco (R07). Se informa en estado/resumen.</summary>
+        /// <summary>In memory only: false if the last checkpoint did not reach disk (R07). Reported in status/summary.</summary>
         public bool Durable = true;
 
-        /// <summary>Sólo en memoria (no se serializa): el backend la llama en el hilo de Revit justo antes de la transacción de cada unidad.
-        /// null = puede ejecutar; texto = no ejecutar esa unidad ni las siguientes del lote (R06, R03).</summary>
+        /// <summary>In memory only (not serialized): the backend calls it on the Revit thread right before each unit's transaction.
+        /// null = may run; text = do not run that unit or the following ones in the batch (R06, R03).</summary>
         public Func<string> Preflight;
 
-        /// <summary>Registra una evidencia de persistencia (barrera propia o guardado del usuario).</summary>
+        /// <summary>Records persistence evidence (own barrier or user save).</summary>
         public void NotePersist(PersistEvidence p)
         {
             if (p == null) return;
@@ -152,7 +152,7 @@ namespace Bimbridge.Engine.Tasks
             if (p.Generation != null && p.When != null) PersistedAt[p.Generation] = p.When;
         }
 
-        /// <summary>¿Hubo un guardado en <paramref name="generation"/> en o después de <paramref name="sinceIso"/>? null = no se sabe (sin hora).</summary>
+        /// <summary>Was there a save in <paramref name="generation"/> at or after <paramref name="sinceIso"/>? null = unknown (no time).</summary>
         public bool? PersistedSince(string generation, string sinceIso)
         {
             if (generation == null || sinceIso == null) return null;
@@ -164,53 +164,55 @@ namespace Bimbridge.Engine.Tasks
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["esquema"] = (long)SchemaVersion,
-            ["id"] = Id, ["objetivo"] = Objective, ["alcance"] = Scope,
-            ["receta"] = new Dictionary<string, object> { ["nombre"] = RecipeName, ["version"] = RecipeVersion, ["hash"] = RecipeHash, ["origen"] = RecipeSource },
-            ["huella"] = ContentHash,
+            ["schema"] = (long)SchemaVersion,
+            ["id"] = Id, ["target"] = Objective, ["scope"] = Scope,
+            ["recipe"] = new Dictionary<string, object> { ["name"] = RecipeName, ["version"] = RecipeVersion, ["hash"] = RecipeHash, ["origin"] = RecipeSource },
+            ["fingerprint"] = ContentHash,
             ["args"] = Args,
             ["docs"] = Docs.Select(d => (object)d.ToJson()).ToList(),
-            ["estado"] = State, ["motivo"] = Reason,
-            ["creada"] = Created, ["actualizada"] = Updated, ["rev"] = Rev,
-            ["cliente"] = Client, ["clientes"] = Clients.Cast<object>().ToList(), ["instancia"] = Owner,
-            ["unidades_total"] = UnitsTotal, ["seq_confirmacion"] = ConfirmSeq,
-            ["decisiones"] = Decisions.Cast<object>().ToList(),
-            ["excepciones"] = Exceptions.Cast<object>().ToList(),
-            ["artefactos"] = Artifacts.Cast<object>().ToList(),
-            ["ultimo_guardado"] = LastPersist?.ToJson(),
-            ["guardado_por_generacion"] = PersistedAt,
-            ["politica"] = Policy, ["metricas"] = Metrics,
-            ["postcondicion"] = Postcondition,
-            ["resumen"] = Summary,
+            ["status"] = State, ["reason"] = Reason,
+            ["created"] = Created, ["updated"] = Updated, ["rev"] = Rev,
+            ["client"] = Client, ["clients"] = Clients.Cast<object>().ToList(), ["instance"] = Owner,
+            ["units_total"] = UnitsTotal, ["commit_seq"] = ConfirmSeq,
+            ["decisions"] = Decisions.Cast<object>().ToList(),
+            ["exceptions"] = Exceptions.Cast<object>().ToList(),
+            ["artifacts"] = Artifacts.Cast<object>().ToList(),
+            ["last_save"] = LastPersist?.ToJson(),
+            ["save_by_generation"] = PersistedAt,
+            ["policy"] = Policy, ["metrics"] = Metrics,
+            ["postcondition"] = Postcondition,
+            ["summary"] = Summary,
         };
 
         public static TaskRecord FromJson(Dictionary<string, object> o)
         {
             var r = new TaskRecord
             {
-                Id = Arg.GetString(o, "id"), Objective = Arg.GetString(o, "objetivo"), Scope = Arg.GetString(o, "alcance"),
-                ContentHash = Arg.GetString(o, "huella"), State = Arg.GetString(o, "estado") ?? TaskState.Preparada, Reason = Arg.GetString(o, "motivo"),
-                Created = Arg.GetString(o, "creada"), Updated = Arg.GetString(o, "actualizada"), Rev = Arg.GetLong(o, "rev") ?? 0,
-                Client = Arg.GetString(o, "cliente"), Owner = Arg.GetString(o, "instancia"),
-                UnitsTotal = Arg.GetLong(o, "unidades_total") ?? 0, ConfirmSeq = Arg.GetLong(o, "seq_confirmacion") ?? 0,
-                Summary = Arg.GetString(o, "resumen"),
+                Id = Arg.GetString(o, "id"), Objective = Arg.GetString(o, "target"), Scope = Arg.GetString(o, "scope"),
+                ContentHash = Arg.GetString(o, "fingerprint"), State = Arg.GetString(o, "status") ?? TaskState.Prepared, Reason = Arg.GetString(o, "reason"),
+                Created = Arg.GetString(o, "created"), Updated = Arg.GetString(o, "updated"), Rev = Arg.GetLong(o, "rev") ?? 0,
+                Client = Arg.GetString(o, "client"), Owner = Arg.GetString(o, "instance"),
+                UnitsTotal = Arg.GetLong(o, "units_total") ?? 0, ConfirmSeq = Arg.GetLong(o, "commit_seq") ?? 0,
+                Summary = Arg.GetString(o, "summary"),
             };
-            if (o.TryGetValue("receta", out var rv) && rv is Dictionary<string, object> rd)
+            if (o.TryGetValue("recipe", out var rv) && rv is Dictionary<string, object> rd)
             {
-                r.RecipeName = Arg.GetString(rd, "nombre"); r.RecipeVersion = Arg.GetString(rd, "version");
-                r.RecipeHash = Arg.GetString(rd, "hash"); r.RecipeSource = Arg.GetString(rd, "origen");
+                r.RecipeName = Arg.GetString(rd, "name"); r.RecipeVersion = Arg.GetString(rd, "version");
+                r.RecipeHash = Arg.GetString(rd, "hash"); r.RecipeSource = Arg.GetString(rd, "origin");
             }
             if (o.TryGetValue("args", out var av) && av is Dictionary<string, object> ad) r.Args = ad;
             if (o.TryGetValue("docs", out var dv) && dv is List<object> dl) r.Docs = dl.OfType<Dictionary<string, object>>().Select(TaskDoc.FromJson).ToList();
-            r.Decisions = Dicts(o, "decisiones");
-            r.Exceptions = Dicts(o, "excepciones");
-            r.Artifacts = Dicts(o, "artefactos");
-            r.Clients = Arg.GetStringList(o, "clientes");
-            if (o.TryGetValue("ultimo_guardado", out var lp) && lp is Dictionary<string, object> lpd) r.LastPersist = PersistEvidence.FromJson(lpd);
-            if (o.TryGetValue("guardado_por_generacion", out var gv) && gv is Dictionary<string, object> gd) r.PersistedAt = gd;
-            if (o.TryGetValue("politica", out var pv) && pv is Dictionary<string, object> pd) r.Policy = pd;
-            if (o.TryGetValue("metricas", out var mv) && mv is Dictionary<string, object> md) r.Metrics = md;
-            if (o.TryGetValue("postcondicion", out var qv) && qv is Dictionary<string, object> qd) r.Postcondition = qd;
+            r.Decisions = Dicts(o, "decisions");
+            r.Exceptions = Dicts(o, "exceptions");
+            r.Artifacts = Dicts(o, "artifacts");
+            r.Clients = Arg.GetStringList(o, "clients");
+            if (o.TryGetValue("last_save", out var lp) && lp is Dictionary<string, object> lpd) r.LastPersist = PersistEvidence.FromJson(lpd);
+            if (o.TryGetValue("save_by_generation", out var gv) && gv is Dictionary<string, object> gd) r.PersistedAt = gd;
+            if (o.TryGetValue("policy", out var pv) && pv is Dictionary<string, object> pd) r.Policy = pd;
+            // Policies stored by 0.9.3/0.9.4 hold legacy values (continuar, guardar, ninguna, lectura, dejar).
+            foreach (var k in new[] { "on_error", "tx", "warnings", "at_end" }) Bimbridge.Protocol.LegacyAliases.NormalizeTokenList(r.Policy, k);
+            if (o.TryGetValue("metrics", out var mv) && mv is Dictionary<string, object> md) r.Metrics = md;
+            if (o.TryGetValue("postcondition", out var qv) && qv is Dictionary<string, object> qd) r.Postcondition = qd;
             return r;
         }
 
@@ -230,11 +232,11 @@ namespace Bimbridge.Engine.Tasks
         public string PolicyString(string name) => Arg.GetString(Policy, name);
     }
 
-    /// <summary>Una unidad de trabajo tal como la ve el motor: clave estable + tipo (unidad o barrera).</summary>
+    /// <summary>A work unit as the engine sees it: stable key + type (unit or barrier).</summary>
     public sealed class UnitRef
     {
         public string Key;
-        /// <summary>null = unidad normal; si no, la barrera (guardar, sync, pdf, cargar…).</summary>
+        /// <summary>null = normal unit; otherwise the barrier (guardar, sync, pdf, cargar…).</summary>
         public string Barrier;
         public Dictionary<string, object> BarrierArgs;
         public int Ordinal;
@@ -243,13 +245,13 @@ namespace Bimbridge.Engine.Tasks
         public override string ToString() => Key;
     }
 
-    /// <summary>Resultado de ejecutar o verificar una unidad.</summary>
+    /// <summary>Result of running or verifying a unit.</summary>
     public sealed class UnitOutcome
     {
         public string Key;
         public string State;
         public long Ms;
-        /// <summary>Elementos creados: [id, UniqueId] (para verificar tras reabrir y evitar duplicados).</summary>
+        /// <summary>Created elements: [id, UniqueId] (to verify after reopening and avoid duplicates).</summary>
         public List<object[]> Created = new List<object[]>();
         public long Changed;
         public long Deleted;
@@ -263,11 +265,11 @@ namespace Bimbridge.Engine.Tasks
         public static UnitOutcome Of(string key, string state, string error = null) => new UnitOutcome { Key = key, State = state, Error = error };
     }
 
-    /// <summary>Estado conocido de una unidad (reconstruido desde unidades.jsonl).</summary>
+    /// <summary>Known state of a unit (rebuilt from unidades.jsonl).</summary>
     public sealed class UnitRecord
     {
         public string Key;
-        public string State = UnitState.Pendiente;
+        public string State = UnitState.Pending;
         public long Seq;
         public int Attempts;
         public string Error;
@@ -276,21 +278,21 @@ namespace Bimbridge.Engine.Tasks
         public string Generation;
         public object Result;
         public string When;
-        /// <summary>Hora del último "inicio" (no se sobrescribe con el final): para saber si un guardado posterior pudo incluirla.</summary>
+        /// <summary>Time of the last "start" (not overwritten by the end): to know whether a later save could include it.</summary>
         public string Started;
 
         public object[] Row() => new object[] { Key, State, (long)Attempts, Ms, Error ?? "", (long)Created.Count };
     }
 
-    /// <summary>Respuesta de un paso del backend: un valor, una espera recuperable (contexto) o un fallo que detiene la tarea.</summary>
+    /// <summary>Response of a backend step: a value, a recoverable wait (context) or a failure that stops the task.</summary>
     public sealed class BackendResult<T>
     {
         public T Value;
-        /// <summary>Esperar y reintentar (Revit ocupado, pausa del usuario, documento cerrado…). La tarea conserva su avance.</summary>
+        /// <summary>Wait and retry (Revit busy, user pause, document closed…). The task keeps its progress.</summary>
         public string Wait;
-        /// <summary>Acción concreta que necesita una persona (cerrar un diálogo, abrir el documento…).</summary>
+        /// <summary>Concrete action that needs a person (close a dialog, open the document…).</summary>
         public string Action;
-        /// <summary>Detiene la tarea (receta inválida, documento sustituido…).</summary>
+        /// <summary>Stops the task (invalid recipe, replaced document…).</summary>
         public string Fatal;
 
         public static BackendResult<T> Ok(T v) => new BackendResult<T> { Value = v };
@@ -299,32 +301,32 @@ namespace Bimbridge.Engine.Tasks
     }
 
     /// <summary>
-    /// Lo que el motor necesita del lado de Revit. El add-in lo implementa con el hilo de Revit (ExternalEvent); las pruebas, con un
-    /// modelo falso con inyección de fallos. El motor nunca toca la API de Revit: sólo decide orden, lotes, checkpoints y estados.
+    /// What the engine needs from the Revit side. The add-in implements it with the Revit thread (ExternalEvent); tests, with a
+    /// fake model with fault injection. The engine never touches the Revit API: it only decides order, batches, checkpoints and states.
     /// </summary>
     public interface ITaskBackend
     {
-        /// <summary>Contexto válido para seguir (sin pausa, documento abierto, misma generación). null = sí; si no, el motivo.</summary>
+        /// <summary>Valid context to continue (no pause, document open, same generation). null = yes; otherwise the reason.</summary>
         BackendResult<bool> CheckContext(TaskRecord task);
 
-        /// <summary>Unidades de la receta, en orden y con claves estables (determinista sobre el mismo modelo).</summary>
+        /// <summary>Recipe units, in order and with stable keys (deterministic over the same model).</summary>
         System.Threading.Tasks.Task<BackendResult<List<UnitRef>>> EnumerateAsync(TaskRecord task, System.Threading.CancellationToken ct);
 
         /// <summary>
-        /// Ejecuta como máximo <paramref name="units"/>.Count unidades en UNA visita al hilo de Revit, cada una en su propia transacción,
-        /// parando antes de pasarse de <paramref name="budgetMs"/>. Devuelve el resultado de las que ejecutó (un prefijo).
+        /// Runs at most <paramref name="units"/>.Count units in ONE visit to the Revit thread, each in its own transaction,
+        /// stopping before exceeding <paramref name="budgetMs"/>. Returns the result of those it ran (a prefix).
         /// </summary>
         System.Threading.Tasks.Task<BackendResult<List<UnitOutcome>>> RunBatchAsync(TaskRecord task, IReadOnlyList<UnitRef> units, int budgetMs, System.Threading.CancellationToken ct);
 
         System.Threading.Tasks.Task<BackendResult<UnitOutcome>> RunBarrierAsync(TaskRecord task, UnitRef barrier, System.Threading.CancellationToken ct);
 
-        /// <summary>Verifica en el modelo unidades dudosas (en curso, parciales, o confirmadas tras el último guardado si se reabrió).</summary>
+        /// <summary>Verifies doubtful units in the model (in progress, partial, or committed after the last save if it was reopened).</summary>
         System.Threading.Tasks.Task<BackendResult<List<UnitOutcome>>> VerifyAsync(TaskRecord task, IReadOnlyList<UnitRecord> units, bool reopened, System.Threading.CancellationToken ct);
 
-        /// <summary>QC final de la receta (sólo lectura). Una lista "desviaciones" no vacía deja la tarea aplicada_con_diferencias.</summary>
+        /// <summary>Final recipe QC (read-only). A non-empty "deviations" list leaves the task aplicada_con_diferencias.</summary>
         System.Threading.Tasks.Task<BackendResult<Dictionary<string, object>>> PostconditionAsync(TaskRecord task, System.Threading.CancellationToken ct);
 
-        /// <summary>Generación actual del documento principal (instancia + apertura), o null si no está abierto.</summary>
+        /// <summary>Current generation of the main document (instance + opening), or null if it is not open.</summary>
         string CurrentGeneration(TaskRecord task);
     }
 

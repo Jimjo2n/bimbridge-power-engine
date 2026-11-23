@@ -27,22 +27,22 @@ namespace Bimbridge.Addin.Revit.Writes
         internal static string Signature(Group group)
         {
             var members = group.GetMemberIds().Select(group.Document.GetElement).ToArray();
-            if (members.Any(e => e == null)) throw new QueryException("faltan miembros al comprobar el grupo");
-            return Home.Sha256Hex(OpSemantics.Canonical(members.Select(e => Bim.Grupos.Firma(group, e))
+            if (members.Any(e => e == null)) throw new QueryException("members are missing while checking the group");
+            return Home.Sha256Hex(OpSemantics.Canonical(members.Select(e => Bim.Groups.Signature(group, e))
                 .OrderBy(x => x, StringComparer.Ordinal).ToList()));
         }
 
         internal static string Difference(Group group, Dictionary<string, object> target)
         {
             if (group == null || group.Location is not LocationPoint location || location.Point.DistanceTo(Point(target)) > Tolerance)
-                return "origen";
-            if (target.ContainsKey("gtype") && Ids.ToLong(group.GetTypeId()) != WriteKit.L(target, "gtype")) return "tipo";
-            if (target.ContainsKey("nivel") && Ids.ToLong(group.get_Parameter(BuiltInParameter.GROUP_LEVEL)?.AsElementId()) != WriteKit.L(target, "nivel"))
-                return "nivel";
+                return "origin";
+            if (target.ContainsKey("gtype") && Ids.ToLong(group.GetTypeId()) != WriteKit.L(target, "gtype")) return "type";
+            if (target.ContainsKey("level") && Ids.ToLong(group.get_Parameter(BuiltInParameter.GROUP_LEVEL)?.AsElementId()) != WriteKit.L(target, "level"))
+                return "level";
             if (target.ContainsKey("rot") && ManifestQc.RotDiff(location.Rotation * 180 / Math.PI, WriteKit.D(target, "rot"), 0) > 0.1)
-                return "giro";
+                return "rotation";
             if (target.ContainsKey("ws") && group.WorksetId.IntegerValue != WriteKit.L(target, "ws")) return "workset";
-            if (target.ContainsKey("firma_miembros") && WriteKit.S(target, "firma_miembros") != Signature(group)) return "miembros respecto al prototipo";
+            if (target.ContainsKey("member_signature") && WriteKit.S(target, "member_signature") != Signature(group)) return "members relative to the prototype";
             return null;
         }
     }

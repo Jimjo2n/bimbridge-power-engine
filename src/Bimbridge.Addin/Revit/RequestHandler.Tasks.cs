@@ -18,9 +18,9 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// 0.6.0 (§4–§6): tareas largas reanudables. Una sola orden (tarea iniciar) entrega una receta y sus argumentos; el motor la recorre
-    /// por lotes en el hilo de Revit, deja checkpoints durables, respeta pausa/Retener/diálogos, guarda y exporta como barreras verificadas,
-    /// y cualquier cliente (Codex o Claude) la continúa con su id y un resumen compacto. El código de la receta queda copiado en la tarea.
+    /// 0.6.0 (§4–§6): long resumable tasks. A single command (tarea iniciar) hands over a recipe and its arguments; the engine walks it
+    /// in batches on the Revit thread, leaves durable checkpoints, honors pause/Hold/dialogs, saves and exports as verified barriers,
+    /// and any client (Codex or Claude) continues it with its id and a compact summary. The recipe code is copied into the task.
     /// </summary>
     public sealed partial class RequestHandler
     {
@@ -29,7 +29,7 @@ namespace Bimbridge.Addin.Revit
         private string _tasksError;
         private readonly object _tasksInit = new object();
 
-        /// <summary>Crea el gestor de tareas y engancha los eventos de guardado (evidencia de persistencia) y Guardar como (alias).</summary>
+        /// <summary>Creates the task manager and hooks the save events (persistence evidence) and Save As (alias).</summary>
         internal void InitTasks()
         {
             lock (_tasksInit)
@@ -38,21 +38,21 @@ namespace Bimbridge.Addin.Revit
                 try
                 {
                     var store = new TaskStore();
-                    _recipes = new RecipeRegistry(RecipeRegistry.UserFolder, Path.Combine(ScriptHost.AddinDir, "recetas"));
+                    _recipes = new RecipeRegistry(RecipeRegistry.UserFolder, Path.Combine(ScriptHost.AddinDir, "recipes"));
                     _taskMgr = new TaskManager(store, DocRegistry.Instance.InstanceId, t => new RevitTaskBackend(this, t))
                     {
-                        // R03: sin almacén de concesiones, el motor niega toda escritura (DenyWritesAuthority).
+                        // R03: without a grant store, the engine denies every write (DenyWritesAuthority).
                         Authority = Ui.Runtime.Grants != null ? (ITaskAuthority)new GrantAuthority(Ui.Runtime.Grants) : DenyWritesAuthority.Instance,
                         Audit = Ui.Runtime.Audit,
                     };
-                    _tracker.Saved += (doc, saveAs) => OnPersisted(doc, saveAs ? "guardar_como" : "guardado");
+                    _tracker.Saved += (doc, saveAs) => OnPersisted(doc, saveAs ? "save_as" : "saved");
                     _tracker.Synced += doc => OnPersisted(doc, "sync");
                 }
                 catch (Exception ex) { _tasksError = ex.GetType().Name + ": " + ex.Message; }
             }
         }
 
-        /// <summary>Evento de Revit (hilo de Revit): sólo se toman los datos baratos; el registro en disco va fuera del hilo.</summary>
+        /// <summary>Revit event (Revit thread): only cheap data is taken; the disk record happens off the thread.</summary>
         private void OnPersisted(Document doc, string kind)
         {
             try
@@ -90,26 +90,26 @@ namespace Bimbridge.Addin.Revit
         {
             switch (taskState)
             {
-                case TaskState.Aplicada: return Status.Ok;
-                case TaskState.AplicadaConDiferencias: return Status.ConDiferencias;
-                case TaskState.Parcial: return Status.Parcial;
-                case TaskState.Interrumpida: return Status.Interrumpido;
-                case TaskState.Cancelada: return Status.Cancelado;
-                case TaskState.CancelacionSolicitada: return Status.CancelacionSolicitada;
-                case TaskState.EsperandoContexto: return Status.EsperandoContexto;
-                default: return Status.EnProceso;
+                case TaskState.Applied: return Status.Ok;
+                case TaskState.AppliedWithDifferences: return Status.CompletedWithDifferences;
+                case TaskState.Partial: return Status.Partial;
+                case TaskState.Interrupted: return Status.Interrupted;
+                case TaskState.Cancelled: return Status.Cancelled;
+                case TaskState.CancelRequested: return Status.CancelRequested;
+                case TaskState.WaitingContext: return Status.WaitingContext;
+                default: return Status.InProgress;
             }
         }
 
-        /// <summary>La tarea la lleva otro Revit = ocupado (reintentar allí), no un argumento mal dado.</summary>
-        private string BusyOrInvalid(string id) => _taskMgr.HeldElsewhere(id) != null ? Status.DocumentoOcupado : Status.Invalido;
+        /// <summary>The task is held by another Revit = busy (retry there), not a bad argument.</summary>
+        private string BusyOrInvalid(string id) => _taskMgr.HeldElsewhere(id) != null ? Status.DocumentBusy : Status.Invalid;
 
         private Response TaskResponse(Request request, TaskRecord t, bool continuation, Dictionary<string, object> extra = null)
         {
             _taskMgr.Get(t.Id, out var units);
             var d = TaskSummary.Status(t, units, continuation);
             if (extra != null) foreach (var kv in extra) d[kv.Key] = kv.Value;
-            return new Response { Id = request.Id, Estado = ResponseStatusOf(t.State), Datos = d };
+            return new Response { Id = request.Id, State = ResponseStatusOf(t.State), Data = d };
         }
 
         // ---------------- op tarea ----------------
@@ -118,94 +118,94 @@ namespace Bimbridge.Addin.Revit
         {
             InitTasks();
             if (_taskMgr == null)
-                return Response.Fail(request.Id, Status.DiarioNoDisponible, "las tareas no están disponibles: no se pudo preparar su carpeta (" + _tasksError + ")");
+                return Response.Fail(request.Id, Status.JournalUnavailable, "tasks are not available: their folder could not be prepared (" + _tasksError + ")");
             var a = request.Args;
             var verb = OpSemantics.TaskVerb(a);
             var id = Arg.GetString(a, "id") ?? Arg.GetString(a, Wire.TaskArg);
             var who = session.ClientName ?? session.Id;
-            if (verb == "recetas") return Recipes(request);
-            if (verb == "lista") return TaskList(request);
-            if (verb == "iniciar") return await StartTask(session, request, ct).ConfigureAwait(false);
-            if (string.IsNullOrWhiteSpace(id)) return Response.Fail(request.Id, Status.Invalido, "falta id= de la tarea (tarea lista muestra las de este equipo)");
+            if (verb == "recipes") return Recipes(request);
+            if (verb == "list") return TaskList(request);
+            if (verb == "start") return await StartTask(session, request, ct).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(id)) return Response.Fail(request.Id, Status.Invalid, "missing the task id= (task list shows the ones on this machine)");
             switch (verb)
             {
-                case "estado":
-                case "resumen":
+                case "status":
+                case "summary":
                 {
                     var t = _taskMgr.Get(id, out _);
-                    if (t == null) return Response.Fail(request.Id, Status.Invalido, "no existe la tarea " + id);
-                    return TaskResponse(request, t, verb == "resumen");
+                    if (t == null) return Response.Fail(request.Id, Status.Invalid, "task does not exist: " + id);
+                    return TaskResponse(request, t, verb == "summary");
                 }
-                case "esperar":
+                case "wait":
                 {
-                    var since = Arg.GetLong(a, "desde") ?? -1;
+                    var since = Arg.GetLong(a, "from") ?? -1;
                     var max = Math.Max(1, Math.Min(120, Arg.GetLong(a, "max") ?? 30));
                     var t = await _taskMgr.WaitAsync(id, since, TimeSpan.FromSeconds(max), ct).ConfigureAwait(false);
-                    if (t == null) return Response.Fail(request.Id, Status.Invalido, "no existe la tarea " + id);
+                    if (t == null) return Response.Fail(request.Id, Status.Invalid, "task does not exist: " + id);
                     return TaskResponse(request, t, false);
                 }
-                case "cancelar":
+                case "cancel":
                 {
                     var t = _taskMgr.Cancel(id, out var busy);
-                    if (t == null) return Response.Fail(request.Id, Status.Invalido, "no existe la tarea " + id);
-                    if (busy != null) return Response.Fail(request.Id, Status.DocumentoOcupado, busy);
+                    if (t == null) return Response.Fail(request.Id, Status.Invalid, "task does not exist: " + id);
+                    if (busy != null) return Response.Fail(request.Id, Status.DocumentBusy, busy);
                     return TaskResponse(request, t, false);
                 }
-                case "reanudar":
+                case "resume":
                 {
-                    if (!_config.AllowsExec(true)) return Response.Fail(request.Id, Status.Rechazado, "este Revit no permite ejecutar recetas (runner/niveles de la configuración del MCP)");
+                    if (!_config.AllowsExec(true)) return Response.Fail(request.Id, Status.Rejected, "this Revit does not allow running recipes (runner/levels in the MCP configuration)");
                     var r = _taskMgr.Resume(id, who, PolicyFrom(a, onlyGiven: true));
                     if (r.Error != null) return Response.Fail(request.Id, r.ErrorStatus ?? Status.Error, r.Error);
                     var t = await WaitBriefly(r.Task, a, ct).ConfigureAwait(false);
-                    return TaskResponse(request, t, false, r.AlreadyRunning ? new Dictionary<string, object> { ["ya_en_curso"] = true } : null);
+                    return TaskResponse(request, t, false, r.AlreadyRunning ? new Dictionary<string, object> { ["already_running"] = true } : null);
                 }
-                case "reconciliar":
+                case "reconcile":
                 {
                     var dec = (Arg.GetString(a, "decision") ?? "").Trim().ToLowerInvariant();
                     bool applied;
-                    if (dec == "aplicada" || dec == "aplicado" || dec == "si") applied = true;
-                    else if (dec == "no_aplicada" || dec == "no_aplicado" || dec == "no") applied = false;
-                    else return Response.Fail(request.Id, Status.Invalido, "reconciliar necesita decision=aplicada (ya está en el modelo: no se repite) o decision=no_aplicada (se ejecutará al reanudar)");
-                    var err = _taskMgr.Reconcile(id, Arg.GetStringList(a, "claves"), applied, Arg.GetString(a, "nota"), who);
+                    if (dec == "applied" || dec == "yes") applied = true;
+                    else if (dec == "not_applied" || dec == "no") applied = false;
+                    else return Response.Fail(request.Id, Status.Invalid, "reconcile needs decision=applied (already in the model: not repeated) or decision=not_applied (it will run on resume)");
+                    var err = _taskMgr.Reconcile(id, Arg.GetStringList(a, "keys"), applied, Arg.GetString(a, "note"), who);
                     if (err != null) return Response.Fail(request.Id, BusyOrInvalid(id), err);
                     return TaskResponse(request, _taskMgr.Get(id, out _), false);
                 }
-                case "anotar":
+                case "note":
                 {
-                    var text = Arg.GetString(a, "texto");
-                    if (string.IsNullOrWhiteSpace(text)) return Response.Fail(request.Id, Status.Invalido, "anotar necesita texto=");
+                    var text = Arg.GetString(a, "text");
+                    if (string.IsNullOrWhiteSpace(text)) return Response.Fail(request.Id, Status.Invalid, "note needs text=");
                     var err = _taskMgr.Note(id, text, who);
                     if (err != null) return Response.Fail(request.Id, BusyOrInvalid(id), err);
                     return TaskResponse(request, _taskMgr.Get(id, out _), false);
                 }
-                case "unidades":
+                case "units":
                 {
-                    var rows = _taskMgr.UnitRows(id, Arg.GetString(a, "estado"), (int)(Arg.GetLong(a, "desde") ?? 0), (int)(Arg.GetLong(a, "n") ?? 50), out var total);
+                    var rows = _taskMgr.UnitRows(id, Arg.GetString(a, "status"), (int)(Arg.GetLong(a, "from") ?? 0), (int)(Arg.GetLong(a, "n") ?? 50), out var total);
                     return new Response
                     {
                         Id = request.Id,
-                        Datos = new Dictionary<string, object>
+                        Data = new Dictionary<string, object>
                         {
-                            ["cols"] = new List<object> { "clave", "estado", "intentos", "ms", "error", "creados" },
+                            ["cols"] = new List<object> { "key", "status", "attempts", "ms", "error", "created" },
                             ["rows"] = rows.Cast<object>().ToList(), ["total"] = (long)total,
                         },
                     };
                 }
-                case "olvidar":
+                case "forget":
                 {
                     var err = _taskMgr.Archive(id);
                     if (err != null) return Response.Fail(request.Id, BusyOrInvalid(id), err);
-                    return new Response { Id = request.Id, Datos = new Dictionary<string, object> { ["tarea"] = id, ["archivada"] = true } };
+                    return new Response { Id = request.Id, Data = new Dictionary<string, object> { ["task"] = id, ["archived"] = true } };
                 }
                 default:
-                    return Response.Fail(request.Id, Status.Invalido, "tarea: iniciar, estado, resumen, esperar, cancelar, reanudar, reconciliar, anotar, lista, unidades, recetas u olvidar");
+                    return Response.Fail(request.Id, Status.Invalid, "task: start, status, summary, wait, cancel, resume, reconcile, note, list, units, recipes or forget");
             }
         }
 
-        /// <summary>Espera corta tras iniciar/reanudar (espera_s, por defecto 10 s): las tareas pequeñas vuelven ya terminadas en UNA llamada.</summary>
+        /// <summary>Short wait after start/resume (espera_s, default 10 s): small tasks come back already finished in ONE call.</summary>
         private async Task<TaskRecord> WaitBriefly(TaskRecord t, IDictionary<string, object> a, CancellationToken ct)
         {
-            var wait = Math.Max(0, Math.Min(120, Arg.GetLong(a, "espera_s") ?? 10));
+            var wait = Math.Max(0, Math.Min(120, Arg.GetLong(a, "wait_s") ?? 10));
             var until = DateTime.UtcNow.AddSeconds(wait);
             var cur = t;
             while (DateTime.UtcNow < until && _taskMgr.IsRunning(t.Id))
@@ -216,7 +216,15 @@ namespace Bimbridge.Addin.Revit
             return _taskMgr.Get(t.Id, out _) ?? cur;
         }
 
-        private static readonly string[] PolicyKeys = { "guardar_cada", "al_final", "en_error", "lote_max", "avisos", "tx" };
+        private static readonly string[] PolicyKeys = { "save_every", "at_end", "on_error", "batch_max", "warnings", "tx" };
+
+        /// <summary>FROZEN hash literals: 0.9.4 capability names in the task content fingerprint. Never change these strings.</summary>
+        private static readonly Dictionary<string, string> FrozenCapabilities = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [Capability.Modify] = "revit_modificar", [Capability.Save] = "revit_guardar", [Capability.Export] = "revit_exportar",
+            [Capability.FileWrite] = "archivo_escritura", [Capability.ReconcileNotApplied] = "reconciliar_no_aplicada",
+            [Capability.ExternalRecipe] = "receta_externa",
+        };
 
         private static Dictionary<string, object> PolicyFrom(IDictionary<string, object> a, bool onlyGiven)
         {
@@ -230,88 +238,90 @@ namespace Bimbridge.Addin.Revit
         {
             var a = request.Args;
             if (!_config.AllowsExec(true))
-                return Response.Fail(request.Id, Status.Rechazado, "este Revit no permite ejecutar recetas que cambien el modelo (runner/niveles " + _config.Levels + " en la configuración del MCP). Dígaselo al usuario.");
+                return Response.Fail(request.Id, Status.Rejected, "this Revit does not allow running recipes that change the model (runner/levels " + _config.Levels + " in the MCP configuration). Tell the user.");
             var target = DocTarget.Ambient.Value;
-            if (target == null) return Response.Fail(request.Id, Status.DestinoNoDisponible, "no hay un documento abierto (o indique doc=)");
+            if (target == null) return Response.Fail(request.Id, Status.TargetUnavailable, "there is no open document (or specify doc=)");
             if (WillHold(target.Key))
-                return Response.Fail(request.Id, Status.NecesitaUsuario, "Retener está activo: una tarea no tiene un diff que encolar. Pida al usuario que cambie el Modo a En vivo para esta tarea.");
+                return Response.Fail(request.Id, Status.NeedsUser, "Hold is active: a task has no diff to queue. Ask the user to switch Mode to Live for this task.");
 
-            // Receta: registrada por nombre (receta=), archivo .cs, script guardado (nombre=) o código en línea.
+            // Recipe: registered by name (receta=), .cs file, saved script (nombre=) or inline code.
             string code, source, recipeName, recipeVersion = null, recipeHash;
             var installedRecipe = false;
-            var reg = Arg.GetString(a, "receta");
+            var reg = Arg.GetString(a, "recipe");
             if (reg != null)
             {
                 var e = _recipes.Find(reg);
                 if (e == null)
-                    return Response.Fail(request.Id, Status.Invalido, "no hay una receta '" + reg + "' (tarea recetas lista las disponibles; las del usuario van en " + RecipeRegistry.UserFolder + ")");
+                    return Response.Fail(request.Id, Status.Invalid, "there is no recipe '" + reg + "' (task recipes lists the available ones; user recipes go in " + RecipeRegistry.UserFolder + ")");
                 code = File.ReadAllText(e.Path);
                 source = e.Origin + ":" + e.Path;
-                installedRecipe = e.Origin == "instalada";
+                installedRecipe = e.Origin == "installed";
                 recipeName = e.Name;
                 recipeVersion = e.Version;
             }
             else
             {
-                // Código propio del agente (codigo=, archivo=, nombre=) también es inyección de C#: respeta el bloqueo. Las recetas registradas no.
+                // The agent's own code (codigo=, archivo=, nombre=) is also C# injection: it honors the block. Registered recipes do not.
                 var blockedTask = DynamicCodePolicy.Decide(Ui.Runtime.BlockDynamicCode);
-                if (blockedTask != null) return Response.Fail(request.Id, Status.Rechazado, blockedTask);
+                if (blockedTask != null) return Response.Fail(request.Id, Status.Rejected, blockedTask);
                 code = ResolveCode(a, out source, out var codeError);
-                if (code == null) return Response.Fail(request.Id, Status.Invalido, codeError ?? "falta la receta: receta=nombre, archivo=ruta.cs, nombre= de un script guardado o codigo=");
-                recipeName = Arg.GetString(a, "nombre") ?? (Arg.GetString(a, "archivo") is string f ? Path.GetFileNameWithoutExtension(f) : "codigo");
+                if (code == null) return Response.Fail(request.Id, Status.Invalid, codeError ?? "missing the recipe: recipe=name, file=path.cs, name= of a saved script or code=");
+                recipeName = Arg.GetString(a, "name") ?? (Arg.GetString(a, "file") is string f ? Path.GetFileNameWithoutExtension(f) : "code");
             }
             recipeHash = Home.Sha256Hex(code);
 
-            // R04: una tarea corre sola → perfil restringido también para las DLL extra (se decide antes de cargarlas).
+            // R04: a task runs unattended → restricted profile for extra DLLs too (decided before loading them).
             var refs = Arg.GetStringList(a, "refs");
             var refDenied = ReferencePolicy.Denied(ExecutionProfile.RestrictedAutonomous, refs,
                 f => { try { return Home.FileSha256(f); } catch (Exception) { return null; } }, ReferencePolicy.LoadTrusted(), ScriptHost.AddinDir);
             if (refDenied.Count > 0)
-                return Response.Fail(request.Id, Status.Rechazado, "referencia_no_confiable: " + string.Join("; ", refDenied.Take(5)) + ". Añada su SHA-256 a " + ReferencePolicy.TrustedListPath + " (lo decide una persona).");
-            // Compilar ya (fuera del hilo de Revit) para fallar rápido; la tarea guarda la copia exacta del código.
+                return Response.Fail(request.Id, Status.Rejected, "referencia_no_confiable: " + string.Join("; ", refDenied.Take(5)) + ". Add its SHA-256 to " + ReferencePolicy.TrustedListPath + " (a person decides).");
+            // Compile now (off the Revit thread) to fail fast; the task keeps the exact copy of the code.
             var compiled = await Task.Run(() =>
             {
                 var c = ScriptHost.Compile(code, _revitVersion, _addinVersion, refs, out var err);
                 return Tuple.Create(c, err);
             }, ct).ConfigureAwait(false);
-            if (compiled.Item1 == null) return Response.Fail(request.Id, Status.Invalido, compiled.Item2);
-            // R03: lo que el agente pide (capacidades=) sólo se ANOTA como solicitado. Lo que nunca se concede se rechaza ya.
-            var requested = Arg.GetStringList(a, "capacidades").Where(c => Capability.Grantable.Contains(c)).ToList();
+            if (compiled.Item1 == null) return Response.Fail(request.Id, Status.Invalid, compiled.Item2);
+            // R03: what the agent asks for (capacidades=) is only NOTED as requested. What is never granted is rejected right away.
+            var requested = Arg.GetStringList(a, "capabilities").Where(c => Capability.Grantable.Contains(c)).ToList();
             var denied = CapabilityPolicy.Denied(ExecutionProfile.RestrictedAutonomous, compiled.Item1.Capabilities, Capability.Grantable);
-            if (denied.Count > 0) return Response.Fail(request.Id, Status.Rechazado, CapabilityPolicy.Explain(denied));
+            if (denied.Count > 0) return Response.Fail(request.Id, Status.Rejected, CapabilityPolicy.Explain(denied));
             var writes = true;
             if (compiled.Item1.RecipeType != null)
             {
-                // rc3: NO se instancia (el constructor es código de la receta y aún no hay autorización). Metadatos del código fuente;
-                // si no son constantes, se asume lo conservador: escribe (revit_modificar).
+                // rc3: NOT instantiated (the constructor is recipe code and there is no authorization yet). Metadata from the source code;
+                // if they are not constants, assume the conservative case: it writes (revit_modificar).
                 recipeVersion = recipeVersion ?? ScriptHost.RecipeConstant(code, "Version") ?? "1";
-                writes = ScriptHost.RecipeConstant(code, "Transaccion") != "Lectura";
+                writes = ScriptHost.RecipeConstant(code, "Transaction") != nameof(TxPolicy.ReadOnly);
                 if (compiled.Item1.RecipeType.GetConstructor(Type.EmptyTypes) == null)
-                    return Response.Fail(request.Id, Status.Invalido, "la receta necesita un constructor público sin argumentos");
+                    return Response.Fail(request.Id, Status.Invalid, "the recipe needs a public parameterless constructor");
             }
 
             var userArgs = a.TryGetValue("args", out var ua) && ua is Dictionary<string, object> ud ? ud : new Dictionary<string, object>(StringComparer.Ordinal);
+            if (installedRecipe) LegacyAliases.NormalizeRecipeArgs(userArgs);   // 0.9.4 input names of our own recipes; user recipes keep theirs
             var policy = PolicyFrom(a, onlyGiven: false);
             if (refs.Count > 0) policy["refs"] = refs.Cast<object>().ToList();
-            // Capacidades que las unidades necesitan (las barreras se comprueban al llegar a ellas): se validan en cada punto de ejecución.
+            // Capabilities the units need (barriers are checked when reached): validated at every execution point.
             var requires = compiled.Item1.Capabilities.Select(CapabilityPolicy.Kind).Where(k => Capability.Grantable.Contains(k)).ToList();
-            if (writes) requires.Add(Capability.Modificar);
-            // R04: el conjunto cerrado de lo que corre solo son las recetas instaladas (verificadas por el instalador). Cualquier otro
-            // código autónomo —también de sólo lectura— exige que una persona apruebe ESA tarea (que fija el SHA-256 de la receta).
-            if (!installedRecipe) requires.Add(Capability.RecetaExterna);
+            if (writes) requires.Add(Capability.Modify);
+            // R04: the closed set of what runs unattended is the installed recipes (verified by the installer). Any other
+            // autonomous code (read-only too) requires a person to approve THAT task (which pins the recipe's SHA-256).
+            if (!installedRecipe) requires.Add(Capability.ExternalRecipe);
             requires = requires.Distinct().ToList();
-            policy["requiere"] = requires.Cast<object>().ToList();
-            if (requested.Count > 0) policy["solicitadas"] = requested.Cast<object>().ToList();
+            policy["requires"] = requires.Cast<object>().ToList();
+            if (requested.Count > 0) policy["requested"] = requested.Cast<object>().ToList();
+            // FROZEN hash literals (0.9.4 key and capability names): re-sending task start for a task created by 0.9.x is not "other content".
             var content = OpSemantics.Canonical(new Dictionary<string, object>
             {
                 ["receta"] = recipeHash, ["args"] = userArgs, ["doc"] = target.Key, ["huella_doc"] = target.Print ?? "", ["refs"] = refs.Cast<object>().ToList(),
-                ["requiere"] = requires.Cast<object>().ToList(),
+                ["requiere"] = requires.Select(r => (object)(FrozenCapabilities.TryGetValue(r, out var legacy) ? legacy : r)).ToList(),
             });
             var draft = new TaskRecord
             {
                 Id = TaskStore.SafeId(Arg.GetString(a, "id") ?? Arg.GetString(a, Wire.TaskArg) ?? TaskStore.NewId(DateTime.UtcNow)),
-                Objective = Arg.GetString(a, "objetivo"),
-                Scope = Arg.GetString(a, "alcance"),
+                Objective = Arg.GetString(a, "target"),
+                Scope = Arg.GetString(a, "scope"),
                 RecipeName = recipeName,
                 RecipeVersion = recipeVersion ?? "1",
                 RecipeHash = recipeHash,
@@ -326,12 +336,12 @@ namespace Bimbridge.Addin.Revit
             var t = await WaitBriefly(r.Task, a, ct).ConfigureAwait(false);
             var extra = new Dictionary<string, object>
             {
-                ["receta"] = recipeName + " v" + draft.RecipeVersion, ["huella"] = draft.ContentHash,
-                ["compilar_ms"] = compiled.Item1.FromCache ? 0L : compiled.Item1.CompileMs,
+                ["recipe"] = recipeName + " v" + draft.RecipeVersion, ["fingerprint"] = draft.ContentHash,
+                ["compile_ms"] = compiled.Item1.FromCache ? 0L : compiled.Item1.CompileMs,
             };
-            if (!r.Created) extra["ya_existia"] = true;
-            if (r.AlreadyRunning) extra["ya_en_curso"] = true;
-            // Lo que falta autorizar se deja como SOLICITUD para una persona (botón «Autorizar» en Revit). El agente no puede aprobarla.
+            if (!r.Created) extra["already_existed"] = true;
+            if (r.AlreadyRunning) extra["already_running"] = true;
+            // What still needs authorization is left as a REQUEST for a person («Authorize» button in Revit). The agent cannot approve it.
             var need = requires.Concat(requested).Distinct().ToList();
             if (Ui.Runtime.Grants != null && need.Count > 0)
             {
@@ -340,10 +350,10 @@ namespace Bimbridge.Addin.Revit
                 {
                     Ui.Runtime.Grants.Request(draft.Id, target.Key, target.Print, target.Title, missing, session.ClientName ?? session.Id, draft.Objective, DateTime.UtcNow);
                     Ui.Runtime.MarkDirty();
-                    extra["autorizacion"] = new Dictionary<string, object>
+                    extra["authorization"] = new Dictionary<string, object>
                     {
-                        ["pendiente"] = missing.Cast<object>().ToList(),
-                        ["como"] = "una persona debe pulsar «Autorizar» en la pestaña BIMBRIDGE de Revit; después: tarea reanudar " + draft.Id,
+                        ["pending"] = missing.Cast<object>().ToList(),
+                        ["as"] = "a person must press «Authorize» on the BIMBRIDGE tab in Revit; then: task resume " + draft.Id,
                     };
                 }
             }
@@ -356,10 +366,10 @@ namespace Bimbridge.Addin.Revit
             return new Response
             {
                 Id = request.Id,
-                Datos = new Dictionary<string, object>
+                Data = new Dictionary<string, object>
                 {
-                    ["cols"] = new List<object> { "nombre", "version", "origen", "descripcion", "sha" }, ["rows"] = rows,
-                    ["carpeta_usuario"] = RecipeRegistry.UserFolder,
+                    ["cols"] = new List<object> { "name", "version", "origin", "description", "sha" }, ["rows"] = rows,
+                    ["user_folder"] = RecipeRegistry.UserFolder,
                 },
             };
         }
@@ -371,22 +381,22 @@ namespace Bimbridge.Addin.Revit
             return new Response
             {
                 Id = request.Id,
-                Datos = new Dictionary<string, object>
+                Data = new Dictionary<string, object>
                 {
-                    ["cols"] = new List<object> { "id", "estado", "receta", "doc", "unidades", "confirmadas", "actualizada" }, ["rows"] = rows,
+                    ["cols"] = new List<object> { "id", "status", "recipe", "doc", "units", "committed_items", "updated" }, ["rows"] = rows,
                 },
             };
         }
 
-        // ---------------- backend de Revit ----------------
+        // ---------------- Revit backend ----------------
 
-        /// <summary>Un script con Run(ctx) usado como tarea: una sola unidad.</summary>
-        private sealed class RunAsRecipe : Receta
+        /// <summary>A script with Run(ctx) used as a task: a single unit.</summary>
+        private sealed class RunAsRecipe : Recipe
         {
             private readonly System.Reflection.MethodInfo _run;
             public RunAsRecipe(System.Reflection.MethodInfo run) { _run = run; }
-            public override IEnumerable<Unidad> Unidades(ScriptContext ctx) { yield return new Unidad("unica"); }
-            public override object Ejecutar(ScriptContext ctx, Unidad u)
+            public override IEnumerable<Unit> Units(ScriptContext ctx) { yield return new Unit("unique"); }
+            public override object Run(ScriptContext ctx, Unit u)
             {
                 try { return _run.Invoke(null, new object[] { ctx }); }
                 catch (System.Reflection.TargetInvocationException tie) { throw tie.InnerException ?? tie; }
@@ -394,9 +404,9 @@ namespace Bimbridge.Addin.Revit
         }
 
         /// <summary>
-        /// Lado Revit del motor (§4): enumera y ejecuta unidades en el hilo de Revit con una transacción por unidad, detecta conflictos con
-        /// cambios ajenos (autor distinto de la tarea), verifica lo dudoso por UniqueId o con Verificar de la receta, y corre las barreras
-        /// guardar/sync/pdf con verificación de archivos. Toma el documento (DocLocks) mientras la tarea corre y lo suelta al terminar.
+        /// Revit side of the engine (§4): enumerates and runs units on the Revit thread with one transaction per unit, detects conflicts with
+        /// foreign changes (author other than the task), verifies doubtful ones by UniqueId or with the recipe's Verify, and runs the
+        /// guardar/sync/pdf barriers with file verification. Takes the document (DocLocks) while the task runs and releases it when done.
         /// </summary>
         private sealed class RevitTaskBackend : ITaskBackend, IDisposable
         {
@@ -406,16 +416,16 @@ namespace Bimbridge.Addin.Revit
             private readonly NamedSets _sets = new NamedSets();
             private readonly ScriptContext.TaskSink _sink;
             private bool _locked;
-            private Receta _recipe;
+            private Recipe _recipe;
             private ScriptHost.Compiled _compiled;
             private readonly RecipeGate _gate;
             private UIApplication _gateApp;
             private string _compileError;
-            private IEnumerator<Unidad> _enum;
+            private IEnumerator<Unit> _enum;
             private bool _enumDone;
             private bool _prepared;
-            private readonly List<Unidad> _found = new List<Unidad>();
-            private readonly Dictionary<string, Unidad> _byKey = new Dictionary<string, Unidad>(StringComparer.Ordinal);
+            private readonly List<Unit> _found = new List<Unit>();
+            private readonly Dictionary<string, Unit> _byKey = new Dictionary<string, Unit>(StringComparer.Ordinal);
             private readonly Dictionary<string, Dictionary<long, long>> _snap = new Dictionary<string, Dictionary<long, long>>(StringComparer.Ordinal);
             private static readonly TimeSpan BusyAfter = TimeSpan.FromSeconds(20);
 
@@ -423,14 +433,14 @@ namespace Bimbridge.Addin.Revit
             {
                 _h = h;
                 _t = t;
-                _owner = "tarea:" + t.Id;
+                _owner = "tarea:" + t.Id;   // document lease owner identity shared with 0.9.3 processes and stored leases: kept verbatim
                 _sink = new ScriptContext.TaskSink { TaskId = t.Id, ArtifactsDir = h._taskMgr.Store.ArtifactsDir(t.Id) };
-                // rc3: frontera de recetas. Autoridad = último punto seguro del motor (leases + concesiones); sin motor en marcha, nada.
-                _gate = new RecipeGate(() => _t.Preflight != null ? _t.Preflight() : "la tarea no está en ejecución", WriteCounter);
+                // rc3: recipe boundary. Authority = the engine's last safe point (leases + grants); with no engine running, nothing.
+                _gate = new RecipeGate(() => _t.Preflight != null ? _t.Preflight() : "the task is not running", WriteCounter);
             }
 
-            /// <summary>Contador de escrituras de todos los documentos abiertos: revisión del tracker (sube con cada transacción
-            /// confirmada) + 1e12 por documento con transacción abierta. Sólo se lee en el hilo de Revit (dentro de OnRevit).</summary>
+            /// <summary>Write counter across all open documents: tracker revision (goes up with each committed
+            /// transaction) + 1e12 per document with an open transaction. Only read on the Revit thread (inside OnRevit).</summary>
             private long WriteCounter()
             {
                 long n = 0;
@@ -444,7 +454,7 @@ namespace Bimbridge.Addin.Revit
                 return n;
             }
 
-            /// <summary>Ejecuta código de la receta dentro de la frontera (en el hilo de Revit). null = bien; si no, el motivo.</summary>
+            /// <summary>Runs recipe code inside the boundary (on the Revit thread). null = fine; otherwise the reason.</summary>
             private string Guard(UIApplication app, string phase, Action body)
             {
                 _gateApp = app;
@@ -452,23 +462,23 @@ namespace Bimbridge.Addin.Revit
                 finally { _gateApp = null; }
             }
 
-            /// <summary>Crea la instancia de la receta (constructor e inicializadores) sólo tras autorizar, en el hilo de Revit.</summary>
+            /// <summary>Creates the recipe instance (constructor and initializers) only after authorization, on the Revit thread.</summary>
             private string EnsureInstance(UIApplication app)
             {
                 if (_recipe != null) return null;
-                if (_compiled == null) return _compileError ?? "receta no compilada";
+                if (_compiled == null) return _compileError ?? "recipe not compiled";
                 var c = _compiled;
-                Receta r = null;
-                var why = Guard(app, RecipeGate.Phase.Constructor, () => r = c.RecipeType != null ? (Receta)Activator.CreateInstance(c.RecipeType) : new RunAsRecipe(c.Run));
+                Recipe r = null;
+                var why = Guard(app, RecipeGate.Phase.Constructor, () => r = c.RecipeType != null ? (Recipe)Activator.CreateInstance(c.RecipeType) : new RunAsRecipe(c.Run));
                 if (why != null) return why;
-                // rc3: la política real debe cuadrar con lo que se autorizó al iniciar (metadatos leídos del código). Si la receta escribe
-                // pero la tarea se autorizó como de lectura (sin revit_modificar), no sigue.
-                PoliticaTx tx = PoliticaTx.PorUnidad;
-                why = Guard(app, RecipeGate.Phase.Constructor, () => tx = r.Transaccion);
+                // rc3: the actual policy must match what was authorized at start (metadata read from the code). If the recipe writes
+                // but the task was authorized as read-only (no revit_modificar), it does not continue.
+                TxPolicy tx = TxPolicy.PerUnit;
+                why = Guard(app, RecipeGate.Phase.Constructor, () => tx = r.Transaction);
                 if (why != null) return why;
-                var req = _t.Policy.TryGetValue("requiere", out var rq) && rq is List<object> rl ? rl.Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)).ToList() : null;
-                if (tx != PoliticaTx.Lectura && req != null && !req.Contains(Capability.Modificar))
-                    return "la receta declara Transaccion=" + tx + " pero la tarea se autorizó como de sólo lectura: no se ejecuta (reinicie la tarea para pedir revit_modificar)";
+                var req = _t.Policy.TryGetValue("requires", out var rq) && rq is List<object> rl ? rl.Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)).ToList() : null;
+                if (tx != TxPolicy.ReadOnly && req != null && !req.Contains(Capability.Modify))
+                    return "the recipe declares Transaction=" + tx + " but the task was authorized as read-only: it is not run (restart the task to request revit_modify)";
                 _recipe = r;
                 return null;
             }
@@ -486,18 +496,18 @@ namespace Bimbridge.Addin.Revit
 
             public BackendResult<bool> CheckContext(TaskRecord task)
             {
-                if (!_h._config.AllowsExec(true)) return BackendResult<bool>.Fail("la configuración del MCP ya no permite ejecutar recetas en este Revit");
-                if (_h._pause != null && _h._pause.On) return BackendResult<bool>.Waiting("el usuario pausó la IA desde Revit", "el usuario pulsa Reanudar IA; la tarea sigue sola");
+                if (!_h._config.AllowsExec(true)) return BackendResult<bool>.Fail("the MCP configuration no longer allows running recipes in this Revit");
+                if (_h._pause != null && _h._pause.On) return BackendResult<bool>.Waiting("the user paused the AI from Revit", "the user presses Resume AI; the task continues on its own");
                 var key = _t.MainDoc?.Key;
-                if (_h.WillHold(key)) return BackendResult<bool>.Waiting("Retener está activo (o hay planes en la cola de este documento)", "el usuario cambia el Modo a En vivo");
+                if (_h.WillHold(key)) return BackendResult<bool>.Waiting("Hold is active (or there are plans in this document's queue)", "the user switches Mode to Live");
                 var info = Info;
-                if (info == null) return BackendResult<bool>.Waiting("el documento " + (_t.MainDoc?.Title ?? key) + " no está abierto en este Revit", "abrirlo; la tarea sigue sola");
+                if (info == null) return BackendResult<bool>.Waiting("document " + (_t.MainDoc?.Title ?? key) + " is not open in this Revit", "open it; the task continues on its own");
                 if (_t.MainDoc.Print != null && info.Print != null && info.Print != _t.MainDoc.Print)
-                    return BackendResult<bool>.Fail("el archivo " + key + " ahora contiene OTRO modelo (huella " + info.Print + " ≠ " + _t.MainDoc.Print + "): la tarea no continúa sobre un documento distinto");
+                    return BackendResult<bool>.Fail("file " + key + " now contains ANOTHER model (fingerprint " + info.Print + " ≠ " + _t.MainDoc.Print + "): the task does not continue on a different document");
                 if (!_locked)
                 {
-                    if (!_h.Locks.TryAcquire(new[] { key }, _owner, "tarea", _t.Id, out var blocking))
-                        return BackendResult<bool>.Waiting("el documento lo tiene " + blocking.Describe(), "esperar a que termine");
+                    if (!_h.Locks.TryAcquire(new[] { key }, _owner, "task", _t.Id, out var blocking))
+                        return BackendResult<bool>.Waiting("the document is held by " + blocking.Describe(), "wait for it to finish");
                     _locked = true;
                 }
                 return BackendResult<bool>.Ok(true);
@@ -511,9 +521,9 @@ namespace Bimbridge.Addin.Revit
 
             private static BackendResult<T> FromWork<T>(WorkResult r)
             {
-                if (r.Kind == WorkResult.KindBusy) return BackendResult<T>.Waiting("Revit está ocupado (un comando, un diálogo o un modo de edición abierto)", "terminar o cerrar lo que esté abierto en Revit");
-                if (r.Kind == WorkResult.KindCancelled) return BackendResult<T>.Waiting("la visita a Revit se canceló", null);
-                return BackendResult<T>.Fail("error interno en el hilo de Revit: " + (r.Error?.Message ?? r.Kind));
+                if (r.Kind == WorkResult.KindBusy) return BackendResult<T>.Waiting("Revit is busy (a command, a dialog or an edit mode is open)", "finish or close whatever is open in Revit");
+                if (r.Kind == WorkResult.KindCancelled) return BackendResult<T>.Waiting("the Revit visit was cancelled", null);
+                return BackendResult<T>.Fail("internal error on the Revit thread: " + (r.Error?.Message ?? r.Kind));
             }
 
             private Document FindDoc(UIApplication app)
@@ -529,42 +539,42 @@ namespace Bimbridge.Addin.Revit
 
             private ScriptContext Ctx(UIApplication app, Document doc, CancellationToken ct)
             {
-                var ctx = new ScriptContext(app, doc, _t.Args, OpSemantics.ModeRun, "tarea", ct, _sets, DocRegistry.Instance.IdOf(doc)) { Sink = _sink };
+                var ctx = new ScriptContext(app, doc, _t.Args, OpSemantics.ModeRun, "task", ct, _sets, DocRegistry.Instance.IdOf(doc)) { Sink = _sink };
                 return ctx;
             }
 
-            /// <summary>Compila la copia de la receta guardada en la tarea (no el archivo actual: si cambió, la tarea sigue con lo suyo).</summary>
+            /// <summary>Compiles the recipe copy saved in the task (not the current file: if it changed, the task keeps its own).</summary>
             private bool EnsureRecipe(out string error)
             {
                 error = null;
                 if (_compiled != null) return true;
                 if (_compileError != null) { error = _compileError; return false; }
                 var code = _h._taskMgr.Store.RecipeCode(_t.Id);
-                if (code == null) { _compileError = "falta la copia de la receta en la carpeta de la tarea"; error = _compileError; return false; }
-                if (Home.Sha256Hex(code) != _t.RecipeHash) { _compileError = "la copia de la receta de la tarea no coincide con su huella (archivo alterado)"; error = _compileError; return false; }
+                if (code == null) { _compileError = "the recipe copy is missing from the task folder"; error = _compileError; return false; }
+                if (Home.Sha256Hex(code) != _t.RecipeHash) { _compileError = "the task's recipe copy does not match its fingerprint (file altered)"; error = _compileError; return false; }
                 var refs = _t.Policy.TryGetValue("refs", out var rv) && rv is List<object> rl ? rl.Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)).ToList() : new List<string>();
                 var c = ScriptHost.Compile(code, _h._revitVersion, _h._addinVersion, refs, out var err);
-                if (c == null) { _compileError = "la receta ya no compila en este Revit: " + err; error = _compileError; return false; }
-                // Lo concedible lo decide la autoridad en cada punto de ejecución; aquí sólo se corta lo que nunca se concede.
+                if (c == null) { _compileError = "the recipe no longer compiles in this Revit: " + err; error = _compileError; return false; }
+                // The authority decides what is grantable at each execution point; here only what is never granted is cut.
                 var denied = CapabilityPolicy.Denied(ExecutionProfile.RestrictedAutonomous, c.Capabilities, Capability.Grantable);
                 if (denied.Count > 0) { _compileError = CapabilityPolicy.Explain(denied); error = _compileError; return false; }
-                // rc3: aquí NO se instancia: el constructor es código de la receta y sólo corre tras autorizar (EnsureInstance).
+                // rc3: NOT instantiated here: the constructor is recipe code and only runs after authorization (EnsureInstance).
                 _compiled = c;
                 return true;
             }
 
-            private PoliticaTx TxPolicy
+            private TxPolicy TxPolicy
             {
                 get
                 {
                     var p = (_t.PolicyString("tx") ?? "").ToLowerInvariant();
-                    if (p == "ninguna") return PoliticaTx.Ninguna;
-                    if (p == "lectura") return PoliticaTx.Lectura;
-                    return _recipe?.Transaccion ?? PoliticaTx.PorUnidad;
+                    if (p == "none") return TxPolicy.None;
+                    if (p == "read") return TxPolicy.ReadOnly;
+                    return _recipe?.Transaction ?? TxPolicy.PerUnit;
                 }
             }
 
-            /// <summary>Recorre la enumeración perezosa de la receta por tramos (varias visitas si hace falta).</summary>
+            /// <summary>Walks the recipe's lazy enumeration in slices (several visits if needed).</summary>
             private async Task<BackendResult<bool>> EnsureEnumerated(CancellationToken ct)
             {
                 if (!EnsureRecipe(out var err)) return BackendResult<bool>.Fail(err);
@@ -574,7 +584,7 @@ namespace Bimbridge.Addin.Revit
                     var r = await OnRevit((app, watch, budget) =>
                     {
                         var doc = FindDoc(app);
-                        if (doc == null) { fail = "cerrado"; return true; }
+                        if (doc == null) { fail = "closed"; return true; }
                         var ctx = Ctx(app, doc, ct);
                         var reg = _h._tracker.For(doc);
                         try
@@ -583,34 +593,34 @@ namespace Bimbridge.Addin.Revit
                             if (g != null) { fail = g; return true; }
                             if (!_prepared)
                             {
-                                g = Guard(app, RecipeGate.Phase.Preparar, () => _recipe.Preparar(ctx));
+                                g = Guard(app, RecipeGate.Phase.Prepare, () => _recipe.Prepare(ctx));
                                 if (g != null) { fail = g; return true; }
                                 _prepared = true;
                             }
                             if (_enum == null)
                             {
-                                g = Guard(app, RecipeGate.Phase.Enumerar, () => _enum = _recipe.Unidades(ctx).GetEnumerator());
+                                g = Guard(app, RecipeGate.Phase.Enumerate, () => _enum = _recipe.Units(ctx).GetEnumerator());
                                 if (g != null) { fail = g; return true; }
                             }
                             var limit = Math.Max(20, budget);
                             while (watch.ElapsedMilliseconds < limit)
                             {
                                 var more = false;
-                                g = Guard(app, RecipeGate.Phase.Enumerar, () => more = _enum.MoveNext());
+                                g = Guard(app, RecipeGate.Phase.Enumerate, () => more = _enum.MoveNext());
                                 if (g != null) { fail = g; return true; }
                                 if (!more) { _enumDone = true; break; }
                                 var u = _enum.Current;
                                 if (u == null) continue;
                                 _found.Add(u);
-                                if (!_byKey.ContainsKey(u.Clave)) _byKey[u.Clave] = u;
-                                if (u.Ids.Count > 0 && reg != null) _snap[u.Clave] = reg.Snapshot(u.Ids);
+                                if (!_byKey.ContainsKey(u.Key)) _byKey[u.Key] = u;
+                                if (u.Ids.Count > 0 && reg != null) _snap[u.Key] = reg.Snapshot(u.Ids);
                             }
                         }
-                        catch (Exception ex) { fail = "la receta falló al enumerar unidades: " + Describe(ex); }
+                        catch (Exception ex) { fail = "the recipe failed while enumerating units: " + Describe(ex); }
                         return true;
                     }, ct).ConfigureAwait(false);
                     if (!r.Ok) return FromWork<bool>(r);
-                    if (fail == "cerrado") return BackendResult<bool>.Waiting("el documento no está abierto", "abrirlo; la tarea sigue sola");
+                    if (fail == "closed") return BackendResult<bool>.Waiting("the document is not open", "open it; the task continues on its own");
                     if (fail != null) return BackendResult<bool>.Fail(fail);
                 }
                 return BackendResult<bool>.Ok(true);
@@ -622,8 +632,8 @@ namespace Bimbridge.Addin.Revit
                 if (e.Value != true) return new BackendResult<List<UnitRef>> { Wait = e.Wait, Action = e.Action, Fatal = e.Fatal };
                 return BackendResult<List<UnitRef>>.Ok(_found.Select(u => new UnitRef
                 {
-                    Key = u.Clave, Barrier = u.Barrera,
-                    BarrierArgs = u.BarreraArgs != null ? new Dictionary<string, object>(u.BarreraArgs) : null,
+                    Key = u.Key, Barrier = u.BarrierAction,
+                    BarrierArgs = u.BarrierArgs != null ? new Dictionary<string, object>(u.BarrierArgs) : null,
                 }).ToList());
             }
 
@@ -635,7 +645,7 @@ namespace Bimbridge.Addin.Revit
                 var r = await OnRevit((app, watch, budget) =>
                 {
                     var doc = FindDoc(app);
-                    if (doc == null) { wait = "el documento no está abierto"; waitAction = "abrirlo; la tarea sigue sola"; return true; }
+                    if (doc == null) { wait = "the document is not open"; waitAction = "open it; the task continues on its own"; return true; }
                     var reg = _h._tracker.For(doc);
                     var ctx = Ctx(app, doc, ct);
                     var limit = Math.Max(10, Math.Min(budget, budgetMs));
@@ -645,17 +655,17 @@ namespace Bimbridge.Addin.Revit
                         foreach (var uref in units)
                         {
                             if (outcomes.Count > 0 && (watch.ElapsedMilliseconds >= limit || ct.IsCancellationRequested)) break;
-                            // R06/R03: último punto seguro, en el hilo de Revit, justo antes de abrir la transacción de esta unidad.
-                            if (task.Preflight?.Invoke() is string refusal) { Ui.Runtime.Log("Tarea " + task.Id + ": unidad " + uref.Key + " no ejecutada (" + refusal + ")"); break; }
+                            // R06/R03: last safe point, on the Revit thread, right before opening this unit's transaction.
+                            if (task.Preflight?.Invoke() is string refusal) { Ui.Runtime.Log("Task " + task.Id + ": unit " + uref.Key + " not run (" + refusal + ")"); break; }
                             if (!_byKey.TryGetValue(uref.Key, out var u))
                             {
-                                outcomes.Add(UnitOutcome.Of(uref.Key, UnitState.Revertida, "la receta ya no enumera esta unidad"));
+                                outcomes.Add(UnitOutcome.Of(uref.Key, UnitState.RolledBack, "the recipe no longer enumerates this unit"));
                                 continue;
                             }
                             var o = RunUnit(doc, reg, ctx, u, out var stopWait);
-                            if (o == null) { wait = stopWait; waitAction = "cerrar el modo de edición o el comando abierto en Revit"; break; }
+                            if (o == null) { wait = stopWait; waitAction = "close the edit mode or command open in Revit"; break; }
                             outcomes.Add(o);
-                            if (o.State == UnitState.Parcial || o.State == UnitState.Desconocida) break;
+                            if (o.State == UnitState.Partial || o.State == UnitState.Unknown) break;
                         }
                     }
                     finally { _h._tracker.CurrentWriter = null; }
@@ -665,89 +675,89 @@ namespace Bimbridge.Addin.Revit
                 return new BackendResult<List<UnitOutcome>> { Value = outcomes, Wait = wait, Action = waitAction };
             }
 
-            /// <summary>Una unidad: conflicto → transacción → Ejecutar → resultado materializado → commit comprobado. null = no se pudo ni empezar.</summary>
-            private UnitOutcome RunUnit(Document doc, VersionRegistry reg, ScriptContext ctx, Unidad u, out string wait)
+            /// <summary>One unit: conflict → transaction → Run → materialized result → checked commit. null = could not even start.</summary>
+            private UnitOutcome RunUnit(Document doc, VersionRegistry reg, ScriptContext ctx, Unit u, out string wait)
             {
                 wait = null;
                 var sw = Stopwatch.StartNew();
-                var o = new UnitOutcome { Key = u.Clave };
-                if (reg != null && _snap.TryGetValue(u.Clave, out var snap) && snap.Count > 0)
+                var o = new UnitOutcome { Key = u.Key };
+                if (reg != null && _snap.TryGetValue(u.Key, out var snap) && snap.Count > 0)
                 {
                     var conflicts = reg.FindConflicts(snap).Where(c => c.Author != _owner).ToList();
                     if (conflicts.Count > 0)
                     {
-                        o.State = UnitState.Conflicto;
-                        o.Error = conflicts.Count + " elementos cambiaron desde la enumeración: " + string.Join("; ", conflicts.Take(3).Select(c => c.Describe(_owner))) +
-                                  ". No se pisó; reanudar la vuelve a enumerar sobre el modelo actual.";
+                        o.State = UnitState.Conflict;
+                        o.Error = conflicts.Count + " elements changed since enumeration: " + string.Join("; ", conflicts.Take(3).Select(c => c.Describe(_owner))) +
+                                  ". Not overwritten; resuming re-enumerates it against the current model.";
                         return o;
                     }
                 }
                 var rev0 = reg?.Rev ?? 0;
                 bool Changed() => (reg?.Rev ?? 0) != rev0;
                 var policy = TxPolicy;
-                var failures = new FailureLog { DeleteWarnings = !string.Equals(_t.PolicyString("avisos"), "dejar", StringComparison.OrdinalIgnoreCase) };
+                var failures = new FailureLog { DeleteWarnings = !string.Equals(_t.PolicyString("warnings"), "leave", StringComparison.OrdinalIgnoreCase) };
                 Transaction t = null;
                 _sink.Clear();
                 try
                 {
-                    if (policy == PoliticaTx.PorUnidad)
+                    if (policy == TxPolicy.PerUnit)
                     {
-                        t = new Transaction(doc, DocumentTracker.TransactionPrefix + " tarea " + _t.Id + " " + Clip(u.Clave, 60));
+                        t = new Transaction(doc, DocumentTracker.TransactionPrefix + " task " + _t.Id + " " + Clip(u.Key, 60));
                         FailureLog.Attach(t, failures);
                         var ts = t.Start();
-                        if (ts != TransactionStatus.Started) { wait = "Revit no permite abrir una transacción ahora (" + ts + ")"; return null; }
+                        if (ts != TransactionStatus.Started) { wait = "Revit does not allow opening a transaction now (" + ts + ")"; return null; }
                     }
-                    var value = _recipe.Ejecutar(ctx, u);
+                    var value = _recipe.Run(ctx, u);
                     object json;
                     try { json = ResultSerializer.ToJson(value, doc, out _, out _); }
-                    catch (Exception ex) when (!(ex is OutOfMemoryException)) { throw new InvalidOperationException("el resultado de la unidad no se pudo convertir: " + ex.Message, ex); }
+                    catch (Exception ex) when (!(ex is OutOfMemoryException)) { throw new InvalidOperationException("the unit result could not be converted: " + ex.Message, ex); }
                     o.Result = json;
                     if (t != null)
                     {
                         var st = t.Commit();
                         if (st == TransactionStatus.RolledBack)
                         {
-                            o.State = UnitState.Revertida;
-                            o.Error = "Revit rechazó la transacción y la revirtió: " + string.Join(" | ", failures.Errors.Take(3));
+                            o.State = UnitState.RolledBack;
+                            o.Error = "Revit rejected the transaction and rolled it back: " + string.Join(" | ", failures.Errors.Take(3));
                         }
                         else if (st != TransactionStatus.Committed)
                         {
-                            o.State = UnitState.Desconocida;
-                            o.Error = "la transacción quedó en estado " + st + " (puede haber un aviso pendiente en pantalla)";
+                            o.State = UnitState.Unknown;
+                            o.Error = "the transaction was left in status " + st + " (there may be a warning pending on screen)";
                         }
-                        else o.State = UnitState.Confirmada;
+                        else o.State = UnitState.Committed;
                     }
-                    else if (policy == PoliticaTx.Lectura && Changed())
+                    else if (policy == TxPolicy.ReadOnly && Changed())
                     {
-                        o.State = UnitState.Parcial;
-                        o.Error = "la receta es de lectura pero el modelo cambió durante la unidad";
+                        o.State = UnitState.Partial;
+                        o.Error = "the recipe is read-only but the model changed during the unit";
                     }
-                    else o.State = UnitState.Confirmada;
-                    if (failures.Warnings.Count > 0) o.Decisions.Add("avisos de Revit en " + u.Clave + ": " + string.Join(" | ", failures.Warnings.Take(3)));
+                    else o.State = UnitState.Committed;
+                    if (failures.Warnings.Count > 0) o.Decisions.Add("Revit warnings in " + u.Key + ": " + string.Join(" | ", failures.Warnings.Take(3)));
                 }
-                catch (OmitirUnidad om)
+                catch (SkipUnit om)
                 {
                     var rolled = RollBack(t);
-                    if (Changed() && (policy != PoliticaTx.PorUnidad || !rolled))
+                    if (Changed() && (policy != TxPolicy.PerUnit || !rolled))
                     {
-                        o.State = UnitState.Parcial;
-                        o.Error = "se pidió omitir, pero quedaron cambios confirmados: " + om.Message;
+                        o.State = UnitState.Partial;
+                        o.Error = "skip was requested, but committed changes remained: " + om.Message;
                     }
-                    else { o.State = UnitState.Omitida; o.Error = om.Message; }
+                    else { o.State = UnitState.Skipped; o.Error = om.Message; }
                 }
                 catch (Exception ex)
                 {
                     var rolled = RollBack(t);
-                    var what = (ex is OperationCanceledException ? "cancelado: " : "") + Describe(ex);
-                    if (!Changed() && rolled) { o.State = UnitState.Revertida; o.Error = what + " (no quedó nada aplicado)"; }
-                    else { o.State = UnitState.Parcial; o.Error = what + ". ATENCIÓN: quedaron cambios confirmados; revise y reconcilie"; }
+                    var what = (ex is OperationCanceledException ? "cancelled: " : "") + Describe(ex);
+                    if (!Changed() && rolled) { o.State = UnitState.RolledBack; o.Error = what + " (nothing was left applied)"; }
+                    else { o.State = UnitState.Partial; o.Error = what + ". WARNING: committed changes remained; review and reconcile"; }
                 }
                 finally
                 {
                     try { t?.Dispose(); } catch (Exception) { }
                 }
                 o.Ms = sw.ElapsedMilliseconds;
-                if (reg != null && Changed() && (o.State == UnitState.Confirmada || o.State == UnitState.Parcial))
+                if (reg != null && Changed() && (o.State == UnitState.Committed || o.State == UnitState.Partial))
                 {
                     foreach (var id in reg.AddedSince(rev0))
                     {
@@ -778,28 +788,28 @@ namespace Bimbridge.Addin.Revit
             public async Task<BackendResult<UnitOutcome>> RunBarrierAsync(TaskRecord task, UnitRef barrier, CancellationToken ct)
             {
                 var verb = (barrier.Barrier ?? "").ToLowerInvariant();
-                if (verb != "guardar" && verb != "sync" && verb != "sincronizar" && verb != "pdf")
-                    return BackendResult<UnitOutcome>.Ok(UnitOutcome.Of(barrier.Key, UnitState.Revertida, "barrera desconocida '" + barrier.Barrier + "' (guardar, sync o pdf)"));
+                if (verb != "save" && verb != "sync" && verb != "sync" && verb != "pdf")
+                    return BackendResult<UnitOutcome>.Ok(UnitOutcome.Of(barrier.Key, UnitState.RolledBack, "unknown barrier '" + barrier.Barrier + "' (save, sync or pdf)"));
                 if (!_h._config.AllowsDocOps)
-                    return BackendResult<UnitOutcome>.Ok(UnitOutcome.Of(barrier.Key, UnitState.Revertida, "la configuración del MCP no permite guardar/sincronizar/exportar en este Revit"));
+                    return BackendResult<UnitOutcome>.Ok(UnitOutcome.Of(barrier.Key, UnitState.RolledBack, "the MCP configuration does not allow save/sync/export in this Revit"));
                 var sw = Stopwatch.StartNew();
                 var diffs = new List<string>();
                 var pend = new DocOps.Pending();
-                Dictionary<string, object> datos = null;
+                Dictionary<string, object> data = null;
                 string fail = null, wait = null, path = null;
                 var bargs = barrier.BarrierArgs ?? new Dictionary<string, object>();
                 var r = await OnRevit((app, watch, budget) =>
                 {
                     var doc = FindDoc(app);
-                    if (doc == null) { wait = "el documento no está abierto"; return true; }
+                    if (doc == null) { wait = "the document is not open"; return true; }
                     _h._tracker.CurrentWriter = _owner;
                     try
                     {
                         switch (verb)
                         {
-                            case "guardar": datos = DocOps.Save(app, doc, bargs, pend, diffs); break;
-                            case "sync": case "sincronizar": datos = DocOps.Sync(doc, bargs, diffs, _h._tracker); break;
-                            case "pdf": datos = DocOps.Pdf(doc, bargs, _sets, DocRegistry.Instance.IdOf(doc), pend, diffs); break;
+                            case "save": data = DocOps.Save(app, doc, bargs, pend, diffs); break;
+                            case "sync":  data = DocOps.Sync(doc, bargs, diffs, _h._tracker); break;
+                            case "pdf": data = DocOps.Pdf(doc, bargs, _sets, DocRegistry.Instance.IdOf(doc), pend, diffs); break;
                         }
                         try { path = doc.IsModelInCloud ? ModelPathUtils.ConvertModelPathToUserVisiblePath(doc.GetCloudModelPath()) : doc.PathName; } catch (Exception) { path = doc.PathName; }
                     }
@@ -809,38 +819,38 @@ namespace Bimbridge.Addin.Revit
                     return true;
                 }, ct).ConfigureAwait(false);
                 if (!r.Ok) return FromWork<UnitOutcome>(r);
-                if (wait != null) return BackendResult<UnitOutcome>.Waiting(wait, "abrirlo; la tarea sigue sola");
+                if (wait != null) return BackendResult<UnitOutcome>.Waiting(wait, "open it; the task continues on its own");
                 var o = new UnitOutcome { Key = barrier.Key };
-                if (fail != null) { o.State = UnitState.Revertida; o.Error = fail; o.Ms = sw.ElapsedMilliseconds; return BackendResult<UnitOutcome>.Ok(o); }
+                if (fail != null) { o.State = UnitState.RolledBack; o.Error = fail; o.Ms = sw.ElapsedMilliseconds; return BackendResult<UnitOutcome>.Ok(o); }
                 List<object> files = null;
                 if (pend.Files.Count > 0)
                 {
-                    var expected = datos != null && datos.TryGetValue("n_hojas", out var nh) && nh is long l ? (int)l : 0;
+                    var expected = data != null && data.TryGetValue("n_sheets", out var nh) && nh is long l ? (int)l : 0;
                     files = await Task.Run(() => DocOps.VerifyFiles(pend, expected, diffs), ct).ConfigureAwait(false);
-                    datos["archivos"] = files;
+                    data["files"] = files;
                 }
-                o.State = UnitState.Confirmada;
-                o.Result = datos;
+                o.State = UnitState.Committed;
+                o.Result = data;
                 o.Ms = sw.ElapsedMilliseconds;
-                foreach (var d in diffs) o.Exceptions.Add(new Dictionary<string, object> { ["motivo"] = "barrera " + verb + ": " + d });
+                foreach (var d in diffs) o.Exceptions.Add(new Dictionary<string, object> { ["reason"] = "barrier " + verb + ": " + d });
                 var first = files?.OfType<Dictionary<string, object>>().FirstOrDefault();
                 if (verb == "pdf")
                 {
                     foreach (var f in files?.OfType<Dictionary<string, object>>() ?? Enumerable.Empty<Dictionary<string, object>>())
                         o.Artifacts.Add(new Dictionary<string, object>
                         {
-                            ["ruta"] = f.TryGetValue("archivo", out var p) ? p : null, ["sha256"] = f.TryGetValue("sha256", out var s) ? s : null,
-                            ["bytes"] = f.TryGetValue("bytes", out var b) ? b : null, ["paginas"] = f.TryGetValue("paginas", out var pg) ? pg : null, ["tipo"] = "pdf",
+                            ["path"] = f.TryGetValue("file", out var p) ? p : null, ["sha256"] = f.TryGetValue("sha256", out var s) ? s : null,
+                            ["bytes"] = f.TryGetValue("bytes", out var b) ? b : null, ["pages"] = f.TryGetValue("pages", out var pg) ? pg : null, ["type"] = "pdf",
                         });
                 }
                 else
                 {
                     o.Persist = new PersistEvidence
                     {
-                        Kind = verb == "guardar" ? "guardar" : "sync", When = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
-                        File = (first != null && first.TryGetValue("archivo", out var fp) ? fp as string : null) ?? path,
+                        Kind = verb == "save" ? "save" : "sync", When = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
+                        File = (first != null && first.TryGetValue("file", out var fp) ? fp as string : null) ?? path,
                         Bytes = first != null && first.TryGetValue("bytes", out var fb) && fb is long lb ? lb : 0,
-                        Mtime = first != null && first.TryGetValue("escrito_utc", out var fm) ? fm as string : null,
+                        Mtime = first != null && first.TryGetValue("written_utc", out var fm) ? fm as string : null,
                         Sha = first != null && first.TryGetValue("sha256", out var fs) ? fs as string : null,
                     };
                 }
@@ -849,7 +859,7 @@ namespace Bimbridge.Addin.Revit
 
             public async Task<BackendResult<List<UnitOutcome>>> VerifyAsync(TaskRecord task, IReadOnlyList<UnitRecord> units, bool reopened, CancellationToken ct)
             {
-                // Verificar de la receta necesita las unidades enumeradas (sus datos); sólo si alguna no se puede verificar por UniqueId.
+                // The recipe's Verify needs the enumerated units (their data); only if some cannot be verified by UniqueId.
                 if (units.Any(u => u.Created.Count == 0))
                 {
                     var e = await EnsureEnumerated(ct).ConfigureAwait(false);
@@ -861,55 +871,55 @@ namespace Bimbridge.Addin.Revit
                 var r = await OnRevit((app, watch, budget) =>
                 {
                     var doc = FindDoc(app);
-                    if (doc == null) { wait = "el documento no está abierto"; return true; }
+                    if (doc == null) { wait = "the document is not open"; return true; }
                     var ctx = Ctx(app, doc, ct);
                     foreach (var u in units) outcomes.Add(VerifyOne(app, doc, ctx, u, reopened, curGen));
                     return true;
                 }, ct).ConfigureAwait(false);
                 if (!r.Ok) return FromWork<List<UnitOutcome>>(r);
-                if (wait != null) return BackendResult<List<UnitOutcome>>.Waiting(wait, "abrirlo; la tarea sigue sola");
+                if (wait != null) return BackendResult<List<UnitOutcome>>.Waiting(wait, "open it; the task continues on its own");
                 return BackendResult<List<UnitOutcome>>.Ok(outcomes);
             }
 
             private UnitOutcome VerifyOne(UIApplication _verifyApp, Document doc, ScriptContext ctx, UnitRecord u, bool reopened, string curGen)
             {
                 var o = new UnitOutcome { Key = u.Key };
-                // 1) Evidencia en el modelo: los elementos que creó (UniqueId).
+                // 1) Evidence in the model: the elements it created (UniqueId).
                 if (u.Created.Count > 0)
                 {
                     var exist = u.Created.Count(c => c.Length > 1 && c[1] is string uid && SafeGet(doc, uid) != null);
-                    if (exist == u.Created.Count) { o.State = UnitState.Confirmada; o.Error = "verificada: sus " + exist + " elementos creados existen"; o.Created = u.Created.ToList(); return o; }
-                    if (exist == 0 && reopened) { o.State = UnitState.Pendiente; o.Error = "verificada: ninguno de sus elementos creados está en el modelo reabierto (se perdió al cerrar sin guardar)"; return o; }
-                    o.State = UnitState.Desconocida;
-                    o.Error = "existen " + exist + " de " + u.Created.Count + " elementos que creó: revise y reconcilie";
+                    if (exist == u.Created.Count) { o.State = UnitState.Committed; o.Error = "verified: its " + exist + " created elements exist"; o.Created = u.Created.ToList(); return o; }
+                    if (exist == 0 && reopened) { o.State = UnitState.Pending; o.Error = "verified: none of its created elements is in the reopened model (lost when closing without saving)"; return o; }
+                    o.State = UnitState.Unknown;
+                    o.Error = exist + " of the " + u.Created.Count + " elements it created exist: review and reconcile";
                     return o;
                 }
-                // 2) Verificar de la receta.
-                var v = Verificacion.Desconocida;
-                if (_byKey.TryGetValue(u.Key, out var unidad))
+                // 2) The recipe's Verify.
+                var v = Verification.Unknown;
+                if (_byKey.TryGetValue(u.Key, out var unit))
                 {
                     try
                     {
-                        var g = _recipe == null ? "receta no instanciada" : Guard(_verifyApp, RecipeGate.Phase.Verificar, () => v = _recipe.Verificar(ctx, unidad));
-                        if (g != null) { v = Verificacion.Desconocida; o.Error = g; }
+                        var g = _recipe == null ? "recipe not instantiated" : Guard(_verifyApp, RecipeGate.Phase.Verify, () => v = _recipe.Verify(ctx, unit));
+                        if (g != null) { v = Verification.Unknown; o.Error = g; }
                     }
-                    catch (Exception ex) { o.Error = "Verificar falló: " + Describe(ex); }
+                    catch (Exception ex) { o.Error = "Verify failed: " + Describe(ex); }
                 }
-                if (v == Verificacion.Aplicada) { o.State = UnitState.Confirmada; o.Error = "verificada por la receta"; return o; }
-                if (v == Verificacion.NoAplicada) { o.State = UnitState.Pendiente; o.Error = "la receta verificó que no está aplicada"; return o; }
-                // 3) Inferencia segura sólo tras reabrir: empezó después del último guardado de SU apertura → no está en el archivo.
+                if (v == Verification.Applied) { o.State = UnitState.Committed; o.Error = "verified by the recipe"; return o; }
+                if (v == Verification.NotApplied) { o.State = UnitState.Pending; o.Error = "the recipe verified that it is not applied"; return o; }
+                // 3) Safe inference only after reopening: it started after the last save of ITS opening → it is not in the file.
                 if (reopened && u.Generation != null && u.Generation != curGen)
                 {
                     var saved = _t.PersistedSince(u.Generation, u.Started);
                     if (saved == false)
                     {
-                        o.State = UnitState.Pendiente;
-                        o.Error = "inferido: empezó (" + u.Started + ") después del último guardado de la apertura " + u.Generation + " y el documento se reabrió sin guardarla";
+                        o.State = UnitState.Pending;
+                        o.Error = "inferred: it started (" + u.Started + ") after the last save of opening " + u.Generation + " and the document was reopened without saving it";
                         return o;
                     }
                 }
-                o.State = UnitState.Desconocida;
-                o.Error = (o.Error != null ? o.Error + "; " : "") + "no se puede comprobar en el modelo (la receta no implementa Verificar y no creó elementos)";
+                o.State = UnitState.Unknown;
+                o.Error = (o.Error != null ? o.Error + "; " : "") + "cannot be checked in the model (the recipe does not implement Verify and created no elements)";
                 return o;
             }
 
@@ -926,29 +936,29 @@ namespace Bimbridge.Addin.Revit
                 var r = await OnRevit((app, watch, budget) =>
                 {
                     var doc = FindDoc(app);
-                    if (doc == null) { wait = "el documento no está abierto"; return true; }
+                    if (doc == null) { wait = "the document is not open"; return true; }
                     var ctx = Ctx(app, doc, ct);
-                    // QC de sólo lectura: dentro de un grupo que siempre se revierte (lo que intente cambiar no queda).
+                    // Read-only QC: inside a group that is always rolled back (whatever it tries to change does not stick).
                     TransactionGroup g = null;
                     using (_h._tracker.Suspend())
                     {
                         try
                         {
-                            // P0: con cambios sin guardar no se abre el grupo temporal (Revit rechazará cualquier intento de modificar).
+                            // P0: with unsaved changes the temporary group is not opened (Revit will reject any attempt to modify).
                             if (Engine.TrialGuard.MayOpenTemporaryGroup(doc.IsModified))
                             {
-                                g = new TransactionGroup(doc, DocumentTracker.TemporaryPrefix + " qc tarea");
+                                g = new TransactionGroup(doc, DocumentTracker.TemporaryPrefix + " qc task");
                                 g.Start();
                             }
                             object value = null;
-                            var pg = EnsureInstance(app) ?? Guard(app, RecipeGate.Phase.Postcondicion, () => value = _recipe.Postcondicion(ctx));
+                            var pg = EnsureInstance(app) ?? Guard(app, RecipeGate.Phase.Postcondition, () => value = _recipe.Postcondition(ctx));
                             if (pg != null) throw new InvalidOperationException(pg);
                             var json = value == null ? null : ResultSerializer.ToJson(value, doc, out _, out _);
-                            result = json as Dictionary<string, object> ?? (json == null ? new Dictionary<string, object>() : new Dictionary<string, object> { ["resultado"] = json });
+                            result = json as Dictionary<string, object> ?? (json == null ? new Dictionary<string, object>() : new Dictionary<string, object> { ["result"] = json });
                         }
                         catch (Exception ex)
                         {
-                            result = new Dictionary<string, object> { ["desviaciones"] = new List<object> { "la postcondición falló: " + Describe(ex) } };
+                            result = new Dictionary<string, object> { ["deviations"] = new List<object> { "the postcondition failed: " + Describe(ex) } };
                         }
                         finally
                         {
@@ -959,7 +969,7 @@ namespace Bimbridge.Addin.Revit
                     return true;
                 }, ct).ConfigureAwait(false);
                 if (!r.Ok) return FromWork<Dictionary<string, object>>(r);
-                if (wait != null) return BackendResult<Dictionary<string, object>>.Waiting(wait, "abrirlo; la tarea sigue sola");
+                if (wait != null) return BackendResult<Dictionary<string, object>>.Waiting(wait, "open it; the task continues on its own");
                 return BackendResult<Dictionary<string, object>>.Ok(result);
             }
 

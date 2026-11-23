@@ -11,47 +11,47 @@ namespace BimBridge.PowerEngine.Workflows
     public static class MarkupPlacement
     {
         private static Dictionary<string, object> Map(object value) => value as Dictionary<string, object> ??
-            throw new QueryException("cada ancla o terminal debe ser un objeto JSON");
+            throw new QueryException("each anchor or terminal must be a JSON object");
         private static List<object> List(Dictionary<string, object> args, string key) =>
             args.TryGetValue(key, out var value) && value is List<object> list && list.Count > 0 ? list :
-                throw new QueryException("falta la lista " + key);
+                throw new QueryException("missing list " + key);
         private static string Text(Dictionary<string, object> args, string key) =>
             Arg.GetString(args, key)?.Trim() is string value && value.Length > 0 ? value :
-                throw new QueryException("falta " + key);
+                throw new QueryException("missing " + key);
         private static double Number(object value)
         {
-            if (!(value is long || value is double)) throw new QueryException("se necesita una coordenada numérica");
+            if (!(value is long || value is double)) throw new QueryException("a numeric coordinate is required");
             var number = Convert.ToDouble(value, CultureInfo.InvariantCulture);
-            if (double.IsNaN(number) || double.IsInfinity(number)) throw new QueryException("se necesita una coordenada finita");
+            if (double.IsNaN(number) || double.IsInfinity(number)) throw new QueryException("a finite coordinate is required");
             return number;
         }
         private static (double X, double Y) Point(Dictionary<string, object> row, string key)
         {
             var list = List(row, key);
-            if (list.Count != 2) throw new QueryException(key + " exige dos coordenadas");
+            if (list.Count != 2) throw new QueryException(key + " requires two coordinates");
             return (Number(list[0]), Number(list[1]));
         }
 
         public static Dictionary<string, object> Plan(Dictionary<string, object> args, string sourceSha, string sourceId, double userUnit, bool equipment = false)
         {
-            var level = Text(args, "nivel");
-            var parameter = equipment ? null : Text(args, "parametro_sentido");
-            var equipmentRules = equipment ? EquipmentRules(List(args, "reglas")) : null;
-            var anchors = List(args, "anclas").Select(Map).Select(a =>
+            var level = Text(args, "level");
+            var parameter = equipment ? null : Text(args, "direction_parameter");
+            var equipmentRules = equipment ? EquipmentRules(List(args, "rules")) : null;
+            var anchors = List(args, "anchors").Select(Map).Select(a =>
             {
                 var (px, py) = Point(a, "pdf");
-                var (x, y) = Point(a, "modelo");
-                return new Anchor(Text(a, "nombre"), px, py, x, y);
+                var (x, y) = Point(a, "model");
+                return new Anchor(Text(a, "name"), px, py, x, y);
             }).ToList();
             var registration = Registration.Solve(anchors, new RegistrationOptions
             {
                 UserUnit = userUnit, TolFt = args.TryGetValue("tol", out var tol) ? Number(tol) : 0.25,
             });
-            var result = new Dictionary<string, object> { ["registro"] = registration.ToJson(), ["sha256"] = sourceSha };
-            if (!registration.Ok) { result["estado"] = "sin_registro"; return result; }
+            var result = new Dictionary<string, object> { ["registration"] = registration.ToJson(), ["sha256"] = sourceSha };
+            if (!registration.Ok) { result["status"] = "unregistered"; return result; }
 
             var items = List(args, "items");
-            if (items.Count > PlanOpsLimits.MaxEntries) throw new QueryException("demasiados terminales en una sola llamada");
+            if (items.Count > PlanOpsLimits.MaxEntries) throw new QueryException("too many terminals in a single call");
             var names = new HashSet<string>(StringComparer.Ordinal);
             var existing = new HashSet<long>();
             var rows = new List<object>();
@@ -60,64 +60,69 @@ namespace BimBridge.PowerEngine.Workflows
             {
                 var item = Map(raw);
                 var id = Text(item, "ref");
-                if (!names.Add(id)) throw new QueryException("referencia repetida: " + id);
+                if (!names.Add(id)) throw new QueryException("duplicate reference: " + id);
                 var (px, py) = Point(item, "pt");
                 var (x, y) = registration.Map(px, py);
-                if (!item.TryGetValue("elev", out var elevation)) throw new QueryException("falta elev de " + id);
+                if (!item.TryGetValue("elev", out var elevation)) throw new QueryException("missing elev for " + id);
                 var offset = Number(elevation);
                 var expected = new Dictionary<string, object>
                 {
                     ["ref"] = id, ["xy_ft"] = new List<object> { x, y }, ["elev_ft"] = offset,
-                    ["nivel"] = level,
-                    ["punto_pt"] = new List<object> { px, py },
+                    ["level"] = level,
+                    ["point_pt"] = new List<object> { px, py },
                 };
                 if (equipmentRules == null)
                 {
-                    var direction = Text(item, "sentido").ToUpperInvariant();
-                    if (direction != "UP" && direction != "DN") throw new QueryException("sentido de " + id + ": use UP o DN");
-                    expected["tipo"] = Text(item, "tipo");
-                    expected["sentido"] = direction;
-                    expected["parametro_sentido"] = parameter;
+                    var direction = Text(item, "direction").ToUpperInvariant();
+                    if (direction != "UP" && direction != "DN") throw new QueryException("direction of " + id + ": use UP or DN");
+                    expected["type"] = Text(item, "type");
+                    expected["direction"] = direction;
+                    expected["direction_parameter"] = parameter;
                 }
                 else
                 {
-                    var scope = Text(item, "ambito");
-                    var code = Text(item, "codigo");
+                    var scope = Text(item, "scope");
+                    var code = Text(item, "code");
                     if (!equipmentRules.TryGetValue((scope.ToUpperInvariant(), code.ToUpperInvariant()), out var rule))
-                        throw new QueryException("falta regla de equipo para " + scope + " / " + code + " (" + id + ")");
-                    expected["ambito"] = scope;
-                    expected["zona"] = Text(item, "zona");
-                    expected["codigo"] = code;
-                    expected["clase"] = rule.Role;
-                    expected["tipo"] = rule.Type;
-                    expected["evidencia"] = Text(item, "evidencia");
+                        throw new QueryException("missing equipment rule for " + scope + " / " + code + " (" + id + ")");
+                    expected["scope"] = scope;
+                    expected["zone"] = Text(item, "zone");
+                    expected["code"] = code;
+                    expected["class"] = rule.Role;
+                    expected["type"] = rule.Type;
+                    expected["evidence"] = Text(item, "evidence");
                 }
                 if (Arg.GetString(item, "ws") is string workset) expected["ws"] = workset;
-                if (item.TryGetValue("giro_pt", out var rotation))
-                    expected["giro_deg"] = registration.RotationDeg + Number(rotation);
+                if (item.TryGetValue("rotation_pt", out var rotation))
+                    expected["rotation_deg"] = registration.RotationDeg + Number(rotation);
                 rows.Add(expected);
-                if (item.ContainsKey("existente_id"))
+                if (item.ContainsKey("existing_id"))
                 {
-                    if (!(Arg.GetLong(item, "existente_id") is long reused) || reused <= 0 || !existing.Add(reused))
-                        throw new QueryException("ID existente inválido o utilizado más de una vez: " + id);
+                    if (!(Arg.GetLong(item, "existing_id") is long reused) || reused <= 0 || !existing.Add(reused))
+                        throw new QueryException("existing ID invalid or used more than once: " + id);
                     expected["id"] = reused;
-                    expected["estado"] = "reutilizacion_por_verificar";
+                    expected["status"] = "reuse_to_verify";
                     continue;
                 }
                 var operation = new Dictionary<string, object>
                 {
-                    ["op"] = "place", ["type"] = expected["tipo"], ["level"] = level, ["elev"] = offset,
-                    ["puntos"] = new List<object> { new List<object> { x, y } },
-                    ["items_fuente"] = new List<object> { id },
+                    ["op"] = "place", ["type"] = expected["type"], ["level"] = level, ["elev"] = offset,
+                    ["points"] = new List<object> { new List<object> { x, y } },
+                    ["source_items"] = new List<object> { id },
                 };
-                if (parameter != null) operation["params"] = new Dictionary<string, object> { [parameter] = expected["sentido"] };
+                if (parameter != null) operation["params"] = new Dictionary<string, object> { [parameter] = expected["direction"] };
                 if (expected.TryGetValue("ws", out var configuredWorkset)) operation["ws"] = configuredWorkset;
-                if (expected.TryGetValue("giro_deg", out var modelRotation)) operation["rot"] = modelRotation;
-                expected["estado"] = "para_colocar";
+                if (expected.TryGetValue("rotation_deg", out var modelRotation)) operation["rot"] = modelRotation;
+                expected["status"] = "to_place";
                 operations.Add(operation);
             }
             var plans = new List<object>();
-            var fingerprint = Home.Sha256Hex(OpSemantics.Canonical(new object[] { rows, operations }));
+            // Hashed in the frozen 0.9.4 form (keys, values and kind literal) so a batch committed before the rename keeps its key.
+            var fingerprint = Home.Sha256Hex(OpSemantics.Canonical(new object[]
+            {
+                rows.Cast<Dictionary<string, object>>().Select(r => SourceBinding.Frozen(r, FrozenRowKeys)).ToList(),
+                operations.Select(o => SourceBinding.Frozen(o, SourceBinding.FrozenOpKeys)).ToList(),
+            }));
             for (var start = 0; start < operations.Count; start += OpSpec.MaxOps)
             {
                 var token = SourceBinding.Token(equipment ? "equipos" : "terminales", sourceId, sourceSha, null,
@@ -130,25 +135,33 @@ namespace BimBridge.PowerEngine.Workflows
                 }
                 plans.Add(new Dictionary<string, object> { ["ops"] = Json.Write(batch) });
             }
-            result["estado"] = "listo";
-            result[equipment ? "equipos" : "terminales"] = rows;
-            result["planes"] = plans;
+            result["status"] = "ready";
+            result[equipment ? "equipment" : "terminals"] = rows;
+            result["plans"] = plans;
             return result;
         }
+
+        /// <summary>FROZEN hash literals: 0.9.4 names of the row keys that feed the plan fingerprint. Never change these strings.</summary>
+        private static readonly IReadOnlyDictionary<string, string> FrozenRowKeys = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["level"] = "nivel", ["point_pt"] = "punto_pt", ["type"] = "tipo", ["direction"] = "sentido", ["direction_parameter"] = "parametro_sentido",
+            ["scope"] = "ambito", ["zone"] = "zona", ["code"] = "codigo", ["class"] = "clase", ["evidence"] = "evidencia", ["rotation_deg"] = "giro_deg",
+            ["status"] = "estado",
+        };
 
         private static Dictionary<(string Scope, string Code), (string Role, string Type)> EquipmentRules(List<object> values)
         {
             var rules = new Dictionary<(string, string), (string, string)>();
             foreach (var entry in values.Select(Map))
             {
-                var scope = Text(entry, "ambito");
-                var code = Text(entry, "codigo");
-                var role = Text(entry, "clase").ToLowerInvariant();
-                if (role != "tablero" && role != "msde" && role != "desconectivo_hvac")
-                    throw new QueryException("clase inválida para " + code + "; use tablero, msde o desconectivo_hvac");
+                var scope = Text(entry, "scope");
+                var code = Text(entry, "code");
+                var role = Text(entry, "class").ToLowerInvariant();
+                if (role != "panel" && role != "msde" && role != "hvac_disconnect")
+                    throw new QueryException("invalid class for " + code + "; use panel, msde or hvac_disconnect");
                 var key = (scope.ToUpperInvariant(), code.ToUpperInvariant());
-                if (rules.ContainsKey(key)) throw new QueryException("reglas de equipo contradictorias para " + scope + " / " + code);
-                rules.Add(key, (role, Text(entry, "tipo")));
+                if (rules.ContainsKey(key)) throw new QueryException("contradictory equipment rules for " + scope + " / " + code);
+                rules.Add(key, (role, Text(entry, "type")));
             }
             return rules;
         }

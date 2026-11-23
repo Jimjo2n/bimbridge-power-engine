@@ -17,9 +17,9 @@ namespace BimBridge.PowerEngine.Workflows
     }
 
     /// <summary>
-    /// Grupos y variantes: lleva cada instancia a coordenadas locales (deshace origen, giro y espejo), calcula la firma de sus
-    /// miembros y agrupa instancias idénticas. La variante mayoritaria de cada tipo de grupo es la referencia; el resto se informa
-    /// con lo que falta y lo que sobra. Da además cobertura por tipo de grupo y nivel.
+    /// Groups and variants: brings each instance to local coordinates (undoes origin, rotation and mirror), computes the signature of its
+    /// members and groups identical instances. The majority variant of each group type is the reference; the rest are reported
+    /// with what is missing and what is extra. Also gives coverage per group type and level.
     /// </summary>
     public static class GroupVariants
     {
@@ -37,28 +37,28 @@ namespace BimBridge.PowerEngine.Workflows
                     var vs = variants[k].Key.Length == 0 ? new string[0] : variants[k].Key.Split(';');
                     deviations.Add(new Dictionary<string, object>
                     {
-                        ["instancias"] = variants[k].Select(g => (object)g.Id).ToList(),
-                        ["faltan"] = MultisetMinus(refSig, vs).Cast<object>().ToList(),
-                        ["sobran"] = MultisetMinus(vs, refSig).Cast<object>().ToList(),
+                        ["instances"] = variants[k].Select(g => (object)g.Id).ToList(),
+                        ["missing_items"] = MultisetMinus(refSig, vs).Cast<object>().ToList(),
+                        ["extra_items"] = MultisetMinus(vs, refSig).Cast<object>().ToList(),
                     });
                 }
                 types.Add(new Dictionary<string, object>
                 {
-                    ["tipo_grupo"] = t.Key, ["instancias"] = (long)t.Count(), ["variantes"] = (long)variants.Count,
-                    ["referencia"] = new Dictionary<string, object> { ["instancias"] = (long)variants[0].Count(), ["miembros"] = (long)refSig.Length },
-                    ["desviaciones"] = deviations,
-                    ["espejadas"] = t.Where(g => g.Mirrored).Select(g => (object)g.Id).ToList(),
-                    ["por_nivel"] = t.GroupBy(g => g.Level ?? "?").OrderBy(l => l.Key, StringComparer.Ordinal).ToDictionary(l => l.Key, l => (object)(long)l.Count()),
+                    ["group_type"] = t.Key, ["instances"] = (long)t.Count(), ["variants"] = (long)variants.Count,
+                    ["reference"] = new Dictionary<string, object> { ["instances"] = (long)variants[0].Count(), ["members"] = (long)refSig.Length },
+                    ["deviations"] = deviations,
+                    ["mirrored"] = t.Where(g => g.Mirrored).Select(g => (object)g.Id).ToList(),
+                    ["by_level"] = t.GroupBy(g => g.Level ?? "?").OrderBy(l => l.Key, StringComparer.Ordinal).ToDictionary(l => l.Key, l => (object)(long)l.Count()),
                 });
             }
             return new Dictionary<string, object>
             {
-                ["grupos"] = (long)groups.Count, ["tipos"] = types,
-                ["nota"] = "La variante mayoritaria es la referencia; no se decide cuál es la correcta: las desviaciones se escalan.",
+                ["groups"] = (long)groups.Count, ["types"] = types,
+                ["note"] = "The majority variant is the reference; which one is correct is not decided: deviations are escalated.",
             };
         }
 
-        /// <summary>Firma local ordenada: tipo|x|y|giro de cada miembro, en el marco de la instancia (cuantizado a tolFt y 1°).</summary>
+        /// <summary>Sorted local signature: type|x|y|rotation of each member, in the instance frame (quantized to tolFt and 1°).</summary>
         public static string[] Signature(GroupInstance g, double tolFt)
         {
             var c = Math.Cos(-g.RotDeg * Math.PI / 180); var s = Math.Sin(-g.RotDeg * Math.PI / 180);

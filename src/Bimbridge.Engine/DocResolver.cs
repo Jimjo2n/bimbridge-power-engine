@@ -6,9 +6,9 @@ using System.Linq;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Resuelve lo que pidió la IA con doc= (handle dN, ruta, clave duradera o título) entre los documentos abiertos, sin la API de Revit
-    /// (se prueba sin Revit). Orden: handle → ruta exacta → ruta normalizada → clave → título. Varias coincidencias por título = ambiguo:
-    /// se listan los candidatos y NO se elige ninguno (§3.1).
+    /// Resolves what the AI requested with doc= (handle dN, path, durable key or title) among the open documents, without the Revit API
+    /// (tested without Revit). Order: handle → exact path → normalized path → key → title. Several title matches = ambiguous:
+    /// the candidates are listed and NONE is chosen (§3.1).
     /// </summary>
     public static class DocResolver
     {
@@ -21,7 +21,7 @@ namespace Bimbridge.Engine
             public bool Active;
         }
 
-        /// <summary>Índice del documento elegido, o -1 con el motivo en <paramref name="error"/>.</summary>
+        /// <summary>Index of the chosen document, or -1 with the reason in <paramref name="error"/>.</summary>
         public static int Find(IReadOnlyList<Candidate> snap, string requested, out string error, out bool ambiguous)
         {
             error = null;
@@ -34,7 +34,7 @@ namespace Bimbridge.Engine
             if (string.IsNullOrWhiteSpace(requested))
             {
                 var a = One(c => c.Active);
-                if (a < 0) error = "no hay ningún documento activo en Revit";
+                if (a < 0) error = "there is no active document in Revit";
                 return a < 0 ? -1 : a;
             }
             var r = requested.Trim();
@@ -52,12 +52,12 @@ namespace Bimbridge.Engine
             if (byTitle.Count > 1)
             {
                 ambiguous = true;
-                error = "hay " + byTitle.Count + " documentos con el título '" + r + "': " +
-                        string.Join("; ", byTitle.Select(c => c.Id + " " + (string.IsNullOrEmpty(c.Path) ? "(sin guardar)" : c.Path))) + ". Use el handle dN; no se elige ninguno";
+                error = "there are " + byTitle.Count + " documents with the title '" + r + "': " +
+                        string.Join("; ", byTitle.Select(c => c.Id + " " + (string.IsNullOrEmpty(c.Path) ? "(unsaved)" : c.Path))) + ". Use the handle dN; none is chosen";
                 return -1;
             }
-            error = "no hay un documento abierto '" + r + "'. Abiertos: " +
-                    (snap.Count == 0 ? "ninguno" : string.Join(", ", snap.Select(c => c.Id + " " + c.Title + (c.Active ? " (activo)" : ""))));
+            error = "there is no open document '" + r + "'. Open: " +
+                    (snap.Count == 0 ? "none" : string.Join(", ", snap.Select(c => c.Id + " " + c.Title + (c.Active ? " (active)" : ""))));
             return -1;
         }
 

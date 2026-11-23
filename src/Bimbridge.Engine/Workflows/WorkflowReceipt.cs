@@ -11,9 +11,9 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine.Workflows
 {
     /// <summary>
-    /// 0.9.1 (Bloque F, #23 CM-01/03): estados de un flujo nativo interactivo (Copy/Monitor y similares). Cada transición exige
-    /// evidencia observable; ni el tiempo transcurrido ni que PostCommand se aceptara bastan para avanzar. "Terminado" no existe como
-    /// atajo: el final válido es <see cref="WorkflowState.save_confirmed"/> o <see cref="WorkflowState.verification_passed"/>.
+    /// 0.9.1 (Block F, #23 CM-01/03): states of an interactive native workflow (Copy/Monitor and similar). Each transition requires
+    /// observable evidence; neither elapsed time nor PostCommand being accepted is enough to advance. "Done" does not exist as a
+    /// shortcut: the valid end is <see cref="WorkflowState.save_confirmed"/> or <see cref="WorkflowState.verification_passed"/>.
     /// </summary>
     public enum WorkflowState
     {
@@ -33,27 +33,27 @@ namespace Bimbridge.Engine.Workflows
         reconciliation_required,
     }
 
-    /// <summary>Nivel de prueba de una evidencia (#23 §6).</summary>
+    /// <summary>Proof level of a piece of evidence (#23 §6).</summary>
     public enum ProofLevel { observed, inferred, verified }
 
-    /// <summary>Tipos de evidencia que el motor reconoce. Cada uno sólo puede producirlo quien lo observa (add-in, ejecutor de UI, verificador).</summary>
+    /// <summary>Evidence kinds the engine recognizes. Each can only be produced by whoever observes it (add-in, UI executor, verifier).</summary>
     public static class EvidenceKind
     {
         public const string PreflightPassed = "preflight_ok";
-        public const string PostCommandAccepted = "postcommand_aceptado";
-        public const string CommandActive = "comando_activo";           // el add-in observa el modo nativo (p. ej. evento de comando / UI)
-        public const string LinkSelected = "vinculo_seleccionado";
-        public const string MappingDialog = "dialogo_mapeo";
-        public const string CopyStarted = "copia_iniciada";
-        public const string CopyObserved = "copia_observada";           // elementos nuevos aparecidos en el anfitrión
-        public const string FinishObserved = "finalizar_observado";
-        public const string VerificationPassed = "verificacion_ok";
-        public const string VerificationFailed = "verificacion_fallida";
-        public const string SaveConfirmed = "guardado_confirmado";       // relectura tras guardar (no sólo la orden de guardar)
-        public const string Cancelled = "cancelado";
-        public const string Uncertain = "incierto";                      // desconexión, diálogo modal, reinicio, tiempo agotado
-        public const string NoUiExecutor = "sin_ejecutor_ui";
-        public const string Reconciled = "reconciliado";
+        public const string PostCommandAccepted = "postcommand_accepted";
+        public const string CommandActive = "active_command";           // the add-in observes the native mode (e.g. command / UI event)
+        public const string LinkSelected = "selected_link";
+        public const string MappingDialog = "mapping_dialog";
+        public const string CopyStarted = "copy_started";
+        public const string CopyObserved = "copy_observed";           // new elements appeared in the host
+        public const string FinishObserved = "finish_observed";
+        public const string VerificationPassed = "verification_ok";
+        public const string VerificationFailed = "verification_failed";
+        public const string SaveConfirmed = "save_confirmed";       // reread after saving (not just the save command)
+        public const string Cancelled = "cancelled";
+        public const string Uncertain = "uncertain";                      // disconnection, modal dialog, restart, timeout
+        public const string NoUiExecutor = "no_ui_executor";
+        public const string Reconciled = "reconciled";
 
         public static readonly string[] All =
         {
@@ -72,21 +72,21 @@ namespace Bimbridge.Engine.Workflows
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["tipo"] = Kind, ["nivel"] = Level.ToString(), ["fuente"] = Source, ["detalle"] = Detail ?? "",
-            ["en"] = AtUtc.ToString("o", CultureInfo.InvariantCulture),
+            ["type"] = Kind, ["level"] = Level.ToString(), ["source"] = Source, ["detail"] = Detail ?? "",
+            ["in"] = AtUtc.ToString("o", CultureInfo.InvariantCulture),
         };
 
         public static Evidence FromJson(Dictionary<string, object> d) => new Evidence
         {
-            Kind = Arg.GetString(d, "tipo"),
-            Level = (ProofLevel)Enum.Parse(typeof(ProofLevel), Arg.GetString(d, "nivel") ?? "observed"),
-            Source = Arg.GetString(d, "fuente"),
-            Detail = Arg.GetString(d, "detalle"),
-            AtUtc = DateTime.Parse(Arg.GetString(d, "en"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+            Kind = Arg.GetString(d, "type"),
+            Level = (ProofLevel)Enum.Parse(typeof(ProofLevel), Arg.GetString(d, "level") ?? "observed"),
+            Source = Arg.GetString(d, "source"),
+            Detail = Arg.GetString(d, "detail"),
+            AtUtc = DateTime.Parse(Arg.GetString(d, "in"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
         };
     }
 
-    /// <summary>Correlación completa de un intento (#23 §3, #25): sin esto no se puede reconciliar ni evitar efectos duplicados.</summary>
+    /// <summary>Full correlation of an attempt (#23 §3, #25): without it there is no way to reconcile or avoid duplicate effects.</summary>
     public sealed class WorkflowCorrelation
     {
         public string AgentId, SessionId, RequestId, TraceId, JobId;
@@ -96,14 +96,14 @@ namespace Bimbridge.Engine.Workflows
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
             ["agent_id"] = AgentId, ["session_id"] = SessionId, ["request_id"] = RequestId, ["trace_id"] = TraceId, ["job_id"] = JobId,
-            ["documento"] = DocumentIdentity, ["vinculo"] = LinkIdentity, ["revit"] = RevitVersion, ["revit_build"] = RevitBuild, ["build"] = ProductBuild,
+            ["document"] = DocumentIdentity, ["link"] = LinkIdentity, ["revit"] = RevitVersion, ["revit_build"] = RevitBuild, ["build"] = ProductBuild,
         };
 
         public static WorkflowCorrelation FromJson(Dictionary<string, object> d) => new WorkflowCorrelation
         {
             AgentId = Arg.GetString(d, "agent_id"), SessionId = Arg.GetString(d, "session_id"), RequestId = Arg.GetString(d, "request_id"),
-            TraceId = Arg.GetString(d, "trace_id"), JobId = Arg.GetString(d, "job_id"), DocumentIdentity = Arg.GetString(d, "documento"),
-            LinkIdentity = Arg.GetString(d, "vinculo"), RevitVersion = Arg.GetString(d, "revit"), RevitBuild = Arg.GetString(d, "revit_build"),
+            TraceId = Arg.GetString(d, "trace_id"), JobId = Arg.GetString(d, "job_id"), DocumentIdentity = Arg.GetString(d, "document"),
+            LinkIdentity = Arg.GetString(d, "link"), RevitVersion = Arg.GetString(d, "revit"), RevitBuild = Arg.GetString(d, "revit_build"),
             ProductBuild = Arg.GetString(d, "build"),
         };
     }
@@ -114,11 +114,11 @@ namespace Bimbridge.Engine.Workflows
         public Evidence Evidence;
     }
 
-    /// <summary>Recibo persistente de un intento. La clave de intento es la idempotencia: el mismo trabajo nunca abre dos recibos.</summary>
+    /// <summary>Persistent receipt of an attempt. The attempt key is the idempotency key: the same job never opens two receipts.</summary>
     public sealed class WorkflowReceipt
     {
         public const string Schema = "bimbridge.workflow_receipt/1";
-        public string Workflow;           // p. ej. copy_monitor_fixtures
+        public string Workflow;           // e.g. copy_monitor_fixtures
         public string AttemptKey;
         public WorkflowCorrelation Correlation = new WorkflowCorrelation();
         public WorkflowState State = WorkflowState.preflight;
@@ -126,12 +126,12 @@ namespace Bimbridge.Engine.Workflows
         public DateTime CreatedUtc;
         public string Note;
 
-        /// <summary>El mejor nivel de prueba alcanzado (verified sólo si una verificación o un guardado confirmado lo respaldan).</summary>
+        /// <summary>The best proof level reached (verified only if backed by a verification or a confirmed save).</summary>
         public ProofLevel Proof => History.Count == 0 ? ProofLevel.inferred : History.Max(h => h.Evidence.Level);
 
         public bool IsTerminal => WorkflowMachine.Terminal.Contains(State);
 
-        /// <summary>¿Hay evidencia de que ya pudo haber efectos en el modelo? Si sí, nunca se repite la orden a ciegas.</summary>
+        /// <summary>Is there evidence that the model may already have effects? If so, the command is never repeated blindly.</summary>
         public bool MayHaveEffects => History.Any(h => EffectStates.Contains(h.To) || h.Evidence.Kind == EvidenceKind.CopyStarted || h.Evidence.Kind == EvidenceKind.CopyObserved);
 
         private static readonly HashSet<WorkflowState> EffectStates = new HashSet<WorkflowState>
@@ -142,35 +142,35 @@ namespace Bimbridge.Engine.Workflows
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["esquema"] = Schema, ["flujo"] = Workflow, ["clave_intento"] = AttemptKey, ["estado"] = State.ToString(),
-            ["prueba"] = Proof.ToString(), ["puede_tener_efectos"] = MayHaveEffects, ["correlacion"] = Correlation.ToJson(),
-            ["creado"] = CreatedUtc.ToString("o", CultureInfo.InvariantCulture), ["nota"] = Note ?? "",
-            ["historial"] = History.Select(h => (object)new Dictionary<string, object> { ["de"] = h.From.ToString(), ["a"] = h.To.ToString(), ["evidencia"] = h.Evidence.ToJson() }).ToList(),
+            ["schema"] = Schema, ["workflow"] = Workflow, ["attempt_key"] = AttemptKey, ["status"] = State.ToString(),
+            ["test"] = Proof.ToString(), ["may_have_effects"] = MayHaveEffects, ["correlation"] = Correlation.ToJson(),
+            ["created"] = CreatedUtc.ToString("o", CultureInfo.InvariantCulture), ["note"] = Note ?? "",
+            ["history"] = History.Select(h => (object)new Dictionary<string, object> { ["de"] = h.From.ToString(), ["a"] = h.To.ToString(), ["evidence"] = h.Evidence.ToJson() }).ToList(),
         };
 
         public static WorkflowReceipt FromJson(Dictionary<string, object> d)
         {
-            if (Arg.GetString(d, "esquema") != Schema) throw new InvalidDataException("recibo con esquema desconocido");
+            if (Arg.GetString(d, "schema") != Schema) throw new InvalidDataException("receipt with unknown schema");
             var r = new WorkflowReceipt
             {
-                Workflow = Arg.GetString(d, "flujo"),
-                AttemptKey = Arg.GetString(d, "clave_intento"),
-                State = (WorkflowState)Enum.Parse(typeof(WorkflowState), Arg.GetString(d, "estado")),
-                Correlation = WorkflowCorrelation.FromJson((Dictionary<string, object>)d["correlacion"]),
-                CreatedUtc = DateTime.Parse(Arg.GetString(d, "creado"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                Note = Arg.GetString(d, "nota"),
+                Workflow = Arg.GetString(d, "workflow"),
+                AttemptKey = Arg.GetString(d, "attempt_key"),
+                State = (WorkflowState)Enum.Parse(typeof(WorkflowState), Arg.GetString(d, "status")),
+                Correlation = WorkflowCorrelation.FromJson((Dictionary<string, object>)d["correlation"]),
+                CreatedUtc = DateTime.Parse(Arg.GetString(d, "created"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                Note = Arg.GetString(d, "note"),
             };
-            foreach (Dictionary<string, object> h in (List<object>)d["historial"])
+            foreach (Dictionary<string, object> h in (List<object>)d["history"])
                 r.History.Add(new WorkflowStep
                 {
                     From = (WorkflowState)Enum.Parse(typeof(WorkflowState), Arg.GetString(h, "de")),
                     To = (WorkflowState)Enum.Parse(typeof(WorkflowState), Arg.GetString(h, "a")),
-                    Evidence = Evidence.FromJson((Dictionary<string, object>)h["evidencia"]),
+                    Evidence = Evidence.FromJson((Dictionary<string, object>)h["evidence"]),
                 });
             return r;
         }
 
-        /// <summary>Clave de intento estable a partir de lo que define el trabajo (flujo, documento, vínculo y la petición del cliente).</summary>
+        /// <summary>Stable attempt key derived from what defines the job (workflow, document, link and the client request).</summary>
         public static string KeyFor(string workflow, string documentIdentity, string linkIdentity, string clientKey)
         {
             using (var sha = SHA256.Create())
@@ -182,15 +182,15 @@ namespace Bimbridge.Engine.Workflows
     }
 
     /// <summary>
-    /// Máquina de estados de los flujos nativos. La única forma de cambiar de estado es <see cref="Apply"/> con una evidencia cuyo tipo
-    /// está permitido desde el estado actual. Lo incierto (desconexión, diálogo, reinicio, tiempo agotado) lleva siempre a
-    /// reconciliation_required; desde ahí sólo se sale con una reconciliación que diga qué se observó.
+    /// State machine of the native workflows. The only way to change state is <see cref="Apply"/> with evidence whose kind
+    /// is allowed from the current state. Anything uncertain (disconnection, dialog, restart, timeout) always leads to
+    /// reconciliation_required; the only way out is a reconciliation that states what was observed.
     /// </summary>
     public static class WorkflowMachine
     {
         public static readonly HashSet<WorkflowState> Terminal = new HashSet<WorkflowState>
         {
-            // manual_handoff y verification_failed NO son terminales (AUD-08): la verificación continúa tras el traspaso o una corrección.
+            // manual_handoff and verification_failed are NOT terminal (AUD-08): verification continues after the handoff or a correction.
             WorkflowState.save_confirmed, WorkflowState.cancelled,
         };
 
@@ -209,17 +209,17 @@ namespace Bimbridge.Engine.Workflows
             [(WorkflowState.finished, EvidenceKind.VerificationPassed)] = WorkflowState.verification_passed,
             [(WorkflowState.finished, EvidenceKind.VerificationFailed)] = WorkflowState.verification_failed,
             [(WorkflowState.verification_passed, EvidenceKind.SaveConfirmed)] = WorkflowState.save_confirmed,
-            // AUD-07/08: el preflight observado no cambia de estado; tras un traspaso manual la verificación continúa
-            // (el usuario hizo la copia y Finalizar en Revit; aquí sólo se puede verificar el resultado, no observar los pasos).
+            // AUD-07/08: an observed preflight does not change state; after a manual handoff verification continues
+            // (the user did the copy and Finish in Revit; here only the result can be verified, not the steps observed).
             [(WorkflowState.preflight, EvidenceKind.PreflightPassed)] = WorkflowState.preflight,
             [(WorkflowState.manual_handoff, EvidenceKind.VerificationPassed)] = WorkflowState.verification_passed,
             [(WorkflowState.manual_handoff, EvidenceKind.VerificationFailed)] = WorkflowState.verification_failed,
-            // Re-verificar tras corregir: un fallo no es definitivo, pero nunca salta a guardado.
+            // Re-verify after correcting: a failure is not final, but it never jumps to saved.
             [(WorkflowState.verification_failed, EvidenceKind.VerificationPassed)] = WorkflowState.verification_passed,
             [(WorkflowState.verification_failed, EvidenceKind.VerificationFailed)] = WorkflowState.verification_failed,
         };
 
-        /// <summary>AUD-07: evidencias privilegiadas que sólo pueden aportar componentes autorizados (verificador o add-in), nunca el cliente.</summary>
+        /// <summary>AUD-07: privileged evidence that only authorized components (verifier or add-in) can supply, never the client.</summary>
         public static readonly Dictionary<string, string[]> PrivilegedSources = new Dictionary<string, string[]>
         {
             [EvidenceKind.VerificationPassed] = new[] { "verifier" },
@@ -230,7 +230,7 @@ namespace Bimbridge.Engine.Workflows
             [EvidenceKind.CommandActive] = new[] { "addin", "ui_executor" },
         };
 
-        /// <summary>Evidencias que exigen un nivel mínimo de prueba (no basta con "inferido").</summary>
+        /// <summary>Evidence that requires a minimum proof level ("inferred" is not enough).</summary>
         private static readonly Dictionary<string, ProofLevel> MinLevel = new Dictionary<string, ProofLevel>
         {
             [EvidenceKind.CopyObserved] = ProofLevel.observed,
@@ -240,39 +240,39 @@ namespace Bimbridge.Engine.Workflows
             [EvidenceKind.SaveConfirmed] = ProofLevel.verified,
         };
 
-        /// <summary>Estado al que llevaría la evidencia, o null si no está permitida desde el estado actual.</summary>
+        /// <summary>State the evidence would lead to, or null if it is not allowed from the current state.</summary>
         public static WorkflowState? Next(WorkflowReceipt r, Evidence e, out string refusal)
         {
             refusal = null;
-            if (r.IsTerminal) { refusal = "el intento ya terminó en " + r.State; return null; }
-            if (e == null || Array.IndexOf(EvidenceKind.All, e.Kind) < 0) { refusal = "evidencia desconocida"; return null; }
-            if (MinLevel.TryGetValue(e.Kind, out var min) && e.Level < min) { refusal = e.Kind + " exige nivel " + min + " (llegó " + e.Level + ")"; return null; }
+            if (r.IsTerminal) { refusal = "the attempt already ended in " + r.State; return null; }
+            if (e == null || Array.IndexOf(EvidenceKind.All, e.Kind) < 0) { refusal = "unknown evidence"; return null; }
+            if (MinLevel.TryGetValue(e.Kind, out var min) && e.Level < min) { refusal = e.Kind + " requires level " + min + " (got " + e.Level + ")"; return null; }
             if (PrivilegedSources.TryGetValue(e.Kind, out var allowed) && Array.IndexOf(allowed, e.Source ?? "") < 0)
-            { refusal = e.Kind + " sólo lo puede aportar " + string.Join(" o ", allowed) + " (llegó de '" + e.Source + "')"; return null; }
+            { refusal = e.Kind + " can only be supplied by " + string.Join(" or ", allowed) + " (came from '" + e.Source + "')"; return null; }
             if (e.Kind == EvidenceKind.Uncertain) return WorkflowState.reconciliation_required;
             if (e.Kind == EvidenceKind.Cancelled)
             {
-                // Cancelar después de que pudo haber copia no borra los efectos: queda pendiente de reconciliar.
+                // Cancelling after a copy may have happened does not erase the effects: it remains pending reconciliation.
                 return r.MayHaveEffects ? WorkflowState.reconciliation_required : WorkflowState.cancelled;
             }
             if (r.State == WorkflowState.reconciliation_required)
             {
-                if (e.Kind != EvidenceKind.Reconciled) { refusal = "pendiente de reconciliar: sólo se admite una reconciliación con lo observado"; return null; }
+                if (e.Kind != EvidenceKind.Reconciled) { refusal = "pending reconciliation: only a reconciliation with what was observed is accepted"; return null; }
                 return ReconciledState(e.Detail, r, out refusal);
             }
             if (Edges.TryGetValue((r.State, e.Kind), out var to)) return to;
-            refusal = "transición no permitida: " + r.State + " + " + e.Kind;
+            refusal = "transition not allowed: " + r.State + " + " + e.Kind;
             return null;
         }
 
-        /// <summary>Una reconciliación declara el estado observado ("detalle" = nombre del estado). Nunca puede saltar a guardado o verificado sin su evidencia.</summary>
+        /// <summary>A reconciliation declares the observed state ("detail" = state name). It can never jump to saved or verified without its own evidence.</summary>
         private static WorkflowState? ReconciledState(string detail, WorkflowReceipt r, out string refusal)
         {
             refusal = null;
-            if (!Enum.TryParse(detail ?? "", out WorkflowState s)) { refusal = "reconciliado: detalle debe ser el estado observado"; return null; }
+            if (!Enum.TryParse(detail ?? "", out WorkflowState s)) { refusal = "reconciled: detail must be the observed state"; return null; }
             if (s == WorkflowState.save_confirmed || s == WorkflowState.verification_passed || s == WorkflowState.reconciliation_required)
-            { refusal = "una reconciliación no puede declarar " + s + ": aporte la verificación o el guardado como evidencia propia"; return null; }
-            if (s == WorkflowState.preflight && r.MayHaveEffects) { refusal = "ya pudo haber copia: no se vuelve a preflight; reconcilie a finished o awaiting_finish"; return null; }
+            { refusal = "a reconciliation cannot declare " + s + ": supply the verification or the save as its own evidence"; return null; }
+            if (s == WorkflowState.preflight && r.MayHaveEffects) { refusal = "a copy may already have happened: no return to preflight; reconcile to finished or awaiting_finish"; return null; }
             return s;
         }
 
@@ -285,19 +285,19 @@ namespace Bimbridge.Engine.Workflows
             return r;
         }
 
-        /// <summary>¿Se puede (re)lanzar la orden nativa? Sólo desde preflight y sin indicios de efectos (#23: nunca re-PostCommand a ciegas).</summary>
+        /// <summary>Can the native command be (re)launched? Only from preflight and with no sign of effects (#23: never re-PostCommand blindly).</summary>
         public static bool CanInvoke(WorkflowReceipt r, out string why)
         {
             why = null;
-            if (r.State != WorkflowState.preflight) { why = "el intento está en " + r.State + "; no se repite la orden nativa (reconcilie o abra un intento nuevo)"; return false; }
-            if (r.MayHaveEffects) { why = "hay indicios de copia previa; reconcilie antes de repetir"; return false; }
+            if (r.State != WorkflowState.preflight) { why = "the attempt is in " + r.State + "; the native command is not repeated (reconcile or open a new attempt)"; return false; }
+            if (r.MayHaveEffects) { why = "there are signs of a previous copy; reconcile before repeating"; return false; }
             return true;
         }
     }
 
     /// <summary>
-    /// Recibos persistidos por clave de intento (un archivo por intento, escritura atómica). Abrir el mismo intento dos veces devuelve
-    /// el recibo existente: así un reintento del cliente, una desconexión o un reinicio no duplican efectos.
+    /// Receipts persisted by attempt key (one file per attempt, atomic write). Opening the same attempt twice returns
+    /// the existing receipt: so a client retry, a disconnection or a restart does not duplicate effects.
     /// </summary>
     public sealed class ReceiptStore
     {
@@ -308,22 +308,22 @@ namespace Bimbridge.Engine.Workflows
 
         private string PathFor(string key)
         {
-            if (string.IsNullOrEmpty(key) || key.Any(c => !(char.IsLetterOrDigit(c) || c == '-' || c == '_'))) throw new ArgumentException("clave de intento no válida");
+            if (string.IsNullOrEmpty(key) || key.Any(c => !(char.IsLetterOrDigit(c) || c == '-' || c == '_'))) throw new ArgumentException("invalid attempt key");
             return Path.Combine(_dir, key + ".json");
         }
 
         public WorkflowReceipt Load(string key)
         {
             var p = PathFor(key);
-            return File.Exists(p) ? WorkflowReceipt.FromJson(Json.ParseObject(File.ReadAllText(p, Encoding.UTF8))) : null;
+            return File.Exists(p) ? WorkflowReceipt.FromJson(LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(p, Encoding.UTF8)))) : null;
         }
 
-        /// <summary>Espera máxima por el bloqueo de un intento (otro proceso escribiendo el mismo recibo).</summary>
+        /// <summary>Maximum wait for an attempt's lock (another process writing the same receipt).</summary>
         public TimeSpan LockWait = TimeSpan.FromSeconds(10);
 
         /// <summary>
-        /// AUD-07: exclusión entre procesos por intento (archivo &lt;clave&gt;.lock abierto sin compartir). Leer-aplicar-guardar ocurre
-        /// entero bajo el bloqueo, así dos procesos no pueden pisar transiciones. Si no se obtiene a tiempo, falla cerrado.
+        /// AUD-07: cross-process exclusion per attempt (file &lt;key&gt;.lock opened without sharing). Read-apply-save happens
+        /// entirely under the lock, so two processes cannot overwrite each other's transitions. If it is not acquired in time, it fails closed.
         /// </summary>
         private T WithKeyLock<T>(string key, Func<T> body)
         {
@@ -336,13 +336,13 @@ namespace Bimbridge.Engine.Workflows
                     FileStream fs = null;
                     try { fs = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
                     catch (IOException) when (DateTime.UtcNow < deadline) { System.Threading.Thread.Sleep(15); continue; }
-                    catch (IOException ex) { throw new TimeoutException("el recibo " + key + " está bloqueado por otro proceso: " + ex.Message); }
+                    catch (IOException ex) { throw new TimeoutException("receipt " + key + " is locked by another process: " + ex.Message); }
                     using (fs) return body();
                 }
             }
         }
 
-        /// <summary>Abre (o recupera) el intento. <paramref name="created"/> = false si ya existía.</summary>
+        /// <summary>Opens (or recovers) the attempt. <paramref name="created"/> = false if it already existed.</summary>
         public WorkflowReceipt Begin(string workflow, string key, WorkflowCorrelation corr, out bool created)
         {
             var isNew = false;
@@ -351,9 +351,9 @@ namespace Bimbridge.Engine.Workflows
                 var existing = Load(key);
                 if (existing != null)
                 {
-                    if (existing.Workflow != workflow) throw new InvalidOperationException("la clave de intento pertenece a otro flujo (" + existing.Workflow + ")");
+                    if (existing.Workflow != workflow) throw new InvalidOperationException("the attempt key belongs to another workflow (" + existing.Workflow + ")");
                     if (!string.Equals(existing.Correlation.DocumentIdentity, corr?.DocumentIdentity, StringComparison.Ordinal))
-                        throw new InvalidOperationException("la clave de intento pertenece a otro documento: cambio de destino rechazado");
+                        throw new InvalidOperationException("the attempt key belongs to another document: target change refused");
                     return existing;
                 }
                 isNew = true;
@@ -367,22 +367,22 @@ namespace Bimbridge.Engine.Workflows
 
         public WorkflowReceipt Record(string key, Evidence e) => WithKeyLock(key, () =>
         {
-            var r = Load(key) ?? throw new InvalidOperationException("no existe el intento " + key);
+            var r = Load(key) ?? throw new InvalidOperationException("attempt " + key + " does not exist");
             WorkflowMachine.Apply(r, e);
             Save(r);
             return r;
         });
 
-        // ------------------------------------------------------------------ AUD-12: inventario inicial por intento
+        // ------------------------------------------------------------------ AUD-12: baseline inventory per attempt
 
-        /// <summary>Inventario inicial (ids del anfitrión antes de copiar) de un intento. Es evidencia: se escribe una vez y no se sobrescribe.</summary>
+        /// <summary>Baseline inventory (host ids before copying) of an attempt. It is evidence: written once and never overwritten.</summary>
         public sealed class Baseline
         {
             public const string Schema = "bimbridge.workflow_baseline/1";
             public string AttemptKey, DocumentIdentity, LinkIdentity, Sha256;
             public List<long> Ids = new List<long>();
             public DateTime CreatedUtc;
-            /// <summary>AUD-20: expectativas congeladas del intento (texto JSON canónico; lo interpreta el flujo). Entra en la huella.</summary>
+            /// <summary>AUD-20: frozen expectations of the attempt (canonical JSON text; interpreted by the workflow). Included in the fingerprint.</summary>
             public string Expectations;
 
             public static string Hash(string key, string doc, string link, IEnumerable<long> ids, string expectations = null) =>
@@ -393,9 +393,9 @@ namespace Bimbridge.Engine.Workflows
         private string BaselinePath(string key) => Path.ChangeExtension(PathFor(key), ".inv");
 
         /// <summary>
-        /// Guarda el inventario inicial del intento SOLO si no existe. Un preflight repetido, otra sesión u otro proceso reciben el
-        /// inventario original (<paramref name="created"/> = false): la evidencia inicial nunca se pisa. Si la clave pertenece a otro
-        /// documento o vínculo, se rechaza.
+        /// Saves the attempt's baseline inventory ONLY if it does not exist. A repeated preflight, another session or another process gets the
+        /// original inventory (<paramref name="created"/> = false): the initial evidence is never overwritten. If the key belongs to another
+        /// document or link, it is refused.
         /// </summary>
         public Baseline SaveBaselineOnce(string key, string documentIdentity, string linkIdentity, IEnumerable<long> ids, out bool created, string expectations = null)
         {
@@ -406,7 +406,7 @@ namespace Bimbridge.Engine.Workflows
                 if (existing != null)
                 {
                     if (!string.Equals(existing.DocumentIdentity, documentIdentity, StringComparison.Ordinal) || !string.Equals(existing.LinkIdentity, linkIdentity, StringComparison.Ordinal))
-                        throw new InvalidOperationException("el inventario inicial de este intento pertenece a otro documento o vínculo: cambio de destino rechazado");
+                        throw new InvalidOperationException("the baseline inventory of this attempt belongs to another document or link: target change refused");
                     return existing;
                 }
                 var list = ids.Distinct().OrderBy(x => x).ToList();
@@ -414,9 +414,9 @@ namespace Bimbridge.Engine.Workflows
                 b.Sha256 = Baseline.Hash(key, documentIdentity, linkIdentity, list, expectations);
                 var json = Json.Write(new Dictionary<string, object>
                 {
-                    ["esquema"] = Baseline.Schema, ["clave_intento"] = key, ["documento"] = documentIdentity, ["vinculo"] = linkIdentity,
-                    ["ids"] = list.Cast<object>().ToList(), ["sha256"] = b.Sha256, ["creado"] = b.CreatedUtc.ToString("o", CultureInfo.InvariantCulture),
-                    ["expectativas"] = expectations,
+                    ["schema"] = Baseline.Schema, ["attempt_key"] = key, ["document"] = documentIdentity, ["link"] = linkIdentity,
+                    ["ids"] = list.Cast<object>().ToList(), ["sha256"] = b.Sha256, ["created"] = b.CreatedUtc.ToString("o", CultureInfo.InvariantCulture),
+                    ["expectations"] = expectations,
                 });
                 var p = BaselinePath(key);
                 var tmp = p + ".tmp";
@@ -426,7 +426,7 @@ namespace Bimbridge.Engine.Workflows
                     fs.Write(bytes, 0, bytes.Length);
                     fs.Flush(true);
                 }
-                File.Move(tmp, p);   // falla si ya existe: nunca sobrescribe
+                File.Move(tmp, p);   // fails if it already exists: never overwrites
                 isNew = true;
                 return b;
             });
@@ -434,7 +434,7 @@ namespace Bimbridge.Engine.Workflows
             return res;
         }
 
-        /// <summary>Inventario inicial del intento, o null si no hay. Un archivo alterado o ilegible lanza InvalidDataException (no se usa).</summary>
+        /// <summary>Baseline inventory of the attempt, or null if there is none. A tampered or unreadable file throws InvalidDataException (it is not used).</summary>
         public Baseline LoadBaseline(string key) => WithKeyLock(key, () => LoadBaselineUnlocked(key));
 
         private Baseline LoadBaselineUnlocked(string key)
@@ -443,22 +443,22 @@ namespace Bimbridge.Engine.Workflows
             if (!File.Exists(p)) return null;
             try
             {
-                var d = Json.ParseObject(File.ReadAllText(p, Encoding.UTF8));
-                if (Arg.GetString(d, "esquema") != Baseline.Schema) throw new InvalidDataException("inventario inicial con esquema desconocido");
+                var d = LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(p, Encoding.UTF8)));
+                if (Arg.GetString(d, "schema") != Baseline.Schema) throw new InvalidDataException("baseline inventory with unknown schema");
                 var b = new Baseline
                 {
-                    AttemptKey = Arg.GetString(d, "clave_intento"), DocumentIdentity = Arg.GetString(d, "documento"), LinkIdentity = Arg.GetString(d, "vinculo"),
+                    AttemptKey = Arg.GetString(d, "attempt_key"), DocumentIdentity = Arg.GetString(d, "document"), LinkIdentity = Arg.GetString(d, "link"),
                     Sha256 = Arg.GetString(d, "sha256"), Ids = ((List<object>)d["ids"]).Select(x => Convert.ToInt64(x, CultureInfo.InvariantCulture)).ToList(),
-                    CreatedUtc = DateTime.Parse(Arg.GetString(d, "creado"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                    Expectations = Arg.GetString(d, "expectativas"),
+                    CreatedUtc = DateTime.Parse(Arg.GetString(d, "created"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                    Expectations = Arg.GetString(d, "expectations"),
                 };
                 if (b.AttemptKey != key || b.Sha256 != Baseline.Hash(key, b.DocumentIdentity, b.LinkIdentity, b.Ids, b.Expectations))
-                    throw new InvalidDataException("el inventario inicial del intento " + key + " no coincide con su huella (alterado o dañado)");
+                    throw new InvalidDataException("the baseline inventory of attempt " + key + " does not match its fingerprint (tampered or damaged)");
                 return b;
             }
             catch (Exception ex) when (ex is FormatException || ex is InvalidCastException || ex is KeyNotFoundException || ex is ArgumentException || ex is OverflowException)
             {
-                throw new InvalidDataException("el inventario inicial del intento " + key + " es ilegible: " + ex.GetType().Name);
+                throw new InvalidDataException("the baseline inventory of attempt " + key + " is unreadable: " + ex.GetType().Name);
             }
         }
 
@@ -470,8 +470,8 @@ namespace Bimbridge.Engine.Workflows
             if (File.Exists(p)) File.Replace(tmp, p, null); else File.Move(tmp, p);
         }
 
-        /// <summary>Intentos sin terminar (para reconciliar al arrancar o tras una desconexión).</summary>
-        /// <param name="unreadable">Recibos que no se pudieron leer: se informan (nunca se descartan en silencio) y bloquean su clave.</param>
+        /// <summary>Unfinished attempts (to reconcile at startup or after a disconnection).</summary>
+        /// <param name="unreadable">Receipts that could not be read: they are reported (never silently discarded) and block their key.</param>
         public List<WorkflowReceipt> Open(out List<string> unreadable)
         {
             var open = new List<WorkflowReceipt>();
@@ -479,7 +479,7 @@ namespace Bimbridge.Engine.Workflows
             foreach (var f in Directory.GetFiles(_dir, "*.json"))
             {
                 WorkflowReceipt r;
-                try { r = WorkflowReceipt.FromJson(Json.ParseObject(File.ReadAllText(f, Encoding.UTF8))); }
+                try { r = WorkflowReceipt.FromJson(LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(f, Encoding.UTF8)))); }
                 catch (Exception ex) when (ex is InvalidDataException || ex is FormatException || ex is ArgumentException || ex is InvalidCastException || ex is KeyNotFoundException || ex is InvalidOperationException)
                 {
                     unreadable.Add(Path.GetFileNameWithoutExtension(f) + ": " + ex.GetType().Name);

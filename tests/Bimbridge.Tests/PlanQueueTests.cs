@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>alpha3 P1-B: la cola del servicio no pierde reprogramaciones ni ejecuta un plan dos veces a la vez.</summary>
+    /// <summary>alpha3 P1-B: the service queue neither loses reschedules nor runs a plan twice at the same time.</summary>
     public class PlanQueueTests
     {
         [Fact]
@@ -31,12 +31,12 @@ namespace Bimbridge.Tests
                 var workers = Enumerable.Range(0, 4).Select(_ => Task.Run(() => q.WorkerLoop(Run, cts.Token))).ToList();
                 Assert.True(q.Enqueue("p"));
                 Assert.True(await inRun.WaitAsync(5000));
-                for (var i = 0; i < 20; i++) Assert.True(q.Enqueue("p"));   // llegan durante la ejecución
+                for (var i = 0; i < 20; i++) Assert.True(q.Enqueue("p"));   // arrive during the run
                 Assert.True(q.IsRunning("p"));
-                Assert.Equal(0, q.Queued);                                    // no ocupan capacidad
+                Assert.Equal(0, q.Queued);                                    // do not take up capacity
                 proceed.Release();
                 for (var t = 0; t < 200 && (runs < 2 || q.IsRunning("p") || q.Queued > 0); t++) await Task.Delay(10);
-                Assert.Equal(2, runs);           // exactamente una repetición, no 0 (perdida) ni 21 (duplicados)
+                Assert.Equal(2, runs);           // exactly one repeat, not 0 (lost) nor 21 (duplicates)
                 Assert.Equal(1, maxConcurrent);
                 cts.Cancel();
                 await Task.WhenAll(workers);

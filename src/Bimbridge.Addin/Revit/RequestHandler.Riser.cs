@@ -15,12 +15,13 @@ namespace Bimbridge.Addin.Revit
     {
         private async Task<Response> RiserDrawingCheck(Request request, CancellationToken ct)
         {
-            var viewId = Arg.GetLong(request.Args, "vista");
-            var style = Arg.GetString(request.Args, "estilo");
+            var viewId = Arg.GetLong(request.Args, "view");
+            var style = Arg.GetString(request.Args, "style");
+            LegacyAliases.NormalizeRows(request.Args, "expected_drawing");   // 0.9.3 edge keys (puntos, rotulo, ...)
             if (!viewId.HasValue || viewId <= 0 || string.IsNullOrWhiteSpace(style) ||
-                !request.Args.TryGetValue("esperado_dibujo", out var value) || value is not List<object> rows ||
+                !request.Args.TryGetValue("expected_drawing", out var value) || value is not List<object> rows ||
                 rows.Count == 0 || rows.Count > 2000 || rows.Any(r => r is not Dictionary<string, object>))
-                return Response.Fail(request.Id, Status.Invalido, "indique vista de dibujo, estilo de línea y esperado_dibujo del riser");
+                return Response.Fail(request.Id, Status.Invalid, "give the drafting view, line style and expected_drawing of the riser");
             var found = new List<object>();
             var missing = new List<object>();
             string error = null;
@@ -31,7 +32,7 @@ namespace Bimbridge.Addin.Revit
                 if (doc == null) return true;
                 if (!(doc.GetElement(Ids.ToId(viewId.Value)) is ViewDrafting view) || view.IsTemplate)
                 {
-                    error = "el riser debe estar en una vista de dibujo del documento destino";
+                    error = "the riser must be in a drafting view of the target document";
                     return true;
                 }
                 using var collector = new FilteredElementCollector(doc);
@@ -53,30 +54,30 @@ namespace Bimbridge.Addin.Revit
                     foreach (var edge in rows.Cast<Dictionary<string, object>>())
                     {
                         var id = Arg.GetString(edge, "id");
-                        if (string.IsNullOrWhiteSpace(id) || !edge.TryGetValue("puntos", out var points) || !edge.TryGetValue("rotulo", out var label))
-                            throw new QueryException("cada arista exige ID, puntos y posición del rótulo");
-                        var path = OpCatalog.Points(points, "puntos del riser", 2, 2000, false);
+                        if (string.IsNullOrWhiteSpace(id) || !edge.TryGetValue("points", out var points) || !edge.TryGetValue("label", out var label))
+                            throw new QueryException("each edge requires ID, points and label position");
+                        var path = OpCatalog.Points(points, "riser points", 2, 2000, false);
                         var absentLegs = new List<object>();
                         for (var i = 1; i < path.Count; i++)
                             if (!lines.Contains(RiserLegKey(RiserPoint(path[i - 1]), RiserPoint(path[i]))))
                                 absentLegs.Add((long)i);
-                        var expected = RiserPoint(OpCatalog.Point(label, "rótulo del riser", false));
+                        var expected = RiserPoint(OpCatalog.Point(label, "riser label", false));
                         var labelTotal = notes[id].Count();
                         var labelCount = notes[id].Count(n => n.Coord.DistanceTo(expected) <= (1.0 / 304.8) * view.Scale);
-                        var startExists = Present(path[0], Arg.GetString(edge, "tipo_origen"));
-                        var endExists = Present(path[path.Count - 1], Arg.GetString(edge, "tipo_destino"));
+                        var startExists = Present(path[0], Arg.GetString(edge, "source_type"));
+                        var endExists = Present(path[path.Count - 1], Arg.GetString(edge, "target_type"));
                         if (absentLegs.Count == 0 && labelCount == 1 && labelTotal == 1 && startExists && endExists)
                         {
                             found.Add(new Dictionary<string, object>
                             {
-                                ["id"] = id, ["origen"] = Arg.GetString(edge, "origen"), ["destino"] = Arg.GetString(edge, "destino"),
-                                ["abierto"] = Arg.GetBool(edge, "abierto") ?? false,
+                                ["id"] = id, ["origin"] = Arg.GetString(edge, "origin"), ["target"] = Arg.GetString(edge, "target"),
+                                ["open"] = Arg.GetBool(edge, "open") ?? false,
                             });
                         }
                         else missing.Add(new Dictionary<string, object>
                         {
-                            ["id"] = id, ["tramos_faltantes"] = absentLegs, ["rotulos_en_posicion"] = (long)labelCount,
-                            ["rotulos_total"] = (long)labelTotal, ["simbolo_origen_ok"] = startExists, ["simbolo_destino_ok"] = endExists,
+                            ["id"] = id, ["missing_segments"] = absentLegs, ["labels_in_position"] = (long)labelCount,
+                            ["labels_total"] = (long)labelTotal, ["source_symbol_ok"] = startExists, ["target_symbol_ok"] = endExists,
                         });
                     }
                 }
@@ -85,12 +86,12 @@ namespace Bimbridge.Addin.Revit
                 return true;
             }, highPriority: false, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!work.Ok) return FromWork(request.Id, work);
-            if (error != null) return Response.Fail(request.Id, Status.Invalido, error);
+            if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
             return new Response
             {
-                Id = request.Id, Rev = revision, Estado = missing.Count > 0 ? Status.ConDiferencias : Status.Ok,
-                Datos = new Dictionary<string, object> { ["observado"] = found, ["diferencias"] = missing,
-                    ["alcance"] = "Comprueba tramos, rótulos y los tipos de símbolo indicados en la vista de dibujo. La conectividad MEP se comprueba en el modelo de instalaciones." },
+                Id = request.Id, Rev = revision, State = missing.Count > 0 ? Status.CompletedWithDifferences : Status.Ok,
+                Data = new Dictionary<string, object> { ["observed"] = found, ["differences"] = missing,
+                    ["scope"] = "Checks segments, labels and the given symbol types in the drafting view. MEP connectivity is checked in the MEP model." },
             };
         }
 

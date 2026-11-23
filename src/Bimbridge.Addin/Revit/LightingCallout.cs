@@ -20,9 +20,9 @@ namespace Bimbridge.Addin.Revit
         {
             if (!(doc.GetElement(Ids.ToId(id)) is FamilyInstance light) ||
                 Ids.ToLong(light.Category?.Id ?? ElementId.InvalidElementId) != (long)BuiltInCategory.OST_LightingFixtures)
-                throw new QueryException("text_note: " + id + " no es una luminaria del anfitrión");
+                throw new QueryException("text_note: " + id + " is not a lighting fixture of the host");
             var config = new Dictionary<string, object> { ["uid"] = light.UniqueId };
-            foreach (var key in new[] { "codigo_param", "altura_param", "descontar_tipo_param", "negrita", "subrayado" })
+            foreach (var key in new[] { "code_param", "height_param", "subtract_type_param", "bold", "underline" })
                 if (args.TryGetValue(key, out var value)) config[key] = value;
             return config;
         }
@@ -30,21 +30,21 @@ namespace Bimbridge.Addin.Revit
         internal static (string Text, XYZ Point, long Id, string TypeUid) Observe(Document doc, Dictionary<string, object> config)
         {
             if (!(doc.GetElement(Arg.GetString(config, "uid")) is FamilyInstance light) || light.Location is not LocationPoint location)
-                throw new QueryException("la luminaria asociada ya no está disponible con un punto de inserción");
+                throw new QueryException("the associated fixture is no longer available with an insertion point");
             var type = light.Symbol;
-            var codeName = Arg.GetString(config, "codigo_param");
+            var codeName = Arg.GetString(config, "code_param");
             var code = codeName == null ? type.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_MARK)?.AsString() : TextParameter(type, codeName);
             if (string.IsNullOrWhiteSpace(code) && codeName == null) code = type.Name;
-            if (string.IsNullOrWhiteSpace(code)) throw new QueryException("la luminaria asociada carece de código");
-            var height = LengthParameter(light, Arg.GetString(config, "altura_param") ?? "Mounting Height");
-            if (Arg.GetString(config, "descontar_tipo_param") is string body) height -= LengthParameter(type, body);
+            if (string.IsNullOrWhiteSpace(code)) throw new QueryException("the associated fixture has no code");
+            var height = LengthParameter(light, Arg.GetString(config, "height_param") ?? "Mounting Height");
+            if (Arg.GetString(config, "subtract_type_param") is string body) height -= LengthParameter(type, body);
             return (LightingCalloutState.Text(code, height), location.Point, Ids.ToLong(light.Id), type.UniqueId);
         }
 
         private static string TextParameter(Element element, string name)
         {
             var matches = element.GetParameters(name).Where(p => p.HasValue && p.StorageType == StorageType.String).ToList();
-            if (matches.Count != 1) throw new QueryException("el código necesita un parámetro de texto único: " + name);
+            if (matches.Count != 1) throw new QueryException("the code needs a single text parameter: " + name);
             return matches[0].AsString();
         }
 
@@ -52,7 +52,7 @@ namespace Bimbridge.Addin.Revit
         {
             var matches = element.GetParameters(name).Where(p => p.HasValue && p.StorageType == StorageType.Double &&
                 p.Definition.GetDataType() == SpecTypeId.Length).ToList();
-            if (matches.Count != 1) throw new QueryException("la altura necesita un parámetro de longitud único: " + name);
+            if (matches.Count != 1) throw new QueryException("the height needs a single length parameter: " + name);
             return matches[0].AsDouble();
         }
 
@@ -67,8 +67,16 @@ namespace Bimbridge.Addin.Revit
             var schema = Schema.Lookup(SchemaId);
             if (schema == null) return null;
             var entity = note.GetEntity(schema);
-            return entity.IsValid() ? Json.ParseObject(entity.Get<string>(schema.GetField(Field))) : null;
+            // Notes written by 0.9.3/0.9.4 hold legacy keys (punto_origen, codigo_param...): read as English, the entity is never rewritten.
+            return entity.IsValid() ? LegacyAliases.NormalizeRecord(Json.ParseObject(entity.Get<string>(schema.GetField(Field)))) : null;
         }
+
+        /// <summary>FROZEN hash literals: the 0.9.4 config key names the callout fingerprints were computed with. Never change these strings.</summary>
+        private static readonly IReadOnlyDictionary<string, string> FrozenKeys = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["origin_point"] = "punto_origen", ["source_type"] = "tipo_origen", ["code_param"] = "codigo_param", ["height_param"] = "altura_param",
+            ["subtract_type_param"] = "descontar_tipo_param", ["bold"] = "negrita", ["underline"] = "subrayado",
+        };
 
         internal static void Write(TextNote note, Dictionary<string, object> config, XYZ point, string typeUid)
         {
@@ -87,27 +95,27 @@ namespace Bimbridge.Addin.Revit
         }
 
         internal static bool IsCurrent(TextNote note, Dictionary<string, object> config, string text, XYZ point, string typeUid) =>
-            LightingCalloutState.IsCurrent(note.Text, Arg.GetString(config, "tipo_origen"), text, typeUid,
+            LightingCalloutState.IsCurrent(note.Text, Arg.GetString(config, "source_type"), text, typeUid,
                 point.DistanceTo(PreviousPoint(config)));
 
         internal static XYZ PreviousPoint(Dictionary<string, object> config)
         {
-            var p = (List<object>)config["punto_origen"];
+            var p = (List<object>)config["origin_point"];
             return new XYZ(Convert.ToDouble(p[0], CultureInfo.InvariantCulture), Convert.ToDouble(p[1], CultureInfo.InvariantCulture),
                 Convert.ToDouble(p[2], CultureInfo.InvariantCulture));
         }
 
         internal static string Fingerprint(Dictionary<string, object> config, string text, XYZ point, string typeUid) =>
-            Home.Sha256Hex(OpSemantics.Canonical(new object[] { config, text, Vector(point), typeUid }));
+            Home.Sha256Hex(OpSemantics.Canonical(new object[] { LegacyAliases.Frozen(config, FrozenKeys), text, Vector(point), typeUid }));
 
         internal static string NoteFingerprint(TextNote note, Dictionary<string, object> config, string source) =>
             NoteFingerprint(note.Text, note.Coord, config, source);
 
         internal static string NoteFingerprint(string text, XYZ location, Dictionary<string, object> config, string source) =>
-            Home.Sha256Hex(OpSemantics.Canonical(new object[] { config, text, Vector(location), source }));
+            Home.Sha256Hex(OpSemantics.Canonical(new object[] { LegacyAliases.Frozen(config, FrozenKeys), text, Vector(location), source }));
 
         internal static Dictionary<string, object> WithSource(Dictionary<string, object> config, XYZ point, string typeUid) =>
-            new Dictionary<string, object>(config) { ["punto_origen"] = Vector(point), ["tipo_origen"] = typeUid };
+            new Dictionary<string, object>(config) { ["origin_point"] = Vector(point), ["source_type"] = typeUid };
 
         internal static XYZ Reposition(TextNote note, View view, Dictionary<string, object> config, XYZ point)
         {
@@ -121,10 +129,10 @@ namespace Bimbridge.Addin.Revit
 
         internal static void Format(TextNote note, Dictionary<string, object> options)
         {
-            if (!options.ContainsKey("negrita") && !options.ContainsKey("subrayado")) return;
+            if (!options.ContainsKey("bold") && !options.ContainsKey("underline")) return;
             using var text = note.GetFormattedText();
-            if (Arg.GetBool(options, "negrita") is bool bold) text.SetBoldStatus(bold);
-            if (Arg.GetBool(options, "subrayado") is bool underline) text.SetUnderlineStatus(underline);
+            if (Arg.GetBool(options, "bold") is bool bold) text.SetBoldStatus(bold);
+            if (Arg.GetBool(options, "underline") is bool underline) text.SetUnderlineStatus(underline);
             note.SetFormattedText(text);
         }
     }

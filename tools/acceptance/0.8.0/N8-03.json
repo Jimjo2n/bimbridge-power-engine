@@ -1,0 +1,83 @@
+{
+ "schema": "bimbridge.campaign080/1",
+ "item": "N8-03",
+ "title": "Element modification",
+ "initial_status": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW.",
+ "variables": {
+  "ids": "3–30 comma-separated ids",
+  "_": "-"
+ },
+ "steps": [
+  {
+   "name": "comment on 3–30 elements",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "set_param",
+      "ids": "${ids}",
+      "name": "Comments",
+      "value": "BB-N8-03"
+     }
+    ],
+    "summary": "campaign 0.8.0"
+   },
+   "save": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "name": "apply",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "write": true
+  },
+  {
+   "name": "re-read",
+   "op": "query",
+   "args": {
+    "ids": "${ids}",
+    "f": [
+     "id",
+     "Comments"
+    ],
+    "page_size": 50
+   },
+   "contains": [
+    "BB-N8-03"
+   ]
+  },
+  {
+   "name": "move and move back",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "move",
+      "ids": "${ids}",
+      "dx": 1
+     },
+     {
+      "op": "move",
+      "ids": "${ids}",
+      "dx": -1
+     }
+    ],
+    "summary": "campaign 0.8.0"
+   },
+   "save": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "name": "apply move",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "write": true
+  }
+ ]
+}

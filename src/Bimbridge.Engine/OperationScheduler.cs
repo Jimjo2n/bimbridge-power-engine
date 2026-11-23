@@ -7,21 +7,21 @@ using System.Threading.Tasks;
 
 namespace Bimbridge.Engine
 {
-    /// <summary>La cola de operaciones largas está llena: se rechaza en vez de acumular sin límite.</summary>
+    /// <summary>The long-operation queue is full: the request is rejected instead of piling up without limit.</summary>
     public sealed class SchedulerBusyException : Exception
     {
         public SchedulerBusyException(string message) : base(message) { }
     }
 
     /// <summary>
-    /// 0.9.1 (Bloque I): planificador de operaciones largas entre agentes. No ejecuta nada por su cuenta: decide CUÁNDO puede empezar
-    /// cada operación para que un agente no acapare el motor.
-    ///  - límite global y por dueño de operaciones en curso;
-    ///  - clave exclusiva opcional (p. ej. el documento): dos operaciones con la misma clave nunca corren a la vez;
-    ///  - reparto justo: entre las que pueden empezar, primero la del dueño con menos en curso y, a igualdad, la más antigua;
-    ///  - cola acotada: si está llena se rechaza (falla cerrado), no se espera indefinidamente;
-    ///  - cancelar una operación en cola la retira sin haber empezado (nada que reconciliar).
-    /// El hilo de Revit sigue teniendo su propia cola (MainThread); esto ordena el trabajo antes de llegar a ella.
+    /// 0.9.1 (Block I): scheduler for long operations across agents. It runs nothing on its own: it decides WHEN each operation
+    /// may start so that one agent does not hog the engine.
+    ///  - global and per-owner limit on running operations;
+    ///  - optional exclusive key (e.g. the document): two operations with the same key never run at the same time;
+    ///  - fair share: among those that can start, first the one whose owner has the fewest running and, on a tie, the oldest;
+    ///  - bounded queue: when full it rejects (fails closed), it does not wait indefinitely;
+    ///  - cancelling a queued operation removes it before it started (nothing to reconcile).
+    /// The Revit thread still has its own queue (MainThread); this orders the work before it reaches it.
     /// </summary>
     public sealed class OperationScheduler
     {
@@ -53,7 +53,7 @@ namespace Bimbridge.Engine
                 if (_queue.Count >= MaxQueued)
                 {
                     _rejected++;
-                    throw new SchedulerBusyException("hay " + _queue.Count + " operaciones largas en cola (máximo " + MaxQueued + "): espere a que terminen o cancele alguna");
+                    throw new SchedulerBusyException("there are " + _queue.Count + " long operations queued (maximum " + MaxQueued + "): wait for them to finish or cancel one");
                 }
                 w.Seq = ++_seq;
                 _queue.Add(w);
@@ -64,7 +64,7 @@ namespace Bimbridge.Engine
             {
                 lock (_lock)
                 {
-                    // Sólo se cancela si sigue en cola; si ya empezó, la cancelación es asunto del cuerpo (su propio token).
+                    // Only cancelled while still queued; once started, cancellation is up to the body (its own token).
                     if (_queue.Remove(w)) { _cancelledQueued++; w.Go.TrySetCanceled(); }
                 }
             }))
@@ -85,14 +85,14 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Arranca todas las que puedan empezar ahora (llamar con el bloqueo tomado).</summary>
+        /// <summary>Starts every operation that can start now (call with the lock held).</summary>
         private void Dispatch()
         {
             while (_running < MaxRunning)
             {
                 Waiter next = null;
                 var best = int.MaxValue;
-                foreach (var w in _queue)   // _queue está en orden de llegada: a igualdad gana la más antigua
+                foreach (var w in _queue)   // _queue is in arrival order: on a tie the oldest wins
                 {
                     var mine = _runningByOwner.TryGetValue(w.Owner, out var n) ? n : 0;
                     if (mine >= MaxPerOwner) continue;
@@ -114,9 +114,9 @@ namespace Bimbridge.Engine
             lock (_lock)
                 return new Dictionary<string, object>
                 {
-                    ["en_curso"] = (long)_running, ["en_cola"] = (long)_queue.Count, ["max_en_curso"] = (long)MaxRunning, ["max_por_agente"] = (long)MaxPerOwner,
-                    ["max_en_cola"] = (long)MaxQueued, ["iniciadas"] = _started, ["rechazadas_por_cola_llena"] = _rejected, ["canceladas_en_cola"] = _cancelledQueued,
-                    ["cola_maxima_vista"] = _maxQueuedSeen, ["agentes_en_curso"] = (long)_runningByOwner.Count,
+                    ["running"] = (long)_running, ["queued"] = (long)_queue.Count, ["max_running"] = (long)MaxRunning, ["max_per_agent"] = (long)MaxPerOwner,
+                    ["max_queued"] = (long)MaxQueued, ["started_items"] = _started, ["rejected_queue_full"] = _rejected, ["cancelled_in_queue"] = _cancelledQueued,
+                    ["max_queue_seen"] = _maxQueuedSeen, ["running_agents"] = (long)_runningByOwner.Count,
                 };
         }
     }

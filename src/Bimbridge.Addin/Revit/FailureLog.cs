@@ -7,9 +7,9 @@ using Autodesk.Revit.DB;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// Fallos de Revit durante una transacción (R058, F18): cada aviso se clasifica por FailureDefinitionId y se asocia a sus elementos,
-    /// en vez de borrarlo sin dejar rastro. Los avisos se quitan del diálogo (no bloquean un trabajo desatendido) pero vuelven en la respuesta.
-    /// Errores: la transacción se revierte entera y se informan.
+    /// Revit failures during a transaction (R058, F18): each warning is classified by FailureDefinitionId and linked to its elements,
+    /// instead of being deleted without a trace. Warnings are removed from the dialog (they do not block an unattended job) but come back in the response.
+    /// Errors: the whole transaction is rolled back and they are reported.
     /// </summary>
     public sealed class FailureLog : IFailuresPreprocessor
     {
@@ -25,17 +25,17 @@ namespace Bimbridge.Addin.Revit
 
             public Dictionary<string, object> ToJson() => new Dictionary<string, object>
             {
-                ["tipo"] = Kind, ["gravedad"] = Severity, ["texto"] = Text, ["definicion"] = Guid,
+                ["type"] = Kind, ["severity"] = Severity, ["text"] = Text, ["definition"] = Guid,
                 ["ids"] = Ids.Take(50).Select(i => (object)i).ToList(),
             };
         }
 
         public readonly List<Item> Items = new List<Item>();
-        /// <summary>false = dejar los avisos en Revit (el usuario los verá en el diálogo de avisos).</summary>
+        /// <summary>false = leave the warnings in Revit (the user will see them in the warnings dialog).</summary>
         public bool DeleteWarnings = true;
 
-        public List<string> Errors => Items.Where(i => i.Severity != "aviso").Select(i => i.Text).ToList();
-        public List<string> Warnings => Items.Where(i => i.Severity == "aviso").Select(i => i.Line()).ToList();
+        public List<string> Errors => Items.Where(i => i.Severity != "warning").Select(i => i.Text).ToList();
+        public List<string> Warnings => Items.Where(i => i.Severity == "warning").Select(i => i.Line()).ToList();
 
         public FailureProcessingResult PreprocessFailures(FailuresAccessor a)
         {
@@ -45,7 +45,7 @@ namespace Bimbridge.Addin.Revit
                 var sev = m.GetSeverity();
                 var item = new Item
                 {
-                    Severity = sev == FailureSeverity.Warning ? "aviso" : sev == FailureSeverity.Error ? "error" : sev.ToString().ToLowerInvariant(),
+                    Severity = sev == FailureSeverity.Warning ? "warning" : sev == FailureSeverity.Error ? "error" : sev.ToString().ToLowerInvariant(),
                     Guid = m.GetFailureDefinitionId()?.Guid.ToString(),
                     Text = m.GetDescriptionText(),
                 };
@@ -59,22 +59,22 @@ namespace Bimbridge.Addin.Revit
             return hasError ? FailureProcessingResult.ProceedWithRollBack : FailureProcessingResult.Continue;
         }
 
-        /// <summary>Tipo corto y estable para agrupar en el QC.</summary>
+        /// <summary>Short, stable kind for grouping in QC.</summary>
         public static string Classify(FailureDefinitionId id, string text)
         {
             try
             {
-                if (id != null && id.Guid == BuiltInFailures.OverlapFailures.DuplicateInstances.Guid) return "duplicados";
+                if (id != null && id.Guid == BuiltInFailures.OverlapFailures.DuplicateInstances.Guid) return "duplicates";
             }
             catch (Exception) { }
             var t = (text ?? "").ToLowerInvariant();
-            if (t.Contains("identical instances") || t.Contains("instancias idénticas")) return "duplicados";
-            if (t.Contains("host") || t.Contains("anfitri")) return "anfitrion";
-            if (t.Contains("overlap") || t.Contains("superpuest")) return "superposicion";
-            if (t.Contains("constraint") || t.Contains("restricci")) return "restriccion";
-            if (t.Contains("group") || t.Contains("grupo")) return "grupo";
-            if (t.Contains("connector") || t.Contains("conector")) return "conector";
-            return "otro";
+            if (t.Contains("identical instances") || t.Contains("instancias idénticas")) return "duplicates";
+            if (t.Contains("host") || t.Contains("anfitri")) return "host";
+            if (t.Contains("overlap") || t.Contains("superpuest")) return "overlap";
+            if (t.Contains("constraint") || t.Contains("restricci")) return "constraint";
+            if (t.Contains("group") || t.Contains("grupo")) return "group";
+            if (t.Contains("connector") || t.Contains("conector")) return "connector";
+            return "other";
         }
 
         public static FailureHandlingOptions Attach(Transaction t, FailureLog log)

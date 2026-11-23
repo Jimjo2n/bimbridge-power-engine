@@ -10,12 +10,12 @@ using Bimbridge.Engine;
 namespace Bimbridge.Addin.Scripting
 {
     /// <summary>
-    /// Carga el compilador (carpeta roslyn\ junto al add-in) sólo cuando hace falta, compila con caché y devuelve el método Run listo.
-    /// - Revit 2025–2026 (.NET 8): Roslyn vive en un AssemblyLoadContext propio; si Revit u otro add-in ya cargó otra versión de Roslyn, no chocan.
-    ///   El script compilado se carga en el MISMO contexto que este add-in, para que vea ScriptContext y la API de Revit tal como las ve el add-in.
-    /// - Revit 2022–2024 (.NET Framework 4.8): AssemblyResolve sobre roslyn\ (sólo para nombres que existan ahí). Si otro add-in ya cargó una
-    ///   versión distinta de System.Collections.Immutable o System.Memory, pueden convivir dos versiones: riesgo documentado, no probado en Revit.
-    /// La compilación corre fuera del hilo de Revit; sólo Run corre dentro.
+    /// Loads the compiler (roslyn\ folder next to the add-in) only when needed, compiles with a cache and returns the ready Run method.
+    /// - Revit 2025–2026 (.NET 8): Roslyn lives in its own AssemblyLoadContext; if Revit or another add-in already loaded another Roslyn version, they do not clash.
+    ///   The compiled script is loaded into the SAME context as this add-in, so it sees ScriptContext and the Revit API exactly as the add-in does.
+    /// - Revit 2022–2024 (.NET Framework 4.8): AssemblyResolve over roslyn\ (only for names that exist there). If another add-in already loaded a
+    ///   different version of System.Collections.Immutable or System.Memory, two versions may coexist: documented risk, not tested in Revit.
+    /// Compilation runs outside the Revit thread; only Run runs inside it.
     /// </summary>
     public static class ScriptHost
     {
@@ -24,21 +24,21 @@ namespace Bimbridge.Addin.Scripting
             public MethodInfo Run;
             public string Key;
             public long CompileMs;
-            /// <summary>Bytes de la imagen del ensamblado (+ PDB) cargado: base de la estimación de memoria de AUD-05.</summary>
+            /// <summary>Bytes of the loaded assembly image (+ PDB): basis of the AUD-05 memory estimate.</summary>
             public long ImageBytes;
             public bool FromCache;
             public string[] Diagnostics;
             public string Kind;
-            /// <summary>Tipo de la receta (cuando el código define una clase que hereda de Receta).</summary>
+            /// <summary>Recipe type (when the code defines a class that inherits from Recipe).</summary>
             public Type RecipeType;
-            /// <summary>Referencias explícitas usadas (ruta → versión o error).</summary>
+            /// <summary>Explicit references used (path → version or error).</summary>
             public Dictionary<string, object> ExtraRefs;
-            /// <summary>Capacidades sensibles detectadas por análisis semántico ("tipo:detalle"). Se aplican con CapabilityPolicy en el punto de ejecución.</summary>
+            /// <summary>Sensitive capabilities detected by semantic analysis ("type:detail"). Enforced with CapabilityPolicy at the point of execution.</summary>
             public string[] Capabilities = new string[0];
         }
 
         private static readonly object Lock = new object();
-        /// <summary>AUD-05: límite de compilaciones distintas (cada una deja un ensamblado cargado hasta reiniciar Revit) y tamaño estimado de imágenes.</summary>
+        /// <summary>AUD-05: limit on distinct compilations (each one leaves an assembly loaded until Revit restarts) and estimated image size.</summary>
         private static readonly CompileCache<Compiled> Cache = new CompileCache<Compiled>(CompileCache<Compiled>.DefaultMaxEntries, c => c.ImageBytes);
         private static MethodInfo _compile;
         private static Func<string> _roslynVersion;
@@ -67,7 +67,7 @@ namespace Bimbridge.Addin.Scripting
 
             protected override Assembly Load(AssemblyName name)
             {
-                // Sólo Roslyn y nuestro compilador salen de roslyn\; el resto (System.*) lo da el runtime de Revit, que es más nuevo.
+                // Only Roslyn and our compiler come from roslyn\; the rest (System.*) is provided by the Revit runtime, which is newer.
                 if (name.Name == null) return null;
                 if (!name.Name.StartsWith("Microsoft.CodeAnalysis", StringComparison.Ordinal) && name.Name != "Bimbridge.Scripting") return null;
                 var path = Path.Combine(_dir, name.Name + ".dll");
@@ -84,15 +84,15 @@ namespace Bimbridge.Addin.Scripting
             try
             {
                 var name = new AssemblyName(e.Name);
-                // 1) Ya cargado con versión suficiente → se reutiliza. Imprescindible para los scripts: se cargan con Assembly.Load(byte[])
-                //    (sin contexto) y su referencia a Bimbridge.Addin no se encuentra sola, porque Revit carga el add-in con LoadFrom.
+                // 1) Already loaded with a sufficient version → reuse it. Essential for scripts: they are loaded with Assembly.Load(byte[])
+                //    (no context) and their reference to Bimbridge.Addin is not found on its own, because Revit loads the add-in with LoadFrom.
                 foreach (var a in AppDomain.CurrentDomain.GetAssemblies())
                 {
                     AssemblyName an;
                     try { an = a.GetName(); } catch (Exception) { continue; }
                     if (string.Equals(an.Name, name.Name, StringComparison.OrdinalIgnoreCase) && (name.Version == null || an.Version >= name.Version)) return a;
                 }
-                // 2) Roslyn y sus dependencias, desde roslyn\.
+                // 2) Roslyn and its dependencies, from roslyn\.
                 var path = Path.Combine(RoslynDir, name.Name + ".dll");
                 if (!File.Exists(path)) return null;
                 var have = AssemblyName.GetAssemblyName(path);
@@ -105,7 +105,7 @@ namespace Bimbridge.Addin.Scripting
 
         private static MethodInfo _recipeConstant;
 
-        /// <summary>rc3: valor constante de una propiedad de la receta leído del código fuente (Roslyn, sin instanciar). null = no constante.</summary>
+        /// <summary>rc3: constant value of a recipe property read from the source code (Roslyn, without instantiating). null = not constant.</summary>
         public static string RecipeConstant(string source, string name)
         {
             if (!EnsureLoaded() || _recipeConstant == null) return null;
@@ -118,7 +118,7 @@ namespace Bimbridge.Addin.Scripting
             lock (Lock)
             {
                 if (_compile != null) return true;
-                if (!Present) { _loadError = "no está la carpeta roslyn\\ con el compilador junto al add-in (" + RoslynDir + "); reinstale"; return false; }
+                if (!Present) { _loadError = "the roslyn\\ folder with the compiler is missing next to the add-in (" + RoslynDir + "); reinstall"; return false; }
                 try
                 {
                     var path = Path.Combine(RoslynDir, "Bimbridge.Scripting.dll");
@@ -140,16 +140,16 @@ namespace Bimbridge.Addin.Scripting
                 }
                 catch (Exception ex)
                 {
-                    _loadError = "no se pudo cargar el compilador: " + ex.GetType().Name + ": " + ex.Message;
+                    _loadError = "could not load the compiler: " + ex.GetType().Name + ": " + ex.Message;
                     return false;
                 }
             }
         }
 
         /// <summary>
-        /// Referencias de compilación: los ensamblados .NET del runtime de Revit + RevitAPI/RevitAPIUI + los del add-in + lo cargado en Revit.
-        /// 0.6.0: se recalcula cuando Revit cargó ensamblados nuevos desde la última vez (antes se congelaba en el primer exec, H-C).
-        /// Si dos versiones tienen el mismo nombre, se queda la más nueva.
+        /// Compilation references: the .NET assemblies of the Revit runtime + RevitAPI/RevitAPIUI + the add-in ones + whatever is loaded in Revit.
+        /// 0.6.0: recalculated when Revit has loaded new assemblies since the last time (it used to freeze on the first exec, H-C).
+        /// If two versions share a name, the newest one is kept.
         /// </summary>
         public static string[] References()
         {
@@ -167,7 +167,7 @@ namespace Bimbridge.Addin.Scripting
                 if (!byName.TryGetValue(an.Name, out var cur) || (an.Version != null && an.Version > cur.Item1))
                     byName[an.Name] = Tuple.Create(an.Version, path);
             }
-            // Runtime: todos los System.* de la carpeta del runtime (en .NET 8 son las implementaciones; en 4.8, el GAC de framework).
+            // Runtime: every System.* in the runtime folder (on .NET 8 these are the implementations; on 4.8, the framework GAC).
             var rt = Path.GetDirectoryName(typeof(object).Assembly.Location);
             foreach (var f in Directory.GetFiles(rt, "*.dll"))
             {
@@ -179,7 +179,7 @@ namespace Bimbridge.Addin.Scripting
             var facades = Path.Combine(rt, "Facades");
             if (Directory.Exists(facades)) foreach (var f in Directory.GetFiles(facades, "*.dll")) Add(f);
 #endif
-            // Lo que ya está cargado en Revit (RevitAPI, RevitAPIUI, netstandard, el add-in…).
+            // What is already loaded in Revit (RevitAPI, RevitAPIUI, netstandard, the add-in…).
             foreach (var a in AppDomain.CurrentDomain.GetAssemblies())
             {
                 try { if (!a.IsDynamic && !string.IsNullOrEmpty(a.Location)) Add(a.Location); } catch (Exception) { }
@@ -195,8 +195,8 @@ namespace Bimbridge.Addin.Scripting
         }
 
         /// <summary>
-        /// Referencias explícitas (refs=ruta.dll[,…]): se resuelven, se cargan en el contexto del add-in para que el script las encuentre
-        /// al correr y entran en la huella de compilación (tamaño + fecha). Devuelve null y el motivo si alguna falla.
+        /// Explicit references (refs=path.dll[,…]): they are resolved, loaded into the add-in context so the script finds them
+        /// at run time, and included in the compilation fingerprint (size + date). Returns null and the reason if any fails.
         /// </summary>
         public static List<string> ResolveExtraRefs(IList<string> paths, Dictionary<string, object> report, out string fingerprint, out string error)
         {
@@ -209,11 +209,11 @@ namespace Bimbridge.Addin.Scripting
             {
                 var p = raw?.Trim();
                 if (string.IsNullOrEmpty(p)) continue;
-                if (!p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)) { error = "refs: '" + p + "' no es un .dll"; return null; }
-                if (!File.Exists(p)) { error = "refs: no existe '" + p + "'"; return null; }
+                if (!p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)) { error = "refs: '" + p + "' is not a .dll"; return null; }
+                if (!File.Exists(p)) { error = "refs: does not exist '" + p + "'"; return null; }
                 AssemblyName an;
                 try { an = AssemblyName.GetAssemblyName(p); }
-                catch (Exception ex) { error = "refs: '" + p + "' no es un ensamblado .NET (" + ex.Message + ")"; return null; }
+                catch (Exception ex) { error = "refs: '" + p + "' is not a .NET assembly (" + ex.Message + ")"; return null; }
                 try
                 {
                     var already = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a =>
@@ -223,7 +223,7 @@ namespace Bimbridge.Addin.Scripting
                     if (already != null)
                     {
                         var have = already.GetName().Version;
-                        report[p] = "ya cargado " + an.Name + " " + have + (have < an.Version ? " (MÁS VIEJO que el pedido " + an.Version + ": se usará el cargado; reinicie Revit para usar el nuevo)" : "");
+                        report[p] = "already loaded " + an.Name + " " + have + (have < an.Version ? " (OLDER than the requested " + an.Version + ": the loaded one will be used; restart Revit to use the new one)" : "");
                     }
                     else
                     {
@@ -233,10 +233,10 @@ namespace Bimbridge.Addin.Scripting
 #else
                         Assembly.LoadFrom(p);
 #endif
-                        report[p] = "cargado " + an.Name + " " + an.Version;
+                        report[p] = "loaded " + an.Name + " " + an.Version;
                     }
                 }
-                catch (Exception ex) { error = "refs: no se pudo cargar '" + p + "': " + ex.Message; return null; }
+                catch (Exception ex) { error = "refs: could not load '" + p + "': " + ex.Message; return null; }
                 var fi = new FileInfo(p);
                 fp.Add(an.FullName + "|" + fi.Length + "|" + fi.LastWriteTimeUtc.Ticks);
                 list.Add(Path.GetFullPath(p));
@@ -245,11 +245,11 @@ namespace Bimbridge.Addin.Scripting
             return list;
         }
 
-        /// <summary>Compila (o toma de la caché) y devuelve el método Run. Fuera del hilo de Revit.</summary>
+        /// <summary>Compiles (or takes from the cache) and returns the Run method. Outside the Revit thread.</summary>
         public static Compiled Compile(string code, string revitVersion, string addinVersion, out string error) =>
             Compile(code, revitVersion, addinVersion, null, out error);
 
-        /// <summary>Compila con referencias explícitas opcionales (refs=). Fuera del hilo de Revit.</summary>
+        /// <summary>Compiles with optional explicit references (refs=). Outside the Revit thread.</summary>
         public static Compiled Compile(string code, string revitVersion, string addinVersion, IList<string> extraRefs, out string error)
         {
             error = null;
@@ -259,19 +259,19 @@ namespace Bimbridge.Addin.Scripting
             if (extra == null) return null;
             var refs = References().Concat(extra).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             var className = "S" + System.Threading.Interlocked.Increment(ref _seq);
-            // La clave de caché no depende del nombre de clase: se envuelve con un nombre fijo para la huella.
+            // The cache key does not depend on the class name: it is wrapped with a fixed name for the fingerprint.
             var probe = ScriptSource.Wrap(code, "S");
             var key = ScriptSource.CacheKey(probe.Source, revitVersion, addinVersion, _refFingerprint + extraFp);
-            // Issue #9: single-flight. Dos peticiones simultáneas del mismo código compilan una sola vez.
+            // Issue #9: single-flight. Two simultaneous requests with the same code compile only once.
             string compileError = null;
-            // AUD-05: contabilidad por agente (o sesión) con la correlación de la petición en curso.
+            // AUD-05: accounting per agent (or session) using the correlation of the current request.
             var owner = Correlation.Current?.AgentId ?? Correlation.Current?.SessionId;
             var got = Cache.GetOrCompile(key, owner, () =>
             {
                 var c = CompileNew(code, className, refs, key, out compileError);
                 return c == null ? null : Tuple.Create(c, c.CompileMs);
             }, out var fromCache, out var refusal);
-            if (got == null) { error = refusal ?? compileError ?? "no compila"; return null; }
+            if (got == null) { error = refusal ?? compileError ?? "does not compile"; return null; }
             if (!fromCache) { got.ExtraRefs = extraReport.Count > 0 ? extraReport : null; return got; }
             return new Compiled
             {
@@ -280,7 +280,7 @@ namespace Bimbridge.Addin.Scripting
             };
         }
 
-        /// <summary>Contadores de la caché de compilación (panel Estado, diagnóstico).</summary>
+        /// <summary>Compilation cache counters (Status panel, diagnostics).</summary>
         public static Dictionary<string, object> CacheStats() => Cache.Stats();
 
         private static Compiled CompileNew(string code, string className, string[] refs, string key, out string error)
@@ -295,7 +295,7 @@ namespace Bimbridge.Addin.Scripting
             var caps = (string[])args[6] ?? new string[0];
             if (image == null)
             {
-                error = "no compila:\n" + string.Join("\n", diags ?? new string[0]);
+                error = "does not compile:\n" + string.Join("\n", diags ?? new string[0]);
                 return null;
             }
             Assembly asm;
@@ -311,15 +311,15 @@ namespace Bimbridge.Addin.Scripting
             Type recipe = null;
             foreach (var t in asm.GetTypes())
             {
-                if (recipe == null && !t.IsAbstract && typeof(Receta).IsAssignableFrom(t)) recipe = t;
+                if (recipe == null && !t.IsAbstract && typeof(Recipe).IsAssignableFrom(t)) recipe = t;
                 var m = t.GetMethod(ScriptSource.EntryMethod, BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(ScriptContext) }, null);
                 if (run == null && m != null && m.ReturnType == typeof(object)) run = m;
             }
             if (run == null && recipe == null)
             {
-                error = wrapped.Kind == "receta"
-                    ? "compiló, pero no hay una clase pública no abstracta que herede de Receta"
-                    : "compiló, pero no hay 'public static object Run(ScriptContext ctx)' en ninguna clase";
+                error = wrapped.Kind == "recipe"
+                    ? "compiled, but there is no public non-abstract class inheriting from Recipe"
+                    : "compiled, but no class has 'public static object Run(ScriptContext ctx)'";
                 return null;
             }
             return new Compiled
@@ -329,7 +329,7 @@ namespace Bimbridge.Addin.Scripting
             };
         }
 
-        /// <summary>Carga Roslyn y compila algo trivial en segundo plano (el primer exec real tarda menos). Nunca lanza.</summary>
+        /// <summary>Loads Roslyn and compiles something trivial in the background (so the first real exec is faster). Never throws.</summary>
         public static void WarmInBackground(Action<string> log)
         {
             if (!Present || _compile != null) return;
@@ -339,9 +339,9 @@ namespace Bimbridge.Addin.Scripting
                 {
                     var sw = System.Diagnostics.Stopwatch.StartNew();
                     var c = Compile("1", "warm", "warm", out var err);
-                    log?.Invoke(c != null ? "Compilador del runner listo en " + sw.ElapsedMilliseconds + " ms" : "Compilador del runner: " + err);
+                    log?.Invoke(c != null ? "Runner compiler ready in " + sw.ElapsedMilliseconds + " ms" : "Runner compiler: " + err);
                 }
-                catch (Exception ex) { log?.Invoke("Compilador del runner: " + ex.Message); }
+                catch (Exception ex) { log?.Invoke("Runner compiler: " + ex.Message); }
             });
         }
     }

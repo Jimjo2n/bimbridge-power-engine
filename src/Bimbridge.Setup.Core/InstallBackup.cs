@@ -9,19 +9,25 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Setup
 {
     /// <summary>
-    /// Respaldo y retorno de instalación (Native Validation): add-ins, puente y Power Engine, configuración, registro de instalación,
-    /// copia del instalador y config.toml de Codex. Lo que no existía queda anotado y se borra al volver.
-    /// El retorno verifica todos los hashes antes de tocar nada y guarda antes el estado actual, para poder deshacerlo.
-    /// No cierra ni detecta Revit: quien llama exige que esté cerrado.
+    /// Install backup and rollback (Native Validation): add-ins, bridge and Power Engine, configuration, install record,
+    /// installer copy and Codex config.toml. What did not exist is noted and deleted when rolling back.
+    /// Rollback verifies every hash before touching anything and first saves the current state, so it can be undone.
+    /// It neither closes nor detects Revit: the caller requires it to be closed.
     /// </summary>
     public static class InstallBackup
     {
-        public const string ManifestName = "respaldo.json";
+        public const string ManifestName = "backup.json";
         public const int Keep = 3;
 
-        public static string Root(SetupPaths p) => Path.Combine(p.Home, "respaldos");
+        public const string Schema = "bimbridge.backup/1";
 
-        /// <summary>Unidades del respaldo: nombre estable → archivo o carpeta real.</summary>
+        public static string Root(SetupPaths p) => LegacyAliases.ResolveExisting(p.Home, Path.Combine(p.Home, "backups"));
+
+        // A backup made by 0.9.3 or earlier keeps its legacy manifest and folder names (LegacyMigration renames them).
+        private static string ManifestPath(string dir) => LegacyAliases.ResolveExisting(dir, Path.Combine(dir, ManifestName));
+        private static string FilesDir(string dir) => LegacyAliases.ResolveExisting(dir, Path.Combine(dir, "files"));
+
+        /// <summary>Backup units: stable name → real file or folder.</summary>
         private static IEnumerable<KeyValuePair<string, string>> Units(SetupPaths p, IEnumerable<string> versions)
         {
             foreach (var v in versions)
@@ -40,7 +46,7 @@ namespace Bimbridge.Setup
         {
             var id = utcNow.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture) + "-" + Guid.NewGuid().ToString("N").Substring(0, 6);
             var dir = Path.Combine(Root(p), id);
-            var filesDir = Path.Combine(dir, "archivos");
+            var filesDir = Path.Combine(dir, "files");
             Directory.CreateDirectory(filesDir);
             var files = new Dictionary<string, object>();
             var absent = new List<object>();
@@ -70,9 +76,9 @@ namespace Bimbridge.Setup
             }
             var manifest = new Dictionary<string, object>
             {
-                ["esquema"] = "bimbridge.respaldo/1", ["id"] = id, ["motivo"] = reason,
-                ["creado_utc"] = utcNow.ToString("o", CultureInfo.InvariantCulture),
-                ["revit"] = versions.Distinct().Cast<object>().ToList(), ["unidades"] = units, ["ausentes"] = absent, ["archivos"] = files,
+                ["schema"] = Schema, ["id"] = id, ["reason"] = reason,
+                ["created_utc"] = utcNow.ToString("o", CultureInfo.InvariantCulture),
+                ["revit"] = versions.Distinct().Cast<object>().ToList(), ["units"] = units, ["missing"] = absent, ["files"] = files,
             };
             File.WriteAllText(Path.Combine(dir, ManifestName), Json.Write(manifest));
             Verify(dir);
@@ -83,31 +89,31 @@ namespace Bimbridge.Setup
         {
             var root = Root(p);
             if (!Directory.Exists(root)) return null;
-            return Directory.GetDirectories(root).Where(d => File.Exists(Path.Combine(d, ManifestName)))
+            return Directory.GetDirectories(root).Where(d => File.Exists(ManifestPath(d)))
                 .OrderByDescending(d => Path.GetFileName(d), StringComparer.Ordinal).FirstOrDefault();
         }
 
-        /// <summary>Lanza InvalidDataException si falta o cambió cualquier archivo del respaldo.</summary>
+        /// <summary>Throws InvalidDataException if any backup file is missing or changed.</summary>
         public static Dictionary<string, object> Verify(string dir)
         {
-            var path = Path.Combine(dir, ManifestName);
-            if (!File.Exists(path)) throw new InvalidDataException("respaldo sin manifiesto: " + dir);
-            var m = Json.ParseObject(File.ReadAllText(path));
-            if (Arg.GetString(m, "esquema") != "bimbridge.respaldo/1") throw new InvalidDataException("esquema de respaldo desconocido");
-            if (!(m.TryGetValue("archivos", out var fo) && fo is Dictionary<string, object> files)) throw new InvalidDataException("respaldo sin lista de archivos");
+            var path = ManifestPath(dir);
+            if (!File.Exists(path)) throw new InvalidDataException("backup without a manifest: " + dir);
+            var m = LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(path)));
+            if (Arg.GetString(m, "schema") != Schema && Arg.GetString(m, "schema") != LegacyAliases.BackupSchema) throw new InvalidDataException("unknown backup schema");
+            if (!(m.TryGetValue("files", out var fo) && fo is Dictionary<string, object> files)) throw new InvalidDataException("backup without a file list");
             foreach (var kv in files)
             {
-                if (kv.Key.Split('/').Any(x => x == ".." || x.Length == 0)) throw new InvalidDataException("ruta inválida en el respaldo: " + kv.Key);
-                var f = Path.Combine(dir, "archivos", kv.Key.Replace('/', Path.DirectorySeparatorChar));
-                if (!File.Exists(f)) throw new InvalidDataException("falta en el respaldo: " + kv.Key);
-                if (!string.Equals(SetupCore.FileSha(f), kv.Value as string, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("hash distinto en el respaldo: " + kv.Key);
+                if (kv.Key.Split('/').Any(x => x == ".." || x.Length == 0)) throw new InvalidDataException("invalid path in the backup: " + kv.Key);
+                var f = Path.Combine(FilesDir(dir), kv.Key.Replace('/', Path.DirectorySeparatorChar));
+                if (!File.Exists(f)) throw new InvalidDataException("missing from the backup: " + kv.Key);
+                if (!string.Equals(SetupCore.FileSha(f), kv.Value as string, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("hash mismatch in the backup: " + kv.Key);
             }
             return m;
         }
 
         /// <summary>
-        /// Vuelve al estado del respaldo. Devuelve la carpeta del respaldo previo al retorno.
-        /// Si algo falla a medias intenta deshacer con ese respaldo y relanza indicando el resultado.
+        /// Goes back to the backup state. Returns the folder of the backup taken right before the rollback.
+        /// If something fails halfway it tries to undo with that backup and rethrows stating the result.
         /// </summary>
         public static string Restore(SetupPaths p, string dir, DateTime utcNow)
         {
@@ -115,26 +121,26 @@ namespace Bimbridge.Setup
             if (LegacyMigration.IsLegacyBackup(m))
                 throw new InvalidDataException("Backup " + Path.GetFileName(dir) + " was made before the product was renamed to BIMBRIDGE and cannot be restored over this installation.");
             var versions = ((List<object>)m["revit"]).Select(x => (string)x).ToList();
-            var before = Create(p, versions, "antes de restaurar " + Path.GetFileName(dir), utcNow);
+            var before = Create(p, versions, "before restoring " + Path.GetFileName(dir), utcNow);
             try { Apply(p, dir, m, versions); }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException)
             {
                 try { Apply(p, before, Verify(before), versions); }
                 catch (Exception undo) when (undo is IOException || undo is UnauthorizedAccessException || undo is InvalidDataException)
                 {
-                    throw new IOException("El retorno falló (" + ex.Message + ") y tampoco se pudo deshacer (" + undo.Message + "). Respaldo intacto en " + before + ".", ex);
+                    throw new IOException("The rollback failed (" + ex.Message + ") and could not be undone either (" + undo.Message + "). Backup intact at " + before + ".", ex);
                 }
-                throw new IOException("El retorno falló y se dejó el estado anterior: " + ex.Message, ex);
+                throw new IOException("The rollback failed and the previous state was kept: " + ex.Message, ex);
             }
             return before;
         }
 
         private static void Apply(SetupPaths p, string dir, Dictionary<string, object> m, List<string> versions)
         {
-            var files = (Dictionary<string, object>)m["archivos"];
+            var files = (Dictionary<string, object>)m["files"];
             foreach (var u in Units(p, versions))
             {
-                // config.toml es del usuario: sólo vuelve la sección de BIMBRIDGE; lo que cambió fuera de ella se conserva.
+                // config.toml belongs to the user: only the BIMBRIDGE section is restored; changes outside it are kept.
                 if (u.Key == "codex.toml") { RestoreCodexSection(p, dir, files); continue; }
                 if (Directory.Exists(u.Value)) Directory.Delete(u.Value, true);
                 else if (File.Exists(u.Value)) { File.SetAttributes(u.Value, FileAttributes.Normal); File.Delete(u.Value); }
@@ -142,16 +148,16 @@ namespace Bimbridge.Setup
                 {
                     var target = kv.Key == u.Key ? u.Value : Path.Combine(u.Value, kv.Key.Substring(u.Key.Length + 1).Replace('/', Path.DirectorySeparatorChar));
                     Directory.CreateDirectory(Path.GetDirectoryName(target));
-                    File.Copy(Path.Combine(dir, "archivos", kv.Key.Replace('/', Path.DirectorySeparatorChar)), target);
+                    File.Copy(Path.Combine(FilesDir(dir), kv.Key.Replace('/', Path.DirectorySeparatorChar)), target);
                     if (!string.Equals(SetupCore.FileSha(target), kv.Value as string, StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidDataException("hash distinto tras restaurar: " + kv.Key);
+                        throw new InvalidDataException("hash mismatch after restoring: " + kv.Key);
                 }
             }
         }
 
         private static void RestoreCodexSection(SetupPaths p, string dir, Dictionary<string, object> files)
         {
-            var saved = files.ContainsKey("codex.toml") ? File.ReadAllText(Path.Combine(dir, "archivos", "codex.toml")) : "";
+            var saved = files.ContainsKey("codex.toml") ? File.ReadAllText(Path.Combine(FilesDir(dir), "codex.toml")) : "";
             var current = File.Exists(p.CodexConfig) ? File.ReadAllText(p.CodexConfig) : "";
             if (current == saved) return;
             var result = SetupCore.ReplaceTomlSection(current, saved, SetupCore.CodexSection);
@@ -160,7 +166,7 @@ namespace Bimbridge.Setup
             File.WriteAllText(p.CodexConfig, result);
         }
 
-        /// <summary>Conserva los últimos respaldos. Nunca falla la instalación por limpiar.</summary>
+        /// <summary>Keeps the latest backups. Cleanup never fails the install.</summary>
         public static void Prune(SetupPaths p)
         {
             var root = Root(p);

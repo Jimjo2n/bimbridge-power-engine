@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.9.1 (Bloque I): planificador de operaciones largas. Deterministas: cada operación espera una señal explícita.</summary>
+    /// <summary>0.9.1 (Block I): long-operation scheduler. Deterministic: each operation waits for an explicit signal.</summary>
     public class OperationSchedulerTests
     {
         private sealed class Op
@@ -44,15 +44,15 @@ namespace Bimbridge.Tests
             var a2 = Start(s, "ana", null, "a2", order);
             var a3 = Start(s, "ana", null, "a3", order);
             var b1 = Start(s, "bob", null, "b1", order);
-            await a1.Started.Task; await b1.Started.Task;                 // bob entra aunque ana llegó antes con tres
+            await a1.Started.Task; await b1.Started.Task;                 // bob gets in even though ana arrived first with three
             Assert.False(a2.Started.Task.IsCompleted);
-            Assert.Equal(2L, Stat(s, "en_curso")); Assert.Equal(2L, Stat(s, "en_cola"));
+            Assert.Equal(2L, Stat(s, "running")); Assert.Equal(2L, Stat(s, "queued"));
             await Finish(a1);
             await a2.Started.Task;
             await Finish(b1); await Finish(a2);
             await a3.Started.Task; await Finish(a3);
             Assert.Equal(new[] { "a1", "b1", "a2", "a3" }, order.ToArray());
-            Assert.Equal(0L, Stat(s, "en_curso")); Assert.Equal(0L, Stat(s, "en_cola"));
+            Assert.Equal(0L, Stat(s, "running")); Assert.Equal(0L, Stat(s, "queued"));
         }
 
         [Fact]
@@ -64,7 +64,7 @@ namespace Bimbridge.Tests
             var y = Start(s, "bob", "doc-1", "y", order);
             var z = Start(s, "bob", "doc-2", "z", order);
             await x.Started.Task; await z.Started.Task;
-            Assert.False(y.Started.Task.IsCompleted);                     // mismo documento: espera
+            Assert.False(y.Started.Task.IsCompleted);                     // same document: waits
             await Finish(x);
             await y.Started.Task;
             await Finish(y); await Finish(z);
@@ -84,12 +84,12 @@ namespace Bimbridge.Tests
                 await Assert.ThrowsAsync<SchedulerBusyException>(() => s.Run("zoe", null, () => Task.FromResult(1), CancellationToken.None));
                 cts.Cancel();
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queued.Task);
-                Assert.False(queued.Started.Task.IsCompleted);            // nunca empezó: nada que reconciliar
+                Assert.False(queued.Started.Task.IsCompleted);            // never started: nothing to reconcile
                 await Finish(running);
                 await other.Started.Task; await Finish(other);
             }
             Assert.Equal(new[] { "r", "o" }, order.ToArray());
-            Assert.Equal(1L, Stat(s, "canceladas_en_cola")); Assert.Equal(1L, Stat(s, "rechazadas_por_cola_llena"));
+            Assert.Equal(1L, Stat(s, "cancelled_in_queue")); Assert.Equal(1L, Stat(s, "rejected_queue_full"));
             using (var pre = new CancellationTokenSource())
             {
                 pre.Cancel();
@@ -103,7 +103,7 @@ namespace Bimbridge.Tests
             var s = new OperationScheduler { MaxRunning = 1 };
             await Assert.ThrowsAsync<InvalidOperationException>(() => s.Run<int>("ana", "doc-1", () => throw new InvalidOperationException("x"), CancellationToken.None));
             Assert.Equal(7, await s.Run("bob", "doc-1", () => Task.FromResult(7), CancellationToken.None));
-            Assert.Equal(0L, Stat(s, "en_curso"));
+            Assert.Equal(0L, Stat(s, "running"));
         }
 
         [Fact]
@@ -113,24 +113,24 @@ namespace Bimbridge.Tests
             int running = 0, peak = 0, sameDoc = 0, sameDocPeak = 0;
             var perOwner = new Dictionary<string, int>(); var ownerPeak = 0;
             var gate = new object();
-            var tasks = Enumerable.Range(0, 120).Select(i => Task.Run(() => s.Run("agente" + (i % 4), i % 5 == 0 ? "doc" : null, async () =>
+            var tasks = Enumerable.Range(0, 120).Select(i => Task.Run(() => s.Run("agent" + (i % 4), i % 5 == 0 ? "doc" : null, async () =>
             {
                 lock (gate)
                 {
                     running++; peak = Math.Max(peak, running);
-                    var o = "agente" + (i % 4); perOwner[o] = (perOwner.TryGetValue(o, out var n) ? n : 0) + 1; ownerPeak = Math.Max(ownerPeak, perOwner[o]);
+                    var o = "agent" + (i % 4); perOwner[o] = (perOwner.TryGetValue(o, out var n) ? n : 0) + 1; ownerPeak = Math.Max(ownerPeak, perOwner[o]);
                     if (i % 5 == 0) { sameDoc++; sameDocPeak = Math.Max(sameDocPeak, sameDoc); }
                 }
                 await Task.Yield();
-                lock (gate) { running--; perOwner["agente" + (i % 4)]--; if (i % 5 == 0) sameDoc--; }
+                lock (gate) { running--; perOwner["agent" + (i % 4)]--; if (i % 5 == 0) sameDoc--; }
                 return i;
             }, CancellationToken.None))).ToArray();
             var results = await Task.WhenAll(tasks);
             Assert.Equal(Enumerable.Range(0, 120), results.OrderBy(x => x));
             Assert.True(peak <= 3, "pico global " + peak);
-            Assert.True(ownerPeak <= 2, "pico por agente " + ownerPeak);
+            Assert.True(ownerPeak <= 2, "peak per agent " + ownerPeak);
             Assert.Equal(1, sameDocPeak);
-            Assert.Equal(120L, Stat(s, "iniciadas"));
+            Assert.Equal(120L, Stat(s, "started_items"));
         }
     }
 }

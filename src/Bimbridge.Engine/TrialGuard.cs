@@ -2,24 +2,24 @@
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// alpha3 (P0 de Codex, 2026-10-28): revertir un TransactionGroup deja Document.IsModified=false aunque el documento tuviera
-    /// cambios sin guardar (observado en NRT-04 run4). Por eso TODA ruta que abre una transacción para revertirla siempre
-    /// (commit modo=ensayo, exec ensayo, captura temporal, QC de tarea) se niega o se degrada si el documento está modificado.
-    /// La decisión vive aquí (pura, probada sin Revit); el add-in la consulta en el hilo de Revit justo antes de abrir el grupo.
-    /// Nunca se manipula IsModified para disimularlo.
+    /// alpha3 (Codex P0, 2026-10-28): rolling back a TransactionGroup leaves Document.IsModified=false even if the document had
+    /// unsaved changes (observed in NRT-04 run4). That is why EVERY path that opens a transaction only to roll it back
+    /// (commit modo=ensayo, exec trial, temporary capture, task QC) refuses or degrades if the document is modified.
+    /// The decision lives here (pure, tested without Revit); the add-in queries it on the Revit thread right before opening the group.
+    /// IsModified is never manipulated to hide this.
     /// </summary>
     public static class TrialGuard
     {
-        public const string Code = "documento_con_cambios_sin_guardar";
+        public const string Code = "document_with_unsaved_changes";
 
-        /// <summary>null = se puede ensayar; texto = motivo del rechazo previo (nada se ha modificado).</summary>
+        /// <summary>null = a trial is allowed; text = reason for the upfront refusal (nothing has been modified).</summary>
         public static string Refuse(bool isModified, string route) =>
             isModified
-                ? Code + ": " + route + " revertiría un grupo de transacciones y Revit borraría la marca de cambios sin guardar del documento. " +
-                  "Guarde o descarte esos cambios a mano y repita, o use un documento sin cambios pendientes. No se modificó nada."
+                ? Code + ": " + route + " would roll back a transaction group and Revit would clear the document's unsaved-changes flag. " +
+                  "Save or discard those changes manually and repeat, or use a document with no pending changes. Nothing was modified."
                 : null;
 
-        /// <summary>Verificación temporal y rollback síncronos, dentro de la misma invocación nativa.</summary>
+        /// <summary>Synchronous temporary verification and rollback, within the same native invocation.</summary>
         public static T VerifyAndRollback<T>(System.Func<T> verify, System.Action rollback)
         {
             try { return verify(); }
@@ -27,14 +27,14 @@ namespace Bimbridge.Engine
         }
 
         public static string TrialStatus(bool functionalOk, bool restorationOk) =>
-            !restorationOk ? Protocol.Status.Desconocido : functionalOk ? PlanStatus.Ensayado : PlanStatus.Revertido;
+            !restorationOk ? Protocol.Status.Unknown : functionalOk ? PlanStatus.Trialed : PlanStatus.RolledBack;
 
-        public const string CorrectReverted = "ensayo_correcto_revertido";
-        public const string FunctionalFailureReverted = "fallo_funcional_revertido";
-        public const string RollbackFailed = "rollback_fallido";
-        public const string UnknownNeedsReconciliation = "desconocido_requiere_reconciliacion";
+        public const string CorrectReverted = "trial_ok_reverted";
+        public const string FunctionalFailureReverted = "functional_failure_reverted";
+        public const string RollbackFailed = "rollback_failed";
+        public const string UnknownNeedsReconciliation = "unknown_requires_reconcile";
 
-        /// <summary>Los cuatro resultados del ensayo. Sólo el primero es éxito, y exige rollback confirmado y relectura limpia.</summary>
+        /// <summary>The four trial results. Only the first is success, and it requires a confirmed rollback and a clean re-read.</summary>
         public static string Classify(bool functionalOk, bool rollbackConfirmed, bool restorationOk) =>
             !rollbackConfirmed ? RollbackFailed : !restorationOk ? UnknownNeedsReconciliation : functionalOk ? CorrectReverted : FunctionalFailureReverted;
 
@@ -43,7 +43,7 @@ namespace Bimbridge.Engine
             !differences && !skipped && !creationMismatch &&
             verifiedCreations >= expectedCreations && verifiedExisting + verifiedCreations > 0;
 
-        /// <summary>Rutas auxiliares (captura, QC de tarea) que pueden funcionar sin grupo temporal: false = no abrir el grupo.</summary>
+        /// <summary>Auxiliary paths (capture, task QC) that can work without a temporary group: false = do not open the group.</summary>
         public static bool MayOpenTemporaryGroup(bool isModified) => !isModified;
     }
 }

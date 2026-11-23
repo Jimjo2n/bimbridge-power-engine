@@ -6,9 +6,9 @@ using System.Security.Cryptography;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// rc1: copia + SHA-256 consistentes de un archivo que otro proceso puede tener abierto (Revit con el .rvt activo).
-    /// Lee compartiendo lectura/escritura y comprueba que el archivo NO cambió durante la lectura (longitud y fecha antes/después,
-    /// bytes leídos = longitud) y que la copia en disco tiene el mismo hash. Cualquier diferencia lanza IOException: nunca un hash "parcial".
+    /// rc1: consistent copy + SHA-256 of a file another process may have open (Revit with the active .rvt).
+    /// Reads sharing read/write and checks that the file did NOT change during the read (length and date before/after,
+    /// bytes read = length) and that the copy on disk has the same hash. Any difference throws IOException: never a "partial" hash.
     /// </summary>
     public static class StableFile
     {
@@ -22,7 +22,7 @@ namespace Bimbridge.Engine
         public static Result CopyAndHash(string source, string destination, Action<int> afterChunk = null, int chunk = 1 << 20)
         {
             var before = new FileInfo(source);
-            if (!before.Exists) throw new FileNotFoundException("no existe", source);
+            if (!before.Exists) throw new FileNotFoundException("does not exist", source);
             long len0 = before.Length; var t0 = before.LastWriteTimeUtc;
             string sha; long read = 0;
             using (var src = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
@@ -42,10 +42,10 @@ namespace Bimbridge.Engine
             var after = new FileInfo(source);
             after.Refresh();
             if (after.Length != len0 || after.LastWriteTimeUtc != t0 || read != len0)
-                throw new IOException("el archivo cambió durante la lectura (longitud " + len0 + "→" + after.Length + ", leídos " + read + ", fecha " +
-                                      t0.ToString("o") + "→" + after.LastWriteTimeUtc.ToString("o") + "): no se certifica");
+                throw new IOException("the file changed during the read (length " + len0 + "→" + after.Length + ", read " + read + ", date " +
+                                      t0.ToString("o") + "→" + after.LastWriteTimeUtc.ToString("o") + "): not certified");
             var copySha = HashFile(destination);
-            if (!string.Equals(copySha, sha, StringComparison.Ordinal)) throw new IOException("la copia temporal no coincide con lo leído (" + copySha + " ≠ " + sha + ")");
+            if (!string.Equals(copySha, sha, StringComparison.Ordinal)) throw new IOException("the temporary copy does not match what was read (" + copySha + " ≠ " + sha + ")");
             return new Result { Sha256 = sha, Length = len0, LastWriteUtc = t0 };
         }
 

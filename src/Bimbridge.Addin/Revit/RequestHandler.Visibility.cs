@@ -20,14 +20,14 @@ namespace Bimbridge.Addin.Revit
             static long[] IdList(Dictionary<string, object> args, string key) => Arg.GetStringList(args, key)
                 .Select(value => long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var id) && id > 0 ? id : 0)
                 .Distinct().ToArray();
-            var views = IdList(request.Args, "vistas");
+            var views = IdList(request.Args, "views");
             var ids = IdList(request.Args, "ids");
             if (views.Length == 0 || ids.Length == 0 || views.Length > 8 || (long)views.Length * ids.Length > 100 ||
                 views.Contains(0) || ids.Contains(0))
-                return Response.Fail(request.Id, Status.Invalido, "indique IDs positivos en vistas e ids. Máximo 8 vistas y 100 pares vista-elemento.");
+                return Response.Fail(request.Id, Status.Invalid, "give positive IDs in views and ids. Maximum 8 views and 100 view-element pairs.");
             VisibilityAudit audit;
             try { audit = new VisibilityAudit(request.Args, views, ids); }
-            catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
+            catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalid, ex.Message); }
 
             var rows = new List<object>();
             string error = null;
@@ -42,7 +42,7 @@ namespace Bimbridge.Addin.Revit
                     if (!(doc.GetElement(Ids.ToId(id)) is View view) || view.IsTemplate || !view.AreGraphicsOverridesAllowed() ||
                         !FilteredElementCollector.IsViewValidForElementIteration(doc, view.Id))
                     {
-                        error = "la vista " + id + " no admite diagnóstico de visibilidad";
+                        error = "view " + id + " does not support visibility diagnosis";
                         return true;
                     }
                     var existing = targets.Where(e => e.Element != null).Select(e => e.Element.Id).ToList();
@@ -61,50 +61,50 @@ namespace Bimbridge.Addin.Revit
                         var element = target.Element;
                         if (element == null)
                         {
-                            elements.Add(new Dictionary<string, object> { ["id"] = target.Id, ["estado"] = "no_encontrado" });
+                            elements.Add(new Dictionary<string, object> { ["id"] = target.Id, ["status"] = "not_found" });
                             continue;
                         }
-                        var diagnosis = Bim.Vistas.PorQueNoSeVe(view, element);
-                        diagnosis["en_colector_de_vista"] = candidates.Contains(element.Id);
-                        diagnosis["graficos_elemento"] = Colors(view.GetElementOverrides(element.Id));
-                        diagnosis["filtros_coincidentes"] = orderedFilters
-                            .Where(filter => Bim.Vistas.MatchesFilter(filter.Filter, element))
+                        var diagnosis = Bim.Views.WhyNotVisible(view, element);
+                        diagnosis["in_view_collector"] = candidates.Contains(element.Id);
+                        diagnosis["element_graphics"] = Colors(view.GetElementOverrides(element.Id));
+                        diagnosis["matching_filters"] = orderedFilters
+                            .Where(filter => Bim.Views.MatchesFilter(filter.Filter, element))
                             .Select(filter => new Dictionary<string, object>
                             {
-                                ["id"] = Ids.ToLong(filter.Id), ["nombre"] = filter.Filter.Name, ["activo"] = filter.Enabled,
-                                ["visible"] = filter.Visible, ["graficos"] = filter.Graphics,
+                                ["id"] = Ids.ToLong(filter.Id), ["name"] = filter.Filter.Name, ["active"] = filter.Enabled,
+                                ["visible"] = filter.Visible, ["graphics"] = filter.Graphics,
                             }).ToList();
                         if (element is RevitLinkInstance link)
                         {
-                            diagnosis["vinculo_cargado"] = link.GetLinkDocument() != null;
+                            diagnosis["link_loaded"] = link.GetLinkDocument() != null;
 #if REVIT2024_OR_GREATER
                             using var settings = view.GetLinkOverrides(link.Id) ?? view.GetLinkOverrides(link.GetTypeId());
-                            diagnosis["modo_vinculo"] = settings?.LinkVisibilityType.ToString();
-                            diagnosis["vista_vinculada_id"] = settings == null ? null : (object)Ids.ToLong(settings.LinkedViewId);
+                            diagnosis["link_mode"] = settings?.LinkVisibilityType.ToString();
+                            diagnosis["linked_view_id"] = settings == null ? null : (object)Ids.ToLong(settings.LinkedViewId);
 #endif
                         }
                         elements.Add(diagnosis);
                     }
                     rows.Add(new Dictionary<string, object>
                     {
-                        ["id"] = id, ["nombre"] = view.Name, ["plantilla"] = doc.GetElement(view.ViewTemplateId)?.Name,
-                        ["plantilla_id"] = Ids.ToLong(view.ViewTemplateId), ["elementos"] = elements,
+                        ["id"] = id, ["name"] = view.Name, ["template"] = doc.GetElement(view.ViewTemplateId)?.Name,
+                        ["template_id"] = Ids.ToLong(view.ViewTemplateId), ["elements"] = elements,
                     });
                 }
                 rev = _tracker.For(doc)?.Rev ?? 0;
                 return true;
             }, highPriority: false, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!work.Ok) return FromWork(request.Id, work);
-            if (error != null) return Response.Fail(request.Id, Status.Invalido, error);
+            if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
             var differences = audit.Compare(rows);
             return new Response
             {
-                Id = request.Id, Rev = rev, Estado = differences.Count == 0 ? Status.Ok : Status.ConDiferencias,
-                Datos = new Dictionary<string, object>
+                Id = request.Id, Rev = rev, State = differences.Count == 0 ? Status.Ok : Status.CompletedWithDifferences,
+                Data = new Dictionary<string, object>
                 {
-                    ["vistas"] = rows,
-                    ["diferencias"] = differences,
-                    ["alcance"] = "El colector identifica candidatos de la vista. Las causas y los overrides son evidencia de configuración. Compruebe el render final para recortes y colores.",
+                    ["views"] = rows,
+                    ["differences"] = differences,
+                    ["scope"] = "The collector identifies the view's candidates. The causes and overrides are configuration evidence. Check the final render for crops and colors.",
                 },
             };
         }
@@ -118,10 +118,10 @@ namespace Bimbridge.Addin.Revit
                 {
                     if (color != null && color.IsValid) colors[key] = new object[] { (long)color.Red, (long)color.Green, (long)color.Blue };
                 }
-                Add("linea_proyeccion", graphics.ProjectionLineColor);
-                Add("linea_corte", graphics.CutLineColor);
-                Add("relleno_superficie", graphics.SurfaceForegroundPatternColor);
-                Add("relleno_corte", graphics.CutForegroundPatternColor);
+                Add("projection_line", graphics.ProjectionLineColor);
+                Add("cut_line", graphics.CutLineColor);
+                Add("surface_fill", graphics.SurfaceForegroundPatternColor);
+                Add("cut_fill", graphics.CutForegroundPatternColor);
                 return colors;
             }
         }

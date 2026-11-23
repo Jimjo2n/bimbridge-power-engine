@@ -10,10 +10,10 @@ using BimBridge.PowerEngine.Workflows;
 namespace BimBridge.PowerEngine
 {
     /// <summary>
-    /// Órdenes de una línea de la herramienta compacta "power" (Bridge). No tocan Revit: documentos autorizados, geometría y
-    /// planificación. Lo que cambia el modelo sale como "ops" para plan→commit (mismas protecciones de siempre).
-    ///   cap [texto|id]         descubrimiento bajo demanda (breve; con un id exacto, ficha completa)
-    ///   estado                 motores, versiones, calibración, carpetas autorizadas y métricas power_engine.*
+    /// One-line commands of the compact "power" tool (Bridge). They do not touch Revit: authorized documents, geometry and
+    /// planning. Whatever changes the model comes out as "ops" for plan→commit (the usual protections).
+    ///   cap [text|id]          on-demand discovery (brief; with an exact id, full card)
+    ///   estado                 engines, versions, calibration, authorized folders and power_engine.* metrics
     ///   pdf info|extract|tables|symbols|grids|verify ruta= [paginas=[1]] [max_elementos=]
     ///   docx ruta= [max=]
     ///   flujo ruta= pagina= nivel= reglas=[…] ejes=[…] [existentes=[…]] [tol=0.25] [conf=0.9] [modo=semejanza|afin]
@@ -21,13 +21,13 @@ namespace BimBridge.PowerEngine
     public static class PowerCommands
     {
         public const string Help =
-            "power (no cambia el modelo): cap [texto|id] | estado | pdf info|extract|tables|symbols|grids ruta= paginas=[1] | pdf verify ruta= esperado=[{textos,papel_pt,rgb_vectorial}] [anterior=] [sha256_esperado=] | docx ruta= | " +
-            "flujo ruta= pagina= nivel= reglas=[{codigo,tipo,montaje|elev,ws}] ejes=[{nombre,p:[x0,y0,x1,y1]}] (pies) [decisiones=[{id_simbolo,decision,evidencia,codigo}]] → plan + ops para plan→commit | " +
-            "red ruta=tramos.json (proximidad ≠ continuidad ≠ conexión física). " +
-            "terminales ruta= pagina= nivel= parametro_sentido= anclas=[{nombre,pdf,modelo}] items=[{ref,pt,tipo,sentido,elev}] → planes de terminales. " +
-            "equipos ruta= pagina= nivel= anclas=[{nombre,pdf,modelo}] reglas=[{ambito,codigo,clase,tipo}] items=[{ref,pt,ambito,zona,codigo,elev,evidencia}] → planes de equipos. " +
-            "riser pdf= xlsx= hoja= [columnas= fila_encabezado= fila_inicio= fila_final=] pdf_aristas=[{id,origen,destino,pagina,evidencia}] vista= estilo= nodos=[…] trazado=[…]. riser_audit relee las fuentes y compara observado=[…]. " +
-            "Coordenadas de página nunca son de Revit: el flujo registra con anclas y escala ambigüedades.";
+            "power (does not change the model): cap [text|id] | status | pdf info|extract|tables|symbols|grids path= pages=[1] | pdf verify path= expected=[{texts,paper_pt,vector_rgb}] [previous=] [expected_sha256=] | docx path= | " +
+            "workflow path= page= level= rules=[{code,type,mounting|elev,ws}] grids=[{name,p:[x0,y0,x1,y1]}] (feet) [decisions=[{symbol_id,decision,evidence,code}]] → plan + ops for plan→commit | " +
+            "network path=segments.json (proximity ≠ continuity ≠ physical connection). " +
+            "terminals path= page= level= direction_parameter= anchors=[{name,pdf,model}] items=[{ref,pt,type,direction,elev}] → terminal plans. " +
+            "equipment path= page= level= anchors=[{name,pdf,model}] rules=[{scope,code,class,type}] items=[{ref,pt,scope,zone,code,elev,evidence}] → equipment plans. " +
+            "riser pdf= xlsx= sheet= [columns= header_row= start_row= end_row=] pdf_edges=[{id,origin,target,page,evidence}] view= style= nodes=[…] trace_path=[…]. riser_audit rereads the sources and compares observed=[…]. " +
+            "Page coordinates are never Revit coordinates: the workflow registers with anchors and escalates ambiguities.";
 
         private static readonly Dictionary<string, string> PdfJobs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -35,7 +35,7 @@ namespace BimBridge.PowerEngine
             ["verify"] = "pdf_verify",
         };
 
-        /// <summary>Carpetas que un trabajo puede abrir: las de documentos y, en laboratorio, también las de laboratorio.</summary>
+        /// <summary>Folders a job may open: the document folders and, in lab, the lab folders as well.</summary>
         public static List<string> AuthorizedFolders(EngineConfig cfg)
         {
             var l = new List<string>(cfg.DocumentFolders ?? new List<string>());
@@ -43,15 +43,15 @@ namespace BimBridge.PowerEngine
             return l.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        /// <summary>Opciones del dispatcher desde config.json, con búsqueda junto al ejecutable si no se indican rutas.</summary>
+        /// <summary>Dispatcher options from config.json, searching next to the executable when no paths are given.</summary>
         public static PowerEngineOptions OptionsFrom(EngineConfig cfg, string baseDir)
         {
             var win = Path.DirectorySeparatorChar == '\\';
             string Near(params string[] parts) { var p = Path.Combine(new[] { baseDir, "power_engine" }.Concat(parts).ToArray()); return File.Exists(p) ? p : null; }
             Calibration cal = null;
-            var calPath = Path.Combine(baseDir, "power_engine", "calibracion.json");
+            var calPath = LegacyAliases.ResolveExisting(baseDir, Path.Combine(baseDir, "power_engine", "calibration.json"));
             if (File.Exists(calPath))
-                try { cal = Calibration.FromJson(Json.ParseObject(File.ReadAllText(calPath))); } catch (Exception) { cal = null; /* archivo roto → valores por defecto */ }
+                try { cal = Calibration.FromJson(LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(calPath)))); } catch (Exception) { cal = null; /* broken file → default values */ }
             return new PowerEngineOptions
             {
                 Calibration = cal ?? Calibration.Default(),
@@ -65,38 +65,44 @@ namespace BimBridge.PowerEngine
         public static Dictionary<string, object> Run(PowerEngineDispatcher pe, IList<string> folders, string line)
         {
             var c = Command.Parse(line);
-            if (c == null) return Err("orden vacía", Help);
+            if (c == null) return Err("empty command", Help);
+            LegacyAliases.NormalizeArgs(null, c.Args);   // 0.9.3 (Spanish) verbs and argument names are still accepted
+            // ...also the keys inside the structured inputs this project owns; names, types, codes and headers stay as given.
+            foreach (var k in new[] { "anchors", "items", "grids", "existing", "pdf_edges", "columns", "expected" }) LegacyAliases.NormalizeRows(c.Args, k);
+            LegacyAliases.NormalizeRows(c.Args, "rules", "class", "mounting");
+            LegacyAliases.NormalizeRows(c.Args, "decisions", "decision");
+            LegacyAliases.NormalizeTokenList(c.Args, "include");
             try
             {
-                switch (c.Verb)
+                switch (LegacyAliases.Token(c.Verb))
                 {
                     case "cap": return Cap(string.Join(" ", c.Positional));
-                    case "estado":
+                    case "status":
                         return new Dictionary<string, object>
                         {
-                            ["motores"] = pe.Status(), ["carpetas_documentos"] = (long)folders.Count, ["capacidades"] = PowerEngineCapabilityRegistry.Summary(),
-                            ["metricas"] = pe.Metrics(),
+                            ["engines"] = pe.Status(), ["document_folders"] = (long)folders.Count, ["capabilities"] = PowerEngineCapabilityRegistry.Summary(),
+                            ["metrics"] = pe.Metrics(),
                         };
                     case "pdf":
                     {
                         var sub = c.Positional.FirstOrDefault() ?? "";
-                        if (!PdfJobs.TryGetValue(sub, out var job)) return Err("pdf " + sub + " desconocido", "pdf info|extract|tables|symbols|grids|verify ruta=");
+                        if (!PdfJobs.TryGetValue(sub, out var job)) return Err("unknown pdf " + sub, "pdf info|extract|tables|symbols|grids|verify path=");
                         return Doc(pe, folders, job, c.Args);
                     }
                     case "docx": return Doc(pe, folders, "docx_extract", c.Args);
-                    case "flujo": return Flow(pe, folders, c.Args);
-                    case "terminales": return Markup(pe, folders, c.Args, equipment: false);
-                    case "equipos": return Markup(pe, folders, c.Args, equipment: true);
+                    case "workflow": return Flow(pe, folders, c.Args);
+                    case "terminals": return Markup(pe, folders, c.Args, equipment: false);
+                    case "equipment": return Markup(pe, folders, c.Args, equipment: true);
                     case "riser": return Riser(pe, folders, c.Args, audit: false);
                     case "riser_audit": return Riser(pe, folders, c.Args, audit: true);
-                    case "red": return Network(pe, folders, c.Args);
-                    case "guide": case "ayuda": return new Dictionary<string, object> { ["ayuda"] = Help };
-                    default: return Err("orden desconocida: " + c.Verb, Help);
+                    case "network": return Network(pe, folders, c.Args);
+                    case "guide": case "help": return new Dictionary<string, object> { ["help"] = Help };
+                    default: return Err("unknown command: " + c.Verb, Help);
                 }
             }
             catch (Exception ex) when (ex is InvalidCastException || ex is KeyNotFoundException || ex is FormatException || ex is ArgumentException || ex is NullReferenceException || ex is QueryException)
             {
-                return Err("argumentos inválidos: " + ex.Message, Help);
+                return Err("invalid arguments: " + ex.Message, Help);
             }
         }
 
@@ -105,46 +111,46 @@ namespace BimBridge.PowerEngine
             var exact = PowerEngineCapabilityRegistry.Describe(q.Trim());
             if (exact != null) return exact.Full();
             var hits = PowerEngineCapabilityRegistry.Search(q, 8);
-            return new Dictionary<string, object> { ["capacidades"] = hits.Select(h => (object)h.Brief()).ToList(), ["detalle"] = "power \"cap <id>\"" };
+            return new Dictionary<string, object> { ["capabilities"] = hits.Select(h => (object)h.Brief()).ToList(), ["detail"] = "power \"cap <id>\"" };
         }
 
         private static Dictionary<string, object> Doc(PowerEngineDispatcher pe, IList<string> folders, string job, Dictionary<string, object> args)
         {
-            if (folders.Count == 0) return Err("sin carpetas de documentos autorizadas", "IT o el usuario las fijan en config.json → \"carpetas_documentos\"; la IA no puede cambiarlo");
+            if (folders.Count == 0) return Err("no authorized document folders", "IT or the user sets them in config.json → \"document_folders\"; the AI cannot change this");
             var a = new Dictionary<string, object>(args, StringComparer.Ordinal);
-            if (a.TryGetValue("paginas", out var p) && p is long one) a["paginas"] = new List<object> { one };
+            if (a.TryGetValue("pages", out var p) && p is long one) a["pages"] = new List<object> { one };
             var r = pe.Document(job, a, folders);
-            var d = new Dictionary<string, object> { ["codigo"] = r.Code, ["motor"] = r.Telemetry.Engine, ["ms"] = Math.Round(r.Telemetry.TotalMs, 1) };
-            if (!r.Ok) d["error"] = r.Error; else d["resultado"] = r.Result;
+            var d = new Dictionary<string, object> { ["code"] = r.Code, ["engine"] = r.Telemetry.Engine, ["ms"] = Math.Round(r.Telemetry.TotalMs, 1) };
+            if (!r.Ok) d["error"] = r.Error; else d["result"] = r.Result;
             return d;
         }
 
         private static Dictionary<string, object> Flow(PowerEngineDispatcher pe, IList<string> folders, Dictionary<string, object> a)
         {
-            if (folders.Count == 0) return Err("sin carpetas de documentos autorizadas", "config.json → \"carpetas_documentos\"");
-            var ruta = Arg.GetString(a, "ruta");
-            if (ruta == null) return Err("falta ruta=", Help);
-            if (!(a.TryGetValue("ejes", out var ej) && ej is List<object> ejes) || ejes.Count < 2)
-                return Err("faltan los ejes del modelo (ejes=[{nombre,p:[x0,y0,x1,y1]}] en pies)", "léalos con revit y páselos tal cual; sin ejes no hay registro y no se coloca nada");
-            if (!(a.TryGetValue("reglas", out var rg) && rg is List<object> reglas)) return Err("faltan reglas=[{codigo,tipo,montaje|elev,ws}]", "sin regla un símbolo queda ambiguo (sin_tipo), nunca se adivina");
+            if (folders.Count == 0) return Err("no authorized document folders", "config.json → \"document_folders\"");
+            var path = Arg.GetString(a, "path");
+            if (path == null) return Err("missing path=", Help);
+            if (!(a.TryGetValue("grids", out var gridsArg) && gridsArg is List<object> grids) || grids.Count < 2)
+                return Err("model grids are missing (grids=[{name,p:[x0,y0,x1,y1]}] in feet)", "read them with revit and pass them as is; without grids there is no registration and nothing is placed");
+            if (!(a.TryGetValue("rules", out var rg) && rg is List<object> rules)) return Err("missing rules=[{code,type,mounting|elev,ws}]", "without a rule a symbol stays ambiguous (no_type); it is never guessed");
             var q = new PdfToPlan.Request
             {
-                PdfPath = ruta, Page = (int)(Arg.GetLong(a, "pagina") ?? 1), Level = Arg.GetString(a, "nivel"),
-                Rules = PdfToPlan.RulesFromJson(reglas), ModelGrids = PdfToPlan.GridsFromJson(ejes),
-                TolFt = Num(a, "tol") ?? 0.25, MinConfidence = Num(a, "conf") ?? 0.9, Mode = Arg.GetString(a, "modo") ?? "semejanza",
+                PdfPath = path, Page = (int)(Arg.GetLong(a, "page") ?? 1), Level = Arg.GetString(a, "level"),
+                Rules = PdfToPlan.RulesFromJson(rules), ModelGrids = PdfToPlan.GridsFromJson(grids),
+                TolFt = Num(a, "tol") ?? 0.25, MinConfidence = Num(a, "conf") ?? 0.9, Mode = Arg.GetString(a, "mode") ?? "similarity",
             };
-            if (a.TryGetValue("decisiones", out var decisions))
+            if (a.TryGetValue("decisions", out var decisions))
             {
-                if (!(decisions is List<object> list)) return Err("decisiones exige una lista JSON", Help);
+                if (!(decisions is List<object> list)) return Err("decisions requires a JSON list", Help);
                 q.SymbolDecisions = list;
             }
-            if (a.TryGetValue("existentes", out var ex) && ex is List<object> exl)
+            if (a.TryGetValue("existing", out var ex) && ex is List<object> exl)
                 q.Existing = exl.Cast<Dictionary<string, object>>().Select(e =>
                 {
                     var p = (List<object>)e["p"];
                     return new ExistingElement
                     {
-                        Id = Arg.GetLong(e, "id") ?? 0, FamilyType = Arg.GetString(e, "tipo"), Level = Arg.GetString(e, "nivel"),
+                        Id = Arg.GetLong(e, "id") ?? 0, FamilyType = Arg.GetString(e, "type"), Level = Arg.GetString(e, "level"),
                         X = Convert.ToDouble(p[0], System.Globalization.CultureInfo.InvariantCulture),
                         Y = Convert.ToDouble(p[1], System.Globalization.CultureInfo.InvariantCulture),
                     };
@@ -154,65 +160,65 @@ namespace BimBridge.PowerEngine
 
         private static Dictionary<string, object> Markup(PowerEngineDispatcher pe, IList<string> folders, Dictionary<string, object> args, bool equipment)
         {
-            var path = Arg.GetString(args, "ruta");
-            if (string.IsNullOrWhiteSpace(path)) return Err("falta ruta al PDF de markups", Help);
-            var info = Doc(pe, folders, "pdf_info", new Dictionary<string, object> { ["ruta"] = path });
-            if (!(info.TryGetValue("resultado", out var value) && value is Dictionary<string, object> pdf)) return info;
-            var page = Arg.GetLong(args, "pagina") ?? 1;
-            var pages = (List<object>)pdf["detalle_paginas"];
-            if (page < 1 || page > pages.Count) return Err("la página del markup no existe", Help);
+            var path = Arg.GetString(args, "path");
+            if (string.IsNullOrWhiteSpace(path)) return Err("missing path to the markup PDF", Help);
+            var info = Doc(pe, folders, "pdf_info", new Dictionary<string, object> { ["path"] = path });
+            if (!(info.TryGetValue("result", out var value) && value is Dictionary<string, object> pdf)) return info;
+            var page = Arg.GetLong(args, "page") ?? 1;
+            var pages = (List<object>)pdf["pages_detail"];
+            if (page < 1 || page > pages.Count) return Err("the markup page does not exist", Help);
             var detail = (Dictionary<string, object>)pages[(int)page - 1];
             var sha = Arg.GetString(pdf, "sha256");
             var source = Path.GetFileName(path) + "#p" + page;
-            return MarkupPlacement.Plan(args, sha, source, Num(detail, "unidad_usuario") ?? 1, equipment);
+            return MarkupPlacement.Plan(args, sha, source, Num(detail, "user_unit") ?? 1, equipment);
         }
 
         private static Dictionary<string, object> Riser(PowerEngineDispatcher pe, IList<string> folders, Dictionary<string, object> args, bool audit)
         {
-            if (!(args.TryGetValue("pdf_aristas", out var raw) && raw is List<object> rows && rows.Count > 0))
-                return Err("indique pdf_aristas con página y evidencia textual de cada alimentador", Help);
+            if (!(args.TryGetValue("pdf_edges", out var raw) && raw is List<object> rows && rows.Count > 0))
+                return Err("provide pdf_edges with the page and textual evidence of each feeder", Help);
             var declared = rows.Cast<Dictionary<string, object>>().ToList();
-            var pages = declared.Select(r => Arg.GetLong(r, "pagina") ?? 0).Distinct().OrderBy(x => x).ToList();
-            if (pages.Any(p => p <= 0)) return Err("cada alimentador del PDF exige una página positiva", Help);
-            var workbook = new Dictionary<string, object> { ["ruta"] = Arg.GetString(args, "xlsx"), ["hoja"] = Arg.GetString(args, "hoja") };
-            foreach (var option in new[] { "columnas", "fila_encabezado", "fila_inicio", "fila_final" })
+            var pages = declared.Select(r => Arg.GetLong(r, "page") ?? 0).Distinct().OrderBy(x => x).ToList();
+            if (pages.Any(p => p <= 0)) return Err("every PDF feeder requires a positive page", Help);
+            var workbook = new Dictionary<string, object> { ["path"] = Arg.GetString(args, "xlsx"), ["sheet"] = Arg.GetString(args, "sheet") };
+            foreach (var option in new[] { "columns", "header_row", "start_row", "end_row" })
                 if (args.TryGetValue(option, out var value)) workbook[option] = value;
             var excel = Doc(pe, folders, "xlsx_feeders", workbook);
-            if (!(excel.TryGetValue("resultado", out var sheet) && sheet is Dictionary<string, object> excelResult)) return excel;
+            if (!(excel.TryGetValue("result", out var sheet) && sheet is Dictionary<string, object> excelResult)) return excel;
             var pdf = Doc(pe, folders, "pdf_extract", new Dictionary<string, object>
             {
-                ["ruta"] = Arg.GetString(args, "pdf"), ["paginas"] = pages.Cast<object>().ToList(), ["incluir"] = new List<object> { "texto" },
+                ["path"] = Arg.GetString(args, "pdf"), ["pages"] = pages.Cast<object>().ToList(), ["include"] = new List<object> { "text" },
             });
-            if (!(pdf.TryGetValue("resultado", out var document) && document is Dictionary<string, object> pdfResult)) return pdf;
-            if (Arg.GetBool(pdfResult, "truncado") == true) return Err("se truncó la lectura PDF; acote las páginas del riser", Help);
+            if (!(pdf.TryGetValue("result", out var document) && document is Dictionary<string, object> pdfResult)) return pdf;
+            if (Arg.GetBool(pdfResult, "truncated") == true) return Err("the PDF read was truncated; narrow down the riser pages", Help);
             static string Normalize(string text) => string.Join(" ", (text ?? "").Split((char[])null, StringSplitOptions.RemoveEmptyEntries));
-            var textByPage = ((List<object>)pdfResult["paginas"]).Cast<Dictionary<string, object>>().ToDictionary(
-                page => Arg.GetLong(page, "numero").Value,
-                page => Normalize(string.Join(" ", ((List<object>)page["palabras"]).Cast<Dictionary<string, object>>()
-                    .Select(word => Arg.GetString(word, "texto")))));
+            var textByPage = ((List<object>)pdfResult["pages"]).Cast<Dictionary<string, object>>().ToDictionary(
+                page => Arg.GetLong(page, "number").Value,
+                page => Normalize(string.Join(" ", ((List<object>)page["words"]).Cast<Dictionary<string, object>>()
+                    .Select(word => Arg.GetString(word, "text")))));
             foreach (var row in declared)
             {
-                var evidence = Normalize(Arg.GetString(row, "evidencia"));
-                if (evidence.Length == 0 || !textByPage.TryGetValue(Arg.GetLong(row, "pagina").Value, out var text) ||
+                var evidence = Normalize(Arg.GetString(row, "evidence"));
+                if (evidence.Length == 0 || !textByPage.TryGetValue(Arg.GetLong(row, "page").Value, out var text) ||
                     text.IndexOf(evidence, StringComparison.OrdinalIgnoreCase) < 0)
-                    return Err("la página no respalda la evidencia textual de " + Arg.GetString(row, "id"), Help);
+                    return Err("the page does not support the textual evidence of " + Arg.GetString(row, "id"), Help);
             }
-            var result = RiserSourceWorkflow.Build(args, (List<object>)excelResult["aristas"], rows, audit);
+            var result = RiserSourceWorkflow.Build(args, (List<object>)excelResult["edges"], rows, audit);
             result["sha256_excel"] = excelResult["sha256"];
             result["sha256_pdf"] = pdfResult["sha256"];
             return result;
         }
 
-        /// <summary>red ruta=conductos.json: tramos leídos de Revit (tools/aceptacion/0.9.0/conductos_090.cs) → análisis en tres capas.</summary>
+        /// <summary>red ruta=conductos.json: runs read from Revit (tools/acceptance/0.9.0/conduits_090.cs) → three-layer analysis.</summary>
         private static Dictionary<string, object> Network(PowerEngineDispatcher pe, IList<string> folders, Dictionary<string, object> a)
         {
-            var ruta = Arg.GetString(a, "ruta");
-            if (ruta == null) return Err("falta ruta= (JSON de tramos)", Help);
-            var full = Path.GetFullPath(ruta);
+            var path = Arg.GetString(a, "path");
+            if (path == null) return Err("missing path= (runs JSON)", Help);
+            var full = Path.GetFullPath(path);
             if (!PowerEngineDispatcher.PathAllowed(full, folders.Select(Path.GetFullPath).ToList()))
-                return new Dictionary<string, object> { ["codigo"] = PowerEngineContracts.Codes.PathDenied, ["error"] = "ruta no autorizada: " + ruta };
+                return new Dictionary<string, object> { ["code"] = PowerEngineContracts.Codes.PathDenied, ["error"] = "path not authorized: " + path };
             var info = new FileInfo(full);
-            if (!info.Exists || info.Length > 64L << 20) return Err("no existe o pasa de 64 MB: " + ruta, Help);
+            if (!info.Exists || info.Length > 64L << 20) return Err("does not exist or exceeds 64 MB: " + path, Help);
             double D(object o) => Convert.ToDouble(o, System.Globalization.CultureInfo.InvariantCulture);
             var segs = Json.Parse(File.ReadAllText(full)) is List<object> l ? l.Cast<Dictionary<string, object>>().Select(t =>
             {
@@ -220,15 +226,15 @@ namespace BimBridge.PowerEngine
                 return new RunSegment
                 {
                     Id = Arg.GetString(t, "id"), Ax = D(p[0]), Ay = D(p[1]), Az = D(p[2]), Bx = D(q[0]), By = D(q[1]), Bz = D(q[2]),
-                    DiameterFt = t.TryGetValue("diam", out var dm) && dm != null ? D(dm) : 0, System = Arg.GetString(t, "sistema"),
-                    ConnA = Arg.GetString(t, "con_a"), ConnB = Arg.GetString(t, "con_b"),
+                    DiameterFt = t.TryGetValue("diam", out var dm) && dm != null ? D(dm) : 0, System = Arg.GetString(t, "system"),
+                    ConnA = Arg.GetString(t, "with_a"), ConnB = Arg.GetString(t, "with_b"),
                 };
-            }).ToList() : throw new FormatException("se esperaba una lista de tramos");
-            return MepNetwork.Analyze(segs, Num(a, "contacto") ?? 1.0 / 192.0, Num(a, "proximidad") ?? 0.5, pe);
+            }).ToList() : throw new FormatException("expected a list of runs");
+            return MepNetwork.Analyze(segs, Num(a, "contact") ?? 1.0 / 192.0, Num(a, "proximity") ?? 0.5, pe);
         }
 
         private static double? Num(Dictionary<string, object> a, string k) => a.TryGetValue(k, out var v) && v != null ? Convert.ToDouble(v, System.Globalization.CultureInfo.InvariantCulture) : (double?)null;
 
-        private static Dictionary<string, object> Err(string error, string hint) => new Dictionary<string, object> { ["codigo"] = "INVALIDO", ["error"] = error, ["pista"] = hint };
+        private static Dictionary<string, object> Err(string error, string hint) => new Dictionary<string, object> { ["code"] = "INVALID", ["error"] = error, ["hint"] = hint };
     }
 }

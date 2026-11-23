@@ -8,75 +8,75 @@ using Bimbridge.Engine;
 namespace Bimbridge.AgentHost.Bench
 {
     /// <summary>
-    /// 0.8.0: medición de rendimiento y tokens. Cada cifra lleva su procedencia:
-    /// MEDIDO_SIMULADO (add-in falso por la tubería real, sin Revit), MEDIDO_NATIVO (Revit real, con evidencia) o NO_MEDIDO.
-    /// Las comparaciones contra pyRevit quedan preparadas pero NO_MEDIDO hasta que haya una corrida nativa autorizada.
+    /// 0.8.0: performance and token measurement. Every figure carries its provenance:
+    /// MEDIDO_SIMULADO (fake add-in over the real pipe, no Revit), MEDIDO_NATIVO (real Revit, with evidence) or NO_MEDIDO.
+    /// Comparisons against pyRevit are prepared but stay NO_MEDIDO until there is an authorized native run.
     /// </summary>
     public static class Benchmarks
     {
         public const string Simulated = "MEDIDO_SIMULADO", Native = "MEDIDO_NATIVO", NotMeasured = "NO_MEDIDO";
 
-        /// <summary>Resumen de las llamadas por cable de un <see cref="Revit.RevitLink"/> (Calls).</summary>
+        /// <summary>Summary of the wire calls of a <see cref="Revit.RevitLink"/> (Calls).</summary>
         public static Dictionary<string, object> Wire(IEnumerable<Dictionary<string, object>> calls)
         {
             var list = calls.ToList();
             long L(Dictionary<string, object> c, string k) => c.TryGetValue(k, out var v) ? Convert.ToInt64(v, CultureInfo.InvariantCulture) : 0;
-            var req = list.Sum(c => L(c, "bytes_peticion"));
-            var resp = list.Sum(c => L(c, "bytes_respuesta"));
+            var req = list.Sum(c => L(c, "request_bytes"));
+            var resp = list.Sum(c => L(c, "response_bytes"));
             return new Dictionary<string, object>
             {
-                ["llamadas_cable"] = (long)list.Count,
-                ["por_operacion"] = list.GroupBy(c => Convert.ToString(c["op"], CultureInfo.InvariantCulture)).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => (object)(long)g.Count()),
-                ["bytes_peticion"] = req, ["bytes_respuesta"] = resp,
+                ["wire_calls"] = (long)list.Count,
+                ["per_operation"] = list.GroupBy(c => Convert.ToString(c["op"], CultureInfo.InvariantCulture)).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => (object)(long)g.Count()),
+                ["request_bytes"] = req, ["response_bytes"] = resp,
                 ["ms_total"] = list.Sum(c => L(c, "ms")),
-                ["tokens_estimados_cable"] = TokenEstimate.FromChars(req + resp),
+                ["wire_estimated_tokens"] = TokenEstimate.FromChars(req + resp),
             };
         }
 
         public sealed class Def
         {
-            public string Id, Nombre, Escenario, Metricas, Arnes, Estado = NotMeasured, Bloqueo;
-            /// <summary>0.9.0: ítems de la campaña nativa que lo cubren (comprobados contra el procedimiento por una prueba).</summary>
+            public string Id, Name, Scenario, Metrics, Harness, State = NotMeasured, Blocker;
+            /// <summary>0.9.0: native campaign items that cover it (checked against the procedure by a test).</summary>
             public string[] Items = new string[0];
             public Dictionary<string, object> ToJson() => new Dictionary<string, object>
             {
-                ["id"] = Id, ["nombre"] = Nombre, ["escenario"] = Escenario, ["metricas"] = Metricas, ["arnes"] = Arnes, ["estado"] = Estado, ["bloqueo"] = Bloqueo, ["items"] = Items.Cast<object>().ToList(),
+                ["id"] = Id, ["name"] = Name, ["scenario"] = Scenario, ["metrics"] = Metrics, ["harness"] = Harness, ["status"] = State, ["lock"] = Blocker, ["items"] = Items.Cast<object>().ToList(),
             };
         }
 
         private const string Blocked = "BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION";
 
-        /// <summary>B1–B8 del informe de flujos reales (§12). Ninguno medido de forma nativa todavía.</summary>
+        /// <summary>B1–B8 from the real workflows report (§12). None measured natively yet.</summary>
         public static readonly IReadOnlyList<Def> Catalog = new List<Def>
         {
-            new Def { Id = "B0", Nombre = "586 luminarias: uno a uno frente a plan", Escenario = "586 elementos sintéticos; leer y cambiar un parámetro de cada uno",
-                Metricas = "llamadas del agente, llamadas por cable, bytes, tokens ESTIMADOS, tiempo; commits",
-                Arnes = "tests: Bench_B0_586_OneByOne_vs_Plan (add-in falso por la tubería real). Salida JSON con BIMBRIDGE_BENCH_OUT=<carpeta>",
-                Estado = Simulated, Bloqueo = "nativo: " + Blocked },
-            new Def { Id = "B1", Nombre = "Plantilla y visibilidad", Escenario = "varias vistas con regla heredada que oculta un sistema y un filtro demasiado amplio",
-                Metricas = "tiempo, llamadas, correspondencia por vista, cero categorías ajenas, plantilla original preservada",
-                Arnes = "campaña ítems N8-02 (vistas y plantillas) y N8-11 (visibilidad) en copia desechable; par pyRevit: script equivalente de lectura+cambio", Items = new[] { "N8-02", "N8-11" }, Bloqueo = Blocked },
-            new Def { Id = "B2", Nombre = "Iluminación y soporte", Escenario = "cientos de luces, símbolos parecidos, casi duplicados, rampas, offset ≠ altura física",
-                Metricas = "precisión/exhaustividad del emparejamiento y montaje, falsos positivos/negativos frente a verdad de prueba",
-                Arnes = "verificar_independiente + geo montaje sobre copia; verdad de prueba sembrada (omisiones y extras); ítems N8-07 y N8-10", Items = new[] { "N8-07", "N8-10" }, Bloqueo = Blocked },
-            new Def { Id = "B3", Nombre = "Grupos y anotación", Escenario = "11 hojas de unidades, variantes, más de un panel, salto de nivel no uniforme",
-                Metricas = "cobertura tipo/planta, miembros correctos, cero referencias inválidas, legibilidad a escala",
-                Arnes = "PREPARADO PARCIAL: lectura de grupos existe; la receta de cobertura por tipo/planta es 0.9.0", Bloqueo = Blocked },
-            new Def { Id = "B4", Nombre = "Feeds de dos sistemas", Escenario = "26 plantas con stubs, rutas cruzadas, vínculos y alertas cerca de la tolerancia",
-                Metricas = "tiempo, memoria, llamadas; continuidad y separación; cero interferencias incompatibles conocidas",
-                Arnes = "NO PREPARADO: routing físico es 0.9.0 (CAP-011)", Bloqueo = Blocked },
-            new Def { Id = "B5", Nombre = "Riser 2D", Escenario = "grafo con derivación omitida, rótulo atravesado, ID repetido válido, extremo abierto respaldado",
-                Metricas = "exactitud de nodos/aristas, tasas de error, legibilidad, una página",
-                Arnes = "PREPARADO PARCIAL: dibujo 2D (detail_*) y verificación independiente existen; el grafo de riser es 0.9.0 (CAP-012)", Bloqueo = Blocked },
-            new Def { Id = "B6", Nombre = "Publicación", Escenario = "set ordenado de 26 láminas y un riser, con un PDF obsoleto presente",
-                Metricas = "persistencia tras reapertura, orden, papel, color, sello; detectar PDF anterior y verificar el nuevo",
-                Arnes = "DeliveryTrack (12 etapas) + campaña N8-05 (láminas y conjunto) y N8-12 (PDF y recibo); exportación sólo con permiso de exportar", Items = new[] { "N8-05", "N8-12" }, Bloqueo = Blocked },
-            new Def { Id = "B7", Nombre = "Recuperación", Escenario = "Revit ocupado, segundo agente, cambio de PID, caída tras commit, respuesta truncada",
-                Metricas = "cero ejecución concurrente, cero duplicación, cero escritura en modelo equivocado; fases repetidas",
-                Arnes = "NRT-03/05/06/07 (simulados en pruebas; NRT-03/05/06 nativos en rc1 14ec21d; NRT-07 sin corrida nativa); ítems N8-09 y N8-13", Items = new[] { "N8-09", "N8-13" }, Bloqueo = Blocked },
-            new Def { Id = "B8", Nombre = "Compatibilidad de familia", Escenario = "instalación/manifiesto, abrir familia, conectores, recarga en 2022–2026",
-                Metricas = "resultado por combinación versión×operación, reversión y recarga verificables",
-                Arnes = "fam info/caras/conector/cargar_archivo + campaña N8-06 (familias externas) y N8-13c (instalación por ZIP) por versión", Items = new[] { "N8-06", "N8-13" }, Bloqueo = Blocked },
+            new Def { Id = "B0", Name = "586 fixtures: one by one vs. plan", Scenario = "586 synthetic elements; read and change one parameter on each",
+                Metrics = "agent calls, wire calls, bytes, ESTIMATED tokens, time; commits",
+                Harness = "tests: Bench_B0_586_OneByOne_vs_Plan (fake add-in over the real pipe). JSON output with BIMBRIDGE_BENCH_OUT=<folder>",
+                State = Simulated, Blocker = "native: " + Blocked },
+            new Def { Id = "B1", Name = "Template and visibility", Scenario = "several views with an inherited rule that hides a system and an overly broad filter",
+                Metrics = "time, calls, per-view match, zero unrelated categories, original template preserved",
+                Harness = "campaign items N8-02 (views and templates) and N8-11 (visibility) on a disposable copy; pyRevit counterpart: equivalent read+change script", Items = new[] { "N8-02", "N8-11" }, Blocker = Blocked },
+            new Def { Id = "B2", Name = "Lighting and support", Scenario = "hundreds of lights, similar symbols, near duplicates, ramps, offset ≠ physical height",
+                Metrics = "precision/recall of matching and mounting, false positives/negatives against test ground truth",
+                Harness = "verify_independent + geo mounting on a copy; seeded test ground truth (omissions and extras); items N8-07 and N8-10", Items = new[] { "N8-07", "N8-10" }, Blocker = Blocked },
+            new Def { Id = "B3", Name = "Groups and annotation", Scenario = "11 unit sheets, variants, more than one panel, non-uniform level jump",
+                Metrics = "type/floor plan coverage, correct members, zero invalid references, legibility at scale",
+                Harness = "PARTIALLY PREPARED: group reading exists; the per type/floor plan coverage recipe is 0.9.0", Blocker = Blocked },
+            new Def { Id = "B4", Name = "Two-system feeds", Scenario = "26 floor plans with stubs, crossing routes, links and alerts near the tolerance",
+                Metrics = "time, memory, calls; continuity and separation; zero known incompatible interferences",
+                Harness = "NOT PREPARED: physical routing is 0.9.0 (CAP-011)", Blocker = Blocked },
+            new Def { Id = "B5", Name = "Riser 2D", Scenario = "graph with an omitted branch, a crossed label, a valid repeated ID, a backed open end",
+                Metrics = "node/edge accuracy, error rates, legibility, one page",
+                Harness = "PARTIALLY PREPARED: 2D drawing (detail_*) and independent verification exist; the riser graph is 0.9.0 (CAP-012)", Blocker = Blocked },
+            new Def { Id = "B6", Name = "Publishing", Scenario = "ordered set of 26 sheets and a riser, with an obsolete PDF present",
+                Metrics = "persistence after reopening, order, paper, color, seal; detect the previous PDF and verify the new one",
+                Harness = "DeliveryTrack (12 stages) + campaign N8-05 (sheets and sheet set) and N8-12 (PDF and receipt); export only with export permission", Items = new[] { "N8-05", "N8-12" }, Blocker = Blocked },
+            new Def { Id = "B7", Name = "Recovery", Scenario = "Revit busy, second agent, PID change, crash after commit, truncated response",
+                Metrics = "zero concurrent execution, zero duplication, zero writes to the wrong model; repeated phases",
+                Harness = "NRT-03/05/06/07 (simulated in tests; NRT-03/05/06 native in rc1 14ec21d; NRT-07 without a native run); items N8-09 and N8-13", Items = new[] { "N8-09", "N8-13" }, Blocker = Blocked },
+            new Def { Id = "B8", Name = "Family compatibility", Scenario = "installation/manifest, open family, connectors, reload in 2022–2026",
+                Metrics = "result per version×operation combination, verifiable rollback and reload",
+                Harness = "fam info/faces/connector/load_file + campaign N8-06 (external families) and N8-13c (ZIP installation) per version", Items = new[] { "N8-06", "N8-13" }, Blocker = Blocked },
         };
     }
 }

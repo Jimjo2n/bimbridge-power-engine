@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Issue #2: lectura completa paginada desde una sola instantánea, ligada a sesión, documento y revisión.</summary>
+    /// <summary>Issue #2: full paged read from a single snapshot, bound to session, document and revision.</summary>
     public class QuerySnapshotTests
     {
         private static List<Dictionary<string, object>> Rows(int n) =>
@@ -47,7 +47,7 @@ namespace Bimbridge.Tests
         [Fact]
         public void PagedFromSnapshot_EqualsLegacyPerPageReads_IncludingUnitsAndWhere()
         {
-            // Lectura clásica: cada página vuelve a leer y filtrar (lo que hacía el add-in en cada llamada).
+            // Classic read: each page reads and filters again (what the add-in did on every call).
             const int n = 5100, ps = 100;
             var legacy = new List<string>();
             var pages = 0;
@@ -60,12 +60,12 @@ namespace Bimbridge.Tests
                 if (p >= pages) break;
             }
 
-            // Nueva: una lectura + filtro, páginas renderizadas desde la instantánea.
+            // New: one read + filter, pages rendered from the snapshot.
             var q1 = Spec(ps, "mm", "lvl!=L0");
             var filtered = ResultTable.Filter(q1, Rows(n), out var matched);
             var fromSnap = new List<string>();
             for (var p = 1; p <= pages; p++) fromSnap.AddRange(RowsOf(ResultTable.Render(q1, filtered, p, ps)));
-            // Renderizar dos veces no altera las filas (no hay doble conversión a mm).
+            // Rendering twice does not alter the rows (no double conversion to mm).
             var again = new List<string>();
             for (var p = 1; p <= pages; p++) again.AddRange(RowsOf(ResultTable.Render(q1, filtered, p, ps)));
 
@@ -89,13 +89,13 @@ namespace Bimbridge.Tests
             Assert.Equal(SnapshotLookup.Ok, store.Get(id, "s1", null, out var snap));
             Assert.Equal(300, snap.Rows.Count);
             Assert.Equal(SnapshotLookup.Ok, store.Get(id, "s1", "d1", out _));
-            Assert.Equal(SnapshotLookup.Unknown, store.Get(id, "s2", null, out _));          // otra sesión: no se revela nada
-            Assert.Equal(SnapshotLookup.OtherDocument, store.Get(id, "s1", "d2", out _));    // otro documento
-            Assert.Equal(SnapshotLookup.Unknown, store.Get("qnoexiste", "s1", null, out _));
+            Assert.Equal(SnapshotLookup.Unknown, store.Get(id, "s2", null, out _));          // another session: nothing is revealed
+            Assert.Equal(SnapshotLookup.OtherDocument, store.Get(id, "s1", "d2", out _));    // another document
+            Assert.Equal(SnapshotLookup.Unknown, store.Get("qdoesnotexist", "s1", null, out _));
 
-            rev = 8;                                                                          // el modelo cambió
+            rev = 8;                                                                          // the model changed
             Assert.Equal(SnapshotLookup.Stale, store.Get(id, "s1", null, out _));
-            Assert.Equal(SnapshotLookup.Unknown, store.Get(id, "s1", null, out _));          // y se descartó
+            Assert.Equal(SnapshotLookup.Unknown, store.Get(id, "s1", null, out _));          // and it was discarded
             Assert.Equal(0, store.Count);
             Assert.Equal(0, store.EstimatedBytes);
         }
@@ -104,7 +104,7 @@ namespace Bimbridge.Tests
         public void LiveRevFailure_FailsClosed()
         {
             var store = new QuerySnapshotStore();
-            var id = Put(store, "s1", "d1", 1, Spec(10), Rows(30), () => throw new InvalidOperationException("documento cerrado"));
+            var id = Put(store, "s1", "d1", 1, Spec(10), Rows(30), () => throw new InvalidOperationException("document closed"));
             Assert.Equal(SnapshotLookup.Stale, store.Get(id, "s1", null, out _));
         }
 
@@ -116,12 +116,12 @@ namespace Bimbridge.Tests
             var id = Put(store, "s1", "d1", 1, Spec(10), Rows(30), () => 1);
             now = now.AddMinutes(4);
             Assert.Equal(SnapshotLookup.Ok, store.Get(id, "s1", null, out _));
-            now = now.AddMinutes(4);   // 8 min desde la creación, 4 desde el último uso
+            now = now.AddMinutes(4);   // 8 min since creation, 4 since last use
             Assert.Equal(SnapshotLookup.Ok, store.Get(id, "s1", null, out _));
             now = now.AddMinutes(6);
-            Assert.Equal(SnapshotLookup.Evicted, store.Get(id, "s1", null, out _));          // se informa, no se invalida en silencio
-            Assert.Contains("vencido", store.EvictionReason(id, "s1"));
-            Assert.Null(store.EvictionReason(id, "s2"));                                     // el motivo sólo se da a la sesión dueña
+            Assert.Equal(SnapshotLookup.Evicted, store.Get(id, "s1", null, out _));          // reported, not silently invalidated
+            Assert.Contains("expired",store.EvictionReason(id, "s1"));
+            Assert.Null(store.EvictionReason(id, "s2"));                                     // the reason is only given to the owner session
             Assert.Equal(0, store.Cells);
             Assert.Equal(0, store.EstimatedBytes);
         }
@@ -129,20 +129,20 @@ namespace Bimbridge.Tests
         [Fact]
         public void Budget_IsInEstimatedBytes_LongTextsCountByTheirSize()
         {
-            // Mismo número de celdas, distinto tamaño real: el presupuesto ve la diferencia (antes, por celdas, eran iguales).
+            // Same number of cells, different real size: the budget sees the difference (before, by cells, they were equal).
             var shortRows = Rows(200);
             var longRows = Rows(200).Select(r => { r["fam"] = new string('x', 5000); return r; }).ToList();
             var q = Spec(100);
             var small = QuerySnapshotStore.EstimateBytes(QuerySnapshotStore.Project(q, shortRows));
             var large = QuerySnapshotStore.EstimateBytes(QuerySnapshotStore.Project(q, longRows));
-            // fam pasa de "F0".."F6" (2 caracteres) a 5000 caracteres: la estimación crece exactamente 2 bytes UTF-16 por carácter añadido.
+            // fam goes from "F0".."F6" (2 characters) to 5000 characters: the estimate grows by exactly 2 UTF-16 bytes per added character.
             Assert.Equal(200L * 2 * (5000 - 2), large - small);
 
-            // Presupuesto de 1 MB: las filas cortas caben; 200 textos de 5000 caracteres (~2 MB) no, y se dice por qué.
+            // 1 MB budget: short rows fit; 200 texts of 5000 characters (~2 MB) do not, and the reason is given.
             var store = new QuerySnapshotStore(maxBytes: 1024 * 1024, maxBytesPerDocument: 1024 * 1024);
             Assert.NotNull(Put(store, "s1", "d1", 1, q, shortRows, () => 1));
             Assert.Null(store.Put("s1", "d1", 1, q, longRows, () => 1, out var refusal));
-            Assert.Contains("MB estimados", refusal);
+            Assert.Contains("MB (estimated)", refusal);
             Assert.True(store.EstimatedBytes <= store.MaxBytes);
         }
 
@@ -151,12 +151,12 @@ namespace Bimbridge.Tests
         {
             var q = Spec(50, "mm", "lvl!=L0");
             var raw = Rows(1000);
-            foreach (var r in raw) { r["comments"] = new string('c', 300); r["ws"] = "Workset largo de filtro"; }   // columnas no pedidas
+            foreach (var r in raw) { r["comments"] = new string('c', 300); r["ws"] = "Long filter workset"; }   // columns not requested
             var filtered = ResultTable.Filter(q, raw, out _);
             var store = new QuerySnapshotStore();
             var id = Put(store, "s1", "d1", 1, q, filtered, () => 1);
             Assert.Equal(SnapshotLookup.Ok, store.Get(id, "s1", null, out var snap));
-            Assert.All(snap.Rows, r => Assert.Equal(q.Fields.Count, r.Count));             // proyección compacta
+            Assert.All(snap.Rows, r => Assert.Equal(q.Fields.Count, r.Count));             // compact projection
             var pages = (int)Math.Ceiling(filtered.Count / 50.0);
             for (var p = 1; p <= pages; p++)
                 Assert.Equal(RowsOf(ResultTable.Render(q, filtered, p, 50)), RowsOf(ResultTable.Render(snap.Spec, snap.Rows, p, 50)));
@@ -169,16 +169,16 @@ namespace Bimbridge.Tests
             var q = Spec(10);
             var rows = Rows(100);
             var one = QuerySnapshotStore.EstimateBytes(QuerySnapshotStore.Project(q, rows));
-            // Global para 3 instantáneas; por documento para 2.
+            // Global limit of 3 snapshots; per document, 2.
             var store = new QuerySnapshotStore(maxBytes: one * 3 + 10, maxBytesPerDocument: one * 2 + 10, maxPerSession: 10, clock: () => now);
             var a = Put(store, "s1", "d1", 1, q, rows, () => 1); now = now.AddSeconds(1);
             var b = Put(store, "s2", "d1", 1, q, rows, () => 1); now = now.AddSeconds(1);
-            Assert.Equal(SnapshotLookup.Ok, store.Get(a, "s1", null, out _)); now = now.AddSeconds(1);   // a pasa a ser la más reciente
-            var c = Put(store, "s3", "d1", 1, q, rows, () => 1); now = now.AddSeconds(1);                // excede d1: sale b (LRU de d1)
+            Assert.Equal(SnapshotLookup.Ok, store.Get(a, "s1", null, out _)); now = now.AddSeconds(1);   // a becomes the most recent
+            var c = Put(store, "s3", "d1", 1, q, rows, () => 1); now = now.AddSeconds(1);                // exceeds d1: b is evicted (LRU of d1)
             Assert.Equal(SnapshotLookup.Evicted, store.Get(b, "s2", null, out _));
-            Assert.Contains("documento", store.EvictionReason(b, "s2"));
-            var d = Put(store, "s4", "d2", 1, q, rows, () => 1); now = now.AddSeconds(1);                // cabe en el global (3)
-            var e = Put(store, "s5", "d3", 1, q, rows, () => 1);                                         // excede el global: sale la LRU (a)
+            Assert.Contains("document", store.EvictionReason(b, "s2"));
+            var d = Put(store, "s4", "d2", 1, q, rows, () => 1); now = now.AddSeconds(1);                // fits in the global limit (3)
+            var e = Put(store, "s5", "d3", 1, q, rows, () => 1);                                         // exceeds the global limit: the LRU (a) is evicted
             Assert.Equal(SnapshotLookup.Evicted, store.Get(a, "s1", null, out _));
             Assert.Contains("global", store.EvictionReason(a, "s1"));
             foreach (var (id, s) in new[] { (c, "s3"), (d, "s4"), (e, "s5") }) Assert.Equal(SnapshotLookup.Ok, store.Get(id, s, null, out _));
@@ -203,8 +203,8 @@ namespace Bimbridge.Tests
                 var r = store.Get(id, session, doc, out var snap);
                 Assert.Contains(r, new[] { SnapshotLookup.Ok, SnapshotLookup.Evicted });
                 if (r == SnapshotLookup.Ok) { Assert.Equal(doc, snap.DocId); Assert.Equal(session, snap.SessionId); Assert.Equal(400, snap.Rows.Count); }
-                Assert.NotEqual(SnapshotLookup.Ok, store.Get(id, session + "x", doc, out _));     // nunca a otra sesión
-                Assert.NotEqual(SnapshotLookup.Ok, store.Get(id, session, doc + "x", out _));     // nunca a otro documento
+                Assert.NotEqual(SnapshotLookup.Ok, store.Get(id, session + "x", doc, out _));     // never to another session
+                Assert.NotEqual(SnapshotLookup.Ok, store.Get(id, session, doc + "x", out _));     // never to another document
             }
         }
 
@@ -221,7 +221,7 @@ namespace Bimbridge.Tests
             Assert.Equal(1, store.Count);
             store.DropDocument("d2");
             Assert.Equal(SnapshotLookup.Evicted, store.Get(other, "s2", null, out _));
-            Assert.Contains("documento se cerró", store.EvictionReason(other, "s2"));
+            Assert.Contains("document was closed", store.EvictionReason(other, "s2"));
             Assert.Equal(0, store.Cells);
             Assert.Equal(0, store.EstimatedBytes);
         }
@@ -229,8 +229,8 @@ namespace Bimbridge.Tests
         [Fact]
         public void FullRead_51Pages_ServedFromSnapshot_IsFast()
         {
-            // Referencia del issue: 51 llamadas, 19 727 ms (cada una releía el modelo). Desde la instantánea, 50 páginas son trabajo
-            // en memoria. Umbral holgado para máquinas de CI lentas; lo que se comprueba es el orden de magnitud.
+            // Issue reference: 51 calls, 19,727 ms (each one reread the model). From the snapshot, 50 pages are in-memory
+            // work. Generous threshold for slow CI machines; what is checked is the order of magnitude.
             var q = Spec(100);
             var filtered = ResultTable.Filter(q, Rows(5100), out _);
             var store = new QuerySnapshotStore();
@@ -244,16 +244,16 @@ namespace Bimbridge.Tests
             }
             sw.Stop();
             Assert.Equal(5100, total);
-            Assert.True(sw.ElapsedMilliseconds < 2000, "50 páginas desde instantánea: " + sw.ElapsedMilliseconds + " ms");
+            Assert.True(sw.ElapsedMilliseconds < 2000, "50 pages from snapshot: " + sw.ElapsedMilliseconds + " ms");
         }
 
         [Theory]
-        [InlineData("documento")]
-        [InlineData("sesion")]
+        [InlineData("document")]
+        [InlineData("session")]
         public void Get_RevalidatesAfterLiveRev_ConcurrentDropIsNeverServed(string drop)
         {
-            // AUD-02: LiveRev se evalúa fuera del bloqueo. Una barrera lo detiene ahí mientras otro hilo descarta la instantánea:
-            // al reanudar, Get NO puede devolver Ok con un objeto ya descartado.
+            // AUD-02: LiveRev is evaluated outside the lock. A barrier stops it there while another thread discards the snapshot:
+            // on resume, Get must NOT return Ok with an already discarded object.
             using (var inLiveRev = new System.Threading.ManualResetEventSlim(false))
             using (var release = new System.Threading.ManualResetEventSlim(false))
             {
@@ -269,12 +269,12 @@ namespace Bimbridge.Tests
                 var reader = new System.Threading.Thread(() => result = store.Get(id, "s1", "d1", out served));
                 reader.Start();
                 Assert.True(inLiveRev.Wait(10000));
-                if (drop == "documento") store.DropDocument("d1"); else store.DropSession("s1");
+                if (drop == "document") store.DropDocument("d1"); else store.DropSession("s1");
                 release.Set();
                 Assert.True(reader.Join(10000));
                 Assert.NotEqual(SnapshotLookup.Ok, result);
                 Assert.Null(served);
-                Assert.Equal(drop == "documento" ? SnapshotLookup.Evicted : SnapshotLookup.Unknown, result);
+                Assert.Equal(drop == "document" ? SnapshotLookup.Evicted : SnapshotLookup.Unknown, result);
                 block = false;
                 Assert.Equal(0, store.Count);
                 Assert.Equal(0, store.EstimatedBytes);
@@ -294,7 +294,7 @@ namespace Bimbridge.Tests
                 {
                     var i = (k * 7 + r) % ids.Count;
                     var doc = "d" + (i % 4);
-                    var droppedBefore = dropped.ContainsKey(doc);   // el descarte terminó ANTES de empezar esta lectura
+                    var droppedBefore = dropped.ContainsKey(doc);   // the discard finished BEFORE this read started
                     var res = store.Get(ids[i], "s1", doc, out var snap);
                     if (res == SnapshotLookup.Ok && droppedBefore) System.Threading.Interlocked.Increment(ref violations);
                 }
@@ -302,7 +302,7 @@ namespace Bimbridge.Tests
             readers.ForEach(t => t.Start());
             foreach (var d in new[] { "d0", "d1", "d2", "d3" }) { System.Threading.Thread.Sleep(5); store.DropDocument(d); dropped[d] = true; }
             readers.ForEach(t => t.Join(20000));
-            // Tras DropDocument nada de ese documento se sirve: una lectura que empieza después del descarte nunca obtiene Ok.
+            // After DropDocument nothing from that document is served: a read that starts after the discard never gets Ok.
             Assert.Equal(0, violations);
             Assert.Equal(0, store.Count);
         }
@@ -310,23 +310,23 @@ namespace Bimbridge.Tests
         [Fact]
         public void IncrementalProjection_StopsAsSoonAsBudgetIsExceeded_NoPartialResult()
         {
-            // AUD-03: con 10 000 filas de textos de 2 000 caracteres (~40 MB estimados) y un límite de 1 MB, la proyección se detiene
-            // en cuanto lo supera: devuelve null (nunca filas recortadas) y no llega a construir el resto.
+            // AUD-03: with 10,000 rows of 2,000-character texts (~40 MB estimated) and a 1 MB limit, the projection stops
+            // as soon as it exceeds it: returns null (never truncated rows) and does not build the rest.
             var q = Spec(100);
             var visited = 0;
             var rows = new CountingList(Rows(10000).Select(r => { r["fam"] = new string('y', 2000); return r; }).ToList(), () => visited++);
             var res = QuerySnapshotStore.ProjectWithinBudget(q, rows, 1024 * 1024, out var bytes);
             Assert.Null(res);
             Assert.True(bytes > 1024 * 1024);
-            Assert.True(visited < 1000, "se detuvo tras " + visited + " filas");     // ~250 filas de ~4 KB cada una
-            // Si cabe, devuelve todas las filas y la misma estimación que el cálculo completo.
+            Assert.True(visited < 1000, "stopped after " + visited + " rows");     // ~250 rows of ~4 KB each
+            // If it fits, it returns all rows and the same estimate as the full computation.
             var small = Rows(500);
             var ok = QuerySnapshotStore.ProjectWithinBudget(q, small, 64L * 1024 * 1024, out var b2);
             Assert.Equal(500, ok.Count);
             Assert.Equal(QuerySnapshotStore.EstimateBytes(QuerySnapshotStore.Project(q, small)), b2);
         }
 
-        /// <summary>Lista de sólo lectura que cuenta cuántas filas se recorren.</summary>
+        /// <summary>Read-only list that counts how many rows are traversed.</summary>
         private sealed class CountingList : IReadOnlyList<Dictionary<string, object>>
         {
             private readonly List<Dictionary<string, object>> _inner; private readonly Action _onVisit;

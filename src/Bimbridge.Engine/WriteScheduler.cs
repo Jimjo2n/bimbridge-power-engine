@@ -5,17 +5,17 @@ using System.Collections.Generic;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Cola única de escritura con turnos justos entre sesiones (sección 9.2).
-    /// Cada elemento de la cola es un sub-lote. El planificador toma uno de la sesión A,
-    /// luego uno de la B, etc., para que un plan grande de un agente no bloquee a otro.
-    /// Una barrera cerrada (guardar, sync, exportar) detiene la entrega de sub-lotes nuevos.
+    /// Single write queue with fair turns between sessions (section 9.2).
+    /// Each queue item is a sub-batch. The scheduler takes one from session A,
+    /// then one from B, etc., so one agent's large plan does not block another.
+    /// A closed barrier (save, sync, export) stops handing out new sub-batches.
     /// </summary>
     public sealed class WriteScheduler<T>
     {
         private readonly object _lock = new object();
         private readonly Dictionary<string, Queue<T>> _queues = new Dictionary<string, Queue<T>>(StringComparer.Ordinal);
         private readonly List<string> _ring = new List<string>();
-        private int _cursor; // índice del próximo candidato en _ring
+        private int _cursor; // index of the next candidate in _ring
         private string _barrierReason;
 
         public void Enqueue(string sessionId, T item)
@@ -33,7 +33,7 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Entrega el siguiente sub-lote según el turno. False si no hay nada o la barrera está cerrada.</summary>
+        /// <summary>Hands out the next sub-batch by turn. False if there is nothing or the barrier is closed.</summary>
         public bool TryDequeue(out string sessionId, out T item)
         {
             lock (_lock)
@@ -51,7 +51,7 @@ namespace Bimbridge.Engine
                     sessionId = sid;
                     if (q.Count == 0)
                     {
-                        // la sesión sale del anillo; el cursor queda en el mismo índice (que ahora es el siguiente)
+                        // the session leaves the ring; the cursor stays at the same index (which is now the next one)
                         _queues.Remove(sid);
                         _ring.RemoveAt(idx);
                         _cursor = _ring.Count == 0 ? 0 : idx % _ring.Count;
@@ -66,13 +66,13 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Cuántos sub-lotes se entregarán antes de que le toque al primero pendiente de esta sesión.</summary>
+        /// <summary>How many sub-batches will be handed out before this session's first pending one gets its turn.</summary>
         public int PositionOf(string sessionId)
         {
             lock (_lock)
             {
                 if (!_queues.ContainsKey(sessionId)) return -1;
-                // simulación del turno sin modificar la cola
+                // simulate the turn without modifying the queue
                 var counts = new Dictionary<string, int>(StringComparer.Ordinal);
                 foreach (var kv in _queues) counts[kv.Key] = kv.Value.Count;
                 var ring = new List<string>(_ring);
@@ -92,7 +92,7 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Quita todo lo pendiente de una sesión (desconexión). Devuelve lo que se quitó.</summary>
+        /// <summary>Removes everything pending for a session (disconnect). Returns what was removed.</summary>
         public List<T> RemoveSession(string sessionId)
         {
             lock (_lock)
@@ -123,10 +123,10 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Cierra la barrera de documento. Lo pendiente queda en cola, sin entregarse.</summary>
+        /// <summary>Closes the document barrier. Pending items stay queued, not handed out.</summary>
         public void CloseBarrier(string reason)
         {
-            lock (_lock) _barrierReason = string.IsNullOrEmpty(reason) ? "operación de documento" : reason;
+            lock (_lock) _barrierReason = string.IsNullOrEmpty(reason) ? "document operation" : reason;
         }
 
         public void OpenBarrier()
@@ -134,7 +134,7 @@ namespace Bimbridge.Engine
             lock (_lock) _barrierReason = null;
         }
 
-        /// <summary>Motivo de la barrera cerrada, o null si está abierta.</summary>
+        /// <summary>Reason for the closed barrier, or null if it is open.</summary>
         public string BarrierReason { get { lock (_lock) return _barrierReason; } }
     }
 }

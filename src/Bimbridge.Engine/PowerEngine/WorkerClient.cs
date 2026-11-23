@@ -16,10 +16,10 @@ using Response = BimBridge.PowerEngine.PowerEngineContracts.Response;
 namespace BimBridge.PowerEngine
 {
     /// <summary>
-    /// Cliente de un motor externo del Power Engine (Python Worker o Rust Geometry Engine en modo IPC). Un proceso hijo aislado
-    /// de Revit, sin consola, con stdin/stdout en JSON por líneas. El cliente impone por su cuenta:
-    /// saludo y versión del contrato, correlación, tiempo máximo (mata el proceso y lo reinicia en el siguiente trabajo),
-    /// cancelación, tamaño máximo de mensaje y vigilancia de memoria. Un trabajo a la vez por cliente (el dispatcher serializa).
+    /// Client of an external Power Engine engine (Python Worker or Rust Geometry Engine in IPC mode). A child process isolated
+    /// from Revit, without a console, with line-delimited JSON over stdin/stdout. The client enforces on its own:
+    /// handshake and contract version, correlation, timeout (kills the process and restarts it on the next job),
+    /// cancellation, maximum message size and memory monitoring. One job at a time per client (the dispatcher serializes).
     /// </summary>
     public sealed class WorkerClient : IDisposable
     {
@@ -46,7 +46,7 @@ namespace BimBridge.PowerEngine
 
         public bool Running => _proc != null && !_proc.HasExited;
 
-        /// <summary>Arranca (si hace falta) y saluda. false si el motor no está disponible o es incompatible (degradación controlada).</summary>
+        /// <summary>Starts (if needed) and performs the handshake. false if the engine is unavailable or incompatible (controlled degradation).</summary>
         public bool EnsureStarted(int helloTimeoutMs = 15000)
         {
             lock (_gate)
@@ -70,11 +70,11 @@ namespace BimBridge.PowerEngine
                     var captured = _stderr;
                     _stderrDrain = DrainStderr(stderr, captured);
                     _in = _proc.StandardInput.BaseStream;
-                    _reader = new LineReader(_proc.StandardOutput.BaseStream);   // uno por proceso: una lectura huérfana no toca al siguiente
+                    _reader = new LineReader(_proc.StandardOutput.BaseStream);   // one per process: an orphaned read does not affect the next one
                 }
                 catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is FileNotFoundException || ex is InvalidOperationException)
                 {
-                    LastStartError = "arranque (" + Path.GetFileName(Exe) + "): " + ex.Message;
+                    LastStartError = "start (" + Path.GetFileName(Exe) + "): " + ex.Message;
                     Kill();
                     return false;
                 }
@@ -85,20 +85,20 @@ namespace BimBridge.PowerEngine
                     Kill();
                     string detail;
                     lock (_stderr) detail = _stderr.ToString().Trim();
-                    LastStartError = "saludo (" + Path.GetFileName(Exe) + "): " + r.Code + ": " + r.Error
-                        + (_exitCode.HasValue ? "; salida=" + _exitCode.Value : "")
+                    LastStartError = "handshake (" + Path.GetFileName(Exe) + "): " + r.Code + ": " + r.Error
+                        + (_exitCode.HasValue ? "; exit=" + _exitCode.Value : "")
                         + (detail.Length == 0 ? "" : "; stderr: " + detail);
                     return false;
                 }
                 var info = HelloInfo.From(r);
-                if (!info.Compatible) { LastStartError = "contrato " + info.Protocol + " incompatible"; Kill(); return false; }
+                if (!info.Compatible) { LastStartError = "incompatible contract " + info.Protocol; Kill(); return false; }
                 Info = info;
                 _everStarted = true;
                 return true;
             }
         }
 
-        /// <summary>Ejecuta un trabajo. Nunca lanza por fallos del motor: devuelve un código.</summary>
+        /// <summary>Runs a job. Never throws on engine failures: returns a code.</summary>
         public Response Call(Request req, CancellationToken ct = default(CancellationToken))
         {
             lock (_gate)
@@ -106,7 +106,7 @@ namespace BimBridge.PowerEngine
                 if (!Running || Info == null)
                 {
                     if (_everStarted) Restarts++;
-                    if (!EnsureStarted()) return Response.Fail(req.Id, Codes.Unavailable, Name + " no disponible: " + LastStartError);
+                    if (!EnsureStarted()) return Response.Fail(req.Id, Codes.Unavailable, Name + " unavailable: " + LastStartError);
                 }
                 return CallLocked(req, ct);
             }
@@ -119,8 +119,8 @@ namespace BimBridge.PowerEngine
             var line = Json.Write(req.ToJson());
             var bytes = Encoding.UTF8.GetBytes(line + "\n");
             ser.Stop();
-            if (bytes.Length > req.Limits.MaxMessageBytes) return Response.Fail(req.Id, Codes.TooLarge, "la petición ocupa " + bytes.Length + " bytes (máximo " + req.Limits.MaxMessageBytes + ")");
-            if (_proc == null || _proc.HasExited) return Response.Fail(req.Id, Codes.Unavailable, Name + " no está en marcha");
+            if (bytes.Length > req.Limits.MaxMessageBytes) return Response.Fail(req.Id, Codes.TooLarge, "the request is " + bytes.Length + " bytes (maximum " + req.Limits.MaxMessageBytes + ")");
+            if (_proc == null || _proc.HasExited) return Response.Fail(req.Id, Codes.Unavailable, Name + " is not running");
             string respLine = null;
             string readErr = null;
             var ipc = Stopwatch.StartNew();
@@ -133,17 +133,17 @@ namespace BimBridge.PowerEngine
                     input.Write(bytes, 0, bytes.Length); input.Flush();
                     respLine = reader.ReadLine(req.Limits.MaxMessageBytes, out readErr);
                 }
-                catch (IOException ex) { readErr = "tubería rota: " + ex.Message; }
-                catch (ObjectDisposedException) { readErr = "proceso terminado"; }
+                catch (IOException ex) { readErr = "broken pipe: " + ex.Message; }
+                catch (ObjectDisposedException) { readErr = "process terminated"; }
             });
-            // Windows no tiene RLIMIT_AS (worker.py lo ignora allí): el límite de memoria se vigila aquí mientras el trabajo corre.
+            // Windows has no RLIMIT_AS (worker.py ignores it there): the memory limit is monitored here while the job runs.
             var limitBytes = (long)req.Limits.MaxMemoryMb << 20;
             var deadline = req.Limits.TimeoutMs < 0 ? long.MaxValue : req.Limits.TimeoutMs;
             int idx = -1;
             try
             {
                 long left;
-                while ((left = deadline - ipc.ElapsedMilliseconds) > 0)   // una sola lectura: nunca pasa -1 (infinito) a WaitAny
+                while ((left = deadline - ipc.ElapsedMilliseconds) > 0)   // a single read: never passes -1 (infinite) to WaitAny
                 {
                     idx = Task.WaitAny(new[] { t }, (int)Math.Min(250, left), ct);
                     if (idx >= 0) break;
@@ -152,34 +152,34 @@ namespace BimBridge.PowerEngine
                     if (now > limitBytes)
                     {
                         Kill();
-                        return Response.Fail(req.Id, Codes.MemoryLimit, Name + " llegó a " + (now >> 20) + " MB (máximo " + req.Limits.MaxMemoryMb + "); se detuvo y se reiniciará en el próximo trabajo");
+                        return Response.Fail(req.Id, Codes.MemoryLimit, Name + " reached " + (now >> 20) + " MB (maximum " + req.Limits.MaxMemoryMb + "); it was stopped and will restart on the next job");
                     }
                 }
             }
-            catch (OperationCanceledException) { Kill(); return Response.Fail(req.Id, Codes.Cancelled, "cancelado por el núcleo; el proceso de " + Name + " se detuvo y se reiniciará en el próximo trabajo"); }
+            catch (OperationCanceledException) { Kill(); return Response.Fail(req.Id, Codes.Cancelled, "cancelled by the core; the " + Name + " process was stopped and will restart on the next job"); }
             ipc.Stop();
-            if (idx < 0) { Kill(); return Response.Fail(req.Id, Codes.Timeout, Name + " superó " + req.Limits.TimeoutMs + " ms; se detuvo y se reiniciará en el próximo trabajo"); }
+            if (idx < 0) { Kill(); return Response.Fail(req.Id, Codes.Timeout, Name + " exceeded " + req.Limits.TimeoutMs + " ms; it was stopped and will restart on the next job"); }
             if (respLine == null)
             {
-                var code = readErr != null && readErr.StartsWith("mensaje", StringComparison.Ordinal) ? Codes.TooLarge : Codes.EngineError;
-                if (req.Job == Hello && readErr == "el proceso cerró la salida")
+                var code = readErr != null && readErr.StartsWith("response message", StringComparison.Ordinal) ? Codes.TooLarge : Codes.EngineError;
+                if (req.Job == Hello && readErr == "the process closed its output")
                     _proc.WaitForExit(150);
                 Kill();
-                return Response.Fail(req.Id, code, readErr ?? "sin respuesta");
+                return Response.Fail(req.Id, code, readErr ?? "no response");
             }
             var deser = Stopwatch.StartNew();
             Dictionary<string, object> obj;
             try { obj = Json.ParseObject(respLine); }
-            catch (FormatException ex) { Kill(); return Response.Fail(req.Id, Codes.EngineError, "respuesta ilegible: " + ex.Message); }
+            catch (FormatException ex) { Kill(); return Response.Fail(req.Id, Codes.EngineError, "unreadable response: " + ex.Message); }
             var r = ParseResponse(req.Id, obj);
             deser.Stop();
             long peak = 0;
             try { _proc.Refresh(); peak = _proc.PeakWorkingSet64 / 1024; } catch (Exception) { }
             if (peak > (long)req.Limits.MaxMemoryMb * 1024)
             {
-                // PeakWorkingSet64 es el pico de toda la vida del proceso: se reinicia siempre, para que no condene al trabajo siguiente.
+                // PeakWorkingSet64 is the peak over the whole process lifetime: always restart so it does not doom the next job.
                 Kill();
-                if (r.Ok) return Response.Fail(req.Id, Codes.MemoryLimit, Name + " usó " + peak / 1024 + " MB (máximo " + req.Limits.MaxMemoryMb + "); resultado descartado");
+                if (r.Ok) return Response.Fail(req.Id, Codes.MemoryLimit, Name + " used " + peak / 1024 + " MB (maximum " + req.Limits.MaxMemoryMb + "); result discarded");
             }
             total.Stop();
             r.Telemetry.Engine = Name;
@@ -199,11 +199,11 @@ namespace BimBridge.PowerEngine
             bool IsAlias(string path) => Path.GetFullPath(path).Split('\\')
                 .Any(part => string.Equals(part, "WindowsApps", StringComparison.OrdinalIgnoreCase));
 
-            const string hint = "Use power_engine.python con la ruta absoluta de un CPython instalado fuera de WindowsApps.";
+            const string hint = "Set power_engine.python to the absolute path of a CPython installed outside WindowsApps.";
             if (Path.GetFileName(exe) != exe)
             {
                 var full = Path.GetFullPath(exe);
-                if (IsAlias(full)) throw new FileNotFoundException("Alias WindowsApps rechazado. " + hint);
+                if (IsAlias(full)) throw new FileNotFoundException("WindowsApps alias rejected. " + hint);
                 return full;
             }
 
@@ -215,7 +215,7 @@ namespace BimBridge.PowerEngine
                 var candidate = Path.Combine(directory, file);
                 if (!IsAlias(candidate) && File.Exists(candidate)) return candidate;
             }
-            throw new FileNotFoundException("CPython no encontrado en PATH fuera de WindowsApps. " + hint);
+            throw new FileNotFoundException("CPython not found in PATH outside WindowsApps. " + hint);
         }
 
         private static async Task DrainStderr(StreamReader reader, StringBuilder captured)
@@ -256,7 +256,7 @@ namespace BimBridge.PowerEngine
             _proc = null;
         }
 
-        /// <summary>Lee hasta '\n' con límite de tamaño (un motor que no termina la línea no agota la memoria del núcleo).</summary>
+        /// <summary>Reads up to '\n' with a size limit (an engine that never ends the line cannot exhaust the core's memory).</summary>
         private sealed class LineReader
         {
             private readonly Stream _s;
@@ -274,13 +274,13 @@ namespace BimBridge.PowerEngine
                     {
                         _len = _s.Read(_buf, 0, _buf.Length);
                         _pos = 0;
-                        if (_len <= 0) { error = "el proceso cerró la salida"; return null; }
+                        if (_len <= 0) { error = "the process closed its output"; return null; }
                     }
                     var nl = Array.IndexOf(_buf, (byte)'\n', _pos, _len - _pos);
                     var end = nl < 0 ? _len : nl;
                     ms.Write(_buf, _pos, end - _pos);
                     _pos = nl < 0 ? _len : nl + 1;
-                    if (ms.Length > max) { error = "mensaje de respuesta mayor que " + max + " bytes"; return null; }
+                    if (ms.Length > max) { error = "response message larger than " + max + " bytes"; return null; }
                     if (nl >= 0) return Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length).TrimEnd('\r');
                 }
             }

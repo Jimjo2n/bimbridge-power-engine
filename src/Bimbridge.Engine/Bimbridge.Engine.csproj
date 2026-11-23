@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Lógica que no necesita Revit: sesiones, versiones, cola, consultas, formato, diario, servidor de pipe. -->
+  <!-- Logic that does not need Revit: sessions, versions, queue, queries, formatting, journal, pipe server. -->
   <PropertyGroup>
-    <!-- netstandard2.0 para Revit 2022–2024 (.NET Framework 4.8); net8.0 para Revit 2025–2026, el puente y las pruebas:
-         en net8 se compilan caminos más rápidos (AVX2 en las mallas). -->
+    <!-- netstandard2.0 for Revit 2022–2024 (.NET Framework 4.8); net8.0 for Revit 2025–2026, the bridge and the tests:
+         net8 compiles faster paths (AVX2 in meshes). -->
     <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
   </PropertyGroup>
   <ItemGroup>

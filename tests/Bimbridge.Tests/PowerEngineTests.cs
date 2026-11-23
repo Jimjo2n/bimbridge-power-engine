@@ -13,7 +13,7 @@ using Request = BimBridge.PowerEngine.PowerEngineContracts.Request;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Raíz del repositorio, ejecutables de los workers y fixtures sintéticos (generados una vez por corrida).</summary>
+    /// <summary>Repository root, worker executables and synthetic fixtures (generated once per run).</summary>
     public static class PowerEngineEnv
     {
         public static readonly string Root = FindRoot();
@@ -36,7 +36,7 @@ namespace Bimbridge.Tests
         {
             var d = AppContext.BaseDirectory;
             while (d != null && !Directory.Exists(Path.Combine(d, "native", "power_engine"))) d = Path.GetDirectoryName(d);
-            return d ?? throw new InvalidOperationException("no se encontró la raíz del repositorio");
+            return d ?? throw new InvalidOperationException("repository root not found");
         }
 
         public static PowerEngineOptions Options(string geometry = "auto") => new PowerEngineOptions
@@ -58,9 +58,9 @@ namespace Bimbridge.Tests
         [Fact]
         public void RustLibrary_IsAvailable_AndSpeaksTheContract()
         {
-            Assert.True(RustGeometryEngine.Available, "compile native/power_engine con cargo build --release: " + RustGeometryEngine.Unavailable);
+            Assert.True(RustGeometryEngine.Available, "build native/power_engine with cargo build --release: " + RustGeometryEngine.Unavailable);
             Assert.Equal("0.9.0", RustGeometryEngine.Version);
-            Assert.True(File.Exists(PowerEngineEnv.RustWorker), "falta el worker IPC de Rust");
+            Assert.True(File.Exists(PowerEngineEnv.RustWorker), "the Rust IPC worker is missing");
         }
 
         public static IEnumerable<object[]> Sizes() => new[] { 0, 1, 7, 500, 6000 }.Select(n => new object[] { n });
@@ -73,13 +73,13 @@ namespace Bimbridge.Tests
             using (var ipc = new PowerEngineDispatcher(PowerEngineEnv.Options("rust_ipc")))
             {
                 var all = new[] { cs, ffi, ipc };
-                // puntos con empates y duplicados exactos (rejilla de 0,25) para ejercitar los desempates
+                // points with ties and exact duplicates (0.25 grid) to exercise the tie-breaks
                 var q = Rand(2 * n, 1, 100, 0.25); var r = Rand(2 * n + 2, 2, 100, 0.25);
                 var m = new[] { 0.866, -0.5, 0, 10, 0.5, 0.866, 0, -4, 0, 0, 1, 2.5 };
                 var xyz = Rand(3 * n, 3, 50);
                 var t = all.Select(d => d.Transform3(xyz, m)).ToList();
                 Assert.Equal(new[] { "csharp", "rust_ffi", "rust_ipc" }, all.Select(d => d.Last.Engine));
-                // misma fórmula; el orden de redondeo puede diferir en 1 ulp (≈7e-15 a 32 ft): tolerancia relativa 1e-13
+                // same formula; rounding order may differ by 1 ulp (~7e-15 at 32 ft): relative tolerance 1e-13
                 for (var k = 1; k < 3; k++) for (var i = 0; i < xyz.Length; i++) Assert.True(Math.Abs(t[0][i] - t[k][i]) <= 1e-13 * Math.Max(1, Math.Abs(t[0][i])), "transform3 " + i);
 
                 var near = all.Select(d => d.Nearest(q, r, 2, 3.0)).ToList();
@@ -94,7 +94,7 @@ namespace Bimbridge.Tests
                 var dup = all.Select(d => d.Duplicates(q, 2, 0.3)).ToList();
                 Assert.Equal(dup[0], dup[1]); Assert.Equal(dup[0], dup[2]);
 
-                var segs = Rand(4 * Math.Min(n, 1500), 4, 100, 1.0);   // coordenadas enteras: muchos toques y colineales
+                var segs = Rand(4 * Math.Min(n, 1500), 4, 100, 1.0);   // integer coordinates: many touches and collinear segments
                 var sc = all.Select(d => d.SegmentContacts(segs)).ToList();
                 Assert.Equal(sc[0], sc[1]); Assert.Equal(sc[0], sc[2]);
 
@@ -112,10 +112,10 @@ namespace Bimbridge.Tests
             var s = new double[]
             {
                 0, 0, 4, 0,     // 0
-                2, -1, 2, 1,    // 1 cruza 0
-                4, 0, 4, 3,     // 2 toca 0 en el extremo
-                3, 0, 6, 0,     // 3 colineal superpuesto a 0
-                10, 10, 11, 11, // 4 aislado
+                2, -1, 2, 1,    // 1 crosses 0
+                4, 0, 4, 3,     // 2 touches 0 at the end
+                3, 0, 6, 0,     // 3 collinear overlapping 0
+                10, 10, 11, 11, // 4 isolated
             };
             foreach (var g in new[] { "csharp", "rust_ffi", "rust_ipc" })
                 using (var d = new PowerEngineDispatcher(PowerEngineEnv.Options(g)))
@@ -135,7 +135,7 @@ namespace Bimbridge.Tests
             Assert.Throws<ArgumentException>(() => GeometryKernels.Duplicates(bad, 2, 0.1));
             Assert.Throws<ArgumentException>(() => RustGeometryEngine.Duplicates(bad, 2, 0.1));
             using (var ipc = new PowerEngineDispatcher(PowerEngineEnv.Options("rust_ipc")))
-                Assert.Contains("INVALIDO", Assert.Throws<InvalidOperationException>(() => ipc.Duplicates(bad, 2, 0.1)).Message);
+                Assert.Contains("INVALID", Assert.Throws<InvalidOperationException>(() => ipc.Duplicates(bad, 2, 0.1)).Message);
             Assert.Throws<ArgumentException>(() => RustGeometryEngine.Transform3(new double[3], new double[11]));
             Assert.Throws<ArgumentException>(() => RustGeometryEngine.Nearest(new double[] { 0, 0 }, new double[] { 1, 1 }, 2, -1));
         }
@@ -147,12 +147,12 @@ namespace Bimbridge.Tests
             var p = Rand(2 * 1000, 7, 100);
             Assert.ThrowsAny<OperationCanceledException>(() => GeometryKernels.Duplicates(p, 2, 0.5, cts.Token));
             Assert.ThrowsAny<OperationCanceledException>(() => RustGeometryEngine.Duplicates(p, 2, 0.5, cts.Token));
-            // durante: 3 M de puntos en un radio enorme (cuadrático en una celda) se cancela a los 100 ms
+            // during: 3 M points in a huge radius (quadratic in one cell) cancelled at 100 ms
             var big = Rand(2 * 200000, 8, 1.0);
             var c2 = new CancellationTokenSource(100);
             var sw = Stopwatch.StartNew();
             Assert.ThrowsAny<OperationCanceledException>(() => RustGeometryEngine.Duplicates(big, 2, 5.0, c2.Token));
-            Assert.True(sw.ElapsedMilliseconds < 5000, "la cancelación debe llegar a Rust mientras calcula");
+            Assert.True(sw.ElapsedMilliseconds < 5000, "cancellation must reach Rust while it computes");
             var c3 = new CancellationTokenSource(100);
             Assert.ThrowsAny<OperationCanceledException>(() => GeometryKernels.Duplicates(big, 2, 5.0, c3.Token));
         }
@@ -164,17 +164,17 @@ namespace Bimbridge.Tests
             {
                 d.Nearest(new double[] { 0, 0 }, new double[] { 1, 1 }, 2, 5);
                 Assert.Equal(EngineCSharp, d.Last.Engine);
-                Assert.Contains("desactivado", d.LastReason);
+                Assert.Contains("disabled", d.LastReason);
             }
             using (var d = new PowerEngineDispatcher(new PowerEngineOptions { Geometry = "rust_ipc", RustWorkerExe = "/no/existe" }))
             {
                 d.Duplicates(new double[] { 0, 0, 0, 0 }, 2, 0.1);
                 Assert.Equal(EngineCSharp, d.Last.Engine);
-                Assert.Contains("degradación", d.LastReason);
+                Assert.Contains("degradation", d.LastReason);
             }
             using (var d = new PowerEngineDispatcher(PowerEngineEnv.Options()))
             {
-                // auto: tamaños pequeños en C#, grandes en Rust según la calibración
+                // auto: small sizes in C#, large in Rust according to the calibration
                 d.Options.Calibration.RustFfiFrom["duplicates"] = 1000;
                 d.Duplicates(new double[20], 2, 0.1);
                 Assert.Equal(EngineCSharp, d.Last.Engine);
@@ -197,7 +197,7 @@ namespace Bimbridge.Tests
             var alias = Path.Combine(Path.GetTempPath(), "Microsoft", "WindowsApps", "python.exe");
             using var worker = new WorkerClient(EnginePython, alias, Array.Empty<string>());
             Assert.False(worker.EnsureStarted());
-            Assert.Contains("Alias WindowsApps rechazado", worker.LastStartError);
+            Assert.Contains("WindowsApps alias rejected", worker.LastStartError);
         }
 
         [Fact]
@@ -208,13 +208,13 @@ namespace Bimbridge.Tests
                 "-I", "-c", "import sys; sys.stderr.write('missing dependency ' + 'x' * 5000); sys.exit(9)"
             });
             Assert.False(worker.EnsureStarted());
-            Assert.Contains("saludo", worker.LastStartError);
+            Assert.Contains("handshake", worker.LastStartError);
             Assert.Contains("missing dependency", worker.LastStartError);
-            Assert.Contains("salida=9", worker.LastStartError);
+            Assert.Contains("exit=9", worker.LastStartError);
             Assert.InRange(worker.LastStartError.Length, 1, 2300);
         }
         private static string F(string n) => Path.Combine(Fx, n);
-        private static Dictionary<string, object> A(string ruta) => new Dictionary<string, object> { ["ruta"] = ruta };
+        private static Dictionary<string, object> A(string path) => new Dictionary<string, object> { ["path"] = path };
 
         [Fact]
         public void Python_Handshake_AndSymbols_ThroughTheCore()
@@ -223,11 +223,11 @@ namespace Bimbridge.Tests
             {
                 var r = d.Document("pdf_symbols", A(F("plan_vectorial.pdf")), new[] { Fx });
                 Assert.True(r.Ok, r.Code + " " + r.Error);
-                var page = (Dictionary<string, object>)((List<object>)r.Result["paginas"])[0];
-                Assert.Equal(74, ((List<object>)page["candidatos"]).Count);   // 72 + 2 casi duplicados
+                var page = (Dictionary<string, object>)((List<object>)r.Result["pages"])[0];
+                Assert.Equal(74, ((List<object>)page["candidates"]).Count);   // 72 + 2 near-duplicates
                 Assert.Equal(EnginePython, r.Telemetry.Engine);
                 Assert.True(r.Telemetry.EngineMs > 0 && r.Telemetry.BytesOut > 0);
-                Assert.Equal(true, d.Status()["python"] is Dictionary<string, object> py && (bool)py["disponible"]);
+                Assert.Equal(true, d.Status()["python"] is Dictionary<string, object> py && (bool)py["available"]);
             }
         }
 
@@ -297,7 +297,7 @@ namespace Bimbridge.Tests
                 var net = d.Document("docx_extract", A(F("especificacion.docx")), new[] { Fx }, preferDotNet: true);
                 Assert.True(py.Ok && net.Ok);
                 Assert.Equal(EnginePython, py.Telemetry.Engine); Assert.Equal(EngineCSharp, net.Telemetry.Engine);
-                foreach (var k in new[] { "sha256", "bloques", "parrafos", "tablas", "sospechosos", "truncado" })
+                foreach (var k in new[] { "sha256", "blocks", "paragraphs", "tables", "suspects", "truncated" })
                     Assert.Equal(Json.Write(py.Result[k]), Json.Write(net.Result[k]));
             }
         }
@@ -321,7 +321,7 @@ namespace Bimbridge.Tests
         public void IncompatibleWorker_IsRefusedAtHandshake()
         {
             var fake = Path.Combine(Fx, "falso_pe2.py");
-            File.WriteAllText(fake, "import sys,json\nfor l in sys.stdin:\n r=json.loads(l)\n print(json.dumps({'pe':2,'id':r.get('id'),'codigo':'OK','resultado':{'pe':2}}),flush=True)\n");
+            File.WriteAllText(fake, "import sys,json\nfor l in sys.stdin:\n r=json.loads(l)\n print(json.dumps({'pe':2,'id':r.get('id'),'code':'OK','result':{'pe':2}}),flush=True)\n");
             using (var w = new WorkerClient(EnginePython, PowerEngineEnv.Python, new[] { "-I", fake }))
             {
                 var r = w.Call(new Request { Job = "pdf_info" });
@@ -336,11 +336,11 @@ namespace Bimbridge.Tests
         [Fact]
         public void Search_ReturnsBriefEntries_DescribeReturnsDetail()
         {
-            var hits = PowerEngineCapabilityRegistry.Search("luminaria pdf");
+            var hits = PowerEngineCapabilityRegistry.Search("fixture pdf");
             Assert.Equal("pdf.symbols", hits[0].Id);
             var d = PowerEngineCapabilityRegistry.Describe("pdf.symbols").Full();
-            Assert.Equal(CapabilityStates.Available, d["estado"]);
-            Assert.NotNull(d["motor"]);
+            Assert.Equal(CapabilityStates.Available, d["status"]);
+            Assert.NotNull(d["engine"]);
             Assert.Null(PowerEngineCapabilityRegistry.Describe("no.existe"));
         }
 
@@ -353,7 +353,7 @@ namespace Bimbridge.Tests
                 Assert.Contains(e.State, states);
                 Assert.False(string.IsNullOrEmpty(e.Engine));
                 if (e.Compatibility.StartsWith("Revit", StringComparison.Ordinal) && e.Permission != Permissions.Read)
-                    Assert.NotEqual(CapabilityStates.Available, e.State);   // nada que escriba en Revit es AVAILABLE sin evidencia nativa
+                    Assert.NotEqual(CapabilityStates.Available, e.State);   // nothing that writes to Revit is AVAILABLE without native evidence
             }
             Assert.Equal(PowerEngineCapabilityRegistry.All.Count, PowerEngineCapabilityRegistry.All.Select(e => e.Id).Distinct().Count());
         }
@@ -362,7 +362,7 @@ namespace Bimbridge.Tests
         public void Wire_ExistingOpsAvailable_LabExecExperimental()
         {
             Assert.Equal(CapabilityStates.Available, PowerEngineCapabilityRegistry.StateOfWire(Wire.OpQuery, new Dictionary<string, object>()));
-            Assert.Equal(CapabilityStates.Experimental, PowerEngineCapabilityRegistry.StateOfWire(Wire.OpExec, new Dictionary<string, object> { ["accion"] = "laboratorio" }));
+            Assert.Equal(CapabilityStates.Experimental, PowerEngineCapabilityRegistry.StateOfWire(Wire.OpExec, new Dictionary<string, object> { ["action"] = "lab" }));
         }
     }
 }

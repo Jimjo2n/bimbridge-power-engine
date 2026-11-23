@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 using System;
 using System.IO;
+using Bimbridge.Protocol;
 
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Interruptor guardado como archivo: si el archivo existe, está encendido. Sobrevive a reinicios
-    /// y se puede ver o cambiar sin abrir Revit. Se relee como mucho una vez por segundo.
-    ///   retener.on  → los commits de la IA quedan en la cola hasta "Aplicar cola".
-    ///   pausado.on  → el add-in rechaza toda petición de la IA ("Pausar IA").
+    /// Switch stored as a file: if the file exists, it is on. Survives restarts
+    /// and can be inspected or changed without opening Revit. Re-read at most once per second.
+    ///   hold.on    → the AI's commits stay in the queue until "Apply queue".
+    ///   paused.on  → the add-in rejects every AI request ("Pause AI").
     /// </summary>
     public class FlagFile
     {
@@ -16,13 +17,13 @@ namespace Bimbridge.Engine
         private readonly object _lock = new object();
         private bool _on;
         private DateTime _checkedUtc;
-        /// <summary>0.9.0: la última orden no se pudo guardar en disco. Mientras tanto manda la memoria: releer el disco la
-        /// desharía en silencio al segundo (era la causa de la prueba inestable HeldCommit…: "Retener" se apagaba solo).</summary>
+        /// <summary>0.9.0: the last command could not be saved to disk. Meanwhile memory wins: re-reading the disk would
+        /// silently undo it a second later (this caused the flaky HeldCommit… test: "Hold" turned itself off).</summary>
         private bool _unsaved;
 
         public FlagFile(string home, string fileName)
         {
-            _file = Path.Combine(home, fileName);
+            _file = LegacyAliases.ResolveExisting(home, Path.Combine(home, fileName));   // a flag set by 0.9.3 keeps its legacy name until migrated
             Refresh();
         }
 
@@ -59,7 +60,7 @@ namespace Bimbridge.Engine
                     else if (File.Exists(_file)) File.Delete(_file);
                     _unsaved = false;
                 }
-                catch (Exception) { _unsaved = true; /* el estado en memoria manda aunque el archivo falle (y no se relee) */ }
+                catch (Exception) { _unsaved = true; /* the in-memory state wins even if the file fails (and it is not re-read) */ }
             }
         }
 
@@ -73,15 +74,15 @@ namespace Bimbridge.Engine
         }
     }
 
-    /// <summary>Botón "Retener" de la cinta.</summary>
+    /// <summary>Ribbon "Hold" button.</summary>
     public sealed class HoldSwitch : FlagFile
     {
-        public HoldSwitch(string home) : base(home, "retener.on") { }
+        public HoldSwitch(string home) : base(home, "hold.on") { }
     }
 
-    /// <summary>Botón "Pausar IA" de la cinta.</summary>
+    /// <summary>Ribbon "Pause AI" button.</summary>
     public sealed class PauseSwitch : FlagFile
     {
-        public PauseSwitch(string home) : base(home, "pausado.on") { }
+        public PauseSwitch(string home) : base(home, "paused.on") { }
     }
 }

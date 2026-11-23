@@ -10,9 +10,9 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// 0.9.1 (Bloque I): historial de operaciones largas terminadas, persistente y consultable (filtros, paginación) para el panel (#5)
-    /// y para los agentes. Cada final queda en un JSONL (una línea, append) y en un anillo en memoria; al arrancar se recargan las últimas
-    /// <see cref="MaxInMemory"/>. Incluye el consejo de reintento: nunca se aconseja repetir lo que pudo haber quedado aplicado.
+    /// 0.9.1 (Block I): history of finished long operations, persistent and queryable (filters, pagination) for the panel (#5)
+    /// and for agents. Each completion goes to a JSONL (one line, append) and to an in-memory ring; on startup the last
+    /// <see cref="MaxInMemory"/> are reloaded. Includes the retry advice: repeating something that may have been applied is never advised.
     /// </summary>
     public sealed class OperationHistory
     {
@@ -21,42 +21,42 @@ namespace Bimbridge.Engine
 
         public sealed class Record
         {
-            public string JobId, Kind, Session, Agent, Task, Estado, Error;
+            public string JobId, Kind, Session, Agent, Task, State, Error;
             public DateTime CreatedUtc, FinishedUtc;
             public long Ms;
             public string Retry;
 
             public Dictionary<string, object> ToJson() => new Dictionary<string, object>
             {
-                ["job_id"] = JobId, ["tipo"] = Kind, ["sesion"] = Session, ["agente"] = Agent, ["tarea"] = Task, ["estado"] = Estado, ["error"] = Error,
-                ["inicio"] = CreatedUtc.ToString("o", CultureInfo.InvariantCulture), ["fin"] = FinishedUtc.ToString("o", CultureInfo.InvariantCulture),
-                ["ms"] = Ms, ["reintento"] = Retry,
+                ["job_id"] = JobId, ["type"] = Kind, ["session"] = Session, ["agent"] = Agent, ["task"] = Task, ["status"] = State, ["error"] = Error,
+                ["start"] = CreatedUtc.ToString("o", CultureInfo.InvariantCulture), ["end"] = FinishedUtc.ToString("o", CultureInfo.InvariantCulture),
+                ["ms"] = Ms, ["retry"] = Retry,
             };
 
             public static Record FromJson(Dictionary<string, object> d) => new Record
             {
-                JobId = Arg.GetString(d, "job_id"), Kind = Arg.GetString(d, "tipo"), Session = Arg.GetString(d, "sesion"), Agent = Arg.GetString(d, "agente"), Task = Arg.GetString(d, "tarea"),
-                Estado = Arg.GetString(d, "estado"), Error = Arg.GetString(d, "error"), Retry = Arg.GetString(d, "reintento"), Ms = Arg.GetLong(d, "ms") ?? 0,
-                CreatedUtc = DateTime.Parse(Arg.GetString(d, "inicio"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                FinishedUtc = DateTime.Parse(Arg.GetString(d, "fin"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                JobId = Arg.GetString(d, "job_id"), Kind = LegacyAliases.Token(Arg.GetString(d, "type")), Session = Arg.GetString(d, "session"), Agent = Arg.GetString(d, "agent"), Task = Arg.GetString(d, "task"),
+                State = Arg.GetString(d, "status"), Error = Arg.GetString(d, "error"), Retry = Arg.GetString(d, "retry"), Ms = Arg.GetLong(d, "ms") ?? 0,
+                CreatedUtc = DateTime.Parse(Arg.GetString(d, "start"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                FinishedUtc = DateTime.Parse(Arg.GetString(d, "end"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
             };
         }
 
         /// <summary>
-        /// Consejo de reintento por estado final. "reintentable": no se aplicó nada (rechazo, conflicto, validación, ocupado, vencido).
-        /// "reconciliar_antes": el resultado es incierto o pudo quedar aplicado en parte. "no_necesario": terminó bien.
-        /// "revisar_diferencias" (AUD-14): se aplicó, pero la verificación no coincide con lo pedido; hay que revisar o reconciliar las
-        /// diferencias antes de darlo por bueno, y NO repetir la operación (ya está aplicada).
+        /// Retry advice per final status. "retryable": nothing was applied (rejection, conflict, validation, busy, expired).
+        /// "reconcile_first": the result is uncertain or may have been partly applied. "not_needed": it finished fine.
+        /// "review_differences" (AUD-14): it was applied, but the verification does not match what was requested; the differences
+        /// must be reviewed or reconciled before accepting it, and the operation must NOT be repeated (it is already applied).
         /// </summary>
-        public static string RetryAdvice(string estado)
+        public static string RetryAdvice(string status)
         {
-            switch (estado)
+            switch (status)
             {
-                case Status.Ok: return "no_necesario";
-                case Status.ConDiferencias: return "revisar_diferencias";
-                case Status.Rechazado: case Status.Conflicto: case Status.Invalido: case Status.Vencido: case Status.Revertido: return "reintentable";
-                case Status.Cancelado: return "reconciliar_antes";   // pudo cancelarse a mitad
-                default: return "reconciliar_antes";
+                case Status.Ok: return "not_needed";
+                case Status.CompletedWithDifferences: return "review_differences";
+                case Status.Rejected: case Status.Conflict: case Status.Invalid: case Status.Expired: case Status.RolledBack: return "retryable";
+                case Status.Cancelled: return "reconcile_first";   // it may have been cancelled midway
+                default: return "reconcile_first";
             }
         }
 
@@ -76,9 +76,9 @@ namespace Bimbridge.Engine
             {
                 n++;
                 if (line.Trim().Length == 0) continue;
-                try { Push(Record.FromJson(Json.ParseObject(line))); }
+                try { Push(Record.FromJson(LegacyAliases.NormalizeRecord(Json.ParseObject(line)))); }
                 catch (Exception ex) when (ex is FormatException || ex is ArgumentException || ex is InvalidOperationException)
-                { if (LoadErrors.Count < 20) LoadErrors.Add("línea " + n + ": " + ex.GetType().Name); }
+                { if (LoadErrors.Count < 20) LoadErrors.Add("line " + n + ": " + ex.GetType().Name); }
             }
         }
 
@@ -92,17 +92,17 @@ namespace Bimbridge.Engine
         {
             var r = new Record
             {
-                JobId = j.Id, Kind = j.Kind, Session = j.SessionId, Agent = j.AgentId, Task = j.Task, Estado = j.Estado, Error = j.Error,
+                JobId = j.Id, Kind = j.Kind, Session = j.SessionId, Agent = j.AgentId, Task = j.Task, State = j.State, Error = j.Error,
                 CreatedUtc = j.CreatedUtc, FinishedUtc = j.FinishedUtc ?? DateTime.UtcNow,
             };
             r.Ms = (long)(r.FinishedUtc - r.CreatedUtc).TotalMilliseconds;
-            r.Retry = RetryAdvice(r.Estado);
+            r.Retry = RetryAdvice(r.State);
             lock (_lock)
             {
                 Push(r);
                 if (_path != null)
                 {
-                    // Rotación simple: al superar el tamaño, se conserva el anillo en memoria y se reescribe (las más antiguas se pierden a propósito).
+                    // Simple rotation: once over the size limit, the in-memory ring is kept and rewritten (the oldest entries are dropped on purpose).
                     if (File.Exists(_path) && new FileInfo(_path).Length > MaxFileBytes)
                         Home.WriteAtomic(_path, string.Join("\n", _ring.Reverse().Select(x => Json.Write(x.ToJson()))) + "\n");
                     else
@@ -117,10 +117,10 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// AUD-13: quién pregunta. Un registro es visible si lo lanzó la MISMA sesión o el MISMO agente con nombre (la sesión cambia al
-        /// reconectar; el agente —principal de Windows + alias— no). El nombre de tarea (tarea=) NO da visibilidad: lo declara el
-        /// cliente y otro podría adivinarlo. Ver lo de otros exige <see cref="SeeAll"/>, que sólo se activa con la autorización
-        /// explícita del usuario (config historial_compartido). Sin identidad alguna no se ve nada.
+        /// AUD-13: who is asking. A record is visible if it was started by the SAME session or the SAME named agent (the session changes on
+        /// reconnect; the agent —Windows principal + alias— does not). The task name (tarea=) does NOT grant visibility: the client
+        /// declares it and another one could guess it. Seeing others' records requires <see cref="SeeAll"/>, which is only enabled with the
+        /// user's explicit authorization (config historial_compartido). Without any identity nothing is visible.
         /// </summary>
         public sealed class Scope
         {
@@ -137,33 +137,33 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// Ámbito de una consulta. Pedir «todos» sin la autorización del usuario (<paramref name="sharedAuthorized"/>) se RECHAZA
-        /// (devuelve null y el motivo): no se degrada en silencio a «lo propio» ni se concede por pedirlo.
+        /// Scope of a query. Asking for "all" without the user's authorization (<paramref name="sharedAuthorized"/>) is REJECTED
+        /// (returns null and the reason): it is not silently downgraded to "own records" nor granted just for asking.
         /// </summary>
         public static Scope ScopeFor(string sessionId, string agentId, bool wantAll, bool sharedAuthorized, out string refusal)
         {
             refusal = null;
             if (wantAll && !sharedAuthorized)
             {
-                refusal = "ver operaciones de otras sesiones exige que el usuario lo autorice (config historial_compartido=true). Sin eso sólo se ve lo propio.";
+                refusal = "seeing operations from other sessions requires the user to authorize it (config shared_history=true). Without that, only your own are visible.";
                 return null;
             }
             return new Scope { SessionId = sessionId, AgentId = agentId, SeeAll = wantAll };
         }
 
-        /// <summary>Consulta con ámbito obligatorio, filtros (cualquiera puede ser null) y paginación; más reciente primero.
-        /// Los filtros sólo estrechan lo visible: pedir sesion= de otro no lo muestra.</summary>
-        public (List<Record> Page, int Total) Query(Scope scope, string estado, string tipo, string sesion, DateTime? desde, string texto, int page = 1, int pageSize = 20)
+        /// <summary>Query with a mandatory scope, filters (any may be null) and pagination; most recent first.
+        /// Filters only narrow what is visible: asking for someone else's sesion= does not show it.</summary>
+        public (List<Record> Page, int Total) Query(Scope scope, string status, string kind, string session, DateTime? since, string text, int page = 1, int pageSize = 20)
         {
             if (scope == null) throw new ArgumentNullException(nameof(scope));
             List<Record> all;
             lock (_lock) all = _ring.ToList();
             IEnumerable<Record> q = all.Where(scope.CanSee);
-            if (!string.IsNullOrWhiteSpace(estado)) q = q.Where(r => string.Equals(r.Estado, estado.Trim(), StringComparison.OrdinalIgnoreCase));
-            if (!string.IsNullOrWhiteSpace(tipo)) q = q.Where(r => (r.Kind ?? "").IndexOf(tipo.Trim(), StringComparison.OrdinalIgnoreCase) >= 0);
-            if (!string.IsNullOrWhiteSpace(sesion)) q = q.Where(r => string.Equals(r.Session, sesion.Trim(), StringComparison.OrdinalIgnoreCase) || string.Equals(r.Task, sesion.Trim(), StringComparison.OrdinalIgnoreCase));
-            if (desde.HasValue) q = q.Where(r => r.FinishedUtc >= desde.Value);
-            if (!string.IsNullOrWhiteSpace(texto)) q = q.Where(r => ((r.Kind ?? "") + " " + (r.Error ?? "") + " " + r.JobId).IndexOf(texto.Trim(), StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!string.IsNullOrWhiteSpace(status)) q = q.Where(r => string.Equals(r.State, status.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(kind)) q = q.Where(r => (r.Kind ?? "").IndexOf(kind.Trim(), StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!string.IsNullOrWhiteSpace(session)) q = q.Where(r => string.Equals(r.Session, session.Trim(), StringComparison.OrdinalIgnoreCase) || string.Equals(r.Task, session.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (since.HasValue) q = q.Where(r => r.FinishedUtc >= since.Value);
+            if (!string.IsNullOrWhiteSpace(text)) q = q.Where(r => ((r.Kind ?? "") + " " + (r.Error ?? "") + " " + r.JobId).IndexOf(text.Trim(), StringComparison.OrdinalIgnoreCase) >= 0);
             var list = q.ToList();
             var size = Math.Max(1, Math.Min(100, pageSize));
             return (list.Skip((Math.Max(1, page) - 1) * size).Take(size).ToList(), list.Count);

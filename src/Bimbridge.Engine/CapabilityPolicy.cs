@@ -5,30 +5,30 @@ using System.Linq;
 
 namespace Bimbridge.Engine
 {
-    /// <summary>Perfil de ejecución de código C# (0.6.1).</summary>
+    /// <summary>C# code execution profile (0.6.1).</summary>
     public enum ExecutionProfile
     {
-        /// <summary>exec pedido en una sesión con una persona presente: todo permitido pero auditado de forma durable antes de correr.</summary>
+        /// <summary>exec requested in a session with a person present: everything allowed but durably audited before it runs.</summary>
         TrustedInteractive,
-        /// <summary>Recetas/tareas que corren solas: sólo API de Revit dentro de la transacción del motor y archivos vía ctx.Artefacto.
-        /// Guardar/sync/exportar sólo por barreras del motor. Nada de procesos, red, reflexión, código nativo, registro ni salida del proceso.</summary>
+        /// <summary>Recipes/tasks that run unattended: only the Revit API inside the engine transaction, and files via ctx.Artifact.
+        /// Save/sync/export only through engine barriers. No processes, network, reflection, native code, registry or process exit.</summary>
         RestrictedAutonomous,
     }
 
     /// <summary>
-    /// Política de capacidades aplicada en el punto de ejecución (antes de Run/Ejecutar), sobre lo que el análisis semántico de Roslyn encontró.
-    /// Límite honesto: es una puerta de política, no un aislamiento; .NET no ofrece sandbox en proceso. Un código hostil puede ocultar
-    /// llamadas (p. ej. vía tipos no listados); por eso el perfil restringido también rechaza toda reflexión y lo dinámico.
+    /// Capability policy applied at the point of execution (before Run), over what Roslyn's semantic analysis found.
+    /// Honest limit: this is a policy gate, not isolation; .NET offers no in-process sandbox. Hostile code can hide
+    /// calls (e.g. via unlisted types); that is why the restricted profile also rejects all reflection and dynamic code.
     /// </summary>
     public static class CapabilityPolicy
     {
-        public static readonly string[] AlwaysDeniedAutonomous = { "proceso", "red", "reflexion", "nativo", "registro", "salida_proceso", "entorno", "hilos", "revit_cerrar", "revit_abrir", "revit_transaccion" };
-        /// <summary>En autónomo se pueden conceder explícitamente (args de la tarea, quedan en su huella).</summary>
-        public static readonly string[] GrantableAutonomous = { "archivo_escritura", "revit_guardar", "revit_sync", "revit_exportar" };
+        public static readonly string[] AlwaysDeniedAutonomous = { "process", "network", "reflection", "native", "registry", "process_output", "environment", "threads", "revit_close", "revit_open", "revit_transaction" };
+        /// <summary>In autonomous mode these can be granted explicitly (task args; they are part of its fingerprint).</summary>
+        public static readonly string[] GrantableAutonomous = { "write_file", "revit_save", "revit_sync", "revit_export" };
 
         public static string Kind(string capability) { var i = capability.IndexOf(':'); return i < 0 ? capability : capability.Substring(0, i); }
 
-        /// <summary>Lista de capacidades denegadas (vacía = permitido).</summary>
+        /// <summary>List of denied capabilities (empty = allowed).</summary>
         public static List<string> Denied(ExecutionProfile profile, IEnumerable<string> used, IEnumerable<string> granted = null)
         {
             var res = new List<string>();
@@ -44,35 +44,35 @@ namespace Bimbridge.Engine
         }
 
         /// <summary>
-        /// Frontera de exec (R04). Sin sesión de código confiable activada por una persona en la cinta de Revit:
-        /// - ejecutar (escribir) con código arbitrario → rechazado: para escribir sin una persona se usan tareas con recetas y concesiones;
-        /// - consultar → perfil restringido (sin procesos, red, reflexión, nativo, archivos, guardar…).
-        /// Con sesión confiable: perfil TrustedInteractive (todo, auditado antes de correr).
+        /// exec boundary (R04). Without a trusted-code session enabled by a person on the Revit ribbon:
+        /// - run (write) with arbitrary code → rejected: writing without a person uses tasks with recipes and grants;
+        /// - query → restricted profile (no processes, network, reflection, native, files, save…).
+        /// With a trusted session: TrustedInteractive profile (everything, audited before it runs).
         /// </summary>
         public static string ExecDecision(bool run, bool trustedSessionActive, IEnumerable<string> usedCapabilities, out ExecutionProfile profile)
         {
             profile = trustedSessionActive ? ExecutionProfile.TrustedInteractive : ExecutionProfile.RestrictedAutonomous;
             if (trustedSessionActive) return null;
             if (run)
-                return "codigo_confiable_requerido: ejecutar código C# arbitrario que escribe exige que una persona active «Código confiable» en la cinta BIMBRIDGE de Revit. " +
-                       "Sin eso: modo=consulta (sólo lectura), plan/commit, o una tarea con receta y concesión.";
+                return "trusted_code_required: running arbitrary C# code that writes requires a person to enable \"Trusted code\" on the BIMBRIDGE ribbon in Revit. " +
+                       "Without that: mode=query (read-only), plan/commit, or a task with a recipe and a grant.";
             var denied = Denied(ExecutionProfile.RestrictedAutonomous, usedCapabilities);
             return denied.Count == 0 ? null : Explain(denied);
         }
 
         public static string Explain(List<string> denied) =>
-            "perfil autónomo restringido: el código usa capacidades no permitidas (" + string.Join(", ", denied.Take(8)) + (denied.Count > 8 ? ", …" : "") +
-            "). Use ctx.Artefacto para archivos y las barreras Unidad.Guardar/Sync/Pdf; procesos, red, reflexión y código nativo nunca corren en una tarea.";
+            "restricted autonomous profile: the code uses capabilities that are not allowed (" + string.Join(", ", denied.Take(8)) + (denied.Count > 8 ? ", …" : "") +
+            "). Use ctx.Artifact for files and the Unit.Save/Sync/Pdf barriers; processes, network, reflection and native code never run in a task.";
     }
 
     /// <summary>
-    /// Referencias DLL adicionales (refs=) — R04. Se decide ANTES de cargar nada en el proceso de Revit.
-    /// Perfil restringido: sólo DLL de la carpeta del add-in o cuyo SHA-256 esté en referencias_confiables.txt (lo mantiene una persona).
-    /// Perfil confiable: cualquiera, pero queda en la auditoría con su SHA-256.
+    /// Additional DLL references (refs=) — R04. Decided BEFORE anything is loaded into the Revit process.
+    /// Restricted profile: only DLLs from the add-in folder or whose SHA-256 is in referencias_confiables.txt (maintained by a person).
+    /// Trusted profile: any, but it is recorded in the audit with its SHA-256.
     /// </summary>
     public static class ReferencePolicy
     {
-        public static string TrustedListPath => System.IO.Path.Combine(Home.Root, "referencias_confiables.txt");
+        public static string TrustedListPath => Home.Sub("trusted_references.txt");
 
         public static HashSet<string> LoadTrusted(string path = null)
         {
@@ -91,7 +91,7 @@ namespace Bimbridge.Engine
             return set;
         }
 
-        /// <summary>Lista de (ruta → motivo) rechazadas. sha: función que da el SHA-256 de un archivo (o null si no se puede leer).</summary>
+        /// <summary>List of rejected (path → reason). sha: function that returns a file's SHA-256 (or null if it cannot be read).</summary>
         public static List<string> Denied(ExecutionProfile profile, IEnumerable<string> paths, Func<string, string> sha, ISet<string> trusted, string addinDir)
         {
             var res = new List<string>();
@@ -102,13 +102,13 @@ namespace Bimbridge.Engine
                 if (string.IsNullOrEmpty(p)) continue;
                 string full;
                 try { full = System.IO.Path.GetFullPath(Environment.ExpandEnvironmentVariables(p)); }
-                catch (Exception) { res.Add(p + ": ruta inválida"); continue; }
+                catch (Exception) { res.Add(p + ": invalid path"); continue; }
                 if (profile == ExecutionProfile.TrustedInteractive) continue;
                 var dir = addinDir == null ? null : System.IO.Path.GetFullPath(addinDir).TrimEnd(System.IO.Path.DirectorySeparatorChar) + System.IO.Path.DirectorySeparatorChar;
                 if (dir != null && full.StartsWith(dir, StringComparison.OrdinalIgnoreCase)) continue;
                 var h = sha(full);
-                if (h == null) { res.Add(p + ": no se puede leer"); continue; }
-                if (!trusted.Contains(h)) res.Add(p + ": SHA-256 " + h.Substring(0, 12) + "… no está en referencias_confiables.txt");
+                if (h == null) { res.Add(p + ": cannot be read"); continue; }
+                if (!trusted.Contains(h)) res.Add(p + ": SHA-256 " + h.Substring(0, 12) + "… is not in referencias_confiables.txt");
             }
             return res;
         }

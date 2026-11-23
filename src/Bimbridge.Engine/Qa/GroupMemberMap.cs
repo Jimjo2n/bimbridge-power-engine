@@ -16,7 +16,7 @@ namespace Bimbridge.Engine.Qa
             {
                 if (!after.TryGetValue(member.Key, out var current)) return false;
                 var expected = new Dictionary<string, object>((Dictionary<string, object>)member.Value);
-                if (changedTypes.TryGetValue(member.Key, out var type)) expected["tipo"] = type;
+                if (changedTypes.TryGetValue(member.Key, out var type)) expected["type"] = type;
                 if (OpSemantics.Canonical(expected) != OpSemantics.Canonical(current)) return false;
             }
             return true;
@@ -33,11 +33,13 @@ namespace Bimbridge.Engine.Qa
                 {
                     if (!(row is Dictionary<string, object> data) || !(Arg.GetLong(data, "id") is long id) || id <= 0 ||
                         !ids.Add(id) || !(Arg.GetString(data, "uid") is string uid) || uid.Length == 0 || !uids.Add(uid))
-                        throw new QueryException("miembros: se requieren IDs y UID únicos en cada instantánea");
-                    result.Add((id, uid, Arg.GetString(data, "firma")));
+                        throw new QueryException("members: unique IDs and UIDs are required in each snapshot");
+                    result.Add((id, uid, Arg.GetString(data, "signature")));
                 }
                 return result;
             }
+            // previous= may be a members_snapshot from a 0.9.3/0.9.4 run (legacy keys such as "firma").
+            foreach (var row in before) if (row is Dictionary<string, object> legacy) LegacyAliases.NormalizeRecord(legacy);
             var old = Read(before);
             var newer = Read(after);
             var byUid = newer.ToDictionary(x => x.Uid, StringComparer.Ordinal);
@@ -63,9 +65,9 @@ namespace Bimbridge.Engine.Qa
             var unmatched = newer.Where(x => !used.Contains(x.Id)).Select(x => (object)x.Id).ToList();
             return new Dictionary<string, object>
             {
-                ["correspondencia"] = pairing.OrderBy(x => x.Key).Select(x => (object)new object[] { x.Key, x.Value }).ToList(),
-                ["anterior_sin_correspondencia"] = unmapped, ["actual_sin_correspondencia"] = unmatched,
-                ["completo"] = unmapped.Count == 0 && unmatched.Count == 0,
+                ["correspondence"] = pairing.OrderBy(x => x.Key).Select(x => (object)new object[] { x.Key, x.Value }).ToList(),
+                ["previous_without_match"] = unmapped, ["current_without_match"] = unmatched,
+                ["complete"] = unmapped.Count == 0 && unmatched.Count == 0,
             };
         }
     }

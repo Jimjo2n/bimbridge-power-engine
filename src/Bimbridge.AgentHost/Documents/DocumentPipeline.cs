@@ -12,20 +12,20 @@ using Bimbridge.Protocol;
 namespace Bimbridge.AgentHost
 {
     /// <summary>
-    /// Documento → requisitos → IR (P1 §5). Tres etapas separadas, cada una con su salida inspeccionable:
-    /// 1. <see cref="RequirementExtractor"/>: EXTRAE requisitos literales con su página, sección e identificador (sin interpretar).
-    /// 2. <see cref="RequirementInterpreter"/>: INTERPRETA cada requisito con reglas deterministas y cerradas; lo ambiguo, lo sospechoso y lo
-    ///    que no encaja queda marcado, nunca se "adivina".
-    /// 3. <see cref="PlanBuilder"/>: CONSTRUYE un plan IR sólo con requisitos de confianza alta y sin ambigüedad; el resto va a la cola de
-    ///    revisión con sus motivos. La ejecución es otra etapa (PlanRunner) que vuelve a validar el plan.
-    /// El contenido del documento es DATO NO CONFIABLE: no hay ningún campo del IR que conceda permisos o cambie políticas, el validador
-    /// rechaza campos de sistema, y las frases que intentan dar órdenes al sistema se marcan como contenido_sospechoso.
-    /// Formato de entrada de alpha1 (texto estructurado, p. ej. extraído de un PDF por una persona o una herramienta aparte):
-    ///   # DOCUMENTO: título
+    /// Document → requirements → IR (P1 §5). Three separate stages, each with its own inspectable output:
+    /// 1. <see cref="RequirementExtractor"/>: EXTRACTS literal requirements with their page, section and identifier (without interpreting).
+    /// 2. <see cref="RequirementInterpreter"/>: INTERPRETS each requirement with deterministic, closed rules; anything ambiguous, suspicious or
+    ///    that does not fit is flagged, never "guessed".
+    /// 3. <see cref="PlanBuilder"/>: BUILDS an IR plan only from high-confidence, unambiguous requirements; the rest goes to the review
+    ///    queue with their reasons. Execution is a separate stage (PlanRunner) that validates the plan again.
+    /// Document content is UNTRUSTED DATA: no IR field grants permissions or changes policies, the validator
+    /// rejects system fields, and sentences that try to give orders to the system are flagged as contenido_sospechoso.
+    /// alpha1 input format (structured text, e.g. extracted from a PDF by a person or a separate tool):
+    ///   # DOCUMENTO: title
     ///   === PAGINA n ===
-    ///   ## 2.1 Sección
-    ///   [REQ-001] texto del requisito
-    /// La extracción desde PDF no forma parte de alpha1.
+    ///   ## 2.1 Section
+    ///   [REQ-001] requirement text
+    /// PDF extraction is not part of alpha1.
     /// </summary>
     public sealed class SourceDocument
     {
@@ -69,12 +69,12 @@ namespace Bimbridge.AgentHost
                 {
                     var id = m.Groups["id"].Value;
                     var t = m.Groups["t"].Value.Trim();
-                    // continuación: líneas siguientes que no son marcador ni requisito pertenecen a este requisito
+                    // continuation: following lines that are neither a marker nor a requirement belong to this requirement
                     while (i + 1 < lines.Length && lines[i + 1].Trim().Length > 0 && !Req.IsMatch(lines[i + 1].Trim()) && !Page.IsMatch(lines[i + 1].Trim()) && !Section.IsMatch(lines[i + 1].Trim()) && !lines[i + 1].TrimStart().StartsWith("#", StringComparison.Ordinal))
                         t += " " + lines[++i].Trim();
-                    if (!seen.Add(id)) { doc.Diagnostics.Add(Diagnostic.Error("requisito_duplicado", id + " (línea " + (i + 1) + ")")); continue; }
-                    if (page == 0) doc.Diagnostics.Add(Diagnostic.Warn("requisito_sin_pagina", id));
-                    if (t.Length == 0) { doc.Diagnostics.Add(Diagnostic.Warn("requisito_vacio", id)); continue; }
+                    if (!seen.Add(id)) { doc.Diagnostics.Add(Diagnostic.Error("duplicate_requirement", id + " (line " + (i + 1) + ")")); continue; }
+                    if (page == 0) doc.Diagnostics.Add(Diagnostic.Warn("requirement_without_page", id));
+                    if (t.Length == 0) { doc.Diagnostics.Add(Diagnostic.Warn("empty_requirement", id)); continue; }
                     doc.Requirements.Add(new RawRequirement { DocSha = doc.Sha256, ReqId = id, Section = section, Original = t, Page = page, Line = i + 1 });
                 }
             }
@@ -85,26 +85,26 @@ namespace Bimbridge.AgentHost
     public sealed class NormalizedRequirement
     {
         public RawRequirement Raw;
-        public string Kind = "no_interpretable";     // fijar_parametro | verificacion | no_interpretable
+        public string Kind = "not_interpretable";     // set_parameter | verification | not_interpretable
         public string Category, Level, Parameter, Unit, Recipe;
         public object Value;
         public double? Tolerance;
-        public string Confidence = "baja";           // alta | media | baja
+        public string Confidence = "low";           // high | medium | low
         public List<string> Ambiguities = new List<string>();
         public List<string> Suspicious = new List<string>();
         public List<string> DependsOnReqs = new List<string>();
         public List<string> Unresolved = new List<string>();
         public string Verification;
-        public bool Executable => Confidence == "alta" && Ambiguities.Count == 0 && Suspicious.Count == 0 && Unresolved.Count == 0 && Kind != "no_interpretable";
+        public bool Executable => Confidence == "high" && Ambiguities.Count == 0 && Suspicious.Count == 0 && Unresolved.Count == 0 && Kind != "not_interpretable";
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["requisito"] = Raw.ReqId, ["pagina"] = (long)Raw.Page, ["seccion"] = Raw.Section, ["original"] = Raw.Original, ["tipo"] = Kind,
-            ["categoria"] = Category, ["nivel"] = Level, ["parametro"] = Parameter, ["valor"] = Value, ["unidades"] = Unit,
-            ["tolerancia"] = Tolerance, ["receta"] = Recipe, ["confianza"] = Confidence,
-            ["ambiguedades"] = Ambiguities.Cast<object>().ToList(), ["sospechoso"] = Suspicious.Cast<object>().ToList(),
-            ["depende_de"] = DependsOnReqs.Cast<object>().ToList(), ["sin_resolver"] = Unresolved.Cast<object>().ToList(),
-            ["verificacion"] = Verification, ["ejecutable"] = Executable,
+            ["requirement"] = Raw.ReqId, ["page"] = (long)Raw.Page, ["section"] = Raw.Section, ["original"] = Raw.Original, ["type"] = Kind,
+            ["category"] = Category, ["level"] = Level, ["parameter"] = Parameter, ["value"] = Value, ["units"] = Unit,
+            ["tolerance"] = Tolerance, ["recipe"] = Recipe, ["confidence"] = Confidence,
+            ["ambiguities"] = Ambiguities.Cast<object>().ToList(), ["suspicious"] = Suspicious.Cast<object>().ToList(),
+            ["depends_on"] = DependsOnReqs.Cast<object>().ToList(), ["unresolved"] = Unresolved.Cast<object>().ToList(),
+            ["verification"] = Verification, ["executable"] = Executable,
         };
     }
 
@@ -123,7 +123,7 @@ namespace Bimbridge.AgentHost
             @"^(?:set|fijar|establecer)\s+(?:the\s+|el\s+)?(?:parameter\s+|par[aá]metro\s+)?""(?<p>[^""]+)""\s+(?:to|a|en|=)\s+(?<v>""[^""]*""|-?\d+(?:\.\d+)?)\s*(?<u>mm|m|ft|in)?\s+" +
             @"(?:for|para|en)\s+(?:all|every|todas?\s+las|todos?\s+los)\s+(?<c>[\p{L}\s]+?)" +
             @"(?:\s+(?:on|in|en|del?)\s+(?:the\s+|el\s+)?(?:level|nivel)?\s*(?<l>[A-Za-z]*\s*\d+))?" +
-            @"(?:\s*\(\s*(?:tolerance|tolerancia)\s*(?:±|\+/-)\s*(?<t>\d+(?:\.\d+)?)\s*(?<tu>mm|m|ft|in)\s*\))?\s*\.?\s*$", O);
+            @"(?:\s*\(\s*(?:tolerance|tolerancia)\s*(?:±|\+/-)\s*(?<t>\d+(?:\.\d+)?)\s*(?<tunit>mm|m|ft|in)\s*\))?\s*\.?\s*$", O);
         private static readonly Regex Verify = new Regex(
             @"^(?:verify|check|verificar|comprobar)\s+(?:that\s+|que\s+)?(?:the\s+|el\s+)?(?<what>qc manifest|manifiesto qc|manifiesto de qc|mounting supports|montaje de soportes|soportes de montaje)" +
             @"(?:\s+(?:on|in|en|del?)\s+(?:the\s+|el\s+)?(?:level|nivel)?\s*(?<l>[A-Za-z]*\s*\d+))?\s*\.?\s*$", O);
@@ -146,53 +146,53 @@ namespace Bimbridge.AgentHost
             {
                 var n = new NormalizedRequirement { Raw = raw };
                 var t = raw.Original;
-                foreach (Match m in Injection.Matches(t)) n.Suspicious.Add("contenido_sospechoso: «" + m.Value + "» (el documento no puede dar órdenes al sistema)");
+                foreach (Match m in Injection.Matches(t)) n.Suspicious.Add("suspicious_content: «" + m.Value + "» (the document cannot give orders to the system)");
                 foreach (Match m in After.Matches(t))
                 {
                     var r = m.Groups["r"].Value;
                     n.DependsOnReqs.Add(r);
-                    if (!ids.Contains(r)) n.Unresolved.Add("dependencia_no_resuelta: " + r + " no existe en el documento");
+                    if (!ids.Contains(r)) n.Unresolved.Add("dependencia_no_resuelta: " + r + " does not exist in the document");
                 }
                 t = After.Replace(t, "").Trim().TrimEnd('.', ' ').Trim();
-                foreach (Match m in Hedge.Matches(t)) n.Ambiguities.Add("lenguaje_ambiguo: «" + m.Value + "»");
+                foreach (Match m in Hedge.Matches(t)) n.Ambiguities.Add("ambiguous_language: «" + m.Value + "»");
                 Match s;
                 if ((s = Set.Match(t)).Success)
                 {
-                    n.Kind = "fijar_parametro";
+                    n.Kind = "set_parameter";
                     n.Parameter = s.Groups["p"].Value;
                     var v = s.Groups["v"].Value;
-                    if (v.StartsWith("\"", StringComparison.Ordinal)) { n.Value = v.Trim('"'); n.Unit = s.Groups["u"].Success ? s.Groups["u"].Value : "texto"; }
+                    if (v.StartsWith("\"", StringComparison.Ordinal)) { n.Value = v.Trim('"'); n.Unit = s.Groups["u"].Success ? s.Groups["u"].Value : "text"; }
                     else
                     {
                         n.Value = v.Contains(".") ? (object)double.Parse(v, CultureInfo.InvariantCulture) : long.Parse(v, CultureInfo.InvariantCulture);
                         if (s.Groups["u"].Success) n.Unit = s.Groups["u"].Value.ToLowerInvariant();
-                        else n.Ambiguities.Add("unidades_no_explicitas: valor numérico " + v + " sin unidad");
+                        else n.Ambiguities.Add("implicit_units: numeric value " + v + " without a unit");
                     }
                     var cat = Regex.Replace(s.Groups["c"].Value.Trim(), @"\s+", " ");
-                    if (Categories.TryGetValue(cat, out var ost)) n.Category = ost; else n.Ambiguities.Add("categoria_desconocida: «" + cat + "»");
+                    if (Categories.TryGetValue(cat, out var ost)) n.Category = ost; else n.Ambiguities.Add("unknown_category: «" + cat + "»");
                     n.Level = NormalizeLevel(s.Groups["l"].Value);
                     if (s.Groups["t"].Success)
                     {
-                        if (n.Unit != null && string.Equals(s.Groups["tu"].Value, n.Unit, StringComparison.OrdinalIgnoreCase)) n.Tolerance = double.Parse(s.Groups["t"].Value, CultureInfo.InvariantCulture);
-                        else n.Ambiguities.Add("tolerancia_en_otra_unidad");
+                        if (n.Unit != null && string.Equals(s.Groups["tunit"].Value, n.Unit, StringComparison.OrdinalIgnoreCase)) n.Tolerance = double.Parse(s.Groups["t"].Value, CultureInfo.InvariantCulture);
+                        else n.Ambiguities.Add("tolerance_in_other_unit");
                     }
-                    n.Verification = "postcondición: todos los objetivos con " + n.Parameter + " = " + Values.Show(n.Value) + (n.Unit != null && n.Unit != "texto" ? " " + n.Unit : "");
-                    n.Confidence = n.Level == null ? "media" : "alta";
-                    if (n.Level == null) n.Ambiguities.Add("alcance_sin_nivel: afectaría a la categoría completa en todos los niveles");
+                    n.Verification = "postcondition: all targets with " + n.Parameter + " = " + Values.Show(n.Value) + (n.Unit != null && n.Unit != "text" ? " " + n.Unit : "");
+                    n.Confidence = n.Level == null ? "medium" : "high";
+                    if (n.Level == null) n.Ambiguities.Add("scope_without_level: would affect the whole category on all levels");
                 }
                 else if ((s = Verify.Match(t)).Success)
                 {
-                    n.Kind = "verificacion";
+                    n.Kind = "verification";
                     var what = s.Groups["what"].Value.ToLowerInvariant();
-                    n.Recipe = what.Contains("manifest") || what.Contains("manifiesto") ? "qc_manifiesto" : "montaje_soportes";
+                    n.Recipe = what.Contains("manifest") || what.Contains("manifiesto") ? "qc_manifest" : "mount_supports";
                     n.Level = NormalizeLevel(s.Groups["l"].Value);
-                    n.Verification = "postcondición: desviaciones = 0 (" + n.Recipe + ")";
-                    n.Confidence = "alta";
+                    n.Verification = "postcondition: deviations = 0 (" + n.Recipe + ")";
+                    n.Confidence = "high";
                 }
-                else n.Ambiguities.Add("no_interpretable: no coincide con ninguna forma admitida; se conserva para revisión");
+                else n.Ambiguities.Add("not_interpretable: does not match any supported form; kept for review");
                 res.Add(n);
             }
-            // dependencias hacia requisitos no ejecutables también quedan sin resolver (no se ejecuta algo cuyo requisito previo no se ejecutará)
+            // dependencies on non-executable requirements also stay unresolved (nothing runs whose prerequisite will not run)
             bool changed;
             do
             {
@@ -200,7 +200,7 @@ namespace Bimbridge.AgentHost
                 var execSet = new HashSet<string>(res.Where(r => r.Executable).Select(r => r.Raw.ReqId), StringComparer.Ordinal);
                 foreach (var r in res.Where(x => x.Executable))
                     foreach (var d in r.DependsOnReqs)
-                        if (!execSet.Contains(d)) { r.Unresolved.Add("dependencia_no_ejecutable: " + d + " queda en revisión"); changed = true; }
+                        if (!execSet.Contains(d)) { r.Unresolved.Add("dependencia_no_ejecutable: " + d + " stays in review"); changed = true; }
             } while (changed);
             return res;
         }
@@ -216,29 +216,29 @@ namespace Bimbridge.AgentHost
 
     public static class PlanBuilder
     {
-        public static BuildResult Build(SourceDocument doc, List<NormalizedRequirement> reqs, string docKey, string docPrint, string lengthUnit = "mm", string coordinates = "interno_revit")
+        public static BuildResult Build(SourceDocument doc, List<NormalizedRequirement> reqs, string docKey, string docPrint, string lengthUnit = "mm", string coordinates = "revit_internal")
         {
             var res = new BuildResult();
-            var plan = new PlanDraft { Objective = "Requisitos de " + (doc.Title ?? doc.Name), DocKey = docKey, DocPrint = docPrint, LengthUnit = lengthUnit, Coordinates = coordinates };
-            plan.Sources.Add(new SourceDoc { Id = "doc-1", Nombre = doc.Name, Sha256 = doc.Sha256 });
+            var plan = new PlanDraft { Objective = "Requirements from " + (doc.Title ?? doc.Name), DocKey = docKey, DocPrint = docPrint, LengthUnit = lengthUnit, Coordinates = coordinates };
+            plan.Sources.Add(new SourceDoc { Id = "doc-1", Name = doc.Name, Sha256 = doc.Sha256 });
             var index = new Dictionary<string, int>(StringComparer.Ordinal);
             var semantic = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var r in reqs)
             {
                 if (!r.Executable) { res.Review.Add(r); continue; }
-                var op = new OpDraft { Source = new SourceRef { Fuente = "doc-1", Pagina = r.Raw.Page > 0 ? r.Raw.Page : (long?)null, Seccion = r.Raw.Section, Requisito = r.Raw.ReqId, Cita = r.Raw.Original.Length > 200 ? r.Raw.Original.Substring(0, 199) + "…" : r.Raw.Original } };
-                if (r.Kind == "fijar_parametro")
+                var op = new OpDraft { Source = new SourceRef { SourceId = "doc-1", Page = r.Raw.Page > 0 ? r.Raw.Page : (long?)null, Section = r.Raw.Section, Requirement = r.Raw.ReqId, Quote = r.Raw.Original.Length > 200 ? r.Raw.Original.Substring(0, 199) + "…" : r.Raw.Original } };
+                if (r.Kind == "set_parameter")
                 {
-                    op.Operation = "fijar_parametro";
-                    op.Scope["categoria"] = r.Category; op.Scope["nivel"] = r.Level;
-                    op.Params["parametro"] = r.Parameter; op.Params["valor"] = r.Value; op.Params["unidades"] = r.Unit;
-                    if (r.Tolerance != null) op.Params["tolerancia"] = r.Tolerance.Value;
+                    op.Operation = "set_parameter";
+                    op.Scope["category"] = r.Category; op.Scope["level"] = r.Level;
+                    op.Params["parameter"] = r.Parameter; op.Params["value"] = r.Value; op.Params["units"] = r.Unit;
+                    if (r.Tolerance != null) op.Params["tolerance"] = r.Tolerance.Value;
                 }
                 else
                 {
-                    op.Operation = "verificar_qc";
-                    op.Params["receta"] = r.Recipe;
-                    if (r.Level != null) op.Scope["nivel"] = r.Level;
+                    op.Operation = "verify_qc";
+                    op.Params["recipe"] = r.Recipe;
+                    if (r.Level != null) op.Scope["level"] = r.Level;
                 }
                 var sk = IrIds.SemanticKey(op.Scope, op.Operation, op.Params);
                 if (semantic.TryGetValue(sk, out var first)) { r.Ambiguities.Add("duplicado_de: " + first); res.Review.Add(r); continue; }
@@ -247,24 +247,24 @@ namespace Bimbridge.AgentHost
                 op.DependsOn.AddRange(r.DependsOnReqs.Select(d => "@" + d));
                 plan.Ops.Add(op);
             }
-            // dependencias por requisito → por índice; un requisito que dependa de uno enviado a revisión también va a revisión
+            // dependencies by requirement → by index; a requirement that depends on one sent to review also goes to review
             foreach (var op in plan.Ops.ToList())
                 op.DependsOn = op.DependsOn.Select(d => index.TryGetValue(d.Substring(1), out var i) ? "#" + i.ToString(CultureInfo.InvariantCulture) : "!" + d.Substring(1)).ToList();
             plan.AssignIdsSafe(res.Errors);
-            foreach (var op in plan.Ops) res.OpByRequirement[op.Source.Requisito] = op.Id;
+            foreach (var op in plan.Ops) res.OpByRequirement[op.Source.Requirement] = op.Id;
             res.Plan = plan;
             return res;
         }
 
-        /// <summary>Comprueba que los documentos de origen siguen siendo los mismos (sha256). Un documento alterado invalida el plan.</summary>
+        /// <summary>Checks that the source documents are still the same (sha256). An altered document invalidates the plan.</summary>
         public static List<string> VerifySources(ValidatedPlan plan, IDictionary<string, byte[]> documents)
         {
             var errs = new List<string>();
             foreach (var s in plan.Sources)
             {
-                if (!documents.TryGetValue(s.Nombre, out var b)) { errs.Add("fuente_no_disponible: " + s.Nombre); continue; }
+                if (!documents.TryGetValue(s.Name, out var b)) { errs.Add("fuente_no_disponible: " + s.Name); continue; }
                 var sha = RequirementExtractor.Sha256Hex(b);
-                if (sha != s.Sha256) errs.Add("fuente_alterada: " + s.Nombre + " sha256 " + sha.Substring(0, 12) + "… ≠ " + s.Sha256.Substring(0, 12) + "…");
+                if (sha != s.Sha256) errs.Add("source_tampered: " + s.Name + " sha256 " + sha.Substring(0, 12) + "… ≠ " + s.Sha256.Substring(0, 12) + "…");
             }
             return errs;
         }
@@ -272,12 +272,12 @@ namespace Bimbridge.AgentHost
 
     internal static class PlanDraftExtensions
     {
-        /// <summary>Como AssignIds, pero una dependencia marcada "!" (hacia un requisito no convertido) se informa como error.</summary>
+        /// <summary>Like AssignIds, but a dependency marked "!" (on a requirement that was not converted) is reported as an error.</summary>
         public static void AssignIdsSafe(this PlanDraft p, List<string> errors)
         {
             foreach (var op in p.Ops)
                 foreach (var d in op.DependsOn.Where(x => x.StartsWith("!", StringComparison.Ordinal)))
-                    errors.Add(op.Source?.Requisito + ": dependencia hacia " + d.Substring(1) + " no convertida");
+                    errors.Add(op.Source?.Requirement + ": dependency on " + d.Substring(1) + " not converted");
             foreach (var op in p.Ops) op.DependsOn = op.DependsOn.Where(x => !x.StartsWith("!", StringComparison.Ordinal)).ToList();
             p.AssignIds();
         }
@@ -293,10 +293,10 @@ namespace Bimbridge.AgentHost
             var reqs = RequirementInterpreter.Interpret(doc);
             var b = PlanBuilder.Build(doc, reqs, Opt("--clave") ?? "?", Opt("--huella") ?? "?");
             var errs = IrValidator.Validate(b.Plan, out var vp);
-            Console.WriteLine("documento " + doc.Name + " sha256 " + doc.Sha256.Substring(0, 16) + "… · " + doc.Pages + " páginas · " + doc.Requirements.Count + " requisitos");
+            Console.WriteLine("document " + doc.Name + " sha256 " + doc.Sha256.Substring(0, 16) + "… · " + doc.Pages + " pages · " + doc.Requirements.Count + " requirements");
             foreach (var d in doc.Diagnostics) Console.WriteLine("diag " + d);
-            Console.WriteLine("convertidos " + b.Plan.Ops.Count + " · a revisión " + b.Review.Count + (vp != null ? " · plan " + vp.Hash : ""));
-            foreach (var r in b.Review) Console.WriteLine("revision " + r.Raw.ReqId + " p." + r.Raw.Page + ": " + string.Join("; ", r.Ambiguities.Concat(r.Suspicious).Concat(r.Unresolved)));
+            Console.WriteLine("converted " + b.Plan.Ops.Count + " · to review " + b.Review.Count + (vp != null ? " · plan " + vp.Hash : ""));
+            foreach (var r in b.Review) Console.WriteLine("review " + r.Raw.ReqId + " p." + r.Raw.Page + ": " + string.Join("; ", r.Ambiguities.Concat(r.Suspicious).Concat(r.Unresolved)));
             foreach (var e in errs.Concat(b.Errors)) Console.WriteLine("error " + e);
             var outp = Opt("--salida");
             if (outp != null)
@@ -304,7 +304,7 @@ namespace Bimbridge.AgentHost
                 File.WriteAllText(outp, Json.Write(b.Plan.ToJson()));
                 File.WriteAllText(Path.ChangeExtension(outp, ".revision.json"), Json.Write(new Dictionary<string, object>
                 {
-                    ["documento"] = doc.Name, ["sha256"] = doc.Sha256, ["requisitos"] = reqs.Select(r => (object)r.ToJson()).ToList(),
+                    ["document"] = doc.Name, ["sha256"] = doc.Sha256, ["requirements"] = reqs.Select(r => (object)r.ToJson()).ToList(),
                 }));
             }
             return errs.Count == 0 && b.Errors.Count == 0 ? 0 : 1;

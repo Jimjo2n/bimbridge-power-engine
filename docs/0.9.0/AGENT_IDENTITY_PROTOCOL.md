@@ -1,49 +1,49 @@
-# Protocolo de identidad de agentes
+# Agent identity protocol
 
-## Qué puede saber BIMBRIDGE y qué no
+## What BIMBRIDGE can and cannot know
 
-| Dato | Fuente | ¿Verificado? |
+| Data | Source | Verified? |
 |---|---|---|
-| Usuario de Windows (`principal`) | ACL de la tubería: sólo ese usuario conecta | **Sí** |
-| Aplicación cliente y versión | `clientInfo` del inicio MCP (p. ej. `claude-code 2.1`) | No (declarado por el cliente) |
-| Alias del agente | `BIMBRIDGE_AGENT` en la configuración MCP, o `ctx agente="…"` | No (declarado) |
-| Conversación y modelo | `BIMBRIDGE_CONVERSATION`, `BIMBRIDGE_MODEL`, o `ctx conversacion= modelo=` | No (declarado) |
-| Título del chat | **El protocolo MCP no lo transmite.** Nunca se inventa | — |
+| Windows user (`principal`) | Pipe ACL: only that user can connect | **Yes** |
+| Client application and version | `clientInfo` from the MCP initialization (e.g. `claude-code 2.1`) | No (declared by the client) |
+| Agent alias | `BIMBRIDGE_AGENT` in the MCP configuration, or `ctx agente="…"` | No (declared) |
+| Conversation and model | `BIMBRIDGE_CONVERSATION`, `BIMBRIDGE_MODEL`, or `ctx conversacion= modelo=` | No (declared) |
+| Chat title | **The MCP protocol does not transmit it.** It is never made up | — |
 
-## Flujo
+## Flow
 
-1. **Conexión:** el puente saluda con `client`, `client_version` y, si está configurado, `agente` con fuente `configuracion`.
-2. **Registro:** `ctx agente="Integration client"`, opcionalmente con `conversacion=` y `modelo=`. Sólo cambia esa sesión, y el puente lo repite si reconecta (fuente `registro`). Un alias vacío o inválido se rechaza.
-3. **Latido:** el puente envía ping cada 10 s. Si no hay tráfico durante 30 s **y la sesión no tiene solicitudes en curso**, el add-in la cierra con motivo `inactividad` (#1). Una operación larga no la cierra.
-4. **Solicitudes:** cada línea del diario lleva `agente`, `cliente`, `doc` y la correlación (#4): `agent_id`, `session_id`, `request_id`, `trace_id` (también en `traza`), `job_id` y `transaction_id` cuando corresponden. Un cliente puede enviar `_traza` (8–64 caracteres `[A-Za-z0-9-_.:]`) para unir sus procesos; el AgentHost envía una por ejecución. Los contadores por sesión llevan solicitudes, errores, en ejecución y ms acumulados.
-5. **Desconexión:** la sesión pasa al historial acotado de cerradas (50) con su motivo (`conexion_cerrada`, `inactividad` o `revit_cerrando`). Un reinicio de Revit vacía el historial: nada de agentes fantasma.
-6. **Desregistro:** `ctx desregistrar=true` devuelve la sesión a «sin nombre» (sin lecturas ni cambios).
-7. **Identificadores:** `session_id` es único por instancia (`S-cliente-pid-<64 bits aleatorios>`) y nunca se reutiliza, ni siquiera al reconectar con el mismo pid. Así `request_id = session_id#n` no se repite. `agent_id` es estable entre reconexiones del mismo alias y usuario.
+1. **Connection:** the bridge greets with `client`, `client_version` and, if configured, `agente` with source `configuracion`.
+2. **Registration:** `ctx agente="Integration client"`, optionally with `conversacion=` and `modelo=`. It only changes that session, and the bridge repeats it on reconnect (source `registro`). An empty or invalid alias is rejected.
+3. **Heartbeat:** the bridge sends a ping every 10 s. If there is no traffic for 30 s **and the session has no requests in progress**, the add-in closes it with reason `inactividad` (#1). A long operation does not close it.
+4. **Requests:** each journal line carries `agente`, `cliente`, `doc` and the correlation (#4): `agent_id`, `session_id`, `request_id`, `trace_id` (also in `traza`), `job_id` and `transaction_id` when applicable. A client can send `_traza` (8–64 characters `[A-Za-z0-9-_.:]`) to tie its processes together; the AgentHost sends one per run. Per-session counters hold requests, errors, in progress and accumulated ms.
+5. **Disconnection:** the session moves to the bounded history of closed sessions (50) with its reason (`conexion_cerrada`, `inactividad` or `revit_cerrando`). A Revit restart empties the history: no ghost agents.
+6. **Deregistration:** `ctx desregistrar=true` returns the session to «unnamed» (no reads and no changes).
+7. **Identifiers:** `session_id` is unique per instance (`S-client-pid-<64 random bits>`) and is never reused, not even when reconnecting with the same pid. That way `request_id = session_id#n` never repeats. `agent_id` is stable across reconnections with the same alias and user.
 
-## Sin nombre (#3)
+## Unnamed (#3)
 
-Una sesión sin alias aparece como «(sin nombre) · cliente», con identidad **insuficiente**.
+A session without an alias appears as «(sin nombre) · client», with **insufficient** identity.
 
-- **Permitido sin nombre:** sólo `hello`, `ping` y el registro (`ctx agente="…"`, o `ctx desregistrar=true`).
-- **Exige alias:** todo lo demás. Incluye las lecturas (`query`, `sets`, `check`, `catalog`, `params`, `docs`, `geo`, `job`) y un `ctx` sin `agente=`, porque devolvería datos del modelo. También `plan`, `commit`, `exec`, `fam`, `doc`, `show`, `capture`, `tarea` y cualquier operación desconocida. Responden `rechazado` con instrucciones de registro, y el rechazo queda en el diario con su correlación (`aviso: identidad_insuficiente`).
-- **Alias duplicado:** si otra sesión activa de otro proceso cliente ya usa el alias (sin distinguir mayúsculas), `ctx agente=` responde `conflicto`, y el saludo deja la sesión sin nombre y explica el motivo. La misma instancia del puente que reconecta antes de que se cierre su sesión anterior conserva el nombre. Nunca se hereda el nombre de otra sesión.
-- **Integraciones antiguas:** `"identidad_obligatoria": false` en `config.json` las tolera. Es una decisión explícita del usuario o de IT, y cada operación anónima queda marcada en el diario (`identidad: sin_nombre_modo_heredado`).
-- **AgentHost:** sin `BIMBRIDGE_AGENT`, se declara por configuración como `AgentHost <pid>`.
+- **Allowed without a name:** only `hello`, `ping` and registration (`ctx agente="…"`, or `ctx desregistrar=true`).
+- **Requires an alias:** everything else. This includes reads (`query`, `sets`, `check`, `catalog`, `params`, `docs`, `geo`, `job`) and a `ctx` without `agente=`, because it would return model data. Also `plan`, `commit`, `exec`, `fam`, `doc`, `show`, `capture`, `tarea` and any unknown operation. They answer `rechazado` with registration instructions, and the rejection is recorded in the journal with its correlation (`aviso: identidad_insuficiente`).
+- **Duplicate alias:** if another active session of another client process already uses the alias (case-insensitive), `ctx agente=` answers `conflicto`, and the greeting leaves the session unnamed and explains why. The same bridge instance reconnecting before its previous session closes keeps the name. A name is never inherited from another session.
+- **Legacy integrations:** `"identidad_obligatoria": false` in `config.json` tolerates them. It is an explicit decision by the user or IT, and each anonymous operation is marked in the journal (`identidad: sin_nombre_modo_heredado`).
+- **AgentHost:** without `BIMBRIDGE_AGENT`, it declares itself via configuration as `AgentHost <pid>`.
 
-## Presencia
+## Presence
 
-`ejecutando` (alguna solicitud activa), `activo` (actividad en los últimos 60 s) o `inactivo` (conectado, sin actividad reciente). Las cerradas aparecen como desconectadas, con su motivo.
+`ejecutando` (some request active), `activo` (activity in the last 60 s) or `inactivo` (connected, no recent activity). Closed sessions appear as disconnected, with their reason.
 
-## Configuración típica (Claude Code)
+## Typical configuration (Claude Code)
 
 ```
 "env": { "BIMBRIDGE_AGENT": "Integration client" }
 ```
 
-## Compatibilidad
+## Compatibility
 
-No se añadieron herramientas MCP: el registro reutiliza `ctx` (perfil compacto, `revit "ctx agente=…"`) y `revit_context agente=` (perfil completo). La identidad no depende de `Mcp-Session-Id`.
+No MCP tools were added: registration reuses `ctx` (compact profile, `revit "ctx agente=…"`) and `revit_context agente=` (complete profile). Identity does not depend on `Mcp-Session-Id`.
 
-## Límites
+## Limits
 
-Los alias son autodeclarados y no autentican a nadie. El agent_id es una huella estable de (principal, alias), no una credencial. La traza llega al AgentHost; los workers de Python y Rust todavía no la registran en sus propios diarios.
+Aliases are self-declared and authenticate no one. The agent_id is a stable fingerprint of (principal, alias), not a credential. The trace reaches the AgentHost; the Python and Rust workers do not yet record it in their own journals.

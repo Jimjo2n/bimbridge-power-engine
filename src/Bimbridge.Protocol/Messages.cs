@@ -4,18 +4,18 @@ using System.Collections.Generic;
 
 namespace Bimbridge.Protocol
 {
-    /// <summary>Constantes del protocolo interno puente ↔ add-in. La IA nunca las ve.</summary>
+    /// <summary>Constants of the internal bridge ↔ add-in protocol. The AI never sees them.</summary>
     public static class Wire
     {
-        /// <summary>Se sube cuando cambia el formato. Puente y add-in deben coincidir.</summary>
-        public const int ProtocolVersion = 2;
+        /// <summary>Bumped when the format changes. Bridge and add-in must match.</summary>
+        public const int ProtocolVersion = 3;
 
         public const string PipePrefix = "Bimbridge.";
 
-        // Operaciones
+        // Operations
         public const string OpHello = "hello";
-        public const string WriteReceiptFeature = "recibo_escritura";
-        public const string LargeResultFeature = "resultado_fuera_de_trama";
+        public const string WriteReceiptFeature = "write_receipt";
+        public const string LargeResultFeature = "out_of_frame_result";
         public const string OpPing = "ping";
         public const string OpContext = "context";
         public const string OpQuery = "query";
@@ -29,82 +29,82 @@ namespace Bimbridge.Protocol
         public const string OpShow = "show";
         public const string OpCapture = "capture";
         public const string OpParams = "params";
-        /// <summary>Runner general: compila y ejecuta C# sobre la API pública de Revit (consulta revertida, ejecución con transacción o sin ella).</summary>
+        /// <summary>General runner: compiles and runs C# against the public Revit API (rolled-back query, run with or without a transaction).</summary>
         public const string OpExec = "exec";
-        /// <summary>Documentos abiertos (proyectos y familias) con handle estable dN.</summary>
+        /// <summary>Open documents (projects and families) with a stable dN handle.</summary>
         public const string OpDocs = "docs";
-        /// <summary>Familias: info, caras, conectores, parámetros, editar, cargar (lecturas y escrituras tipadas).</summary>
+        /// <summary>Families: info, faces, connectors, parameters, edit, load (typed reads and writes).</summary>
         public const string OpFam = "fam";
-        /// <summary>Operaciones de documento: guardar, guardar como, sincronizar, PDF, cerrar.</summary>
+        /// <summary>Document operations: save, save as, sync, PDF, close.</summary>
         public const string OpDoc = "doc";
-        /// <summary>0.6.0: tareas largas reanudables (iniciar, estado, esperar, cancelar, reanudar, reconciliar, resumen…).</summary>
-        public const string OpTask = "tarea";
-        /// <summary>Clave de args con el documento destino (handle dN, ruta o título). Sin ella: el activo al recibir la petición, fijo para toda la petición.</summary>
+        /// <summary>0.6.0: long resumable tasks (start, status, wait, cancel, resume, reconcile, summary…).</summary>
+        public const string OpTask = "task";
+        /// <summary>Args key with the target document (dN handle, path or title). Without it: the document active when the request arrives, fixed for the whole request.</summary>
         public const string DocArg = "doc";
-        /// <summary>Clave de idempotencia: la misma clave en el mismo documento no se vuelve a aplicar.</summary>
-        public const string KeyArg = "clave";
-        public const string TaskArg = "tarea";
-        /// <summary>Clave opcional en args con el nombre de la herramienta que vio la IA (p. ej. "get"), sólo para el diario.</summary>
+        /// <summary>Idempotency key: the same key on the same document is not applied again.</summary>
+        public const string KeyArg = "key";
+        public const string TaskArg = "task";
+        /// <summary>Optional args key with the name of the tool the AI saw (e.g. "get"), journal only.</summary>
         public const string ToolArg = "_tool";
     }
 
-    /// <summary>Estados de respuesta (sección 6 de la arquitectura). Son los que ve la IA.</summary>
+    /// <summary>Response statuses (architecture section 6). These are what the AI sees.</summary>
     public static class Status
     {
         public const string Ok = "ok";
-        public const string EnCola = "en_cola";
-        public const string EnProceso = "en_proceso";
-        /// <summary>El cambio quedó en la cola de Revit; el usuario lo aplicará con el botón "Aplicar cola".</summary>
-        public const string Retenido = "retenido";
-        public const string Conflicto = "conflicto";
-        public const string RevitOcupado = "revit_ocupado";
-        public const string Revertido = "revertido";
-        public const string Vencido = "vencido";
-        public const string Rechazado = "rechazado";
-        public const string Invalido = "invalido";
-        public const string RevitNoDisponible = "revit_no_disponible";
+        public const string Queued = "queued";
+        public const string InProgress = "in_progress";
+        /// <summary>The change is in the Revit queue; the user will apply it with the "Apply queue" button.</summary>
+        public const string Held = "held";
+        public const string Conflict = "conflict";
+        public const string RevitBusy = "revit_busy";
+        public const string RolledBack = "reverted";
+        public const string Expired = "expired";
+        public const string Rejected = "rejected";
+        public const string Invalid = "invalid";
+        public const string RevitUnavailable = "revit_unavailable";
         public const string Incompatible = "incompatible";
         public const string Error = "error";
-        /// <summary>Se venció el plazo de la petición y el trabajo se canceló dentro de Revit.</summary>
-        public const string TiempoAgotado = "tiempo_agotado";
-        /// <summary>La operación no aplica a este tipo de documento o a esta versión de Revit (dice cuál y qué alternativa hay).</summary>
-        public const string NoSoportado = "no_soportado";
-        /// <summary>El documento o el Revit fijado ya no está abierto. No se redirige a otro.</summary>
-        public const string DestinoNoDisponible = "destino_no_disponible";
-        /// <summary>Hace falta una decisión del usuario (p. ej. Retener activo, dato ambiguo sin resolver).</summary>
-        public const string NecesitaUsuario = "necesita_usuario";
-        /// <summary>Una operación con esa clave empezó y no consta su final (Revit se cerró o se cortó): reconciliar antes de repetir.</summary>
-        public const string Interrumpido = "interrumpido";
-        /// <summary>Se aplicó, pero la verificación posterior encontró diferencias con lo pedido (se listan).</summary>
-        public const string ConDiferencias = "completado_con_diferencias";
+        /// <summary>The request deadline passed and the work was cancelled inside Revit.</summary>
+        public const string TimedOut = "timed_out";
+        /// <summary>The operation does not apply to this document type or Revit version (says which, and what alternative exists).</summary>
+        public const string NotSupported = "not_supported";
+        /// <summary>The pinned document or Revit is no longer open. Not redirected to another one.</summary>
+        public const string TargetUnavailable = "target_unavailable";
+        /// <summary>A user decision is needed (e.g. Hold is on, ambiguous data left unresolved).</summary>
+        public const string NeedsUser = "needs_user";
+        /// <summary>An operation with that key started and its end is not recorded (Revit closed or was cut off): reconcile before repeating.</summary>
+        public const string Interrupted = "interrupted";
+        /// <summary>Applied, but the follow-up verification found differences from what was requested (they are listed).</summary>
+        public const string CompletedWithDifferences = "completed_with_differences";
 
-        // 0.6.0: estados semánticos que distinguen lo aplicado, lo revertido y lo que no se sabe.
-        /// <summary>Una parte se confirmó y otra no (p. ej. tx=ninguna con un fallo a mitad, o un documento sí y otro no). Reconciliar antes de repetir.</summary>
-        public const string Parcial = "parcial";
-        /// <summary>No se puede saber si se aplicó (se perdió la evidencia). Reconciliar antes de repetir.</summary>
-        public const string Desconocido = "desconocido";
-        /// <summary>Los cambios se confirmaron, pero falló producir la respuesta. No se revirtió nada.</summary>
-        public const string AplicadoErrorResultado = "aplicado_error_resultado";
-        public const string CancelacionSolicitada = "cancelacion_solicitada";
-        /// <summary>Cancelación confirmada: lo confirmado antes de cancelar sigue aplicado y se lista.</summary>
-        public const string Cancelado = "cancelado";
-        /// <summary>La tarea espera algo del contexto (pausa del usuario, diálogo abierto, documento cerrado). Conserva su avance.</summary>
-        public const string EsperandoContexto = "esperando_contexto";
-        /// <summary>El diario de operaciones no está disponible: no se aplica una escritura con clave= sin poder garantizar su idempotencia.</summary>
-        public const string DiarioNoDisponible = "diario_no_disponible";
-        /// <summary>Un nombre coincide con varios documentos o elementos: se devuelven candidatos, no se elige el primero.</summary>
-        public const string Ambiguo = "ambiguo";
-        /// <summary>Otra tarea o barrera tiene el documento; la escritura no se aplicó.</summary>
-        public const string DocumentoOcupado = "documento_ocupado";
+        // 0.6.0: semantic statuses that tell apart what was applied, what was rolled back and what is unknown.
+        /// <summary>One part was committed and another was not (e.g. tx=ninguna with a failure halfway, or one document yes and another no). Reconcile before repeating.</summary>
+        public const string Partial = "partial";
+        /// <summary>It cannot be known whether it was applied (the evidence was lost). Reconcile before repeating.</summary>
+        public const string Unknown = "unknown";
+        /// <summary>The changes were committed, but producing the response failed. Nothing was rolled back.</summary>
+        public const string AppliedResultError = "applied_result_error";
+        public const string CancelRequested = "cancellation_requested";
+        /// <summary>Cancellation confirmed: what was committed before cancelling stays applied and is listed.</summary>
+        public const string Cancelled = "cancelled";
+        /// <summary>The task is waiting on context (user pause, open dialog, closed document). It keeps its progress.</summary>
+        public const string WaitingContext = "waiting_for_context";
+        /// <summary>The operation journal is unavailable: a write with clave= is not applied when its idempotency cannot be guaranteed.</summary>
+        public const string JournalUnavailable = "journal_unavailable";
+        /// <summary>A name matches several documents or elements: candidates are returned, the first one is not picked.</summary>
+        public const string Ambiguous = "ambiguous";
+        /// <summary>Another task or barrier holds the document; the write was not applied.</summary>
+        public const string DocumentBusy = "document_busy";
 
-        /// <summary>Estados terminales que confirman que NO quedó nada aplicado (se puede reintentar con la misma clave).</summary>
+        /// <summary>Terminal statuses that confirm NOTHING was applied (can be retried with the same key).</summary>
         public static bool ConfirmsNothingApplied(string s) =>
-            s == Revertido || s == Rechazado || s == Invalido || s == DestinoNoDisponible || s == NoSoportado || s == NecesitaUsuario ||
-            s == Conflicto || s == RevitOcupado || s == Vencido || s == DiarioNoDisponible || s == Ambiguo || s == DocumentoOcupado ||
-            s == Incompatible || s == RevitNoDisponible || s == TiempoAgotado;
+            s == RolledBack || s == Rejected || s == Invalid || s == TargetUnavailable || s == NotSupported || s == NeedsUser ||
+            s == Conflict || s == RevitBusy || s == Expired || s == JournalUnavailable || s == Ambiguous || s == DocumentBusy ||
+            s == Incompatible || s == RevitUnavailable || s == TimedOut;
 
-        /// <summary>Estados terminales que cuentan como aplicado (repetir la clave devuelve el resultado guardado).</summary>
-        public static bool CountsAsApplied(string s) => s == Ok || s == ConDiferencias || s == Retenido || s == AplicadoErrorResultado;
+        /// <summary>Terminal statuses that count as applied (repeating the key returns the stored result).</summary>
+        public static bool CountsAsApplied(string s) => s == Ok || s == CompletedWithDifferences || s == Held || s == AppliedResultError;
     }
 
     public sealed class Request : IJsonWritable
@@ -112,14 +112,14 @@ namespace Bimbridge.Protocol
         public long Id;
         public string Op;
         public Dictionary<string, object> Args = new Dictionary<string, object>(StringComparer.Ordinal);
-        /// <summary>Tiempo máximo que el puente esperará; el add-in lo usa para no trabajar en vano.</summary>
+        /// <summary>Maximum time the bridge will wait; the add-in uses it to avoid wasted work.</summary>
         public int DeadlineMs;
         public string AttemptId;
 
         public object ToJson()
         {
             var data = new Dictionary<string, object> { ["id"] = Id, ["op"] = Op, ["args"] = Args, ["deadline_ms"] = DeadlineMs };
-            if (AttemptId != null) data["intento_id"] = AttemptId;
+            if (AttemptId != null) data["attempt_id"] = AttemptId;
             return data;
         }
 
@@ -130,7 +130,7 @@ namespace Bimbridge.Protocol
             {
                 Id = Arg.GetLong(o, "id") ?? 0,
                 Op = Arg.GetString(o, "op"),
-                AttemptId = Arg.GetString(o, "intento_id"),
+                AttemptId = LegacyAliases.GetString(o, "attempt_id"),
                 Args = o.TryGetValue("args", out var a) && a is Dictionary<string, object> d
                     ? d
                     : new Dictionary<string, object>(StringComparer.Ordinal),
@@ -142,39 +142,39 @@ namespace Bimbridge.Protocol
     public sealed class Response : IJsonWritable
     {
         public long Id;
-        public string Estado = Status.Ok;
+        public string State = Status.Ok;
         public long? Rev;
-        public object Datos;
-        public string Aviso;
+        public object Data;
+        public string Warning;
 
         public object ToJson()
         {
-            var d = new Dictionary<string, object> { ["id"] = Id, ["estado"] = Estado };
+            var d = new Dictionary<string, object> { ["id"] = Id, ["status"] = State };
             if (Rev.HasValue) d["rev"] = Rev.Value;
-            if (Datos != null) d["datos"] = Datos;
-            if (!string.IsNullOrEmpty(Aviso)) d["aviso"] = Aviso;
+            if (Data != null) d["data"] = Data;
+            if (!string.IsNullOrEmpty(Warning)) d["warning"] = Warning;
             return d;
         }
 
         public static Response FromJson(string json)
         {
             var o = Json.ParseObject(json);
-            o.TryGetValue("datos", out var datos);
+            LegacyAliases.TryGet(o, "data", out var data);
             return new Response
             {
                 Id = Arg.GetLong(o, "id") ?? 0,
-                Estado = Arg.GetString(o, "estado") ?? Status.Error,
+                State = LegacyAliases.GetString(o, "status") ?? Status.Error,
                 Rev = Arg.GetLong(o, "rev"),
-                Datos = datos,
-                Aviso = Arg.GetString(o, "aviso"),
+                Data = data,
+                Warning = LegacyAliases.GetString(o, "warning"),
             };
         }
 
-        public static Response Fail(long id, string estado, string aviso) =>
-            new Response { Id = id, Estado = estado, Aviso = aviso };
+        public static Response Fail(long id, string status, string warning) =>
+            new Response { Id = id, State = status, Warning = warning };
     }
 
-    /// <summary>Lectura tolerante de argumentos JSON ya parseados.</summary>
+    /// <summary>Lenient reading of already-parsed JSON arguments.</summary>
     public static class Arg
     {
         public static string GetString(IDictionary<string, object> o, string key)
@@ -204,7 +204,7 @@ namespace Bimbridge.Protocol
             return null;
         }
 
-        /// <summary>Acepta "a" o ["a","b"] y devuelve siempre una lista.</summary>
+        /// <summary>Accepts "a" or ["a","b"] and always returns a list.</summary>
         public static List<string> GetStringList(IDictionary<string, object> o, string key)
         {
             var result = new List<string>();
@@ -221,7 +221,7 @@ namespace Bimbridge.Protocol
                     if (item != null) result.Add(Convert.ToString(item, System.Globalization.CultureInfo.InvariantCulture));
                 return result;
             }
-            // Un número suelto (ids=12345) también es una lista de uno.
+            // A bare number (ids=12345) is also a list of one.
             if (v is long || v is int || v is double) result.Add(Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture));
             return result;
         }

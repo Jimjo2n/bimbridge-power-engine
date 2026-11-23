@@ -8,11 +8,11 @@ using System.Threading.Tasks;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Coordinación por documento (0.6.0, §4). Una tarea larga o una barrera (guardar, sync, exportar, cargar familia) toma el documento;
-    /// mientras lo tenga, las escrituras de otros clientes devuelven documento_ocupado en vez de intercalarse. Las lecturas no se bloquean.
-    /// - Todo o nada y en orden (claves ordenadas): un script multidocumento nunca se queda con la mitad, y dos dueños no se bloquean
-    ///   mutuamente (no hay interbloqueo).
-    /// - Reentrante para el mismo dueño (la tarea puede ejecutar sus barreras).
+    /// Per-document coordination (0.6.0, §4). A long task or a barrier (save, sync, export, load family) takes the document;
+    /// while it holds it, writes from other clients return documento_ocupado instead of interleaving. Reads are not blocked.
+    /// - All or nothing and in order (sorted keys): a multi-document script never ends up holding half, and two owners never block
+    ///   each other (no deadlock).
+    /// - Reentrant for the same owner (the task can run its barriers).
     /// </summary>
     public sealed class DocLocks
     {
@@ -25,7 +25,7 @@ namespace Bimbridge.Engine
             internal int Depth;
 
             public string Describe() => Kind + " " + Owner + (string.IsNullOrEmpty(Detail) ? "" : " (" + Detail + ")") +
-                                        " desde " + SinceUtc.ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) + " UTC";
+                                        " since " + SinceUtc.ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) + " UTC";
         }
 
         private readonly object _lock = new object();
@@ -34,7 +34,7 @@ namespace Bimbridge.Engine
 
         public DocLocks(Func<DateTime> now = null) { _now = now ?? (() => DateTime.UtcNow); }
 
-        /// <summary>Intenta tomar todos los documentos a la vez. Si alguno lo tiene otro dueño, no toma ninguno y devuelve quién lo tiene.</summary>
+        /// <summary>Tries to take all documents at once. If another owner holds any of them, takes none and returns who holds it.</summary>
         public bool TryAcquire(IEnumerable<string> docs, string owner, string kind, string detail, out Holder blocking)
         {
             blocking = null;
@@ -52,7 +52,7 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Espera (acotada) a poder tomar los documentos. Comprueba cada 100 ms; nunca deja una toma a medias.</summary>
+        /// <summary>Waits (bounded) until the documents can be taken. Checks every 100 ms; never leaves a partial acquisition.</summary>
         public async Task<Holder> AcquireAsync(IEnumerable<string> docs, string owner, string kind, string detail, TimeSpan wait, CancellationToken ct)
         {
             var keys = Normalize(docs);
@@ -74,7 +74,7 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Quién tiene el documento, o null. Si <paramref name="exceptOwner"/> lo tiene, también null.</summary>
+        /// <summary>Who holds the document, or null. If <paramref name="exceptOwner"/> holds it, also null.</summary>
         public Holder HeldByOther(string doc, string exceptOwner)
         {
             if (doc == null) return null;

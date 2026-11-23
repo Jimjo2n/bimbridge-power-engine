@@ -1,16 +1,16 @@
-# Hoja de ruta tras 0.7.0-alpha1
+# Roadmap after 0.7.0-alpha1
 
-**alpha2 (sin Revit)**
-- Ejecutar la suite en Windows (Revit 2024/2026 instalados pero sin abrir modelos).
-- Corregir la carrera de clave de GrantStore (requiere aprobación del operador, toca rc3).
-- Extracción PDF de especificaciones con página/sección; más patrones de requisitos.
-- Precondiciones adicionales (valor actual, existencia de parámetro, tipo).
+**alpha2 (without Revit)**
+- Run the suite on Windows (Revit 2024/2026 installed but without opening models).
+- Fix the GrantStore key race (requires operator approval, touches rc3).
+- PDF extraction of specifications with page/section; more requirement patterns.
+- Additional preconditions (current value, parameter existence, type).
 
-**beta1 (Revit, solo lectura, copia de práctica, con aprobación)**
-- Conectar `RevitTaskAdapter.Observe/Prepare` al add-in rc3 en modo lectura.
-- Comparar observación simulada vs real en el mismo plan.
+**beta1 (Revit, read-only, practice copy, with approval)**
+- Connect `RevitTaskAdapter.Observe/Prepare` to the rc3 add-in in read mode.
+- Compare simulated vs real observation on the same plan.
 
-**beta2 (escritura en copia de práctica, con aprobación explícita del operador)**
-- `Execute` vía recetas rc3 con concesión `revit_modificar`; recuperación AH-01 contra el diario de transacciones de rc3.
+**beta2 (writes on a practice copy, with explicit operator approval)**
+- `Execute` via rc3 recipes with the `revit_modificar` grant; AH-01 recovery against the rc3 transaction journal.
 
-**Rust**: solo si una medición en Revit real muestra que el cálculo (no la extracción) domina; usar el banco y digest de RENDIMIENTO.
+**Rust**: only if a measurement in real Revit shows that computation (not extraction) dominates; use the bench and digest from RENDIMIENTO.

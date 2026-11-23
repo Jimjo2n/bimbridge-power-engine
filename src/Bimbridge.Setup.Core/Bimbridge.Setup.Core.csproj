@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Lógica del instalador, sin Windows ni UI: se prueba en cualquier sistema con carpetas temporales. -->
+  <!-- Installer logic, without Windows or UI: testable on any system with temp folders. -->
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>

@@ -8,10 +8,10 @@ using System.Text;
 namespace Bimbridge.Protocol
 {
     /// <summary>
-    /// JSON mínimo y sin dependencias. Existe para que el add-in no cargue ninguna DLL
-    /// externa dentro de Revit (choques de versiones en 2022–2024).
-    /// Objetos → Dictionary&lt;string, object&gt;, arreglos → List&lt;object&gt;,
-    /// números enteros → long, decimales → double, true/false → bool, null → null.
+    /// Minimal, dependency-free JSON. It exists so the add-in loads no external DLL
+    /// inside Revit (version clashes in 2022–2024).
+    /// Objects → Dictionary&lt;string, object&gt;, arrays → List&lt;object&gt;,
+    /// integers → long, decimals → double, true/false → bool, null → null.
     /// </summary>
     public static class Json
     {
@@ -22,14 +22,14 @@ namespace Bimbridge.Protocol
             p.SkipWs();
             var value = p.ReadValue(0);
             p.SkipWs();
-            if (!p.AtEnd) throw p.Error("texto sobrante después del valor");
+            if (!p.AtEnd) throw p.Error("trailing text after the value");
             return value;
         }
 
         public static Dictionary<string, object> ParseObject(string text)
         {
             var o = Parse(text) as Dictionary<string, object>;
-            if (o == null) throw new FormatException("JSON: se esperaba un objeto");
+            if (o == null) throw new FormatException("JSON: expected an object");
             return o;
         }
 
@@ -40,11 +40,11 @@ namespace Bimbridge.Protocol
             return sb.ToString();
         }
 
-        // ---------------- escritura ----------------
+        // ---------------- writing ----------------
 
         private static void WriteValue(StringBuilder sb, object v, int depth)
         {
-            if (depth > 64) throw new InvalidOperationException("JSON: anidamiento excesivo");
+            if (depth > 64) throw new InvalidOperationException("JSON: nesting too deep");
             switch (v)
             {
                 case null: sb.Append("null"); return;
@@ -95,7 +95,7 @@ namespace Bimbridge.Protocol
         private static void WriteDouble(StringBuilder sb, double d)
         {
             if (double.IsNaN(d) || double.IsInfinity(d)) { sb.Append("null"); return; }
-            // "R" conserva el valor exacto; quitamos ceros innecesarios para ahorrar tokens.
+            // "R" keeps the exact value; unnecessary zeros are dropped to save tokens.
             sb.Append(d.ToString("R", CultureInfo.InvariantCulture));
         }
 
@@ -122,7 +122,7 @@ namespace Bimbridge.Protocol
             sb.Append('"');
         }
 
-        // ---------------- lectura ----------------
+        // ---------------- reading ----------------
 
         private sealed class Parser
         {
@@ -133,7 +133,7 @@ namespace Bimbridge.Protocol
             public bool AtEnd => _i >= _s.Length;
 
             public FormatException Error(string msg) =>
-                new FormatException("JSON: " + msg + " (posición " + _i + ")");
+                new FormatException("JSON: " + msg + " (position " + _i + ")");
 
             public void SkipWs()
             {
@@ -142,8 +142,8 @@ namespace Bimbridge.Protocol
 
             public object ReadValue(int depth)
             {
-                if (depth > 64) throw Error("anidamiento excesivo");
-                if (AtEnd) throw Error("fin inesperado");
+                if (depth > 64) throw Error("nesting too deep");
+                if (AtEnd) throw Error("unexpected end");
                 var c = _s[_i];
                 switch (c)
                 {
@@ -155,13 +155,13 @@ namespace Bimbridge.Protocol
                     case 'n': Expect("null"); return null;
                     default:
                         if (c == '-' || (c >= '0' && c <= '9')) return ReadNumber();
-                        throw Error("carácter inesperado '" + c + "'");
+                        throw Error("unexpected character '" + c + "'");
                 }
             }
 
             private void Expect(string word)
             {
-                if (string.CompareOrdinal(_s, _i, word, 0, word.Length) != 0) throw Error("se esperaba " + word);
+                if (string.CompareOrdinal(_s, _i, word, 0, word.Length) != 0) throw Error("expected " + word);
                 _i += word.Length;
             }
 
@@ -173,17 +173,17 @@ namespace Bimbridge.Protocol
                 while (true)
                 {
                     SkipWs();
-                    if (AtEnd || _s[_i] != '"') throw Error("se esperaba una clave");
+                    if (AtEnd || _s[_i] != '"') throw Error("expected a key");
                     var key = ReadString();
                     SkipWs();
-                    if (AtEnd || _s[_i] != ':') throw Error("se esperaba ':'");
+                    if (AtEnd || _s[_i] != ':') throw Error("expected ':'");
                     _i++; SkipWs();
                     d[key] = ReadValue(depth + 1);
                     SkipWs();
-                    if (AtEnd) throw Error("objeto sin cerrar");
+                    if (AtEnd) throw Error("unclosed object");
                     if (_s[_i] == ',') { _i++; continue; }
                     if (_s[_i] == '}') { _i++; return d; }
-                    throw Error("se esperaba ',' o '}'");
+                    throw Error("expected ',' or '}'");
                 }
             }
 
@@ -197,24 +197,24 @@ namespace Bimbridge.Protocol
                     SkipWs();
                     l.Add(ReadValue(depth + 1));
                     SkipWs();
-                    if (AtEnd) throw Error("arreglo sin cerrar");
+                    if (AtEnd) throw Error("unclosed array");
                     if (_s[_i] == ',') { _i++; continue; }
                     if (_s[_i] == ']') { _i++; return l; }
-                    throw Error("se esperaba ',' o ']'");
+                    throw Error("expected ',' or ']'");
                 }
             }
 
             private string ReadString()
             {
-                _i++; // comilla inicial
+                _i++; // opening quote
                 var sb = new StringBuilder();
                 while (true)
                 {
-                    if (AtEnd) throw Error("cadena sin cerrar");
+                    if (AtEnd) throw Error("unclosed string");
                     var c = _s[_i++];
                     if (c == '"') return sb.ToString();
                     if (c != '\\') { sb.Append(c); continue; }
-                    if (AtEnd) throw Error("escape incompleto");
+                    if (AtEnd) throw Error("incomplete escape");
                     var e = _s[_i++];
                     switch (e)
                     {
@@ -227,11 +227,11 @@ namespace Bimbridge.Protocol
                         case 'b': sb.Append('\b'); break;
                         case 'f': sb.Append('\f'); break;
                         case 'u':
-                            if (_i + 4 > _s.Length) throw Error("escape \\u incompleto");
+                            if (_i + 4 > _s.Length) throw Error("incomplete \\u escape");
                             sb.Append((char)int.Parse(_s.Substring(_i, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture));
                             _i += 4;
                             break;
-                        default: throw Error("escape desconocido");
+                        default: throw Error("unknown escape");
                     }
                 }
             }
@@ -252,12 +252,12 @@ namespace Bimbridge.Protocol
                 var token = _s.Substring(start, _i - start);
                 if (!isFloat && long.TryParse(token, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var l)) return l;
                 if (double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out var d)) return d;
-                throw Error("número inválido '" + token + "'");
+                throw Error("invalid number '" + token + "'");
             }
         }
     }
 
-    /// <summary>Objetos que saben convertirse a la forma JSON (diccionarios y listas).</summary>
+    /// <summary>Objects that can convert themselves to JSON form (dictionaries and lists).</summary>
     public interface IJsonWritable
     {
         object ToJson();

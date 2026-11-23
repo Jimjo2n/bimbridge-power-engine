@@ -1,0 +1,45 @@
+{
+ "schema": "bimbridge.campaign080/1",
+ "item": "N9-03",
+ "title": "Placement from PDF as a trial (applies, verifies and reverts)",
+ "initial_status": "Disposable LOCAL copy, not workshared, of an authorized public or synthetic model (e.g. an Autodesk sample) with named straight grids and a OneLevelBased lighting fixture family loaded. Revit 2024 with BIMBRIDGE 0.9.0 installed; config.json levels RPW, lab profile with the copy's folder in laboratorio.carpetas and carpetas_documentos with the test PDF folder. NEVER the user's working model.",
+ "status": "BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION",
+ "variables": {
+  "ops": "@<power-engine flujo-pdf output>/ops.json"
+ },
+ "steps": [
+  {
+   "name": "plan with the ops from the PDF workflow",
+   "op": "plan",
+   "args": {
+    "ops": "${ops}",
+    "summary": "campaign 0.9.0 trial"
+   },
+   "save": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "name": "trial",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}",
+    "mode": "trial"
+   },
+   "write": true,
+   "contains": [
+    "trial"
+   ]
+  },
+  {
+   "name": "the model did not change",
+   "op": "query",
+   "args": {
+    "cat": [
+     "LightingFixtures"
+    ],
+    "count": true
+   }
+  }
+ ]
+}

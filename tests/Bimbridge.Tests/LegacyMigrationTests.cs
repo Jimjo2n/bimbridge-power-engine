@@ -79,7 +79,7 @@ namespace Bimbridge.Tests
             Assert.True(File.Exists(LegacyMigration.LegacyAddinManifest(_p, "2024")));
             Assert.True(File.Exists(Path.Combine(LegacyMigration.LegacyAddinFolder(_p, "2024"), "x.dll")));
             Assert.True(File.Exists(LegacyMigration.LegacyBridge(_p)));
-            Assert.Equal("tarea", File.ReadAllText(Path.Combine(_p.Home, "tareas", "t1.json")));
+            Assert.Equal("tarea", File.ReadAllText(Path.Combine(_p.Home, "tasks", "t1.json")));
         }
 
         [Fact]
@@ -87,12 +87,38 @@ namespace Bimbridge.Tests
         {
             BuildOldLayout();
             MigrateAndInstall();
-            var recipe = File.ReadAllText(Path.Combine(_p.Home, "recetas", "mia.cs"));
-            Assert.Contains(": Bimbridge.Addin.Scripting.Receta", recipe);
+            var recipe = File.ReadAllText(Path.Combine(_p.Home, "recipes", "mia.cs"));
+            Assert.Contains(": Bimbridge.Addin.Scripting.Recipe {", recipe);
             Assert.Contains("// Bimbridge.Engine", recipe);
             Assert.DoesNotContain(LegacyMigration.LegacyFolder, recipe);
             Assert.Equal("return 1;\n", File.ReadAllText(Path.Combine(_p.Home, "scripts", "ok.cs")));
-            Assert.Contains(LegacyMigration.LegacyNamespacePrefix, File.ReadAllText(Path.Combine(_p.Home, "tareas", "t2", "receta.cs")));
+            Assert.Contains(LegacyMigration.LegacyNamespacePrefix, File.ReadAllText(Path.Combine(_p.Home, "tasks", "t2", "recipe.cs")));
+        }
+
+        [Fact]
+        public void RewritesOldScriptingApiNames()
+        {
+            // Test data: a recipe written against the pre-rename (Spanish) scripting API.
+            var old = "public class X : Receta {\n" +
+                      "    public override string Descripcion => \"Ejecutar\";\n" +
+                      "    public override PoliticaTx Transaccion => PoliticaTx.Lectura;\n" +
+                      "    public override IEnumerable<string> Entradas => new[] { \"nivel\" };\n" +
+                      "    public override void Preparar(ScriptContext ctx) { base.Preparar(ctx); }\n" +
+                      "    public override IEnumerable<Unidad> Unidades(ScriptContext ctx) { yield return new Unidad(\"k\", null); yield return Unidad.Guardar(); }\n" +
+                      "    public override object Ejecutar(ScriptContext ctx, Unidad u) { if (u.Clave == \"\") ctx.Omitir(\"x\"); ctx.Excepcion(\"m\"); ctx.Artefacto(\"a\", \"b\"); return Bim.Montaje.Vista3D(ctx.Doc); }\n" +
+                      "    public override Verificacion Verificar(ScriptContext ctx, Unidad u) => Verificacion.NoAplicada;\n" +
+                      "    public override object Postcondicion(ScriptContext ctx) => null;\n}\n";
+            var expected = "public class X : Recipe {\n" +
+                      "    public override string Description => \"Ejecutar\";\n" +
+                      "    public override TxPolicy Transaction => TxPolicy.ReadOnly;\n" +
+                      "    public override IEnumerable<string> Inputs => new[] { \"nivel\" };\n" +
+                      "    public override void Prepare(ScriptContext ctx) { base.Prepare(ctx); }\n" +
+                      "    public override IEnumerable<Unit> Units(ScriptContext ctx) { yield return new Unit(\"k\", null); yield return Unit.Save(); }\n" +
+                      "    public override object Run(ScriptContext ctx, Unit u) { if (u.Key == \"\") ctx.Skip(\"x\"); ctx.Exception(\"m\"); ctx.Artifact(\"a\", \"b\"); return Bim.Mounting.View3D(ctx.Doc); }\n" +
+                      "    public override Verification Verify(ScriptContext ctx, Unit u) => Verification.NotApplied;\n" +
+                      "    public override object Postcondition(ScriptContext ctx) => null;\n}\n";
+            Assert.Equal(expected, LegacyMigration.RewriteScriptText(old));
+            Assert.Equal(expected, LegacyMigration.RewriteScriptText(expected));
         }
 
         [Fact]
@@ -130,7 +156,8 @@ namespace Bimbridge.Tests
 
             Assert.False(Directory.Exists(LegacyMigration.LegacyHome(_p)));
             Assert.False(Directory.Exists(LegacyMigration.LegacyConfigDir(_p)));
-            Assert.Equal("tarea", File.ReadAllText(Path.Combine(_p.Home, "tareas", "t1.json")));
+            Assert.Equal("tarea", File.ReadAllText(Path.Combine(_p.Home, "tasks", "t1.json")));
+            Assert.False(Directory.Exists(Path.Combine(_p.Home, "tareas")));
             Assert.True(File.Exists(_p.InstallRecord));
             Assert.False(Directory.Exists(Path.Combine(_p.Home, "bin")));
             Assert.False(Directory.Exists(Path.Combine(_p.Home, "instances")));
@@ -143,7 +170,7 @@ namespace Bimbridge.Tests
             Assert.False(File.Exists(LegacyMigration.LegacyAddinManifest(_p, "2024")));
             Assert.False(Directory.Exists(LegacyMigration.LegacyAddinFolder(_p, "2024")));
 
-            Assert.StartsWith(GrantStore.KeyHeader + "\n", File.ReadAllText(Path.Combine(_p.Home, "autorizaciones", "clave.bin")));
+            Assert.StartsWith(GrantStore.KeyHeader + "\n", File.ReadAllText(Path.Combine(_p.Home, "authorizations", "key.bin")));
             Assert.Equal(GrantStore.KeyHeader, LegacyMigration.NewKeyHeader);
 
             var toml = File.ReadAllText(_p.CodexConfig);
@@ -162,16 +189,50 @@ namespace Bimbridge.Tests
         public void MergeKeepsNewerFilesWhenTargetExists()
         {
             BuildOldLayout();
-            Write(Path.Combine(_p.Home, "tareas", "t1.json"), "nueva");
+            Write(Path.Combine(_p.Home, "tasks", "t1.json"), "nueva");
             Write(Path.Combine(_p.Home, "instalador.lock"), "");
             MigrateAndInstall();
 
-            Assert.Equal("nueva", File.ReadAllText(Path.Combine(_p.Home, "tareas", "t1.json")));
+            Assert.Equal("nueva", File.ReadAllText(Path.Combine(_p.Home, "tasks", "t1.json")));
             Assert.True(File.Exists(_p.InstallRecord));
-            // The conflicting old file stays where it was; nothing else is left behind.
-            Assert.True(File.Exists(Old("tareas", "t1.json")));
+            // The conflicting old file is kept under its legacy folder name (never overwritten); nothing else is left behind.
+            Assert.Equal("tarea", File.ReadAllText(Path.Combine(_p.Home, "tareas", "t1.json")));
             Assert.False(File.Exists(Old("install.json")));
             Assert.Contains(_log, l => l.Contains("Kept the old copy"));
+        }
+
+        [Fact]
+        public void SpanishDataNames_AreRenamed_ContentsUntouched_Idempotently()
+        {
+            // Test data: a data folder written by 0.9.3 (Spanish folder and file names).
+            var audit = "{\"seq\":1,\"prev\":\"\",\"estado\":\"ok\"}\n";
+            Write(Path.Combine(_p.Home, "auditoria", "auditoria.jsonl"), audit);
+            Write(Path.Combine(_p.Home, "auditoria", "auditoria.jsonl.cabeza"), "{\"seq\":1}");
+            Write(Path.Combine(_p.Home, "tareas", "T1", "tarea.json"), "{\"estado\":\"en_curso\"}");
+            Write(Path.Combine(_p.Home, "tareas", "T1", "unidades.jsonl"), "{}\n");
+            Write(Path.Combine(_p.Home, "cola", "abc", "cuarentena", "P-1.json"), "{}");
+            Write(Path.Combine(_p.Home, "autorizaciones", "clave.bin"), "k");
+            Write(Path.Combine(_p.Home, "autorizaciones", "solicitudes", "r.json"), "{}");
+            Write(Path.Combine(_p.Home, "operaciones", "operaciones.jsonl"), "{}\n");
+            Write(Path.Combine(_p.Home, "retener.on"), "x");
+            Write(Path.Combine(_p.Home, "recipes", "nueva.cs"), "// already English");
+            Write(Path.Combine(_p.Home, "recetas", "vieja.cs"), "// legacy");
+
+            Assert.True(LegacyMigration.MigrateDataNames(_p.Home, _log.Add));
+            Assert.Equal(audit, File.ReadAllText(Path.Combine(_p.Home, "audit", "audit.jsonl")));   // hash-chained: bytes untouched
+            Assert.True(File.Exists(Path.Combine(_p.Home, "audit", "audit.jsonl.head")));
+            Assert.True(File.Exists(Path.Combine(_p.Home, "tasks", "T1", "task.json")));
+            Assert.True(File.Exists(Path.Combine(_p.Home, "tasks", "T1", "units.jsonl")));
+            Assert.True(File.Exists(Path.Combine(_p.Home, "queue", "abc", "quarantine", "P-1.json")));
+            Assert.True(File.Exists(Path.Combine(_p.Home, "authorizations", "key.bin")));
+            Assert.True(File.Exists(Path.Combine(_p.Home, "authorizations", "requests", "r.json")));
+            Assert.True(File.Exists(Path.Combine(_p.Home, "operations", "operations.jsonl")));
+            Assert.True(File.Exists(Path.Combine(_p.Home, "hold.on")));
+            Assert.True(File.Exists(Path.Combine(_p.Home, "recipes", "nueva.cs")));   // merged into the existing English folder
+            Assert.True(File.Exists(Path.Combine(_p.Home, "recipes", "vieja.cs")));
+            foreach (var legacy in new[] { "auditoria", "tareas", "cola", "autorizaciones", "operaciones", "recetas", "retener.on" })
+                Assert.False(File.Exists(Path.Combine(_p.Home, legacy)) || Directory.Exists(Path.Combine(_p.Home, legacy)), legacy);
+            Assert.False(LegacyMigration.MigrateDataNames(_p.Home, _log.Add));
         }
 
         [Fact]
@@ -179,10 +240,10 @@ namespace Bimbridge.Tests
         {
             var dir = InstallBackup.Create(_p, new[] { "2024" }, "test", DateTime.UtcNow);
             var key = "addin/2024/" + LegacyMigration.LegacyFolder + "/x.dll";
-            Write(Path.Combine(dir, "archivos", key.Replace('/', Path.DirectorySeparatorChar)), "dll");
+            Write(Path.Combine(dir, "files", key.Replace('/', Path.DirectorySeparatorChar)), "dll");
             var manifest = Path.Combine(dir, InstallBackup.ManifestName);
             var m = Bimbridge.Protocol.Json.ParseObject(File.ReadAllText(manifest));
-            ((Dictionary<string, object>)m["archivos"])[key] = SetupCore.FileSha(Path.Combine(dir, "archivos", key.Replace('/', Path.DirectorySeparatorChar)));
+            ((Dictionary<string, object>)m["files"])[key] = SetupCore.FileSha(Path.Combine(dir, "files", key.Replace('/', Path.DirectorySeparatorChar)));
             File.WriteAllText(manifest, Bimbridge.Protocol.Json.Write(m));
             Assert.Throws<InvalidDataException>(() => InstallBackup.Restore(_p, dir, DateTime.UtcNow));
         }

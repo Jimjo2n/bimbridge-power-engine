@@ -1,0 +1,25 @@
+{
+ "schema": "bimbridge.campaign080/1",
+ "item": "N8-12",
+ "title": "Deliverable preparation and verification",
+ "initial_status": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW. After N8-05. config allows export (RPW without a 'permisos' list).",
+ "variables": {
+  "pdf_folder": "local test folder (JSON-escaped)"
+ },
+ "steps": [
+  {
+   "name": "export the set to PDF",
+   "op": "doc",
+   "args": {
+    "action": "pdf",
+    "sheet_set": "BB-N8-05 SET",
+    "folder": "${pdf_folder}",
+    "combine": true
+   },
+   "write": true,
+   "contains": [
+    ".pdf"
+   ]
+  }
+ ]
+}

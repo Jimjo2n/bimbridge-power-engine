@@ -7,8 +7,8 @@ using System.IO;
 namespace Bimbridge.Protocol
 {
     /// <summary>
-    /// Archivo que cada Revit con el add-in deja en %LOCALAPPDATA%\Bimbridge\instances\&lt;pid&gt;.json
-    /// para que el puente lo encuentre. Se borra al cerrar Revit; si Revit se cae, lo limpia el puente.
+    /// File that each Revit running the add-in leaves in %LOCALAPPDATA%\Bimbridge\instances\&lt;pid&gt;.json
+    /// so the bridge can find it. Deleted when Revit closes; if Revit crashes, the bridge cleans it up.
     /// </summary>
     public sealed class InstanceDescriptor : IJsonWritable
     {
@@ -70,7 +70,7 @@ namespace Bimbridge.Protocol
             try { if (File.Exists(FilePath)) File.Delete(FilePath); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
 
-        /// <summary>Lee todos los descriptores. Los ilegibles o de procesos muertos se borran (problema C7 de pyRevit).</summary>
+        /// <summary>Reads all descriptors. Unreadable ones or those of dead processes are deleted (pyRevit issue C7).</summary>
         public static List<InstanceDescriptor> ReadAll(bool deleteDead = true)
         {
             var list = new List<InstanceDescriptor>();
@@ -78,7 +78,7 @@ namespace Bimbridge.Protocol
             foreach (var file in System.IO.Directory.GetFiles(Directory, "*.json"))
             {
                 InstanceDescriptor d = null;
-                try { d = FromJson(File.ReadAllText(file)); } catch (Exception) { /* ilegible */ }
+                try { d = FromJson(File.ReadAllText(file)); } catch (Exception) { /* unreadable */ }
                 if (d == null || d.Pid <= 0 || !IsAlive(d.Pid))
                 {
                     if (deleteDead) { try { File.Delete(file); } catch (Exception) { } }
@@ -98,7 +98,7 @@ namespace Bimbridge.Protocol
             }
             catch (ArgumentException) { return false; }
             catch (InvalidOperationException) { return false; }
-            // Pid reutilizado por un proceso protegido: el Revit de este usuario se podría abrir, así que éste no lo es.
+            // Pid reused by a protected process: this user's Revit could be opened, so this one is not it.
             catch (System.ComponentModel.Win32Exception) { return false; }
         }
     }

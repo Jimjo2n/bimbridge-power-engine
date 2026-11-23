@@ -10,9 +10,9 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Filas ya leídas de Revit (sólo valores simples, nunca objetos de la API).
-    /// Aquí se filtran, agrupan, paginan y se convierten al formato compacto que ve la IA:
-    /// encabezado una sola vez, filas como arreglos. Ahorra 40–70 % frente a JSON por objeto.
+    /// Rows already read from Revit (simple values only, never API objects).
+    /// Here they are filtered, grouped, paged and converted to the compact format the AI sees:
+    /// header once, rows as arrays. Saves 40–70 % compared to JSON per object.
     /// </summary>
     public sealed class ResultTable
     {
@@ -20,7 +20,7 @@ namespace Bimbridge.Engine
         public static object Build(QuerySpec q, IEnumerable<Dictionary<string, object>> rows, out List<long> matchedIds, int maxGroups = 500)
             => Render(q, Filter(q, rows, out matchedIds), q.Page, q.PageSize, maxGroups);
 
-        /// <summary>Convierte unidades (en el sitio) y aplica where. Lo que devuelve ya no debe volver a pasar por aquí.</summary>
+        /// <summary>Converts units (in place) and applies where. What it returns must not pass through here again.</summary>
         public static List<Dictionary<string, object>> Filter(QuerySpec q, IEnumerable<Dictionary<string, object>> rows, out List<long> matchedIds)
         {
             matchedIds = new List<long>();
@@ -80,22 +80,22 @@ namespace Bimbridge.Engine
                     ["total"] = _total, ["cols"] = new List<object>(_spec.GroupBy) { "n" },
                     ["groups"] = order.Take(maxGroups).Select(key => (object)_groups[key]).ToList(),
                 };
-                if (order.Count > maxGroups) result["aviso"] = "más de " + maxGroups + " grupos; se muestran los primeros";
+                if (order.Count > maxGroups) result["warning"] = "more than " + maxGroups + " groups; showing the first ones";
                 return result;
             }
         }
 
-        /// <summary>True si la consulta devuelve filas paginables (ni digest, ni conteo, ni agrupación).</summary>
+        /// <summary>True if the query returns pageable rows (no digest, count or grouping).</summary>
         public static bool IsPagedListing(QuerySpec q) => !q.Digest && !q.CountOnly && q.GroupBy.Count == 0;
 
-        /// <summary>Formatea filas ya filtradas. Puro: no modifica las filas (sirve para paginar una instantánea).</summary>
+        /// <summary>Formats already-filtered rows. Pure: does not modify the rows (used to page a snapshot).</summary>
         public static object Render(QuerySpec q, IReadOnlyList<Dictionary<string, object>> filtered, int page, int pageSize, int maxGroups = 500)
         {
             var result = new Dictionary<string, object> { ["total"] = (long)filtered.Count };
 
             if (q.Digest)
             {
-                // Orden canónico de todas las filas filtradas. Se conservan duplicados y textos completos.
+                // Canonical order of all filtered rows. Duplicates and full texts are kept.
                 var canonicalRows = filtered.Select(row => OpSemantics.Canonical(q.Fields.Select(f => Get(row, f)).ToList()))
                     .OrderBy(row => row, StringComparer.Ordinal);
                 var payload = OpSemantics.Canonical(new object[]
@@ -104,7 +104,7 @@ namespace Bimbridge.Engine
                 });
                 using (var sha = SHA256.Create())
                     result["sha256"] = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(payload))).Replace("-", "").ToLowerInvariant();
-                result["formato_digest"] = "query-rows-v1";
+                result["digest_format"] = "query-rows-v1";
                 return result;
             }
 
@@ -139,8 +139,8 @@ namespace Bimbridge.Engine
             }
             result["cols"] = new List<object>(q.Fields);
             result["rows"] = outRows;
-            if (q.Millimeters) result["unidades"] = "mm";
-            if (trimmed > 0) result["aviso_texto"] = trimmed + " textos recortados a " + QuerySpec.MaxTextLength + " caracteres; use full=true para verlos completos";
+            if (q.Millimeters) result["units"] = "mm";
+            if (trimmed > 0) result["text_warning"] = trimmed + " texts truncated to " + QuerySpec.MaxTextLength + " characters; use full=true to see them in full";
             if (pages > 1)
             {
                 result["page"] = (long)page;

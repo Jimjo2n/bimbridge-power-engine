@@ -11,9 +11,9 @@ using Bimbridge.Addin.Revit;
 namespace Bimbridge.Addin.Scripting
 {
     /// <summary>
-    /// Convierte lo que devuelve un script en datos JSON simples, DENTRO del hilo de Revit (los objetos de la API no salen de él).
-    /// ElementId → número; Element → {id, cat, nombre}; XYZ → [x,y,z] en pies; Document → {doc, titulo}; colecciones y objetos anónimos.
-    /// Límites: profundidad 6 y 20.000 elementos; lo que exceda se marca, no se pierde en silencio.
+    /// Converts what a script returns into plain JSON data, INSIDE the Revit thread (API objects never leave it).
+    /// ElementId → number; Element → {id, cat, nombre}; XYZ → [x,y,z] in feet; Document → {doc, titulo}; collections and anonymous objects.
+    /// Limits: depth 6 and 20,000 items; anything beyond is marked, not silently dropped.
     /// </summary>
     public static class ResultSerializer
     {
@@ -26,8 +26,8 @@ namespace Bimbridge.Addin.Scripting
         public static object ToJson(object value, Document doc, out bool truncated) => ToJson(value, doc, out truncated, out _);
 
         /// <summary>
-        /// 0.6.0: una enumeración diferida que lanza (LINQ perezoso, colector sobre un documento cerrado…) no tumba la respuesta ni deja el
-        /// trabajo colgado: se corta ahí, se marca en el resultado y se informa en <paramref name="errors"/>.
+        /// 0.6.0: a deferred enumeration that throws (lazy LINQ, a collector over a closed document…) neither breaks the response nor leaves the
+        /// job hanging: it is cut off there, marked in the result and reported in <paramref name="errors"/>.
         /// </summary>
         public static object ToJson(object value, Document doc, out bool truncated, out List<string> errors)
         {
@@ -45,7 +45,7 @@ namespace Bimbridge.Addin.Scripting
         private static string Fail(Exception ex, string where)
         {
             var inner = ex is TargetInvocationException tie && tie.InnerException != null ? tie.InnerException : ex;
-            var msg = "error al " + where + ": " + inner.GetType().Name + ": " + inner.Message;
+            var msg = "error while trying to " + where + ": " + inner.GetType().Name + ": " + inner.Message;
             if (_errors != null && _errors.Count < 20) _errors.Add(msg);
             return msg;
         }
@@ -72,8 +72,8 @@ namespace Bimbridge.Addin.Scripting
                 case ElementId id: return Ids.ToLong(id);
                 case XYZ p: return new List<object> { Round(p.X), Round(p.Y), Round(p.Z) };
                 case UV uv: return new List<object> { Round(uv.U), Round(uv.V) };
-                case Document doc: return new Dictionary<string, object> { ["doc"] = DocRegistry.Instance.IdOf(doc), ["titulo"] = doc.Title };
-                case Parameter p: return new Dictionary<string, object> { ["nombre"] = p.Definition?.Name, ["valor"] = ScriptContext.ShowValue(p) };
+                case Document doc: return new Dictionary<string, object> { ["doc"] = DocRegistry.Instance.IdOf(doc), ["title"] = doc.Title };
+                case Parameter p: return new Dictionary<string, object> { ["name"] = p.Definition?.Name, ["value"] = ScriptContext.ShowValue(p) };
                 case Reference r:
                     try { return _doc != null ? r.ConvertToStableRepresentation(_doc) : Ids.ToLong(r.ElementId).ToString(CultureInfo.InvariantCulture); }
                     catch (Exception) { return Ids.ToLong(r.ElementId).ToString(CultureInfo.InvariantCulture); }
@@ -92,7 +92,7 @@ namespace Bimbridge.Addin.Scripting
                         if (budget[0] < 0) break;
                     }
                 }
-                catch (Exception ex) when (!(ex is OutOfMemoryException)) { o["_error"] = Fail(ex, "enumerar el diccionario"); }
+                catch (Exception ex) when (!(ex is OutOfMemoryException)) { o["_error"] = Fail(ex, "enumerate the dictionary"); }
                 return o;
             }
             if (v is IEnumerable seq)
@@ -106,12 +106,12 @@ namespace Bimbridge.Addin.Scripting
                         if (budget[0] < 0) break;
                     }
                 }
-                catch (Exception ex) when (!(ex is OutOfMemoryException)) { list.Add(Fail(ex, "enumerar el elemento " + list.Count)); }
+                catch (Exception ex) when (!(ex is OutOfMemoryException)) { list.Add(Fail(ex, "enumerate item " + list.Count)); }
                 return list;
             }
             var type = v.GetType();
             if (type.IsPrimitive) return v.ToString();
-            // Objetos anónimos o clases propias del script: propiedades públicas.
+            // Anonymous objects or the script's own classes: public properties.
             var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.GetIndexParameters().Length == 0).ToArray();
             var fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
             if (props.Length == 0 && fields.Length == 0) return v.ToString();
@@ -125,7 +125,7 @@ namespace Bimbridge.Addin.Scripting
             foreach (var f in fields)
             {
                 try { obj[f.Name] = Convert(f.GetValue(v), depth + 1, budget, ref truncated); }
-                catch (Exception ex) when (!(ex is OutOfMemoryException)) { obj[f.Name] = Fail(ex, "leer " + f.Name); }
+                catch (Exception ex) when (!(ex is OutOfMemoryException)) { obj[f.Name] = Fail(ex, "read " + f.Name); }
             }
             return obj;
         }
@@ -134,7 +134,7 @@ namespace Bimbridge.Addin.Scripting
         {
             var d = new Dictionary<string, object> { ["id"] = Ids.ToLong(e.Id) };
             try { if (e.Category != null) d["cat"] = e.Category.Name; } catch (Exception) { }
-            try { d["nombre"] = e.Name; } catch (Exception) { }
+            try { d["name"] = e.Name; } catch (Exception) { }
             return d;
         }
 

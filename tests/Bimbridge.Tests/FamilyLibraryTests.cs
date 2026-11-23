@@ -11,26 +11,26 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.8.0 paquete D: biblioteca de familias autorizada (sin Revit).</summary>
+    /// <summary>0.8.0 package D: authorized family library (without Revit).</summary>
     public class FamilyLibraryTests
     {
         [Fact]
         public void ReloadChecksNamedPortsEvenWhenTheirTotalHasNotChanged()
         {
             Dictionary<string, object> Port(string key, string system, string flow, double radius) =>
-                new Dictionary<string, object> { ["clave"] = key, ["sistema"] = system, ["flujo"] = flow, ["radio_mm"] = radius };
+                new Dictionary<string, object> { ["key"] = key, ["system"] = system, ["workflow"] = flow, ["radius_mm"] = radius };
             var source = new List<Dictionary<string, object>>
             {
-                Port("fria", "DomesticColdWater", "entrada", 6.5),
-                Port("caliente", "DomesticHotWater", "entrada", 6.5),
-                Port("desague", "Sanitary", "salida", 20),
+                Port("cold", "DomesticColdWater", "in", 6.5),
+                Port("hot", "DomesticHotWater", "in", 6.5),
+                Port("drain", "Sanitary", "out", 20),
             };
             var project = (List<object>)Json.Parse(Json.Write(source.AsEnumerable().Reverse().ToList()));
             Assert.Empty(FamilyPortAudit.Compare(source, project));
-            project[0] = Port("desague", "DomesticColdWater", "entrada", 25);
+            project[0] = Port("drain", "DomesticColdWater", "in", 25);
             Assert.Collection(FamilyPortAudit.Compare(source, project),
-                row => Assert.Contains("sistema", row), row => Assert.Contains("flujo", row), row => Assert.Contains("radio", row));
-            Assert.Contains("sin instancia", Assert.Single(FamilyPortAudit.Compare(source, null)));
+                row => Assert.Contains("system", row), row => Assert.Contains("workflow", row), row => Assert.Contains("radius", row));
+            Assert.Contains("no placed instance", Assert.Single(FamilyPortAudit.Compare(source, null)));
         }
 
         private static string Rfa(string dir, string name, int? version, params string[] catalogTypes)
@@ -55,9 +55,9 @@ namespace Bimbridge.Tests
             var root = AH.NewDir("famlib");
             Rfa(Path.Combine(root, "Lighting"), "LTG_DOWNLIGHT-SURFACE - ROUND", 2024, "G", "D");
             Rfa(Path.Combine(root, "Lighting"), "LTG_STRIP LIGHT", 2026);
-            Rfa(Path.Combine(root, "Lighting"), "LTG_STRIP LIGHT.0003", 2024);                 // copia de seguridad: no se indexa
+            Rfa(Path.Combine(root, "Lighting"), "LTG_STRIP LIGHT.0003", 2024);                 // backup copy: not indexed
             Rfa(Path.Combine(root, "Electrical", "Panels"), "EL_PANELBOARD", null);
-            var cache = Path.Combine(AH.NewDir("famcache"), "indice.json");
+            var cache = Path.Combine(AH.NewDir("famcache"), "index.json");
             var lib = new FamilyLibrary(new[] { root }, cache);
             var r = lib.Refresh();
             Assert.Equal(3, r.added);
@@ -68,10 +68,10 @@ namespace Bimbridge.Tests
             Assert.Equal(2024, hits[0].Entry.RevitVersion);
             Assert.Contains("G", hits[0].Entry.CatalogTypes);
             var strip = lib.Search("strip", 2024)[0];
-            Assert.False(strip.Compatible);                      // guardada en 2026, destino 2024
-            Assert.Null(lib.Search("panel", 2024).Single().Entry.RevitVersion);   // no se adivina
+            Assert.False(strip.Compatible);                      // saved in 2026, target 2024
+            Assert.Null(lib.Search("panel", 2024).Single().Entry.RevitVersion);   // not guessed
 
-            // caché: segunda instancia reutiliza sin releer
+            // cache: a second instance reuses it without rereading
             var lib2 = new FamilyLibrary(new[] { root }, cache);
             Assert.Equal(3, lib2.Refresh().cached);
         }
@@ -84,15 +84,15 @@ namespace Bimbridge.Tests
             var inside = Rfa(root, "INSIDE", 2024);
             var lib = new FamilyLibrary(new[] { root });
             lib.Refresh();
-            Assert.Null(lib.ResolveForLoad(outside, out var e1)); Assert.Contains("autorizada", e1);
-            Assert.Null(lib.ResolveForLoad(Path.Combine(root, "..", Path.GetFileName(Path.GetDirectoryName(outside)), "OUTSIDE.rfa"), out var e2)); Assert.Contains("autorizada", e2);
+            Assert.Null(lib.ResolveForLoad(outside, out var e1)); Assert.Contains("authorized", e1);
+            Assert.Null(lib.ResolveForLoad(Path.Combine(root, "..", Path.GetFileName(Path.GetDirectoryName(outside)), "OUTSIDE.rfa"), out var e2)); Assert.Contains("authorized", e2);
             var ok = lib.ResolveForLoad(inside, out var e3);
             Assert.Null(e3); Assert.Equal(64, ok.Sha256.Length);
             var late = Rfa(root, "LATE", 2024);
-            Assert.Null(lib.ResolveForLoad(late, out var e4)); Assert.Contains("índice", e4);
+            Assert.Null(lib.ResolveForLoad(late, out var e4)); Assert.Contains("index", e4);
             File.AppendAllText(inside, "x");
             File.SetLastWriteTimeUtc(inside, DateTime.UtcNow.AddMinutes(1));
-            Assert.Null(lib.ResolveForLoad(inside, out var e5)); Assert.Contains("cambió", e5);
+            Assert.Null(lib.ResolveForLoad(inside, out var e5)); Assert.Contains("changed", e5);
         }
 
         [Fact]

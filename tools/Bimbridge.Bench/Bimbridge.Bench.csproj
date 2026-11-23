@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    Banco de pruebas de la auditoría (sin Revit): edificio sintético del tamaño de SAMPLE PROJECT (14 niveles, 1442 luminarias),
-    mismo motor que corre dentro de Revit, y tamaños reales de lo que ve la IA (esquemas de herramientas y respuestas).
-      dotnet run -c Release -project tools/Bimbridge.Bench            → todo
-      dotnet run -c Release -project tools/Bimbridge.Bench cold       → primera llamada vs. segunda (JIT)
+    Audit test bench (without Revit): synthetic building the size of SAMPLE PROJECT (14 levels, 1442 fixtures),
+    the same engine that runs inside Revit, and real sizes of what the AI sees (tool schemas and responses).
+      dotnet run -c Release -project tools/Bimbridge.Bench            → everything
+      dotnet run -c Release -project tools/Bimbridge.Bench cold       → first call vs. second (JIT)
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>

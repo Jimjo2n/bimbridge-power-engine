@@ -2,7 +2,7 @@
   {
     "de": 2022,
     "a": 2023,
-    "postable_command_nuevos": [
+    "postable_command_new": [
       "PickAPlane",
       "ParametersService",
       "ActivateControlsAndDimensions",
@@ -23,7 +23,7 @@
       "AnalyticalAutomation",
       "PanelByExtrusion"
     ],
-    "postable_command_retirados": [
+    "postable_command_removed": [
       "ResetAnalyticalModel",
       "CheckMemberSupports",
       "AnalyticalConsistencyChecks",
@@ -33,7 +33,7 @@
       "ManageCloudModels",
       "Optimize"
     ],
-    "built_in_category_nuevas": [
+    "built_in_category_new": [
       "OST_BridgeArchTags",
       "OST_BridgeGirderTags",
       "OST_BridgeFramingCrossBracingTags",
@@ -103,24 +103,24 @@
       "OST_ToposolidLink",
       "OST_ElectricalLoadSet"
     ],
-    "built_in_category_retiradas": [
+    "built_in_category_removed": [
       "OST_BridgeArchTags2021_Deprecated",
       "OST_BridgeGirderTags2021_Deprecated",
       "OST_ElectricalZoneEquipment",
       "OST_MEPLoadAreaTags"
     ],
-    "superficies_aparecen": [
+    "surfaces_appear": [
       "Autodesk.Revit.DB.Electrical.ElectricalAnalyticalNode",
       "Autodesk.Revit.DB.Structure.AnalyticalElement"
     ],
-    "superficies_desaparecen": [
+    "surfaces_disappear": [
       "Autodesk.Revit.DB.Structure.AnalyticalModel"
     ]
   },
   {
     "de": 2023,
     "a": 2024,
-    "postable_command_nuevos": [
+    "postable_command_new": [
       "InsertCoupler",
       "MEPFabricationDuctworkStiffener",
       "AnalyticalLink",
@@ -134,7 +134,7 @@
       "PDF",
       "CanvasTheme"
     ],
-    "postable_command_retirados": [
+    "postable_command_removed": [
       "SplitSurface",
       "OpenBuildingComponent",
       "CoordinationModel",
@@ -145,7 +145,7 @@
       "StructuralRebarCoupler",
       "CreateAnalyticalLink"
     ],
-    "built_in_category_nuevas": [
+    "built_in_category_new": [
       "OST_ElectricalLoadCase",
       "OST_ElectricalConnector",
       "OST_ElectricalConnectorTags",
@@ -155,17 +155,17 @@
       "OST_FloorLayers",
       "OST_DataExchanges"
     ],
-    "built_in_category_retiradas": [],
-    "superficies_aparecen": [
+    "built_in_category_removed": [],
+    "surfaces_appear": [
       "Autodesk.Revit.DB.ElementId::Value",
       "Autodesk.Revit.DB.Toposolid::Create"
     ],
-    "superficies_desaparecen": []
+    "surfaces_disappear": []
   },
   {
     "de": 2024,
     "a": 2025,
-    "postable_command_nuevos": [
+    "postable_command_new": [
       "ExportCADFormatsSTEP",
       "ReCenterReference",
       "LoadCasesDisplay",
@@ -180,14 +180,14 @@
       "SubstitutionSettings",
       "AddInsManager"
     ],
-    "postable_command_retirados": [
+    "postable_command_removed": [
       "ExportOptionsIFCOptions",
       "LoadCases",
       "LoadCombinations",
       "GenerateAnalysis",
       "ViewAnalysis"
     ],
-    "built_in_category_nuevas": [
+    "built_in_category_new": [
       "OST_RebarSpliceLines",
       "OST_RebarSpliceType",
       "OST_PipeFlowDirectionSymbols_Obsolete",
@@ -198,14 +198,14 @@
       "OST_DuctAnalyticalSegments",
       "OST_DuctAnalyticalSegmentTags"
     ],
-    "built_in_category_retiradas": [],
-    "superficies_aparecen": [],
-    "superficies_desaparecen": []
+    "built_in_category_removed": [],
+    "surfaces_appear": [],
+    "surfaces_disappear": []
   },
   {
     "de": 2025,
     "a": 2026,
-    "postable_command_nuevos": [
+    "postable_command_new": [
       "ZoneBySketch",
       "ZoneBySpace",
       "AutomationCustomization",
@@ -215,13 +215,13 @@
       "RunPhysicalToAnalyticalForBuildings",
       "RunAnalyticalToPhysicalForBuildings"
     ],
-    "postable_command_retirados": [
+    "postable_command_removed": [
       "Zone",
       "SystemZone",
       "AnalyticalAutomation",
       "OperatingSchedules"
     ],
-    "built_in_category_nuevas": [
+    "built_in_category_new": [
       "OST_ElectricalInternalCircuits_Obsolete",
       "OST_RebarCrankType",
       "OST_PanelSchedules",
@@ -230,11 +230,11 @@
       "OST_ViewPosition",
       "OST_MEPSystemZoneColorFill"
     ],
-    "built_in_category_retiradas": [
+    "built_in_category_removed": [
       "OST_ElectricalInternalCircuits"
     ],
-    "superficies_aparecen": [],
-    "superficies_desaparecen": [
+    "surfaces_appear": [],
+    "surfaces_disappear": [
       "Autodesk.Revit.DB.ElementId::IntegerValue"
     ]
   }

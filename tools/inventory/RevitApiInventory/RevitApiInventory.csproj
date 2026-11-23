@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- SPDX-License-Identifier: GPL-3.0-only -->
-  <!-- Inventario offline de la API de Revit (0.9.1, Bloque B): lee SÓLO metadatos de los ensamblados de referencia por versión.
-       No carga ni ejecuta Revit, ni ningún tipo de Autodesk: usa System.Reflection.Metadata. -->
+  <!-- Offline Revit API inventory (0.9.1, Block B): reads ONLY metadata from the reference assemblies of each version.
+       Does not load or run Revit, or any Autodesk type: uses System.Reflection.Metadata. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>

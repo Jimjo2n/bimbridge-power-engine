@@ -1,0 +1,1035 @@
+{
+ "instructions": "Tools to read and, if the user enabled it, change the open Revit model. Start with revit_context and catalog. Use query with group_by or count for summaries and request rows only when needed; several reads at once with lote. Save results with save_as and reuse them with ids=$name instead of repeating ids. To see a view use capture (colorear=categorias tells lighting fixtures apart from receptacles and switches); to point elements out to the user, show. To change something: plan → commit (typed, one Undo), exec (C# against the Revit API) or fam/doc_op (families, connectors, save, sync, PDF). If the user authorized the task, apply without asking for confirmation per batch; otherwise show the diff before the commit. clave= avoids repeating a write. estado=retenido means the change is waiting in the Revit queue for the user to apply it: do not repeat it. If a response has 'estado', read 'aviso' and follow it. Details for any tool: guide.",
+ "tools": [
+  {
+   "name": "lote",
+   "description": "Several reads in ONE call (they run concurrently): llamadas=[{\"tool\":\"query\",\"cat\":\"LightingFixtures\",\"count\":true},{\"tool\":\"catalog\",\"que\":\"niveles\"}]. Accepts revit_context, query, get, catalog, check, geo and sets; max 8. Returns results in the same order.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "llamadas": {
+      "description": "List of calls: each with tool and its arguments"
+     }
+    },
+    "required": [
+     "llamadas"
+    ]
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "sets",
+   "description": "Sets saved with save_as. op=list (default) or op=drop with name.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "op": {
+      "description": "list or drop",
+      "type": "string",
+      "default": "list"
+     },
+     "name": {
+      "description": "Set name, e.g. $l5_perimetro",
+      "type": "string",
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "query",
+   "description": "Queries elements without modifying anything: table {total, cols, rows} or {cols, groups} with group_by. Lengths in feet (units=mm). Give cat, ids or view. Details: guide tema=consulta.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "cat": {
+      "description": "Categories, e.g. LightingFixtures,LightingDevices",
+      "type": "string",
+      "default": null
+     },
+     "lvl": {
+      "description": "Levels by name, e.g. LEVEL05",
+      "type": "string",
+      "default": null
+     },
+     "type": {
+      "description": "Filter by family or type (contains)",
+      "type": "string",
+      "default": null
+     },
+     "ws": {
+      "description": "Worksets by name",
+      "type": "string",
+      "default": null
+     },
+     "ids": {
+      "description": "Ids \"1,2\" or $set",
+      "type": "string",
+      "default": null
+     },
+     "view": {
+      "description": "Only elements visible in this view (id)",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "where": {
+      "description": "Conditions: field=value, !=, >, <, >=, <=, ~ (contains), field? (not empty), !field (empty)",
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": null
+     },
+     "f": {
+      "description": "Fields (default id,fam,type,lvl): cat,ws,elev,mark,comments,host,x,y,z or a parameter",
+      "type": "string",
+      "default": null
+     },
+     "group_by": {
+      "description": "Group and count by these fields (max 3)",
+      "type": "string",
+      "default": null
+     },
+     "count": {
+      "description": "true = total only",
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     },
+     "page": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "page_size": {
+      "description": "max 200",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "save_as": {
+      "description": "Save ids as $name",
+      "type": "string",
+      "default": null
+     },
+     "since": {
+      "description": "Only elements changed after this rev",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "units": {
+      "description": "ft or mm (elev, x, y, z, where)",
+      "type": "string",
+      "default": null
+     },
+     "full": {
+      "description": "untruncated text",
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     },
+     "cursor": {
+      "description": "Cursor returned by the first page: with page=N it serves the next ones without rereading the model (rejected if the document changed)",
+      "type": "string",
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "job",
+   "description": "Tracking. job_id: waits for the result of a long check (up to ~40 s per call) or op=cancel. plan_id: plan status (listo, retenido, aplicado, conflicto, revertido, vencido, descartado, desconocido, reconciliado) or op=drop. op=pendientes: document lock. op=reconciliar plan_id: compares with the model and releases only if proven. Without ids: list for this conversation.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "job_id": {
+      "description": "job_id returned by geo or plan (optional)",
+      "type": "string",
+      "default": null
+     },
+     "plan_id": {
+      "description": "plan_id (optional)",
+      "type": "string",
+      "default": null
+     },
+     "op": {
+      "description": "status (default), cancel (job), drop (plan), pendientes or reconciliar",
+      "type": "string",
+      "default": null
+     },
+     "intento_id": {
+      "description": "Write attempt ID for a read-only query",
+      "type": "string",
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "fam",
+   "description": "Families and connectors. accion=info|caras (read) | abrir (EditFamily → dN) | conector (creates or reconciles by name: sistema, cara, radio/diametro with unit, flujo) | param (valor/formula, crear, asociar) | cargar (en=dN, sobrescribir=no|valores). Arguments in 'args' as a JSON object.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "accion": {
+      "description": "info | caras | abrir | conector | param | cargar",
+      "type": "string"
+     },
+     "args": {
+      "description": "Arguments, e.g. {\"nombre\":\"fria\",\"sistema\":\"fria\",\"cara\":\"812:3\",\"radio\":\"6.5mm\"}",
+      "default": null
+     },
+     "doc": {
+      "description": "Document dN",
+      "type": "string",
+      "default": null
+     },
+     "clave": {
+      "description": "Idempotency key",
+      "type": "string",
+      "default": null
+     }
+    },
+    "required": [
+     "accion"
+    ]
+   },
+   "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "capture",
+   "description": "Image of a Revit view so you can SEE it (does not modify the model). colorear=categorias tells apart fixtures (orange), switches (green), receptacles (blue), panels (magenta)… resaltar=$set (or \"$a=rojo;$b=azul\") marks elements; encuadre=ids|$set|resaltado crops to them. Returns the image and a legend of what is visible per category.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "vista": {
+      "description": "View id (default: the active one)",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "colorear": {
+      "description": "categorias = one color per category",
+      "type": "string",
+      "default": null
+     },
+     "resaltar": {
+      "description": "Ids/$set to highlight; several groups with ; and color with =, e.g. $sin_tag=rojo;$ok=verde",
+      "type": "string",
+      "default": null
+     },
+     "encuadre": {
+      "description": "Crop to these ids/$set, or resaltado",
+      "type": "string",
+      "default": null
+     },
+     "px": {
+      "description": "Longest side in pixels, 400–2400 (default 1400)",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "get",
+   "description": "Details of specific elements: ids or $set. Default id,cat,fam,type,lvl,ws,elev,mark,host,x,y,z; f to request other parameters by name. f=* = ALL instance and type parameters (up to 10 elements; shared values once; buscar filters names).",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "ids": {
+      "description": "Comma-separated ids or $set",
+      "type": "string"
+     },
+     "f": {
+      "description": "Fields or parameter names, comma-separated; * = all",
+      "type": "string",
+      "default": null
+     },
+     "page": {
+      "description": "Page (from 1)",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "units": {
+      "description": "ft (default) or mm",
+      "type": "string",
+      "default": null
+     },
+     "full": {
+      "description": "untruncated text",
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     },
+     "buscar": {
+      "description": "With f=*: only parameters whose name contains this text",
+      "type": "string",
+      "default": null
+     }
+    },
+    "required": [
+     "ids"
+    ]
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "res",
+   "description": "Reads a saved long result (id r… or b…) in line ranges.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "description": "Result id",
+      "type": "string"
+     },
+     "desde": {
+      "description": "Start line",
+      "type": "integer",
+      "default": 0
+     },
+     "lineas": {
+      "description": "Number of lines",
+      "type": "integer",
+      "default": 300
+     }
+    },
+    "required": [
+     "id"
+    ]
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "doc_op",
+   "description": "Document operations: guardar | guardar_como (como=path) | sync (comentario=) | pdf (conjunto= or hojas=, carpeta=, nombre=) | cerrar (guardar=si|descartar=si). Verifies the result (file, hash, pages). Arguments in 'args' as a JSON object.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "accion": {
+      "description": "guardar | guardar_como | sync | pdf | cerrar",
+      "type": "string"
+     },
+     "args": {
+      "description": "Arguments (JSON object)",
+      "default": null
+     },
+     "doc": {
+      "description": "Document dN",
+      "type": "string",
+      "default": null
+     },
+     "clave": {
+      "description": "Idempotency key",
+      "type": "string",
+      "default": null
+     }
+    },
+    "required": [
+     "accion"
+    ]
+   },
+   "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "catalog",
+   "description": "Model catalog in one call, table {total, cols, rows}. Details: guide tema=catalogo.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "que": {
+      "description": "resumen, categorias, tipos, familias, niveles, vistas, plantillas, laminas, worksets, vinculos or filtros",
+      "type": "string",
+      "default": null
+     },
+     "cat": {
+      "description": "Categories (types and families), e.g. LightingFixtures",
+      "type": "string",
+      "default": null
+     },
+     "lvl": {
+      "description": "Levels (views)",
+      "type": "string",
+      "default": null
+     },
+     "tipo": {
+      "description": "View type: plano, rcp, seccion, alzado, 3d, leyenda, tabla…",
+      "type": "string",
+      "default": null
+     },
+     "buscar": {
+      "description": "Text to search for in any column",
+      "type": "string",
+      "default": null
+     },
+     "f": {
+      "description": "Extra parameters (views, sheets), e.g. Sub-Discipline,Set Group",
+      "type": "string",
+      "default": null
+     },
+     "page": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "page_size": {
+      "description": "max 200",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "units": {
+      "description": "ft or mm",
+      "type": "string",
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "docs",
+   "description": "Documents open in this Revit (projects and families) with their dN handle, type, path, whether modified, and last save/sync.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {}
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "commit",
+   "description": "Applies a plan already reviewed by the user. If the user has the queue on, it answers estado=retenido: the change waits for the user to apply it from Revit; do not repeat it. If something changed since the plan: estado=conflicto and nothing is applied. What was created is in $creados (and $creados_n per operation); 'verificacion' rereads what was touched.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "plan_id": {
+      "description": "plan_id returned by plan",
+      "type": "string"
+     },
+     "clave": {
+      "description": "Idempotency key: the same key is never applied twice",
+      "type": "string",
+      "default": null
+     },
+     "tarea": {
+      "description": "Authorized task",
+      "type": "string",
+      "default": null
+     },
+     "reconciliar": {
+      "description": "After interrumpido with clave=: no_aplicado | aplicado",
+      "type": "string",
+      "default": null
+     },
+     "modo": {
+      "description": "aplicar (default) | ensayo: applies, verifies and ROLLS BACK; it is not a commit",
+      "type": "string",
+      "default": null
+     }
+    },
+    "required": [
+     "plan_id"
+    ]
+   },
+   "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": false
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "show",
+   "description": "Shows elements to the user in Revit: selects them and frames them in the active view (vista=id switches view first). Does not modify the model. If they are not visible in the active view, suggests views where to find them.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "ids": {
+      "description": "Comma-separated ids or $set",
+      "type": "string",
+      "default": null
+     },
+     "vista": {
+      "description": "View to open first (id, optional)",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "seleccionar": {
+      "description": "false = do not change the selection",
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     },
+     "zoom": {
+      "description": "false = do not move the zoom",
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "revit_context",
+   "description": "Revit state: version, active document, user, whether it is modified, worksharing and rev. Use it first. rev counts the changes seen since Revit opened the model (0 = none yet); use it for since. With several Revit open it lists 'instancias'; instancia=<pid or version, e.g. 2024> switches to another. Usage details: guide.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "instancia": {
+      "description": "pid or version of the Revit to use when several are open (optional)",
+      "type": "string",
+      "default": null
+     },
+     "agente": {
+      "description": "Name of this agent for the BIMBRIDGE panel, e.g. the chat title (optional; register it once)",
+      "type": "string",
+      "default": null
+     },
+     "detalle": {
+      "description": "true: includes the capability table",
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "plan",
+   "description": "Prepares changes WITHOUT applying them and returns the diff (before → after) with plan_id. Typed operations, max 200, one plan = one Undo. ops: set_param, set_values, set_type_param, change_type, set_elevation, set_workset, set_level, snap_to_surface, move, rotate, mirror, copy, delete, place, tag, tag_move, group_create, ungroup, group_place, view_create, view_set, view_hide, view_override, sheet_create, sheet_place, text_note, filled_region. ids: \"1,2\", $set or @n (what op n created). Arguments: guide tema=escritura op=<op>. job_id → job.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "ops": {
+      "description": "[{\"op\":\"set_param\",\"ids\":\"$x\",\"name\":\"Comments\",\"value\":\"REVISAR\"}]"
+     },
+     "summary": {
+      "description": "Short summary for the user (shown in the Revit queue)",
+      "type": "string",
+      "default": null
+     },
+     "doc": {
+      "description": "Document dN (default: the active one)",
+      "type": "string",
+      "default": null
+     },
+     "tarea": {
+      "description": "Authorized task (allows commit after reconnecting)",
+      "type": "string",
+      "default": null
+     }
+    },
+    "required": [
+     "ops"
+    ]
+   },
+   "annotations": {
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "guide",
+   "description": "On-demand usage guide (does not touch Revit). tema: flujo, consulta, catalogo, geo, escritura, captura, lote. For escritura, op=tag,place… returns only those operations.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "tema": {
+      "description": "flujo (default), consulta, catalogo, geo, escritura, captura or lote",
+      "type": "string",
+      "default": null
+     },
+     "op": {
+      "description": "Only with tema=escritura: comma-separated operations",
+      "type": "string",
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   }
+  },
+  {
+   "name": "geo",
+   "description": "Real geometry (meshes of the model and its links), without modifying anything. name: montaje (9 points against the bottom face of what is above: ok, empotrada, flotando, sin_superficie), holgura, choques, cerca, muro, nivel_real, duplicados, cuarto, rango_vista, indice. Returns counts, problems first (clearances in inches) and $sets per class for plan. If slow: job_id → job. Repeating without changes is instant. Details: guide tema=geo.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "description": "Recipe",
+      "type": "string"
+     },
+     "cat": {
+      "description": "Categories (LightingFixtures)",
+      "type": "string",
+      "default": null
+     },
+     "lvl": {
+      "type": "string",
+      "default": null
+     },
+     "ids": {
+      "description": "Ids or $set",
+      "type": "string",
+      "default": null
+     },
+     "ws": {
+      "type": "string",
+      "default": null
+     },
+     "type": {
+      "description": "Family or type (contains)",
+      "type": "string",
+      "default": null
+     },
+     "contra": {
+      "description": "losas, vigas, columnas, rampas, escaleras, muros, cielos, techos or categories",
+      "type": "string",
+      "default": null
+     },
+     "vinculos": {
+      "description": "Links (contains), todos or ninguno",
+      "type": "string",
+      "default": null
+     },
+     "anfitrion": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     },
+     "lado": {
+      "description": "arriba or abajo",
+      "type": "string",
+      "default": null
+     },
+     "puntos": {
+      "description": "1, 5 or 9",
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "tol": {
+      "description": "1/16\" default",
+      "type": "string",
+      "default": null
+     },
+     "max": {
+      "description": "30' default",
+      "type": "string",
+      "default": null
+     },
+     "radio": {
+      "description": "cerca/muro, e.g. 2'",
+      "type": "string",
+      "default": null
+     },
+     "views": {
+      "description": "rango_vista: rcp, rcp_todos, plantas or ids",
+      "type": "string",
+      "default": null
+     },
+     "fuente": {
+      "description": "cuarto: ambos, cuartos or espacios",
+      "type": "string",
+      "default": null
+     },
+     "sub_excluir": {
+      "description": "Subcategories to ignore, e.g. JBox",
+      "type": "string",
+      "default": null
+     },
+     "solo": {
+      "description": "Class to list, or todos",
+      "type": "string",
+      "default": null
+     },
+     "page": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "page_size": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "default": null
+     },
+     "units": {
+      "description": "ft or mm",
+      "type": "string",
+      "default": null
+     },
+     "reconstruir": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     },
+     "referencias": {
+      "description": "montaje/holgura: source IDs and face point on the host",
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     }
+    },
+    "required": [
+     "name"
+    ]
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "exec",
+   "description": "C# against the public Revit API. Code: expression, body with return, or class with static object Run(ScriptContext ctx). doc, uidoc, app, uiapp, args, ctx already exist. modo=consulta (read-only, no transaction) | ensayo (changes and rolls back; level W) | ejecutar (tx=auto|grupo|ninguna; ninguna for EditFamily/LoadFamily). Returns the value as JSON, Revit warnings and what changed.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "codigo": {
+      "description": "C# code",
+      "type": "string",
+      "default": null
+     },
+     "modo": {
+      "description": "consulta | ensayo | ejecutar",
+      "type": "string",
+      "default": "consulta"
+     },
+     "tx": {
+      "description": "auto | grupo | ninguna",
+      "type": "string",
+      "default": null
+     },
+     "doc": {
+      "description": "Document dN",
+      "type": "string",
+      "default": null
+     },
+     "args": {
+      "description": "Arguments (JSON object) → args",
+      "default": null
+     },
+     "nombre": {
+      "description": "Saved script to repeat, or 'lista'",
+      "type": "string",
+      "default": null
+     },
+     "guardar": {
+      "description": "Save the code under that name",
+      "type": "string",
+      "default": null
+     },
+     "clave": {
+      "description": "Idempotency key",
+      "type": "string",
+      "default": null
+     },
+     "tarea": {
+      "description": "Authorized task",
+      "type": "string",
+      "default": null
+     },
+     "archivo": {
+      "description": ".cs file with the code",
+      "type": "string",
+      "default": null
+     },
+     "refs": {
+      "description": "Extra DLLs, comma-separated",
+      "type": "string",
+      "default": null
+     },
+     "docs": {
+      "description": "Other documents it touches: d2,d3",
+      "type": "string",
+      "default": null
+     },
+     "reconciliar": {
+      "description": "After interrumpido with clave=: no_aplicado | aplicado",
+      "type": "string",
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "tarea",
+   "description": "Long resumable tasks: a recipe (class inheriting from Recipe, by registered name, .cs file or code) walks units in batches, with checkpoints, verified guardar/sync/pdf barriers and final QC. Any client can continue it by id. accion=iniciar | estado | resumen | esperar (desde=rev, max=s) | unidades | lista | recetas | reanudar | cancelar | reconciliar (decision=aplicada|no_aplicada, claves) | anotar (texto) | olvidar.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "accion": {
+      "description": "iniciar | estado | resumen | esperar | unidades | lista | recetas | reanudar | cancelar | reconciliar | anotar | olvidar",
+      "type": "string",
+      "default": "estado"
+     },
+     "id": {
+      "description": "Task id (on iniciar: optional, so it can be repeated without duplicating)",
+      "type": "string",
+      "default": null
+     },
+     "receta": {
+      "description": "Registered recipe by name",
+      "type": "string",
+      "default": null
+     },
+     "archivo": {
+      "description": ".cs file with the recipe",
+      "type": "string",
+      "default": null
+     },
+     "codigo": {
+      "description": "Recipe code",
+      "type": "string",
+      "default": null
+     },
+     "args": {
+      "description": "Recipe arguments (JSON object)",
+      "default": null
+     },
+     "objetivo": {
+      "description": "Goal in one sentence (task memory)",
+      "type": "string",
+      "default": null
+     },
+     "opciones": {
+      "description": "Options: \"guardar_cada=200 al_final=guardar,pdf en_error=continuar lote_max=200 espera_s=10 desde=N max=30 decision=aplicada claves=a,b texto=...\"",
+      "type": "string",
+      "default": null
+     },
+     "doc": {
+      "description": "Document dN",
+      "type": "string",
+      "default": null
+     }
+    }
+   },
+   "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  },
+  {
+   "name": "check",
+   "description": "Complete checks in one call. name=lighting_audit: fixtures by level, workset and type; untagged, orphan tags and duplicates per view (saves $sin_tag, $tags_huerfanos, $tags_sobrantes). views=rcp adds, for each lighting ceiling plan (those that already have tags), fixtures, tags and sin_tag_en_vista, estimated by level and without regenerating. exacto=true counts what is really visible but regenerates each view: only with few views (max 12).",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "description": "lighting_audit, cobertura, tabla_audit or vista_audit",
+      "type": "string"
+     },
+     "lvl": {
+      "description": "Levels by name, comma-separated (optional)",
+      "type": "string",
+      "default": null
+     },
+     "views": {
+      "description": "rcp (ceiling plans with fixture tags), rcp_todos, or comma-separated view ids (optional)",
+      "type": "string",
+      "default": null
+     },
+     "exacto": {
+      "description": "true = fixtures really visible per view (slow: max 12 views)",
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "default": null
+     },
+     "args": {
+      "description": "JSON arguments. lighting_audit: inventory manifest in mm; cobertura: q, modo, id and filters; tabla_audit: tabla, ids_esperados, cantidad_esperada, filtros_esperados, celdas_esperadas; vista_audit: vistas, ids and optional expectations per view-element pair.",
+      "type": "string",
+      "default": null
+     }
+    },
+    "required": [
+     "name"
+    ]
+   },
+   "annotations": {
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+   },
+   "execution": {
+    "taskSupport": "optional"
+   }
+  }
+ ]
+}

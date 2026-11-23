@@ -10,21 +10,21 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Addin.Revit.Writes
 {
     /// <summary>
-    /// Herramientas comunes de escritura: formas canónicas para comparar "antes/después", búsquedas por nombre con mensajes
-    /// claros y conversión de valores. Todo corre en el hilo de Revit.
+    /// Common write helpers: canonical forms to compare "before/after", name lookups with clear
+    /// messages and value conversion. Everything runs on the Revit thread.
     /// </summary>
     internal static class WriteKit
     {
         public const string Missing = "\u0000borrado";
         public const string NoParam = "\u0000sin_parametro";
 
-        // ------------------------------------------------------------------ formas canónicas
+        // ------------------------------------------------------------------ canonical forms
 
         public static string Num(double v) => PlanEntry.Canon(Math.Round(v, 6));
 
         public static string Xyz(XYZ p) => p == null ? "" : Num(p.X) + "," + Num(p.Y) + "," + Num(p.Z);
 
-        /// <summary>Punto que representa la posición del elemento: punto de inserción, centro de su curva o centro de su caja.</summary>
+        /// <summary>Point representing the element's position: insertion point, midpoint of its curve or center of its box.</summary>
         public static XYZ LocationOf(Element e)
         {
             try
@@ -38,7 +38,7 @@ namespace Bimbridge.Addin.Revit.Writes
             return bb == null ? null : (bb.Min + bb.Max) / 2;
         }
 
-        /// <summary>Giro en planta en grados [0,360), o null si el elemento no tiene punto de inserción.</summary>
+        /// <summary>Plan rotation in degrees [0,360), or null if the element has no insertion point.</summary>
         public static double? RotationDeg(Element e)
         {
             try
@@ -91,7 +91,7 @@ namespace Bimbridge.Addin.Revit.Writes
             return doc.GetWorksetTable().GetWorkset(e.WorksetId)?.Name ?? "";
         }
 
-        /// <summary>Elevation from Level; si la familia es alojada y no lo tiene, Offset del host.</summary>
+        /// <summary>Elevation from Level; if the family is hosted and lacks it, the host Offset.</summary>
         public static Parameter ElevParam(Element e)
         {
             var p = e.get_Parameter(BuiltInParameter.INSTANCE_ELEVATION_PARAM);
@@ -114,29 +114,29 @@ namespace Bimbridge.Addin.Revit.Writes
             catch (Exception) { return null; }
         }
 
-        // ------------------------------------------------------------------ comprobaciones por elemento
+        // ------------------------------------------------------------------ per-element checks
 
-        /// <summary>Por qué no se puede editar un elemento (null = se puede).</summary>
+        /// <summary>Why an element cannot be edited (null = it can).</summary>
         public static string WhyNotEditable(Document doc, Element e, bool allowGroupMember = false, bool allowPinned = true)
         {
-            if (e == null) return "no existe";
-            if (!allowGroupMember && e.GroupId != null && e.GroupId != ElementId.InvalidElementId) return "está dentro de un grupo";
+            if (e == null) return "does not exist";
+            if (!allowGroupMember && e.GroupId != null && e.GroupId != ElementId.InvalidElementId) return "is inside a group";
             if (!allowPinned)
             {
-                try { if (e.Pinned) return "está fijado (pin)"; } catch (Exception) { }
+                try { if (e.Pinned) return "is pinned"; } catch (Exception) { }
             }
             if (doc.IsWorkshared)
             {
                 try
                 {
-                    if (WorksharingUtils.GetCheckoutStatus(doc, e.Id) == CheckoutStatus.OwnedByOtherUser) return "lo tiene prestado otro usuario";
+                    if (WorksharingUtils.GetCheckoutStatus(doc, e.Id) == CheckoutStatus.OwnedByOtherUser) return "is borrowed by another user";
                 }
                 catch (Exception) { }
             }
             return null;
         }
 
-        // ------------------------------------------------------------------ valores de parámetros
+        // ------------------------------------------------------------------ parameter values
 
         private static bool IsLength(Parameter p)
         {
@@ -151,9 +151,9 @@ namespace Bimbridge.Addin.Revit.Writes
         }
 
         /// <summary>
-        /// Convierte lo que da la IA al valor que Revit guarda: números en unidades internas, textos con unidades ("9' - 3\"", "2820 mm"),
-        /// sí/no, o nombres para parámetros que apuntan a un elemento (nivel, fase, plantilla, scope box, material).
-        /// <paramref name="show"/> es cómo se muestra en el diff.
+        /// Converts what the AI gives into the value Revit stores: numbers in internal units, text with units ("9' - 3\"", "2820 mm"),
+        /// yes/no, or names for parameters that point to an element (level, phase, template, scope box, material).
+        /// <paramref name="show"/> is how it is shown in the diff.
         /// </summary>
         public static bool TryTarget(Document doc, Parameter p, object v, out object value, out string show, out string why)
         {
@@ -176,10 +176,10 @@ namespace Bimbridge.Addin.Revit.Writes
                             { value = parsed; show = text; return true; }
                         }
                         catch (Exception) { }
-                        why = "no entiendo '" + text + "' para este parámetro; dé un número en unidades internas";
+                        why = "cannot parse '" + text + "' for this parameter; give a number in internal units";
                         return false;
                     }
-                    why = "es numérico: dé un número en unidades internas (pies para longitudes) o un texto con unidades";
+                    why = "it is numeric: give a number in internal units (feet for lengths) or text with units";
                     return false;
                 case StorageType.Integer:
                     if (v is bool b) { value = b ? 1L : 0L; return true; }
@@ -188,11 +188,11 @@ namespace Bimbridge.Addin.Revit.Writes
                     if (v is string s2)
                     {
                         var t = s2.Trim().ToLowerInvariant();
-                        if (IsYesNo(p) && (t == "si" || t == "sí" || t == "yes" || t == "true" || t == "1")) { value = 1L; return true; }
+                        if (IsYesNo(p) && (t == "yes" || LegacyAliases.IsLegacyYes(t) || t == "true" || t == "1")) { value = 1L; return true; }
                         if (IsYesNo(p) && (t == "no" || t == "false" || t == "0")) { value = 0L; return true; }
                         if (long.TryParse(t, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n)) { value = n; return true; }
                     }
-                    why = IsYesNo(p) ? "es sí/no: dé true o false" : "es entero: dé un número entero";
+                    why = IsYesNo(p) ? "it is yes/no: give true or false" : "it is an integer: give a whole number";
                     return false;
                 case StorageType.String:
                     value = v == null ? "" : Convert.ToString(v, CultureInfo.InvariantCulture);
@@ -200,15 +200,15 @@ namespace Bimbridge.Addin.Revit.Writes
                 case StorageType.ElementId:
                     if (v is long lid)
                     {
-                        if (lid != -1 && doc.GetElement(Ids.ToId(lid)) == null) { why = "no existe el elemento " + lid; return false; }
+                        if (lid != -1 && doc.GetElement(Ids.ToId(lid)) == null) { why = "element " + lid + " does not exist"; return false; }
                         value = lid;
-                        show = lid == -1 ? "ninguno" : doc.GetElement(Ids.ToId(lid))?.Name;
+                        show = lid == -1 ? "none" : doc.GetElement(Ids.ToId(lid))?.Name;
                         return true;
                     }
                     var name = v == null ? "" : Convert.ToString(v, CultureInfo.InvariantCulture).Trim();
-                    if (name.Length == 0 || name.Equals("ninguno", StringComparison.OrdinalIgnoreCase) || name.Equals("ninguna", StringComparison.OrdinalIgnoreCase) || name.Equals("none", StringComparison.OrdinalIgnoreCase))
+                    if (name.Length == 0 || name.Equals("none", StringComparison.OrdinalIgnoreCase) || LegacyAliases.IsLegacyNone(name))
                     {
-                        value = -1L; show = "ninguno"; return true;
+                        value = -1L; show = "none"; return true;
                     }
                     var target = ResolveByName(doc, p, name, out why);
                     if (target == null) return false;
@@ -216,11 +216,11 @@ namespace Bimbridge.Addin.Revit.Writes
                     show = target.Name;
                     return true;
             }
-            why = "tipo de parámetro no soportado";
+            why = "unsupported parameter type";
             return false;
         }
 
-        /// <summary>Elemento por nombre para un parámetro que apunta a otro elemento.</summary>
+        /// <summary>Element by name for a parameter that points to another element.</summary>
         private static Element ResolveByName(Document doc, Parameter p, string name, out string why)
         {
             why = null;
@@ -228,9 +228,9 @@ namespace Bimbridge.Addin.Revit.Writes
             var tag = bip.ToString();
             IEnumerable<Element> pool;
             string what;
-            if (tag.Contains("LEVEL")) { pool = new FilteredElementCollector(doc).OfClass(typeof(Level)); what = "nivel"; }
-            else if (tag.Contains("PHASE")) { pool = doc.Phases.Cast<Element>(); what = "fase"; }
-            else if (tag.Contains("TEMPLATE")) { pool = new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>().Where(x => x.IsTemplate); what = "plantilla de vista"; }
+            if (tag.Contains("LEVEL")) { pool = new FilteredElementCollector(doc).OfClass(typeof(Level)); what = "level"; }
+            else if (tag.Contains("PHASE")) { pool = doc.Phases.Cast<Element>(); what = "phase"; }
+            else if (tag.Contains("TEMPLATE")) { pool = new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>().Where(x => x.IsTemplate); what = "view template"; }
             else if (tag.Contains("VOLUME_OF_INTEREST")) { pool = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_VolumeOfInterest).WhereElementIsNotElementType(); what = "scope box"; }
             else if (tag.Contains("MATERIAL")) { pool = new FilteredElementCollector(doc).OfClass(typeof(Material)); what = "material"; }
             else
@@ -239,18 +239,18 @@ namespace Bimbridge.Addin.Revit.Writes
                     .Concat(doc.Phases.Cast<Element>())
                     .Concat(new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_VolumeOfInterest).WhereElementIsNotElementType())
                     .Concat(new FilteredElementCollector(doc).OfClass(typeof(Material)));
-                what = "elemento";
+                what = "element";
             }
             var hits = pool.Where(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
             if (hits.Count == 1) return hits[0];
-            why = hits.Count == 0 ? "no existe " + what + " '" + name + "'" : "'" + name + "' es ambiguo (" + hits.Count + "); dé el id";
+            why = hits.Count == 0 ? "no " + what + " named '" + name + "'" : "'" + name + "' is ambiguous (" + hits.Count + "); give the id";
             return null;
         }
 
         public static void SetParam(Parameter p, object target)
         {
-            if (p == null) throw new InvalidOperationException("sin parámetro");
-            if (p.IsReadOnly) throw new InvalidOperationException("parámetro de sólo lectura");
+            if (p == null) throw new InvalidOperationException("no parameter");
+            if (p.IsReadOnly) throw new InvalidOperationException("read-only parameter");
             bool ok;
             switch (p.StorageType)
             {
@@ -261,12 +261,12 @@ namespace Bimbridge.Addin.Revit.Writes
                     var id = Convert.ToInt64(target, CultureInfo.InvariantCulture);
                     ok = p.Set(id == -1 ? ElementId.InvalidElementId : Ids.ToId(id));
                     break;
-                default: throw new InvalidOperationException("tipo de parámetro no soportado");
+                default: throw new InvalidOperationException("unsupported parameter type");
             }
-            if (!ok) throw new InvalidOperationException("Revit no aceptó el valor");
+            if (!ok) throw new InvalidOperationException("Revit did not accept the value");
         }
 
-        // ------------------------------------------------------------------ lectores de Target (los planes retenidos vuelven del disco como JSON)
+        // ------------------------------------------------------------------ Target readers (held plans come back from disk as JSON)
 
         public static Dictionary<string, object> Dict(object target) => target as Dictionary<string, object> ?? new Dictionary<string, object>();
 
@@ -311,7 +311,7 @@ namespace Bimbridge.Addin.Revit.Writes
 
         public static List<object> List(params double[] v) => v.Select(x => (object)x).ToList();
 
-        // ------------------------------------------------------------------ colores
+        // ------------------------------------------------------------------ colors
 
         public static bool TryColor(string hex, out Color c)
         {
@@ -325,17 +325,17 @@ namespace Bimbridge.Addin.Revit.Writes
 
         public static string Hex(Color c) => c == null || !c.IsValid ? "" : "#" + c.Red.ToString("X2") + c.Green.ToString("X2") + c.Blue.ToString("X2");
 
-        /// <summary>Forma canónica de unas sobrescrituras: sólo lo que este MCP maneja (color, medio tono, transparencia, grosor).</summary>
+        /// <summary>Canonical form of graphic overrides: only what this MCP handles (color, halftone, transparency, line weight). The tokens are compared against held plans, so they stay unchanged.</summary>
         public static string Overrides(OverrideGraphicSettings o)
         {
             if (o == null) return "";
             var parts = new List<string>();
             var col = Hex(o.ProjectionLineColor);
             if (col.Length > 0) parts.Add("color=" + col);
-            if (o.Halftone) parts.Add("medio_tono");
-            if (o.Transparency > 0) parts.Add("transparencia=" + o.Transparency);
-            if (o.ProjectionLineWeight > 0) parts.Add("grosor=" + o.ProjectionLineWeight);
-            return parts.Count == 0 ? "sin cambios" : string.Join(" ", parts);
+            if (o.Halftone) parts.Add("halftone");
+            if (o.Transparency > 0) parts.Add("transparency=" + o.Transparency);
+            if (o.ProjectionLineWeight > 0) parts.Add("line_weight=" + o.ProjectionLineWeight);
+            return parts.Count == 0 ? "unchanged" : string.Join(" ", parts);
         }
 
         public static Category CategoryByName(Document doc, string name)
@@ -351,8 +351,8 @@ namespace Bimbridge.Addin.Revit.Writes
     }
 
     /// <summary>
-    /// Búsquedas por nombre con caché durante una planificación (tipos, niveles, vistas, plantillas, láminas, worksets).
-    /// Recorrer todos los tipos del modelo una vez cuesta ~50 ms; hacerlo por operación, segundos.
+    /// Cached name lookups during planning (types, levels, views, templates, sheets, worksets).
+    /// Walking all model types once costs ~50 ms; doing it per operation, seconds.
     /// </summary>
     internal sealed class ModelIndex
     {
@@ -369,11 +369,11 @@ namespace Bimbridge.Addin.Revit.Writes
         public List<View> Views => _views ?? (_views = new FilteredElementCollector(Doc).OfClass(typeof(View)).Cast<View>().ToList());
         public List<ViewSheet> Sheets => _sheets ?? (_sheets = new FilteredElementCollector(Doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>().ToList());
 
-        /// <summary>"Familia: Tipo", o sólo "Tipo" si es único (con el filtro dado).</summary>
+        /// <summary>"Family: Type", or just "Type" if unique (with the given filter).</summary>
         public ElementType FindType(string spec, string op, Func<ElementType, bool> filter = null, string hint = null)
         {
             var s = (spec ?? "").Trim();
-            if (s.Length == 0) throw new QueryException(op + ": falta el tipo (\"Familia: Tipo\")");
+            if (s.Length == 0) throw new QueryException(op + ": missing type (\"Family: Type\")");
             if (long.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) && Doc.GetElement(Ids.ToId(id)) is ElementType byId)
                 return byId;
             var pool = filter == null ? Types : Types.Where(filter);
@@ -389,14 +389,14 @@ namespace Bimbridge.Addin.Revit.Writes
             if (hits.Count == 1) return hits[0];
             if (hits.Count == 0)
             {
-                // Sugerencias: tipos que contienen el texto buscado.
+                // Suggestions: types containing the searched text.
                 var key = (i > 0 ? s.Substring(i + 1) : s).Trim();
                 var near = pool.Where(t => (t.FamilyName + ": " + t.Name).IndexOf(key, StringComparison.OrdinalIgnoreCase) >= 0)
                                .Select(t => t.FamilyName + ": " + t.Name).Distinct().Take(5).ToList();
-                throw new QueryException(op + ": no existe el tipo '" + spec + "'" + (hint != null ? " (" + hint + ")" : "") +
-                                         (near.Count > 0 ? ". Parecidos: " + string.Join(" | ", near) : ". Use catalog para ver los tipos cargados"));
+                throw new QueryException(op + ": type '" + spec + "' does not exist" + (hint != null ? " (" + hint + ")" : "") +
+                                         (near.Count > 0 ? ". Similar: " + string.Join(" | ", near) : ". Use catalog to see the loaded types"));
             }
-            throw new QueryException(op + ": '" + spec + "' es ambiguo (" + hits.Count + " tipos); use \"Familia: Tipo\"");
+            throw new QueryException(op + ": '" + spec + "' is ambiguous (" + hits.Count + " types); use \"Family: Type\"");
         }
 
         public Level FindLevel(string name, string op)
@@ -405,18 +405,18 @@ namespace Bimbridge.Addin.Revit.Writes
             if (long.TryParse(n, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) && Doc.GetElement(Ids.ToId(id)) is Level byId) return byId;
             var hit = Levels.FirstOrDefault(l => string.Equals(l.Name, n, StringComparison.OrdinalIgnoreCase))
                       ?? Levels.FirstOrDefault(l => string.Equals(l.Name.Replace(" ", ""), n.Replace(" ", ""), StringComparison.OrdinalIgnoreCase));
-            if (hit == null) throw new QueryException(op + ": no existe el nivel '" + name + "'. Niveles: " + string.Join(", ", Levels.Select(l => l.Name).Take(30)));
+            if (hit == null) throw new QueryException(op + ": level '" + name + "' does not exist. Levels: " + string.Join(", ", Levels.Select(l => l.Name).Take(30)));
             return hit;
         }
 
-        /// <summary>Vista por id o por nombre exacto (no plantillas). Las láminas también se aceptan por número.</summary>
+        /// <summary>View by id or exact name (not templates). Sheets are also accepted by number.</summary>
         public View FindView(object spec, string op, bool allowSheet = true)
         {
             var s = Convert.ToString(spec, CultureInfo.InvariantCulture)?.Trim() ?? "";
             if (long.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
             {
                 if (Doc.GetElement(Ids.ToId(id)) is View v && !v.IsTemplate) return v;
-                throw new QueryException(op + ": " + id + " no es una vista del modelo");
+                throw new QueryException(op + ": " + id + " is not a view in the model");
             }
             var hits = Views.Where(v => !v.IsTemplate && string.Equals(v.Name, s, StringComparison.OrdinalIgnoreCase)).ToList();
             if (hits.Count == 1) return hits[0];
@@ -425,15 +425,15 @@ namespace Bimbridge.Addin.Revit.Writes
                 var sh = Sheets.FirstOrDefault(x => string.Equals(x.SheetNumber, s, StringComparison.OrdinalIgnoreCase));
                 if (sh != null) return sh;
             }
-            if (hits.Count > 1) throw new QueryException(op + ": hay " + hits.Count + " vistas llamadas '" + s + "' (distinto tipo); use el id");
-            throw new QueryException(op + ": no existe la vista '" + s + "'");
+            if (hits.Count > 1) throw new QueryException(op + ": there are " + hits.Count + " views named '" + s + "' (different types); use the id");
+            throw new QueryException(op + ": view '" + s + "' does not exist");
         }
 
         public View FindTemplate(string name, string op)
         {
             var hit = Views.FirstOrDefault(v => v.IsTemplate && string.Equals(v.Name, (name ?? "").Trim(), StringComparison.OrdinalIgnoreCase));
             if (hit == null)
-                throw new QueryException(op + ": no existe la plantilla de vista '" + name + "'. Plantillas: " +
+                throw new QueryException(op + ": view template '" + name + "' does not exist. Templates: " +
                                          string.Join(", ", Views.Where(v => v.IsTemplate).Select(v => v.Name).OrderBy(x => x).Take(25)));
             return hit;
         }
@@ -444,24 +444,24 @@ namespace Bimbridge.Addin.Revit.Writes
             if (long.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) && Doc.GetElement(Ids.ToId(id)) is ViewSheet byId) return byId;
             var hit = Sheets.FirstOrDefault(x => string.Equals(x.SheetNumber, s, StringComparison.OrdinalIgnoreCase))
                       ?? Sheets.FirstOrDefault(x => string.Equals(x.Name, s, StringComparison.OrdinalIgnoreCase));
-            if (hit == null) throw new QueryException(op + ": no existe la lámina '" + s + "' (use número, nombre o id)");
+            if (hit == null) throw new QueryException(op + ": sheet '" + s + "' does not exist (use number, name or id)");
             return hit;
         }
 
         public Workset FindWorkset(string name, string op)
         {
-            if (!Doc.IsWorkshared) throw new QueryException(op + ": el modelo no usa worksets");
+            if (!Doc.IsWorkshared) throw new QueryException(op + ": the model does not use worksets");
             var ws = new FilteredWorksetCollector(Doc).OfKind(WorksetKind.UserWorkset)
                 .FirstOrDefault(w => string.Equals(w.Name, (name ?? "").Trim(), StringComparison.OrdinalIgnoreCase));
             if (ws == null)
-                throw new QueryException(op + ": no existe el workset '" + name + "'. Worksets: " +
+                throw new QueryException(op + ": workset '" + name + "' does not exist. Worksets: " +
                                          string.Join(", ", new FilteredWorksetCollector(Doc).OfKind(WorksetKind.UserWorkset).Select(w => w.Name).OrderBy(x => x).Take(30)));
             return ws;
         }
 
         /// <summary>
-        /// ¿Ya hay una vista con ese nombre? Revit exige nombres únicos por tipo de vista (una planta y un plano de techo pueden llamarse igual);
-        /// sin tipo se comparan todas. Las láminas no cuentan: su nombre puede repetir el de una vista.
+        /// Is there already a view with that name? Revit requires unique names per view type (a floor plan and a ceiling plan can share a name);
+        /// with no type, all are compared. Sheets do not count: their name may repeat a view's.
         /// </summary>
         public bool ViewNameTaken(string name, ViewType? type = null) =>
             Views.Any(v => !v.IsTemplate && !(v is ViewSheet) && (type == null || v.ViewType == type.Value) && string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase));
@@ -470,11 +470,11 @@ namespace Bimbridge.Addin.Revit.Writes
         {
             switch (kind)
             {
-                case "plano": return ViewType.FloorPlan;
+                case "plan": return ViewType.FloorPlan;
                 case "rcp": return ViewType.CeilingPlan;
-                case "seccion": return ViewType.Section;
+                case "section": return ViewType.Section;
                 case "3d": return ViewType.ThreeD;
-                case "dibujo": return ViewType.DraftingView;
+                case "drafting": return ViewType.DraftingView;
                 default: return null;
             }
         }

@@ -7,20 +7,20 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.6.1 fase 2: auditoría durable encadenada, separada de la telemetría.</summary>
+    /// <summary>0.6.1 phase 2: durable chained audit, separate from telemetry.</summary>
     public class AuditLogTests
     {
-        private static string NewPath() => Path.Combine(Path.GetTempPath(), "bimbridgeaudit_" + Guid.NewGuid().ToString("N"), "auditoria.jsonl");
+        private static string NewPath() => Path.Combine(Path.GetTempPath(), "bimbridgeaudit_" + Guid.NewGuid().ToString("N"), "audit.jsonl");
 
         [Fact]
         public void Audit_ChainVerifies_AndSurvivesReopen()
         {
             var p = NewPath();
             var a = new AuditLog(p);
-            a.Append("s1", "exec_codigo", "ejecutar");
-            a.Append("s1", "aplicar_cola", "aplicado");
-            var b = new AuditLog(p); // otro proceso / reinicio continúa la cadena
-            b.Append("s2", "exec_codigo", "consulta");
+            a.Append("s1", "exec_code", "run");
+            a.Append("s1", "apply_queue", "applied");
+            var b = new AuditLog(p); // another process / restart continues the chain
+            b.Append("s2", "exec_code", "query");
             var v = AuditLog.Verify(p);
             Assert.True(v.Ok, string.Join("; ", v.Errors));
             Assert.Equal(3, v.Lines);
@@ -58,8 +58,8 @@ namespace Bimbridge.Tests
         {
             var p = NewPath(); var a = new AuditLog(p);
             Directory.Delete(Path.GetDirectoryName(p), true);
-            File.WriteAllText(Path.GetDirectoryName(p), "bloquea el directorio"); // la ruta del directorio ahora es un archivo
-            Assert.Throws<JournalUnavailableException>(() => a.Append("s", "exec_codigo", "ejecutar"));
+            File.WriteAllText(Path.GetDirectoryName(p), "blocks the directory"); // the directory path is now a file
+            Assert.Throws<JournalUnavailableException>(() => a.Append("s", "exec_code", "run"));
             Assert.Equal(1, a.Failures);
         }
 

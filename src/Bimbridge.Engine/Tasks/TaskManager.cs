@@ -9,9 +9,9 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine.Tasks
 {
     /// <summary>
-    /// Tareas de este Revit: crea, lanza, reanuda, cancela, espera cambios y reconcilia. Un solo motor por tarea en el proceso: si Codex y
-    /// Claude piden "reanudar" a la vez, el segundo recibe el estado del que ya corre. Entre procesos (dos Revit) decide el lease en disco.
-    /// Cualquier cliente recupera la tarea por su id, sin la sesión que la creó.
+    /// Tasks of this Revit: creates, launches, resumes, cancels, waits for changes and reconciles. A single engine per task in the process: if Codex and
+    /// Claude ask to "resume" at the same time, the second gets the state of the one already running. Across processes (two Revits) the lease on disk decides.
+    /// Any client retrieves the task by its id, without the session that created it.
     /// </summary>
     public sealed class TaskManager
     {
@@ -23,15 +23,15 @@ namespace Bimbridge.Engine.Tasks
         private readonly Dictionary<string, Task> _work = new Dictionary<string, Task>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, TaskCompletionSource<bool>> _signals = new Dictionary<string, TaskCompletionSource<bool>>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Para las pruebas: esperas rápidas.</summary>
+        /// <summary>For tests: fast waits.</summary>
         public Func<TimeSpan, CancellationToken, Task> Delay;
         public TimeSpan? MaxWait;
         public int BudgetMs = 200;
-        /// <summary>R03: autoridad de concesiones; por defecto niega escrituras.</summary>
+        /// <summary>R03: grant authority; denies writes by default.</summary>
         public ITaskAuthority Authority = DenyWritesAuthority.Instance;
-        /// <summary>R01: auditoría en dos fases de lotes y barreras.</summary>
+        /// <summary>R01: two-phase audit of batches and barriers.</summary>
         public AuditLog Audit;
-        /// <summary>R06: leases por documento (carpeta hermana de las tareas).</summary>
+        /// <summary>R06: per-document leases (sibling folder of the tasks).</summary>
         public TaskStore DocLeases;
 
         public TaskManager(TaskStore store, string instance, Func<TaskRecord, ITaskBackend> backend)
@@ -53,8 +53,8 @@ namespace Bimbridge.Engine.Tasks
         }
 
         /// <summary>
-        /// Crea y lanza una tarea. Mismo id con la misma huella → se devuelve la existente (no se duplica); mismo id con otro contenido →
-        /// error (un id identifica una tarea). La receta se guarda junto a la tarea: reanudar usa esa copia.
+        /// Creates and launches a task. Same id with the same fingerprint → the existing one is returned (no duplicate); same id with other content →
+        /// error (an id identifies one task). The recipe is stored with the task: resume uses that copy.
         /// </summary>
         public StartResult Start(TaskRecord draft, string recipeCode, string client)
         {
@@ -66,16 +66,16 @@ namespace Bimbridge.Engine.Tasks
                     if (existing.ContentHash != draft.ContentHash)
                         return new StartResult
                         {
-                            Error = "la tarea " + draft.Id + " ya existe con otro contenido (receta, argumentos o documento distintos: " + existing.ContentHash + " ≠ " + draft.ContentHash +
-                                    "). Use otro id, o tarea reanudar " + draft.Id + " para continuar la existente tal cual.",
-                            ErrorStatus = Status.Invalido,
+                            Error = "task " + draft.Id + " already exists with other content (different recipe, arguments or document: " + existing.ContentHash + " ≠ " + draft.ContentHash +
+                                    "). Use another id, or task resume " + draft.Id + " to continue the existing one as is.",
+                            ErrorStatus = Status.Invalid,
                         };
                     var running = _running.ContainsKey(draft.Id);
                     if (!running && !TaskState.IsFinal(existing.State)) return Resume(draft.Id, client, null);
                     return new StartResult { Task = running ? _running[draft.Id].Task_ : existing, AlreadyRunning = running };
                 }
                 draft.Created = TaskTime.Now();
-                draft.State = TaskState.EnCola;
+                draft.State = TaskState.Queued;
                 draft.Client = client;
                 if (client != null && !draft.Clients.Contains(client)) draft.Clients.Add(client);
                 _store.Create(draft, recipeCode);
@@ -84,22 +84,22 @@ namespace Bimbridge.Engine.Tasks
             }
         }
 
-        /// <summary>Reanuda una tarea no terminada (o terminada con diferencias, para reintentar conflictos y revertidas).</summary>
+        /// <summary>Resumes an unfinished task (or one finished with differences, to retry conflicts and rolled-back units).</summary>
         public StartResult Resume(string id, string client, Dictionary<string, object> policy)
         {
             lock (_lock)
             {
                 if (_running.TryGetValue(id, out var r)) return new StartResult { Task = r.Task_, AlreadyRunning = true };
                 var t = _store.Load(id);
-                if (t == null) return new StartResult { Error = "no existe la tarea " + id + " (tarea lista)", ErrorStatus = Status.Invalido };
-                if (t.State == TaskState.Aplicada)
+                if (t == null) return new StartResult { Error = "task " + id + " does not exist (task list)", ErrorStatus = Status.Invalid };
+                if (t.State == TaskState.Applied)
                     return new StartResult { Task = t };
                 var elsewhere = HeldElsewhere(id);
-                if (elsewhere != null) return new StartResult { Task = t, Error = elsewhere, ErrorStatus = Status.DocumentoOcupado };
+                if (elsewhere != null) return new StartResult { Task = t, Error = elsewhere, ErrorStatus = Status.DocumentBusy };
                 if (policy != null) foreach (var kv in policy) t.Policy[kv.Key] = kv.Value;
                 t.Client = client ?? t.Client;
                 if (client != null && !t.Clients.Contains(client)) t.Clients.Add(client);
-                t.State = TaskState.EnCola;
+                t.State = TaskState.Queued;
                 t.Reason = null;
                 _store.Save(t);
                 Launch(t);
@@ -113,7 +113,7 @@ namespace Bimbridge.Engine.Tasks
             var runner = new TaskRunner(_store, backend, t, "inst:" + _instance, _instance, Changed)
             {
                 BudgetMs = BudgetMs, Authority = Authority, Audit = Audit,
-                DocLeases = DocLeases ?? new TaskStore(_store.Root.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar) + "_documentos"),
+                DocLeases = DocLeases ?? new TaskStore(_store.Root.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar) + "_documents"),
             };
             if (Delay != null) runner.Delay = Delay;
             if (MaxWait.HasValue) runner.MaxWait = MaxWait.Value;
@@ -124,14 +124,14 @@ namespace Bimbridge.Engine.Tasks
                 finally
                 {
                     lock (_lock) { _running.Remove(t.Id); }
-                    // El backend suelta lo que tomó (documentos, compilación) al terminar el motor, pase lo que pase.
+                    // The backend releases what it took (documents, compilation) when the engine finishes, no matter what.
                     try { (backend as IDisposable)?.Dispose(); } catch (Exception) { }
                     Changed(t);
                 }
             });
         }
 
-        /// <summary>Espera a que termine el motor de la tarea (para pruebas y para el cierre ordenado de Revit).</summary>
+        /// <summary>Waits for the task engine to finish (for tests and for an orderly Revit shutdown).</summary>
         public Task Completion(string id)
         {
             lock (_lock) return _work.TryGetValue(id, out var w) ? w : Task.CompletedTask;
@@ -143,20 +143,20 @@ namespace Bimbridge.Engine.Tasks
         }
 
         /// <summary>
-        /// Otro Revit tiene la tarea (lease vigente de otra instancia): su motor no lee tarea.json, así que cambiarla desde aquí
-        /// se perdería en su siguiente punto de control. null si nadie más la lleva.
+        /// Another Revit holds the task (valid lease from another instance): its engine does not read tarea.json, so changing it from here
+        /// would be lost at its next checkpoint. null if nobody else holds it.
         /// </summary>
         public string HeldElsewhere(string id)
         {
             var lease = _store.ReadLease(id);
             return lease != null && lease.Valid(DateTime.UtcNow) && lease.Instance != _instance
-                ? "la tarea se está ejecutando en otro Revit (" + lease.Instance + "); hágalo desde ese Revit"
+                ? "the task is running in another Revit (" + lease.Instance + "); do it from that Revit"
                 : null;
         }
 
         /// <summary>
-        /// Cancelación cooperativa: queda "cancelacion_solicitada" hasta que el motor la confirma entre lotes.
-        /// <paramref name="busy"/> dice por qué no se canceló si la lleva otro Revit (la tarea vuelve sin cambios).
+        /// Cooperative cancellation: stays "cancellation_requested" until the engine confirms it between batches.
+        /// <paramref name="busy"/> says why it was not cancelled if another Revit holds it (the task is returned unchanged).
         /// </summary>
         public TaskRecord Cancel(string id, out string busy)
         {
@@ -167,7 +167,7 @@ namespace Bimbridge.Engine.Tasks
                 {
                     r.CancelRequested = true;
                     var t = r.Task_;
-                    if (!TaskState.IsFinal(t.State)) { t.State = TaskState.CancelacionSolicitada; t.Reason = "cancelación pedida; se confirma al terminar la unidad en curso"; }
+                    if (!TaskState.IsFinal(t.State)) { t.State = TaskState.CancelRequested; t.Reason = "cancellation requested; confirmed when the current unit finishes"; }
                     Changed(t);
                     return t;
                 }
@@ -176,8 +176,8 @@ namespace Bimbridge.Engine.Tasks
                 if ((busy = HeldElsewhere(id)) != null) return s;
                 if (!TaskState.IsFinal(s.State))
                 {
-                    s.State = TaskState.Cancelada;
-                    s.Reason = "cancelada sin estar en ejecución; lo confirmado antes sigue aplicado";
+                    s.State = TaskState.Cancelled;
+                    s.Reason = "cancelled while not running; what was committed before stays applied";
                     s.Rev++;
                     _store.Save(s);
                     Changed(s);
@@ -186,7 +186,7 @@ namespace Bimbridge.Engine.Tasks
             }
         }
 
-        /// <summary>Estado actual: el del motor si corre aquí; si no, el de disco (con "interrumpida" si su motor murió).</summary>
+        /// <summary>Current state: the engine's if it runs here; otherwise the one on disk (with "interrupted" if its engine died).</summary>
         public TaskRecord Get(string id, out UnitLog units)
         {
             lock (_lock)
@@ -195,20 +195,20 @@ namespace Bimbridge.Engine.Tasks
             }
             var t = _store.Load(id);
             units = t == null ? new UnitLog() : _store.LoadUnits(id);
-            if (t != null && (t.State == TaskState.Ejecutando || t.State == TaskState.EnCola || t.State == TaskState.CancelacionSolicitada))
+            if (t != null && (t.State == TaskState.Running || t.State == TaskState.Queued || t.State == TaskState.CancelRequested))
             {
                 var lease = _store.ReadLease(id);
                 if (lease == null || !lease.Valid(DateTime.UtcNow) || lease.Instance == _instance)
                 {
-                    // Nadie la corre: el proceso que la llevaba murió o se cerró Revit.
-                    t.State = TaskState.Interrumpida;
-                    t.Reason = "el motor que la ejecutaba ya no está (Revit se cerró o se reinició); tarea reanudar verifica lo dudoso y continúa";
+                    // Nobody is running it: the process that held it died or Revit was closed.
+                    t.State = TaskState.Interrupted;
+                    t.Reason = "the engine that was running it is gone (Revit was closed or restarted); task resume verifies what is doubtful and continues";
                 }
             }
             return t;
         }
 
-        /// <summary>Espera hasta que la revisión de la tarea supere <paramref name="since"/> o pase el tiempo (sin sondeo del agente).</summary>
+        /// <summary>Waits until the task revision exceeds <paramref name="since"/> or the time runs out (no polling by the agent).</summary>
         public async Task<TaskRecord> WaitAsync(string id, long since, TimeSpan timeout, CancellationToken ct)
         {
             var until = DateTime.UtcNow + timeout;
@@ -242,44 +242,44 @@ namespace Bimbridge.Engine.Tasks
         }
 
         /// <summary>
-        /// Reconciliación explícita (§3.2): el agente o el usuario leyeron el modelo y deciden. aplicada = queda confirmada (no se repite);
-        /// no_aplicada = vuelve a pendiente (se ejecutará al reanudar). Sólo con la tarea detenida.
+        /// Explicit reconciliation (§3.2): the agent or the user read the model and decide. aplicada = stays committed (not repeated);
+        /// no_aplicada = goes back to pending (will run on resume). Only with the task stopped.
         /// </summary>
         /// <summary>
-        /// Reconciliación con transiciones explícitas (R05):
-        /// - sólo unidades DUDOSAS (en_curso, parcial, desconocida). Una confirmada/omitida nunca vuelve a pendiente por esta vía
-        ///   (procedimiento extraordinario: una tarea nueva que el usuario decide);
-        /// - "aplicada" exige evidencia (nota); "no aplicada" provoca que se vuelva a ejecutar, así que además exige la concesión
-        ///   reconciliar_no_aplicada de una persona para ESTA tarea y documento;
-        /// - una tarea finalizada (aplicada, aplicada_con_diferencias, cancelada) no se reabre;
-        /// - nada se borra: cada decisión es un evento nuevo con el estado anterior.
+        /// Reconciliation with explicit transitions (R05):
+        /// - only DOUBTFUL units (en_curso, parcial, desconocida). A committed/skipped unit never goes back to pending this way
+        ///   (extraordinary procedure: a new task the user decides on);
+        /// - "applied" requires evidence (nota); "not applied" causes it to run again, so it also requires the
+        ///   reconciliar_no_aplicada grant from a person for THIS task and document;
+        /// - a finished task (aplicada, aplicada_con_diferencias, cancelada) is not reopened;
+        /// - nothing is deleted: each decision is a new event with the previous state.
         /// </summary>
         public string Reconcile(string id, IList<string> keys, bool applied, string note, string who)
         {
             lock (_lock)
             {
-                if (_running.ContainsKey(id)) return "la tarea está corriendo; cancélela o espere a que se detenga antes de reconciliar";
+                if (_running.ContainsKey(id)) return "the task is running; cancel it or wait for it to stop before reconciling";
                 var elsewhere = HeldElsewhere(id);
                 if (elsewhere != null) return elsewhere;
                 var t = _store.Load(id);
-                if (t == null) return "no existe la tarea " + id;
-                if (TaskState.IsFinal(t.State)) return "transicion_ilegal: la tarea está " + t.State + " y no se reabre; inicie una tarea nueva si hace falta";
-                if (string.IsNullOrWhiteSpace(note)) return "evidencia_requerida: diga en nota= qué se comprobó en el modelo (ids, valores) para decidir";
+                if (t == null) return "task " + id + " does not exist";
+                if (TaskState.IsFinal(t.State)) return "illegal_transition: the task is " + t.State + " and is not reopened; start a new task if needed";
+                if (string.IsNullOrWhiteSpace(note)) return "evidence_required: state in note= what was checked in the model (ids, values) to decide";
                 var units = _store.LoadUnits(id);
                 var targets = keys != null && keys.Count > 0
                     ? keys.ToList()
                     : units.Units.Values.Where(u => UnitState.NeedsReconcile(u.State)).Select(u => u.Key).ToList();
                 var unknown = targets.Where(k => units.Get(k) == null).ToList();
-                if (unknown.Count > 0) return "unidades que no existen en la tarea: " + string.Join(", ", unknown.Take(10));
+                if (unknown.Count > 0) return "units that do not exist in the task: " + string.Join(", ", unknown.Take(10));
                 var illegal = targets.Where(k => !UnitState.NeedsReconcile(units.Get(k).State)).ToList();
                 if (illegal.Count > 0)
-                    return "transicion_ilegal: sólo se reconcilian unidades dudosas (en_curso, parcial, desconocida); " +
+                    return "illegal_transition: only doubtful units are reconciled (running, partial, unknown); " +
                            string.Join(", ", illegal.Take(10).Select(k => k + "=" + units.Get(k).State)) +
-                           (illegal.Any(k => UnitState.IsDone(units.Get(k).State)) ? ". Una unidad confirmada no se vuelve a ejecutar." : "");
+                           (illegal.Any(k => UnitState.IsDone(units.Get(k).State)) ? ". A committed unit is not run again." : "");
                 if (!applied)
                 {
-                    var why = (Authority == null ? "sin autoridad configurada" : Authority.Check(t, Capability.ReconciliarNoAplicada, DateTime.UtcNow));
-                    if (why != null) return "autorizacion_requerida: marcar como no aplicada hará que se ejecute otra vez; " + why;
+                    var why = (Authority == null ? "no authority configured" : Authority.Check(t, Capability.ReconcileNotApplied, DateTime.UtcNow));
+                    if (why != null) return "authorization_required: marking as not applied will make it run again; " + why;
                 }
                 foreach (var k in targets)
                 {
@@ -287,16 +287,16 @@ namespace Bimbridge.Engine.Tasks
                     if (applied) seq = ++t.ConfirmSeq;
                     _store.AppendUnitEvent(id, new Dictionary<string, object>
                     {
-                        ["ev"] = "reconciliada", ["clave"] = k, ["estado"] = applied ? UnitState.Confirmada : UnitState.Pendiente, ["seq"] = seq,
-                        ["antes"] = units.Get(k).State, ["quien"] = who, ["evidencia"] = note,
-                        ["error"] = (applied ? "reconciliada como aplicada" : "reconciliada como no aplicada") + ": " + note + " (" + who + ")",
+                        ["ev"] = "reconciled", ["key"] = k, ["status"] = applied ? UnitState.Committed : UnitState.Pending, ["seq"] = seq,
+                        ["before"] = units.Get(k).State, ["who"] = who, ["evidence"] = note,
+                        ["error"] = (applied ? "reconciled as applied" : "reconciled as not applied") + ": " + note + " (" + who + ")",
                     });
                 }
                 t.Decisions.Add(new Dictionary<string, object>
                 {
-                    ["t"] = TaskTime.Now(), ["texto"] = "reconciliadas " + targets.Count + " unidades como " + (applied ? "aplicadas" : "no aplicadas") + ": " + note, ["quien"] = who,
+                    ["t"] = TaskTime.Now(), ["text"] = "reconciled " + targets.Count + " units as " + (applied ? "applied" : "not applied") + ": " + note, ["who"] = who,
                 });
-                if (t.State == TaskState.Interrumpida || t.State == TaskState.Parcial) t.Reason = "reconciliada; use tarea reanudar";
+                if (t.State == TaskState.Interrupted || t.State == TaskState.Partial) t.Reason = "reconciled; use task resume";
                 t.Rev++;
                 t.Summary = TaskSummary.Continuation(t, _store.LoadUnits(id));
                 _store.Save(t);
@@ -305,7 +305,7 @@ namespace Bimbridge.Engine.Tasks
             }
         }
 
-        /// <summary>Anota una decisión del agente o del usuario en la memoria de la tarea (aparece en el resumen de continuación).</summary>
+        /// <summary>Notes a decision of the agent or the user in the task memory (it appears in the continuation summary).</summary>
         public string Note(string id, string text, string who)
         {
             lock (_lock)
@@ -318,8 +318,8 @@ namespace Bimbridge.Engine.Tasks
                     if (elsewhere != null) return elsewhere;
                     t = _store.Load(id);
                 }
-                if (t == null) return "no existe la tarea " + id;
-                lock (t) t.Decisions.Add(new Dictionary<string, object> { ["t"] = TaskTime.Now(), ["texto"] = text, ["quien"] = who });
+                if (t == null) return "task " + id + " does not exist";
+                lock (t) t.Decisions.Add(new Dictionary<string, object> { ["t"] = TaskTime.Now(), ["text"] = text, ["who"] = who });
                 if (!_running.ContainsKey(id)) { t.Rev++; _store.Save(t); }
                 Changed(t);
                 return null;
@@ -327,9 +327,9 @@ namespace Bimbridge.Engine.Tasks
         }
 
         /// <summary>
-        /// Un documento se guardó o sincronizó (lo informa Revit, lo haya pedido la tarea o el usuario). Las tareas no terminadas de ese
-        /// documento EN ESA MISMA apertura registran la evidencia: lo confirmado hasta ahora ya está en disco. Un guardado en otra apertura no
-        /// cuenta (lo confirmado en la apertura anterior pudo perderse al cerrar sin guardar).
+        /// A document was saved or synced (Revit reports it, whether the task or the user requested it). Unfinished tasks of that
+        /// document IN THAT SAME opening record the evidence: what was committed so far is already on disk. A save in another opening does not
+        /// count (what was committed in the previous opening may have been lost when closing without saving).
         /// </summary>
         public int RecordPersist(string docKey, string generation, PersistEvidence ev)
         {
@@ -362,7 +362,7 @@ namespace Bimbridge.Engine.Tasks
             return n;
         }
 
-        /// <summary>Guardar como: las tareas no terminadas del documento siguen en el archivo nuevo (y lo anotan).</summary>
+        /// <summary>Save as: the document's unfinished tasks continue in the new file (and note it).</summary>
         public int Rekey(string oldKey, string newKey)
         {
             var n = 0;
@@ -377,7 +377,7 @@ namespace Bimbridge.Engine.Tasks
                     lock (t)
                     {
                         d.Key = newKey;
-                        t.Decisions.Add(new Dictionary<string, object> { ["t"] = TaskTime.Now(), ["texto"] = "el documento se guardó como " + newKey + " (antes " + oldKey + "); la tarea sigue en el nuevo", ["quien"] = "revit" });
+                        t.Decisions.Add(new Dictionary<string, object> { ["t"] = TaskTime.Now(), ["text"] = "the document was saved as " + newKey + " (formerly " + oldKey + "); the task continues in the new one", ["who"] = "revit" });
                     }
                     changed.Add(t);
                     n++;
@@ -387,7 +387,7 @@ namespace Bimbridge.Engine.Tasks
                     var d = t.Docs.FirstOrDefault(x => x.Key == oldKey);
                     if (d == null) continue;
                     d.Key = newKey;
-                    t.Decisions.Add(new Dictionary<string, object> { ["t"] = TaskTime.Now(), ["texto"] = "el documento se guardó como " + newKey + " (antes " + oldKey + ")", ["quien"] = "revit" });
+                    t.Decisions.Add(new Dictionary<string, object> { ["t"] = TaskTime.Now(), ["text"] = "the document was saved as " + newKey + " (formerly " + oldKey + ")", ["who"] = "revit" });
                     t.Rev++;
                     _store.Save(t);
                     changed.Add(t);
@@ -398,13 +398,13 @@ namespace Bimbridge.Engine.Tasks
             return n;
         }
 
-        /// <summary>Archiva una tarea detenida (mueve su carpeta a tareas\_archivo). No borra nada.</summary>
+        /// <summary>Archives a stopped task (moves its folder to tareas\_archivo). Deletes nothing.</summary>
         public string Archive(string id)
         {
             lock (_lock)
             {
-                if (_running.ContainsKey(id)) return "la tarea está corriendo; cancélela antes de archivarla";
-                if (!_store.Exists(id)) return "no existe la tarea " + id;
+                if (_running.ContainsKey(id)) return "the task is running; cancel it before archiving it";
+                if (!_store.Exists(id)) return "task " + id + " does not exist";
                 var elsewhere = HeldElsewhere(id);
                 if (elsewhere != null) return elsewhere;
                 return _store.Archive(id);
@@ -413,7 +413,7 @@ namespace Bimbridge.Engine.Tasks
 
         public List<TaskRecord> List() => _store.List().Select(t => Get(t.Id, out _)).Where(t => t != null).ToList();
 
-        /// <summary>Filas de unidades (paginadas) para no mandar miles al agente.</summary>
+        /// <summary>Unit rows (paged) so as not to send thousands to the agent.</summary>
         public List<object[]> UnitRows(string id, string state, int from, int count, out int total)
         {
             Get(id, out var units);

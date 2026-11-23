@@ -13,10 +13,10 @@ using Bimbridge.Engine.Qa;
 using Bimbridge.Engine.Workflows;
 using Bimbridge.Protocol;
 
-// Harness offline reproducible (0.9.1). Cada escenario BM-xx mide, con mediana, p95, throughput y bytes asignados, la parte de BIMBRIDGE
-// que corre FUERA del hilo de Revit. Lo que necesita Revit (lectura/escritura reales, MEP, familias, compilación dinámica) NO se mide
-// aquí: se declara en `workloads` con su especificación para la campaña nativa. Nada de esto es rendimiento de Revit ni de pyRevit.
-// uso: WorkflowBench [salida.md] [salida.json] [repeticiones]
+// Reproducible offline harness (0.9.1). Each BM-xx scenario measures, with median, p95, throughput and allocated bytes, the part of BIMBRIDGE
+// that runs OUTSIDE the Revit thread. What needs Revit (real reads/writes, MEP, families, dynamic compilation) is NOT measured
+// here: it is declared in `workloads` with its specification for the native campaign. None of this is Revit or pyRevit performance.
+// usage: WorkflowBench [output.md] [output.json] [repetitions]
 internal static class Program
 {
     private sealed class Row
@@ -28,7 +28,7 @@ internal static class Program
 
     private static Row Measure(string id, string name, string variant, int n, int reps, Func<object> body, string note = null)
     {
-        body();                                   // calentamiento
+        body();                                   // warm-up
         var times = new List<double>(); long alloc = 0;
         for (var i = 0; i < reps; i++)
         {
@@ -44,11 +44,11 @@ internal static class Program
         var med = times[times.Count / 2]; var p95 = times[Math.Min(times.Count - 1, (int)Math.Ceiling(times.Count * 0.95) - 1)];
         var row = new Row { Id = id, Name = name, Variant = variant, N = n, MedianMs = med, P95Ms = p95, ThroughputPerS = med > 0 ? n / (med / 1000.0) : 0, AllocBytes = alloc, Note = note };
         Rows.Add(row);
-        Console.WriteLine(id + " " + variant + " n=" + n + " mediana " + med.ToString("0.00", CultureInfo.InvariantCulture) + " ms");
+        Console.WriteLine(id + " " + variant + " n=" + n + " median " + med.ToString("0.00", CultureInfo.InvariantCulture) + " ms");
         return row;
     }
 
-    // ---------------- datos sintéticos (semilla fija) ----------------
+    // ---------------- synthetic data (fixed seed) ----------------
     private static List<ModelHealth.Element> Elements(int n, bool dense)
     {
         var r = new Random(11); var l = new List<ModelHealth.Element>(n);
@@ -63,7 +63,7 @@ internal static class Program
         return l;
     }
 
-    // Línea base: la implementación anterior de la detección (grupo con List.Contains), copiada para medir el «antes».
+    // Baseline: the previous detection implementation (group with List.Contains), copied to measure the "before".
     private static List<List<long>> DuplicatesBefore(IEnumerable<ModelHealth.Element> elements, double tol = ModelHealth.DuplicateTolerance)
     {
         var groups = new List<List<long>>();
@@ -120,80 +120,80 @@ internal static class Program
                 return groups.Render();
             }
             var check = Json.Write(Legacy());
-            if (check != Json.Write(Streaming())) throw new InvalidOperationException("BM-01: las agrupaciones difieren");
-            var note = "mismo conteo, orden y grupos; SHA-256 " + Home.Sha256Hex(check) + "; sólo proyección y agregación offline";
-            Measure("BM-01", "Inventario agrupado", "materializado", n, Math.Max(30, reps), Legacy, note);
-            Measure("BM-01", "Inventario agrupado", "incremental", n, Math.Max(30, reps), Streaming, note);
+            if (check != Json.Write(Streaming())) throw new InvalidOperationException("BM-01: the groupings differ");
+            var note = "same count, order and groups; SHA-256 " + Home.Sha256Hex(check) + "; offline projection and aggregation only";
+            Measure("BM-01", "Grouped inventory", "materialized", n, Math.Max(30, reps), Legacy, note);
+            Measure("BM-01", "Grouped inventory", "incremental", n, Math.Max(30, reps), Streaming, note);
         }
 
-        // BM-03 Model Health (análisis fuera de Revit) en tamaños distintos, y duplicados denso antes/después.
+        // BM-03 Model Health (analysis outside Revit) at different sizes, and dense duplicates before/after.
         foreach (var n in new[] { 1000, 10000, 50000 })
         {
             var els = Elements(n, false);
-            Measure("BM-03", "Model Health: informe (duplicados, parámetros, conectores)", "informe", n, reps, () => ModelHealth.Report(null, els, new List<ModelHealth.Connector>(), null, null, new[] { "Circuit Number" }));
+            Measure("BM-03", "Model Health: report (duplicates, parameters, connectors)", "report", n, reps, () => ModelHealth.Report(null, els, new List<ModelHealth.Connector>(), null, null, new[] { "Circuit Number" }));
         }
         foreach (var n in new[] { 10000, 50000 })
         {
             var els = Elements(n, true);
-            Measure("BM-03", "Duplicados en modelo denso", "antes (List.Contains)", n, reps, () => DuplicatesBefore(els));
-            Measure("BM-03", "Duplicados en modelo denso", "después (HashSet)", n, reps, () => ModelHealth.Duplicates(els));
+            Measure("BM-03", "Duplicates in a dense model", "before (List.Contains)", n, reps, () => DuplicatesBefore(els));
+            Measure("BM-03", "Duplicates in a dense model", "after (HashSet)", n, reps, () => ModelHealth.Duplicates(els));
         }
         var cluster = Enumerable.Range(0, 20000).Select(i => new ModelHealth.Element { Id = i + 1, Category = "C", Family = "F", Type = "T", Level = "L", X = 5, Y = 5, Z = 9 }).ToList();
-        Measure("BM-03", "Duplicados: un único grupo de 20.000 coincidentes", "antes (List.Contains)", cluster.Count, Math.Min(reps, 3), () => DuplicatesBefore(cluster));
-        Measure("BM-03", "Duplicados: un único grupo de 20.000 coincidentes", "después (HashSet)", cluster.Count, reps, () => ModelHealth.Duplicates(cluster));
+        Measure("BM-03", "Duplicates: a single group of 20,000 coincident elements", "before (List.Contains)", cluster.Count, Math.Min(reps, 3), () => DuplicatesBefore(cluster));
+        Measure("BM-03", "Duplicates: a single group of 20,000 coincident elements", "after (HashSet)", cluster.Count, reps, () => ModelHealth.Duplicates(cluster));
 
-        // BM-06 Escrituras por lote: validar N operaciones sueltas (N llamadas a plan) frente a una operación compuesta (1 llamada con N ops).
+        // BM-06 Batch writes: validate N separate operations (N plan calls) versus one compound operation (1 call with N ops).
         foreach (var n in new[] { 10, 50, 200 })
         {
             var ops = Enumerable.Range(0, n).Select(PlaceOp).ToList();
-            Measure("BM-06", "Validación offline de N colocaciones", "N planes de 1 op", n, reps, () => { var c = 0; foreach (var o in ops) c += OpSpec.ParseAll(new Dictionary<string, object> { ["ops"] = new List<object> { o } }).Count; return c; },
-                "mide sólo la validación offline; cada plan adicional en Revit añade una visita al hilo y una transacción (no medido aquí)");
-            Measure("BM-06", "Validación offline de N colocaciones", "1 plan de N ops", n, reps, () => OpSpec.ParseAll(new Dictionary<string, object> { ["ops"] = ops.Cast<object>().ToList() }).Count);
+            Measure("BM-06", "Offline validation of N placements", "N plans of 1 op", n, reps, () => { var c = 0; foreach (var o in ops) c += OpSpec.ParseAll(new Dictionary<string, object> { ["ops"] = new List<object> { o } }).Count; return c; },
+                "measures offline validation only; each extra plan in Revit adds one trip to the thread and one transaction (not measured here)");
+            Measure("BM-06", "Offline validation of N placements", "1 plan of N ops", n, reps, () => OpSpec.ParseAll(new Dictionary<string, object> { ["ops"] = ops.Cast<object>().ToList() }).Count);
         }
 
-        // BM-07 Copy/Monitor: verificación del fixture sintético de 88 aparatos (y 10.000), sin la intervención manual.
+        // BM-07 Copy/Monitor: verification of the synthetic 88-fixture test set (and 10,000), without the manual step.
         foreach (var n in new[] { 88, 10000 })
         {
             var src = Enumerable.Range(0, n).Select(i => new SourceFixture { UniqueId = "S" + i, Category = "PlumbingFixtures", Family = "F" + (i % 5), Type = "T", Level = "L1", X = (i % 100) * 6.0, Y = (i / 100) * 8.0 }).ToList();
             var tf = new LinkTransform { Dx = 100, Dy = -20, RotationDeg = 30 };
             long id = 5000;
             var host = src.Select(s => { var p = tf.Apply(s.X, s.Y, s.Z); return new HostFixture { Id = id++, Family = s.Family, Type = s.Type, X = p.X, Y = p.Y, Z = p.Z, RotationDeg = tf.RotateAngle(0), Monitoring = true, MonitoredLinkInstances = new List<long> { 77 } }; }).ToList();
-            Measure("BM-07", "Copy/Monitor: verificación de la copia (sin la parte manual)", "verificar", n, reps, () => CopyMonitorVerifier.Verify(src, new List<HostFixture>(), host, tf, null, 77));
+            Measure("BM-07", "Copy/Monitor: verification of the copy (without the manual part)", "verify", n, reps, () => CopyMonitorVerifier.Verify(src, new List<HostFixture>(), host, tf, null, 77));
             var e = new CopyMonitorExpectations { HostIdentity = "h", LinkIdentity = "l", Category = "PlumbingFixtures", Transform = tf, Source = src };
-            Measure("BM-07", "Copy/Monitor: congelar y comparar expectativas", "huella + diff", n, reps, () => { var f = e.Fingerprint; return e.Diff(e).Count + f.Length; });
+            Measure("BM-07", "Copy/Monitor: freeze and compare expectations", "fingerprint + diff", n, reps, () => { var f = e.Fingerprint; return e.Diff(e).Count + f.Length; });
         }
 
-        // BM-09 Agentes concurrentes: reparto del planificador con 1, 2, 4 y 8 agentes (operaciones sintéticas de 5 ms).
+        // BM-09 Concurrent agents: scheduler distribution with 1, 2, 4 and 8 agents (synthetic 5 ms operations).
         foreach (var agents in new[] { 1, 2, 4, 8 })
         {
-            Measure("BM-09", "Planificador: 64 operaciones repartidas entre agentes", agents + " agente(s)", 64, Math.Min(reps, 5), () =>
+            Measure("BM-09", "Scheduler: 64 operations distributed among agents", agents + " agent(s)", 64, Math.Min(reps, 5), () =>
             {
                 var s = new OperationScheduler { MaxRunning = 4, MaxPerOwner = 2, MaxQueued = 1000 };
-                var tasks = Enumerable.Range(0, 64).Select(i => Task.Run(() => s.Run("agente" + (i % agents), "doc" + (i % 3), async () => { await Task.Delay(5); return i; }, CancellationToken.None))).ToArray();
+                var tasks = Enumerable.Range(0, 64).Select(i => Task.Run(() => s.Run("agent" + (i % agents), "doc" + (i % 3), async () => { await Task.Delay(5); return i; }, CancellationToken.None))).ToArray();
                 Task.WaitAll(tasks);
                 return s.Stats();
-            }, "espera sintética de 5 ms por operación: mide el coste de coordinación y el reparto, no trabajo en Revit");
+            }, "synthetic 5 ms wait per operation: measures coordination and distribution cost, not work in Revit");
         }
 
-        // Instrumentación: coste de armar y serializar las métricas de un workflow (no debe pesar frente al workflow).
-        Measure("INS", "Armar y serializar WorkflowMetrics", "1 workflow", 1, reps * 20, () => Json.Write(WorkflowMetrics.FromMainThread(100, 5, 80, 4, 30).Observe("elements_read", 1000).Observe("cache_hits", 900).Observe("cache_misses", 100).ToJson()));
+        // Instrumentation: cost of building and serializing a workflow's metrics (must be negligible next to the workflow).
+        Measure("INS", "Build and serialize WorkflowMetrics", "1 workflow", 1, reps * 20, () => Json.Write(WorkflowMetrics.FromMainThread(100, 5, 80, 4, 30).Observe("elements_read", 1000).Observe("cache_hits", 900).Observe("cache_misses", 100).ToJson()));
 
         var md = new StringBuilder();
-        md.AppendLine("# Benchmarks offline de workflows (0.9.1)");
+        md.AppendLine("# Offline workflow benchmarks (0.9.1)");
         md.AppendLine();
-        md.AppendLine("Generado por `tools/bench/WorkflowBench` en " + Environment.ProcessorCount + " CPU lógicas, " + System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription + ". Mediana y p95 de " + reps + " repeticiones tras calentamiento; semilla fija.");
-        md.AppendLine("**Mide sólo lo que BIMBRIDGE hace fuera del hilo de Revit.** No es rendimiento de Revit ni de pyRevit; las cifras «antes/después» comparan dos implementaciones del mismo cálculo en este equipo.");
+        md.AppendLine("Generated by `tools/bench/WorkflowBench` on " + Environment.ProcessorCount + " logical CPUs, " + System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription + ". Median and p95 of " + reps + " repetitions after warm-up; fixed seed.");
+        md.AppendLine("**Measures only what BIMBRIDGE does outside the Revit thread.** It is not Revit or pyRevit performance; the \"before/after\" figures compare two implementations of the same computation on this machine.");
         md.AppendLine();
-        md.AppendLine("| Escenario | Variante | N | Mediana ms | p95 ms | Throughput /s | Asignado KB | Nota |");
+        md.AppendLine("| Scenario | Variant | N | Median ms | p95 ms | Throughput /s | Allocated KB | Note |");
         md.AppendLine("|---|---|---|---|---|---|---|---|");
         foreach (var r in Rows)
             md.AppendLine("| " + r.Id + " " + r.Name + " | " + r.Variant + " | " + r.N + " | " + r.MedianMs.ToString("0.00", CultureInfo.InvariantCulture) + " | " + r.P95Ms.ToString("0.00", CultureInfo.InvariantCulture) + " | " +
                           r.ThroughputPerS.ToString("0", CultureInfo.InvariantCulture) + " | " + r.AllocBytes / 1024 + " | " + (r.Note ?? "") + " |");
         md.AppendLine();
-        md.AppendLine("## Antes → después (misma máquina, mismo dato)");
-        foreach (var g in Rows.Where(r => r.Variant.StartsWith("antes")).Select(r => r))
+        md.AppendLine("## Before → after (same machine, same data)");
+        foreach (var g in Rows.Where(r => r.Variant.StartsWith("before")).Select(r => r))
         {
-            var after = Rows.First(r => r.Name == g.Name && r.N == g.N && r.Variant.StartsWith("después"));
+            var after = Rows.First(r => r.Name == g.Name && r.N == g.N && r.Variant.StartsWith("after"));
             md.AppendLine("- " + g.Name + " (N=" + g.N + "): " + g.MedianMs.ToString("0.00", CultureInfo.InvariantCulture) + " ms → " + after.MedianMs.ToString("0.00", CultureInfo.InvariantCulture) + " ms (" + (g.MedianMs / Math.Max(0.001, after.MedianMs)).ToString("0.0", CultureInfo.InvariantCulture) + "×)");
         }
         var outMd = args.Length > 0 ? args[0] : "workflow-bench.md";
@@ -209,19 +209,19 @@ internal static class Program
         return 0;
     }
 
-    /// <summary>Especificación de los workloads que sólo se pueden medir dentro de Revit (campaña nativa). Mismos parámetros para BIMBRIDGE y pyRevit.</summary>
+    /// <summary>Specification of the workloads that can only be measured inside Revit (native campaign). Same parameters for BIMBRIDGE and pyRevit.</summary>
     private static readonly List<Dictionary<string, object>> Workloads = new List<Dictionary<string, object>>
     {
-        W("BM-01", "Lectura masiva", "1000, 10000, 50000 elementos; lectura completa y paginada", "mismo conjunto de campos (id, fam, type, lvl, 3 parámetros)", "filas iguales (conteo y hash del conjunto)"),
-        W("BM-02", "Parámetros", "leer y modificar 1 parámetro en 100, 1000, 5000 instancias", "mismo parámetro y valores", "relectura: 100 % de valores como se pidieron"),
-        W("BM-03n", "Model Health", "modelos sintéticos pequeño/mediano/grande", "mismas reglas (avisos, duplicados, parámetros vacíos, conectores libres)", "mismos ids por hallazgo"),
-        W("BM-04", "Familias", "colocar y modificar instancias repetidas (100, 1000)", "mismo tipo, nivel y puntos", "posición y tipo verificados"),
-        W("BM-05", "MEP", "consultar sistemas, conectores, equipos, circuitos y relaciones", "mismas categorías", "mismos conteos y relaciones"),
-        W("BM-06n", "Escrituras por lotes", "N operaciones individuales frente a una compuesta equivalente", "mismo resultado en el modelo", "diff de relectura idéntico"),
-        W("BM-07n", "Copy/Monitor", "preflight y verificación del fixture de 88 aparatos; la intervención manual se cronometra APARTE", "fixture sintético redistribuible", "verificado/fallido con la misma regla; no se compara como automatización nativa terminada"),
-        W("BM-08", "PDF→Revit", "extracción, registro, planificación y aplicación con tiempo separado por etapa", "mismo PDF, mismas reglas de tipo", "verificación independiente de colocación"),
-        W("BM-09n", "Agentes concurrentes", "1, 2, 4 y 8 agentes sobre documentos y operaciones compatibles", "misma carga total", "sin duplicados ni pérdidas; orden de escritura intacto"),
-        W("BM-10", "Compilación dinámica", "compilación en frío, en caliente, caché y ejecución por separado", "mismo script", "mismo resultado"),
+        W("BM-01", "Bulk read", "1000, 10000, 50000 elements; full and paged read", "same set of fields (id, fam, type, lvl, 3 parameters)", "identical rows (count and hash of the set)"),
+        W("BM-02", "Parameters", "read and modify 1 parameter on 100, 1000, 5000 instances", "same parameter and values", "re-read: 100 % of values as requested"),
+        W("BM-03n", "Model Health", "small/medium/large synthetic models", "same rules (warnings, duplicates, empty parameters, free connectors)", "same ids per finding"),
+        W("BM-04", "Families", "place and modify repeated instances (100, 1000)", "same type, level and points", "position and type verified"),
+        W("BM-05", "MEP", "query systems, connectors, equipment, circuits and relationships", "same categories", "same counts and relationships"),
+        W("BM-06n", "Batch writes", "N individual operations versus one equivalent compound operation", "same result in the model", "identical re-read diff"),
+        W("BM-07n", "Copy/Monitor", "preflight and verification of the 88-fixture test set; the manual step is timed SEPARATELY", "redistributable synthetic test set", "verified/failed with the same rule; not compared as finished native automation"),
+        W("BM-08", "PDF→Revit", "extraction, registration, planning and apply, timed separately per stage", "same PDF, same type rules", "independent placement verification"),
+        W("BM-09n", "Concurrent agents", "1, 2, 4 and 8 agents on compatible documents and operations", "same total load", "no duplicates or losses; write order intact"),
+        W("BM-10", "Dynamic compilation", "cold compilation, warm compilation, cache and execution separately", "same script", "same result"),
     };
 
     private static Dictionary<string, object> W(string id, string name, string size, string sameInput, string correctness) =>

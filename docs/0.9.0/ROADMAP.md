@@ -1,11 +1,11 @@
-# BIMBRIDGE 0.9.0 — hoja de ruta técnica
+# BIMBRIDGE 0.9.0 — technical roadmap
 
-| Prioridad | Cambio local | Siguiente comprobación |
+| Priority | Local change | Next check |
 |---|---|---|
-| P0 Worker | Selección de CPython, diagnóstico de arranque y JSONL UTF-8 | Validar con la cuenta de laboratorio y la distribución final de dependencias |
-| P1 Consultas | Digest canónico, conjuntos existentes y tiempos por tramo | Medir p50/p95 en frío/caliente con el mismo documento, filtros, campos y digest en corridas comparables |
-| P1 PDF | T04 reconoce 4 ejes y 4 cruces con inferencia optativa | Validar inferencia con PDFs públicos adicionales antes de utilizar sus anclas en colocaciones |
-| P0 Escritura | Refuerzo de `commit modo=ensayo`, mocks y compilación | Aceptación nativa tras autorización explícita de una instancia y copia local concretas |
-| P2 Tokens | Estimación y comparación pareada en el resumen CSV | Recoger tokens reales del cliente para intercambios del mismo alcance |
+| P0 Worker | CPython selection, startup diagnostics and UTF-8 JSONL | Validate with the lab account and the final dependency distribution |
+| P1 Queries | Canonical digest, existing sets and per-slice timings | Measure cold/warm p50/p95 with the same document, filters, fields and digest in comparable runs |
+| P1 PDF | T04 recognizes 4 grids and 4 intersections with optional inference | Validate inference with additional public PDFs before using its anchors for placements |
+| P0 Writes | Hardening of `commit modo=ensayo`, mocks and build | Native acceptance after explicit authorization of a specific instance and local copy |
+| P2 Tokens | Estimation and paired comparison in the CSV summary | Collect real client tokens for exchanges of the same scope |
 
-La campaña 0.9.0 sigue **NATIVE_ACCEPTANCE_PENDING**. Aplicaciones persistentes, guardado, sincronización e instalación se gobiernan por autorizaciones independientes.
+The 0.9.0 campaign remains **NATIVE_ACCEPTANCE_PENDING**. Persistent applies, save, sync and installation are governed by independent authorizations.

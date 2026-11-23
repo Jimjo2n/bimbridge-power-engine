@@ -13,9 +13,9 @@ using Xunit;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// Issue #27: group commit de AuditLog entre escritores. Pruebas deterministas en un proceso: el bloqueo real (auditoria.lock, FileShare.None)
-    /// lo retiene la prueba para fijar el orden; cada AuditLog es un escritor independiente sobre el mismo archivo, como un proceso de Revit.
-    /// Garantías comprobadas: ninguna confirmación antes de persistir, ninguna pérdida, ningún duplicado, orden de encolado, fallo cerrado.
+    /// Issue #27: AuditLog group commit across writers. Deterministic in-process tests: the test holds the real lock (auditoria.lock, FileShare.None)
+    /// to fix the order; each AuditLog is an independent writer on the same file, like a Revit process.
+    /// Guarantees checked: no confirmation before persisting, no loss, no duplicate, enqueue order, fail-closed.
     /// </summary>
     public class AuditGroupCommitTests
     {
@@ -33,7 +33,7 @@ namespace Bimbridge.Tests
         private static void WaitFor(Func<bool> cond, string what, int ms = 10000)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            while (!cond()) { if (sw.ElapsedMilliseconds > ms) throw new TimeoutException("no ocurrió: " + what); Thread.Sleep(5); }
+            while (!cond()) { if (sw.ElapsedMilliseconds > ms) throw new TimeoutException("did not happen: " + what); Thread.Sleep(5); }
         }
 
         private static List<Dictionary<string, object>> Lines(string audit) =>
@@ -49,9 +49,9 @@ namespace Bimbridge.Tests
             using (HoldLock(p))
             {
                 t = Task.Run(() => b.Append("b", "op", "ok"));
-                WaitFor(() => Pending(p).Length == 1, "entrada en cola");
+                WaitFor(() => Pending(p).Length == 1, "entry queued");
                 Thread.Sleep(150);
-                Assert.False(t.IsCompleted);                 // sin bloqueo no hay escritura: tampoco confirmación
+                Assert.False(t.IsCompleted);                 // no lock means no write: and no confirmation either
                 Assert.Single(Lines(p));
             }
             Assert.Equal(2, t.Result);
@@ -59,8 +59,8 @@ namespace Bimbridge.Tests
             Assert.True(v.Ok, string.Join("; ", v.Errors));
             Assert.Equal(2, v.Lines);
             var last = Lines(p).Last();
-            Assert.Equal("b", Arg.GetString(last, "autor"));
-            Assert.False(string.IsNullOrEmpty(Arg.GetString(last, "cid")));   // entrada que pasó por la cola: identificable
+            Assert.Equal("b", Arg.GetString(last, "author"));
+            Assert.False(string.IsNullOrEmpty(Arg.GetString(last, "cid")));   // entry that went through the queue: identifiable
             Assert.Empty(Pending(p));
         }
 
@@ -78,7 +78,7 @@ namespace Bimbridge.Tests
                     var w = writers[i]; var name = "w" + (i + 1);
                     tasks.Add(Task.Run(() => w.Append(name, "op", "ok")));
                     var expected = i + 1;
-                    WaitFor(() => Pending(p).Length == expected, "cola de " + expected);   // orden de encolado fijado por la prueba
+                    WaitFor(() => Pending(p).Length == expected, "queue of " + expected);   // enqueue order fixed by the test
                 }
                 Assert.All(tasks, x => Assert.False(x.IsCompleted));
             }
@@ -87,8 +87,8 @@ namespace Bimbridge.Tests
             Assert.Equal(new long[] { 2, 3, 4, 5 }, seqs.OrderBy(x => x).ToArray());
             Assert.Equal(seqs.Count, seqs.Distinct().Count());
             var lines = Lines(p);
-            Assert.Equal(new[] { "s", "w1", "w2", "w3", "w4" }, lines.Select(l => Arg.GetString(l, "autor")).ToArray());
-            for (var i = 0; i < 4; i++) Assert.Equal(seqs[i], Convert.ToInt64(lines[i + 1]["seq"]));   // cada escritor recibe SU seq
+            Assert.Equal(new[] { "s", "w1", "w2", "w3", "w4" }, lines.Select(l => Arg.GetString(l, "author")).ToArray());
+            for (var i = 0; i < 4; i++) Assert.Equal(seqs[i], Convert.ToInt64(lines[i + 1]["seq"]));   // each writer gets ITS seq
             Assert.True(AuditLog.Verify(p).Ok);
         }
 
@@ -101,12 +101,12 @@ namespace Bimbridge.Tests
             using (HoldLock(p))
             {
                 var ex = Assert.Throws<JournalUnavailableException>(() => b.Append("b", "op", "ok"));
-                Assert.Contains("no se escribió nada", ex.Message);
+                Assert.Contains("nothing was written", ex.Message);
             }
             Assert.Equal(1, b.Failures);
-            Assert.Empty(Pending(p));                          // la entrada retirada no puede escribirla otro líder después
+            Assert.Empty(Pending(p));                          // the withdrawn entry cannot be written by another leader later
             Assert.Single(Lines(p));
-            Assert.Equal(2, b.Append("b", "op2", "ok"));       // el escritor sigue utilizable
+            Assert.Equal(2, b.Append("b", "op2", "ok"));       // the writer is still usable
             Assert.True(AuditLog.Verify(p).Ok);
         }
 
@@ -119,16 +119,16 @@ namespace Bimbridge.Tests
             Task<long> t;
             using (HoldLock(p))
             {
-                t = Task.Run(() => b.Append("b", "intencion_x", "intencion"));
-                WaitFor(() => Pending(p).Length == 1, "entrada en cola");
-                // Un líder la reclama (misma primitiva: apertura exclusiva que borra al cerrar) y "cae" antes de escribir y confirmar.
+                t = Task.Run(() => b.Append("b", "intent_x", "intent"));
+                WaitFor(() => Pending(p).Length == 1, "entry queued");
+                // A leader claims it (same primitive: exclusive open that deletes on close) and "crashes" before writing and confirming.
                 using (new FileStream(Pending(p)[0], FileMode.Open, FileAccess.Read, FileShare.None, 4096, FileOptions.DeleteOnClose)) { }
                 var ex = Assert.Throws<AggregateException>(() => t.Wait(10000));
                 Assert.IsType<JournalUnavailableException>(ex.InnerException);
-                Assert.Contains("reclamada", ex.InnerException.Message);
+                Assert.Contains("claimed", ex.InnerException.Message);
             }
-            Assert.Single(Lines(p));                           // el seguidor no la reescribe: sin duplicados
-            b.Append("b", "despues", "ok");
+            Assert.Single(Lines(p));                           // the follower does not rewrite it: no duplicates
+            b.Append("b", "after", "ok");
             Assert.Equal(2, AuditLog.Verify(p).Lines);
         }
 
@@ -137,12 +137,12 @@ namespace Bimbridge.Tests
         {
             var p = NewAudit();
             new AuditLog(p).Append("s", "genesis", "ok");
-            var b = new AuditLog(p) { FaultBeforeWrite = _ => throw new IOException("disco lleno") };
+            var b = new AuditLog(p) { FaultBeforeWrite = _ => throw new IOException("disk full") };
             Task<long> t;
             using (HoldLock(p))
             {
                 t = Task.Run(() => b.Append("b", "op", "ok"));
-                WaitFor(() => Pending(p).Length == 1, "entrada en cola");
+                WaitFor(() => Pending(p).Length == 1, "entry queued");
             }
             var ex = Assert.Throws<AggregateException>(() => t.Wait(10000));
             Assert.IsType<JournalUnavailableException>(ex.InnerException);
@@ -159,23 +159,23 @@ namespace Bimbridge.Tests
             var p = NewAudit();
             new AuditLog(p).Append("s", "genesis", "ok");
             var follower = new AuditLog(p);
-            var leader = new AuditLog(p) { FaultBeforeWrite = _ => throw new IOException("disco lleno") };
+            var leader = new AuditLog(p) { FaultBeforeWrite = _ => throw new IOException("disk full") };
             Task<long> tf, tl;
             using (HoldLock(p))
             {
-                tl = Task.Run(() => leader.Append("lider", "op", "ok"));
-                WaitFor(() => Pending(p).Length == 1, "líder en cola");
-                tf = Task.Run(() => follower.Append("seguidor", "op", "ok"));
-                WaitFor(() => Pending(p).Length == 2, "seguidor en cola");
+                tl = Task.Run(() => leader.Append("leader", "op", "ok"));
+                WaitFor(() => Pending(p).Length == 1, "leader queued");
+                tf = Task.Run(() => follower.Append("follower", "op", "ok"));
+                WaitFor(() => Pending(p).Length == 2, "follower queued");
             }
-            // Quien tome el bloqueo primero escribe el lote. Si es el líder con fallo, ambos reciben error; si es el seguidor, éste escribe ambas
-            // entradas y el líder con fallo sólo falla si le toca escribir. En ningún caso hay confirmación sin línea persistida.
+            // Whoever takes the lock first writes the batch. If it is the faulty leader, both get an error; if it is the follower, it writes both
+            // entries and the faulty leader only fails if it is the one writing. In no case is there a confirmation without a persisted line.
             var results = new[] { tl, tf }.Select(x => { try { return (ok: true, seq: x.Result); } catch (AggregateException) { return (ok: false, seq: 0L); } }).ToList();
             var lines = Lines(p);
             var v = AuditLog.Verify(p);
             Assert.True(v.Ok, string.Join("; ", v.Errors));
             foreach (var r in results.Where(r => r.ok)) Assert.Contains(lines, l => Convert.ToInt64(l["seq"]) == r.seq);
-            Assert.Equal(1 + results.Count(r => r.ok), lines.Count);   // cada confirmación tiene exactamente una línea, y no hay líneas sin dueño confirmado o fallido
+            Assert.Equal(1 + results.Count(r => r.ok), lines.Count);   // each confirmation has exactly one line, and there are no lines without a confirmed or failed owner
             Assert.Empty(Pending(p));
         }
 
@@ -184,22 +184,22 @@ namespace Bimbridge.Tests
         {
             var p = NewAudit();
             new AuditLog(p).Append("s", "genesis", "ok");
-            // Un escritor dejó su entrada en la cola y murió antes de recibir confirmación (reinicio de Revit, proceso terminado).
+            // A writer left its entry in the queue and died before getting confirmation (Revit restart, process terminated).
             Directory.CreateDirectory(p + ".pend");
             var id = Guid.NewGuid().ToString("N");
             File.WriteAllText(Path.Combine(p + ".pend", DateTime.UtcNow.Ticks.ToString("D19") + "-" + id + ".json"), Json.Write(new Dictionary<string, object>
             {
-                ["id"] = id, ["autor"] = "muerto", ["op"] = "exec", ["estado"] = "intencion", ["pid"] = 1L, ["t"] = "2026-11-10T00:00:00Z",
-                ["extra"] = new Dictionary<string, object> { ["intencion"] = "abc123", ["objetivo"] = "doc" },
+                ["id"] = id, ["author"] = "dead", ["op"] = "exec", ["status"] = "intent", ["pid"] = 1L, ["t"] = "2026-11-10T00:00:00Z",
+                ["extra"] = new Dictionary<string, object> { ["intent"] = "abc123", ["target"] = "doc" },
             }), new UTF8Encoding(false));
             var c = new AuditLog(p);
-            Assert.Equal(3, c.Append("c", "op", "ok"));       // el líder siguiente escribe primero la entrada huérfana, luego la suya
+            Assert.Equal(3, c.Append("c", "op", "ok"));       // the next leader writes the orphan entry first, then its own
             var lines = Lines(p);
-            Assert.Equal(new[] { "s", "muerto", "c" }, lines.Select(l => Arg.GetString(l, "autor")).ToArray());
+            Assert.Equal(new[] { "s", "dead", "c" }, lines.Select(l => Arg.GetString(l, "author")).ToArray());
             Assert.Equal(id, Arg.GetString(lines[1], "cid"));
             Assert.True(AuditLog.Verify(p).Ok);
-            // La intención huérfana no tiene resultado: queda pendiente de reconciliar, nunca como completada.
-            Assert.Contains(AuditLog.PendingIntents(p), x => Arg.GetString(x, "intencion") == "abc123");
+            // The orphan intent has no result: it stays pending reconciliation, never as completed.
+            Assert.Contains(AuditLog.PendingIntents(p), x => Arg.GetString(x, "intent") == "abc123");
         }
 
         [Fact]
@@ -209,15 +209,15 @@ namespace Bimbridge.Tests
             var a = new AuditLog(p);
             for (var i = 0; i < 5; i++) a.Append("a", "op" + i, "ok");
             Task<long> t;
-            var b = new AuditLog(p);                           // la apertura también toma el bloqueo: se crea antes de retenerlo
+            var b = new AuditLog(p);                           // opening also takes the lock: it is created before holding it
             using (HoldLock(p))
             {
                 t = Task.Run(() => b.Append("b", "op", "ok"));
-                WaitFor(() => Pending(p).Length == 1, "entrada en cola");
+                WaitFor(() => Pending(p).Length == 1, "entry queued");
                 Assert.False(t.IsCompleted);
             }
             Assert.Equal(6, t.Result);
-            var reopened = new AuditLog(p);                    // "reinicio": instancia nueva relee toda la cadena
+            var reopened = new AuditLog(p);                    // "restart": a new instance rereads the whole chain
             Assert.Equal(7, reopened.Append("r", "op", "ok"));
             var v = AuditLog.Verify(p);
             Assert.True(v.Ok, string.Join("; ", v.Errors));

@@ -16,7 +16,7 @@ The implementation uses C# for the Revit integration and orchestration, Rust for
 - Windows installer, backup and recovery procedures.
 - Operational status panel and session metrics.
 
-See [architecture](docs/0.9.0/POWER_ENGINE_ARCHITECTURE.md), [capabilities](docs/MATRIZ_CAPACIDADES.md) and [architecture decisions](docs/0.9.0/ARCHITECTURE_DECISIONS.md).
+See [architecture](docs/0.9.0/POWER_ENGINE_ARCHITECTURE.md), [capabilities](docs/CAPABILITY_MATRIX.md) and [architecture decisions](docs/0.9.0/ARCHITECTURE_DECISIONS.md).
 
 ## Validation
 
@@ -24,7 +24,7 @@ Offline tests and native acceptance are separate. Historical reports under `docs
 
 The repository preparation verified Rust unit/IPC tests, Python document-worker tests and a selected C# regression suite. A full distribution build, hosted CI and native acceptance remain release requirements. Current evidence and limitations must be recorded against the exact source commit.
 
-Native acceptance uses an isolated Revit instance and disposable, authorized models. Procedures: [native validation](docs/0.9.0/NATIVE_VALIDATION.md) and [0.9.0 acceptance](tools/aceptacion/0.9.0/PROCEDIMIENTO_0.9.0.md).
+Native acceptance uses an isolated Revit instance and disposable, authorized models. Procedures: [native validation](docs/0.9.0/NATIVE_VALIDATION.md) and [0.9.0 acceptance](tools/acceptance/0.9.0/PROCEDURE_0.9.0.md).
 
 ## Open work
 

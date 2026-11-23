@@ -9,9 +9,9 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Observabilidad del consumo (§6): por llamada del agente se registran herramienta, operación, caracteres recibidos y devueltos,
-    /// duración y estado. Son CARACTERES, no tokens: los tokens reales sólo los conoce el cliente (Codex/Claude). Un archivo JSONL por día
-    /// en metricas\ (se borran los de más de 14 días); sin argumentos ni resultados, sólo tamaños.
+    /// Usage observability (§6): for each agent call, tool, operation, characters received and returned,
+    /// duration and status are recorded. These are CHARACTERS, not tokens: only the client (Codex/Claude) knows the real tokens. One JSONL file per day
+    /// in metricas\ (files older than 14 days are deleted); no arguments or results, only sizes.
     /// </summary>
     public static class UsageMetrics
     {
@@ -30,11 +30,11 @@ namespace Bimbridge.Engine
         private static bool _cleaned;
         public static bool WriteFiles = true;
 
-        public static string Folder => _folder ?? (_folder = Home.Sub("metricas"));
+        public static string Folder => _folder ?? (_folder = Home.Sub("metrics"));
 
-        public static void Record(string client, string tool, string op, long charsIn, long charsOut, long ms, string estado)
+        public static void Record(string client, string tool, string op, long charsIn, long charsOut, long ms, string status)
         {
-            var error = estado != null && estado != "ok" && estado != "completado_con_diferencias";
+            var error = status != null && status != "ok" && status != "completed_with_differences";
             lock (Lock)
             {
                 if (!ByTool.TryGetValue(tool, out var r)) ByTool[tool] = r = new Row();
@@ -51,20 +51,20 @@ namespace Bimbridge.Engine
                 if (!_cleaned)
                 {
                     _cleaned = true;
-                    foreach (var f in Directory.GetFiles(Folder, "puente-*.jsonl"))
+                    foreach (var f in Directory.GetFiles(Folder, "bridge-*.jsonl"))
                         if (File.GetLastWriteTimeUtc(f) < DateTime.UtcNow.AddDays(-14)) File.Delete(f);
                 }
                 var line = Json.Write(new Dictionary<string, object>
                 {
-                    ["t"] = Home.Now(), ["cliente"] = client, ["herramienta"] = tool, ["op"] = op,
-                    ["chars_entrada"] = charsIn, ["chars_salida"] = charsOut, ["ms"] = ms, ["estado"] = estado,
+                    ["t"] = Home.Now(), ["client"] = client, ["tool_name"] = tool, ["op"] = op,
+                    ["chars_in"] = charsIn, ["chars_out"] = charsOut, ["ms"] = ms, ["status"] = status,
                 }) + "\n";
-                File.AppendAllText(Path.Combine(Folder, "puente-" + DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture) + ".jsonl"), line);
+                File.AppendAllText(Path.Combine(Folder, "bridge-" + DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture) + ".jsonl"), line);
             }
-            catch (Exception) { /* la métrica nunca rompe una llamada */ }
+            catch (Exception) { /* metrics never break a call */ }
         }
 
-        /// <summary>Resumen de este proceso del puente (desde que arrancó).</summary>
+        /// <summary>Summary of this bridge process (since it started).</summary>
         public static Dictionary<string, object> Summary()
         {
             lock (Lock)
@@ -74,13 +74,13 @@ namespace Bimbridge.Engine
                     .ToList();
                 return new Dictionary<string, object>
                 {
-                    ["cols"] = new List<object> { "herramienta", "llamadas", "chars_entrada", "chars_salida", "ms_medio", "errores" },
+                    ["cols"] = new List<object> { "tool_name", "calls", "chars_in", "chars_out", "mean_ms", "errors" },
                     ["rows"] = rows,
-                    ["llamadas"] = ByTool.Values.Sum(r => r.Calls),
+                    ["calls"] = ByTool.Values.Sum(r => r.Calls),
                     ["chars_total"] = ByTool.Values.Sum(r => r.CharsIn + r.CharsOut),
-                    ["tokens_estimados"] = TokenEstimate.FromChars(ByTool.Values.Sum(r => r.CharsIn + r.CharsOut)),
-                    ["tokens_metodo"] = TokenEstimate.Method,
-                    ["nota"] = "caracteres intercambiados con el agente; los tokens reales los informa el cliente",
+                    ["estimated_tokens"] = TokenEstimate.FromChars(ByTool.Values.Sum(r => r.CharsIn + r.CharsOut)),
+                    ["tokens_method"] = TokenEstimate.Method,
+                    ["note"] = "characters exchanged with the agent; the client reports the real tokens",
                 };
             }
         }

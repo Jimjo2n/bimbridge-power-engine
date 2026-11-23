@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>0.9.1: índice de capacidades con búsqueda, filtros y paginación; contrato completo sólo bajo demanda.</summary>
+    /// <summary>0.9.1: capability index with search, filters and pagination; full contract only on demand.</summary>
     public class CapabilityIndexTests
     {
         private static CapabilityIndex Idx => CapabilityIndex.Default;
@@ -14,7 +14,7 @@ namespace Bimbridge.Tests
         [Theory]
         [InlineData("Lighting fixture QA", "F20-LIGHT-QA-001")]
         [InlineData("QA de luminarias y etiquetas", "F20-LIGHT-QA-001")]
-        [InlineData("choques", "F32-GEO-CLASH-001")]
+        [InlineData("clashes", "F32-GEO-CLASH-001")]
         [InlineData("Clash / mounting analysis", "F32-GEO-CLASH-001")]
         [InlineData("f28-link-rvt-001", "F28-LINK-RVT-001")]
         public void Relevance_FindsBilingualTasksAndRespectsFilters(string query, string expected)
@@ -31,9 +31,9 @@ namespace Bimbridge.Tests
             var c = Idx.Get("f20-circuit-create-001");
             Assert.NotNull(c);
             var k = CapabilityIndex.Contract(c);
-            Assert.Equal("circuit_create", ((string)k["estrategia"]).Substring(6));
-            Assert.Equal("DIRECT_REVIT_API", k["ejecutor"]);
-            Assert.Equal("pendiente", k["verificacion_nativa"]);
+            Assert.Equal("circuit_create", ((string)k["strategy"]).Substring(6));
+            Assert.Equal("DIRECT_REVIT_API", k["executor"]);
+            Assert.Equal("pending", k["native_verification"]);
             Assert.Null(Idx.Get("F99-NADA-001"));
         }
 
@@ -43,7 +43,7 @@ namespace Bimbridge.Tests
             var (byDomain, total) = Idx.Search(new CapabilityQuery { Domain = "F20", PageSize = 100 });
             Assert.Equal(CapabilityCatalog.All.Count(c => c.Domain == "F20"), total);
             Assert.All(byDomain, c => Assert.Equal("F20", c.Domain));
-            var (hits, _) = Idx.Search(new CapabilityQuery { Text = "tuberia" });
+            var (hits, _) = Idx.Search(new CapabilityQuery { Text = "pípe" });
             Assert.Contains(hits, c => c.Id == "F18-PIPE-CREATE-001");
             var (pre, _) = Idx.Search(new CapabilityQuery { Text = "circ" });
             Assert.Contains(pre, c => c.Id == "F20-CIRCUIT-CREATE-001");
@@ -73,7 +73,7 @@ namespace Bimbridge.Tests
             var e = CapabilityCatalog.All[0];
             Assert.Throws<ArgumentException>(() => new CapabilityIndex(new[] { e, e }));
             Assert.Equal(new CapabilityIndex(CapabilityCatalog.All).Version, Idx.Version);
-            // AUD-16: cambiar CUALQUIER campo del contrato (no sólo id/estado/estrategia) cambia la huella; el orden de entrada no.
+            // AUD-16: changing ANY contract field (not just id/estado/estrategia) changes the fingerprint; input order does not.
             CapabilityEntry Clone(CapabilityEntry c) => (CapabilityEntry)typeof(object).GetMethod("MemberwiseClone", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(c, null);
             var baseSet = CapabilityCatalog.All.Take(5).Select(Clone).ToList();
             var v0 = new CapabilityIndex(baseSet).Version;

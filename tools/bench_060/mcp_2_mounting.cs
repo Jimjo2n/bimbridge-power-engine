@@ -1,0 +1,20 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Benchmark 0.6.0 · workload 2 (geometric QC of fixtures) · MCP engine. Equivalent: pyrevit_2_mounting.py (same algorithm).
+// exec codigo/archivo (modo consulta) args={"nivel":"<name or empty>","tol_mm":3,"max_mm":3000}
+var sw = System.Diagnostics.Stopwatch.StartNew();
+var level = args.ContainsKey("nivel") ? Convert.ToString(args["nivel"]) : null;
+var tol = args.ContainsKey("tol_mm") ? Convert.ToDouble(args["tol_mm"]) : 3.0;
+var max = args.ContainsKey("max_mm") ? Convert.ToDouble(args["max_mm"]) : 3000.0;
+var v3 = Bim.Mounting.View3D(doc);
+var fixtures = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_LightingFixtures).WhereElementIsNotElementType()
+    .Where(e => string.IsNullOrEmpty(level) || (doc.GetElement(e.LevelId) as Level)?.Name == level).ToList();
+var counts = new SortedDictionary<string, int>();
+var sample = new List<object>();
+foreach (var e in fixtures)
+{
+    var r = Bim.Mounting.Support(e, v3, "arriba", max, tol);
+    var c = Convert.ToString(r["clase"]);
+    counts[c] = counts.TryGetValue(c, out var n) ? n + 1 : 1;
+    if (c != "al_ras" && sample.Count < 5) sample.Add(new object[] { r["id"], c, r.ContainsKey("holgura_mm") ? r["holgura_mm"] : null });
+}
+return new { carga = "montaje", motor = "mcp", luces = fixtures.Count, cuenta = counts, muestra = sample, ms = sw.ElapsedMilliseconds };

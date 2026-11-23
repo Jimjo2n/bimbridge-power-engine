@@ -8,12 +8,12 @@ using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Text.Json;
 
-// Inventario offline de la API pública de Revit por versión (0.9.1, Bloque B).
-// Lee los ensamblados de referencia (paquetes Nice3point.Revit.Api.* de la caché de NuGet) con System.Reflection.Metadata:
-// no carga los ensamblados ni ejecuta código de Autodesk, y no necesita Revit instalado.
+// Offline inventory of the public Revit API per version (0.9.1, Block B).
+// Reads the reference assemblies (Nice3point.Revit.Api.* packages from the NuGet cache) with System.Reflection.Metadata:
+// it does not load the assemblies or run Autodesk code, and does not need Revit installed.
 //
-// uso: RevitApiInventory <carpeta-salida> [raíz-paquetes-nuget]
-// Salida: revit-api-<año>.json por versión y revit-api-diff.json con lo que aparece o desaparece entre versiones.
+// usage: RevitApiInventory <output-folder> [nuget-packages-root]
+// Output: revit-api-<year>.json per version and revit-api-diff.json with what appears or disappears between versions.
 internal static class Program
 {
     private static readonly (int Year, string Version)[] Versions =
@@ -21,7 +21,7 @@ internal static class Program
         (2022, "2022.1.80"), (2023, "2023.1.90"), (2024, "2024.3.60"), (2025, "2025.4.60"), (2026, "2026.4.10"),
     };
 
-    // Superficies de API que la cobertura funcional necesita conocer (tipo y, opcionalmente, método estático/instancia por nombre).
+    // API surfaces that functional coverage needs to know about (type and, optionally, static/instance method by name).
     private static readonly string[] Surfaces =
     {
         "Autodesk.Revit.DB.Wall::Create", "Autodesk.Revit.DB.Floor::Create", "Autodesk.Revit.DB.Ceiling::Create", "Autodesk.Revit.DB.RoofBase",
@@ -62,11 +62,11 @@ internal static class Program
 
     private static int Main(string[] args)
     {
-        if (args.Length < 1) { Console.Error.WriteLine("uso: RevitApiInventory <carpeta-salida> [raíz-paquetes-nuget] | registry <carpeta-salida> <carpeta-inventario>"); return 2; }
+        if (args.Length < 1) { Console.Error.WriteLine("usage: RevitApiInventory <output-folder> [nuget-packages-root] | registry <output-folder> <inventory-folder>"); return 2; }
         if (args[0] == "registry") return Registry(args[1], args[2]);
         if (args[0] == "has")
         {
-            // has <carpeta-inventario> <símbolo>… : por cada símbolo (Tipo o Tipo::Miembro, nombre completo o sufijo) las versiones donde existe.
+            // has <inventory-folder> <symbol>… : for each symbol (Type or Type::Member, full name or suffix) the versions where it exists.
             var sets = Versions.Select(v => (v.Year, Lines: Symbols.ReadGz(Path.Combine(args[1], "revit-symbols-" + v.Year + ".txt.gz")).Select(l => l.Split('|')[2]).ToList())).ToList();
             foreach (var s in args.Skip(2))
             {
@@ -84,7 +84,7 @@ internal static class Program
         {
             var api = FindDll(root, "nice3point.revit.api.revitapi", ver, "RevitAPI.dll");
             var ui = FindDll(root, "nice3point.revit.api.revitapiui", ver, "RevitAPIUI.dll");
-            if (api == null || ui == null) { Console.Error.WriteLine("falta el paquete de referencia " + year + " (" + ver + ")"); return 3; }
+            if (api == null || ui == null) { Console.Error.WriteLine("missing reference package " + year + " (" + ver + ")"); return 3; }
             using var apiPe = new PEReader(File.OpenRead(api));
             using var uiPe = new PEReader(File.OpenRead(ui));
             var apiMd = apiPe.GetMetadataReader(); var uiMd = uiPe.GetMetadataReader();
@@ -96,32 +96,32 @@ internal static class Program
             foreach (var s in Surfaces) surfaces[s] = HasSurface(apiMd, s) || HasSurface(uiMd, s);
             var doc = new Dictionary<string, object>
             {
-                ["revit"] = year, ["paquete_referencia"] = ver,
-                ["metodo"] = "System.Reflection.Metadata sobre ensamblados de referencia; sin cargar ni ejecutar Revit",
+                ["revit"] = year, ["reference_package"] = ver,
+                ["method"] = "System.Reflection.Metadata over reference assemblies; without loading or running Revit",
                 ["postable_command"] = postable, ["built_in_category"] = categories, ["built_in_parameter_total"] = parameters.Count,
-                ["view_type"] = viewTypes, ["superficies"] = surfaces,
+                ["view_type"] = viewTypes, ["surfaces"] = surfaces,
             };
             perVersion[year] = doc;
             File.WriteAllText(Path.Combine(outDir, "revit-api-" + year + ".json"), JsonSerializer.Serialize(doc, new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
-            Console.WriteLine(year + ": PostableCommand " + postable.Count + ", BuiltInCategory " + categories.Count + ", BuiltInParameter " + parameters.Count + ", superficies presentes " + surfaces.Count(kv => kv.Value) + "/" + surfaces.Count);
+            Console.WriteLine(year + ": PostableCommand " + postable.Count + ", BuiltInCategory " + categories.Count + ", BuiltInParameter " + parameters.Count + ", surfaces present " + surfaces.Count(kv => kv.Value) + "/" + surfaces.Count);
         }
-        // Diferencias entre versiones consecutivas.
+        // Differences between consecutive versions.
         var diff = new List<Dictionary<string, object>>();
         var years = perVersion.Keys.ToList();
         for (var i = 1; i < years.Count; i++)
         {
             var a = perVersion[years[i - 1]]; var b = perVersion[years[i]];
             List<string> L(Dictionary<string, object> d, string k) => (List<string>)d[k];
-            var sa = (SortedDictionary<string, bool>)a["superficies"]; var sb = (SortedDictionary<string, bool>)b["superficies"];
+            var sa = (SortedDictionary<string, bool>)a["surfaces"]; var sb = (SortedDictionary<string, bool>)b["surfaces"];
             diff.Add(new Dictionary<string, object>
             {
                 ["de"] = years[i - 1], ["a"] = years[i],
-                ["postable_command_nuevos"] = L(b, "postable_command").Except(L(a, "postable_command")).ToList(),
-                ["postable_command_retirados"] = L(a, "postable_command").Except(L(b, "postable_command")).ToList(),
-                ["built_in_category_nuevas"] = L(b, "built_in_category").Except(L(a, "built_in_category")).ToList(),
-                ["built_in_category_retiradas"] = L(a, "built_in_category").Except(L(b, "built_in_category")).ToList(),
-                ["superficies_aparecen"] = sb.Where(kv => kv.Value && !sa[kv.Key]).Select(kv => kv.Key).ToList(),
-                ["superficies_desaparecen"] = sa.Where(kv => kv.Value && !sb[kv.Key]).Select(kv => kv.Key).ToList(),
+                ["postable_command_new"] = L(b, "postable_command").Except(L(a, "postable_command")).ToList(),
+                ["postable_command_removed"] = L(a, "postable_command").Except(L(b, "postable_command")).ToList(),
+                ["built_in_category_new"] = L(b, "built_in_category").Except(L(a, "built_in_category")).ToList(),
+                ["built_in_category_removed"] = L(a, "built_in_category").Except(L(b, "built_in_category")).ToList(),
+                ["surfaces_appear"] = sb.Where(kv => kv.Value && !sa[kv.Key]).Select(kv => kv.Key).ToList(),
+                ["surfaces_disappear"] = sa.Where(kv => kv.Value && !sb[kv.Key]).Select(kv => kv.Key).ToList(),
             });
         }
         File.WriteAllText(Path.Combine(outDir, "revit-api-diff.json"), JsonSerializer.Serialize(diff, new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
@@ -129,9 +129,9 @@ internal static class Program
     }
 
     /// <summary>
-    /// Exporta el catálogo de capacidades (código del motor) y la clasificación de cada PostableCommand de cada versión.
-    /// registry.json: contratos de capacidad. commands.json: comando → dominio, versiones, capacidad enlazada y estado
-    /// (UNKNOWN si ninguna capacidad lo cubre: clasificar no es soportar). coverage.md: resumen legible.
+    /// Exports the capability catalog (engine code) and the classification of each PostableCommand of each version.
+    /// registry.json: capability contracts. commands.json: command → domain, versions, linked capability and status
+    /// (UNKNOWN if no capability covers it: classifying is not supporting). coverage.md: readable summary.
     /// </summary>
     private static int Registry(string outDir, string inventoryDir)
     {
@@ -165,7 +165,7 @@ internal static class Program
             var linked = Bimbridge.Engine.Coverage.CommandClassifier.LinkedCapabilities(kv.Key);
             return new Dictionary<string, object>
             {
-                // Dominio de la capacidad enlazada (análisis); el de la regla por nombre queda como referencia.
+                // Domain of the linked capability (analysis); the one from the name rule is kept as a reference.
                 ["command"] = kv.Key, ["domain"] = linked.Count > 0 ? linked[0].Domain : domain, ["domain_by_name"] = domain, ["classified_by_rule"] = byRule, ["revit_versions"] = kv.Value,
                 ["capabilities"] = linked.Select(c => c.Id).ToArray(),
                 ["status"] = linked.Count == 0 ? "UNKNOWN" : linked.Select(c => c.Status).Min().ToString(),
@@ -176,34 +176,34 @@ internal static class Program
         }).ToList();
         File.WriteAllText(Path.Combine(outDir, "commands.json"), JsonSerializer.Serialize(commands, opts), new UTF8Encoding(false));
 
-        // Resumen legible.
+        // Readable summary.
         var sb = new StringBuilder();
-        sb.AppendLine("# Cobertura funcional de Revit — registro generado");
+        sb.AppendLine("# Revit functional coverage — generated registry");
         sb.AppendLine();
-        sb.AppendLine("Generado por `tools/inventory/RevitApiInventory registry` desde `src/Bimbridge.Engine/Coverage/CapabilityCatalog.cs` y el inventario offline de la API (`docs/0.9.1/inventory`). No editar a mano.");
+        sb.AppendLine("Generated by `tools/inventory/RevitApiInventory registry` from `src/Bimbridge.Engine/Coverage/CapabilityCatalog.cs` and the offline API inventory (`docs/0.9.1/inventory`). Do not edit by hand.");
         sb.AppendLine();
-        sb.AppendLine("Estados: ninguna capacidad es `NATIVE_VERIFIED` mientras no exista la campaña nativa única de 0.9.1. `IMPLEMENTED_UNVERIFIED` = implementación tipada con pruebas de planificación offline; su efecto en Revit está pendiente de campaña.");
+        sb.AppendLine("Statuses: no capability is `NATIVE_VERIFIED` until the single native campaign of 0.9.1 exists. `IMPLEMENTED_UNVERIFIED` = typed implementation with offline planning tests; its effect in Revit is pending the campaign.");
         sb.AppendLine();
-        sb.AppendLine("## Capacidades por estado");
+        sb.AppendLine("## Capabilities by status");
         sb.AppendLine();
         foreach (var g in Bimbridge.Engine.Coverage.CapabilityCatalog.All.GroupBy(c => c.Status).OrderBy(g => g.Key))
             sb.AppendLine("- `" + g.Key + "`: " + g.Count());
         sb.AppendLine();
-        sb.AppendLine("## Comandos de la cinta (PostableCommand, unión 2022–2026)");
+        sb.AppendLine("## Ribbon commands (PostableCommand, union 2022–2026)");
         sb.AppendLine();
-        sb.AppendLine("- Total distintos: " + commands.Count);
-        sb.AppendLine("- Con capacidad enlazada: " + commands.Count(c => ((string[])c["capabilities"]).Length > 0));
-        sb.AppendLine("- Estado `UNKNOWN`: " + commands.Count(c => (string)c["status"] == "UNKNOWN") + " (sin analizar: " + commands.Count(c => (string)c["analysis"] == "sin_analizar") +
-                      "; analizados sin evidencia suficiente, con investigación pendiente registrada: " + commands.Count(c => (string)c["analysis"] == "analizado_sin_evidencia") + ")");
-        sb.AppendLine("- Por estado: " + string.Join(", ", commands.GroupBy(c => (string)c["status"]).OrderBy(g => g.Key).Select(g => "`" + g.Key + "` " + g.Count())));
-        sb.AppendLine("- Por ejecutor: " + string.Join(", ", commands.GroupBy(c => (string)c["executor"]).OrderBy(g => g.Key).Select(g => "`" + g.Key + "` " + g.Count())));
-        sb.AppendLine("- Un comando enlazado a una capacidad DYNAMIC_CSHARP_ONLY sólo tiene API pública identificada; no es automatización completa.");
-        sb.AppendLine("- Dominio: el de la capacidad enlazada (" + commands.Count(c => ((string[])c["capabilities"]).Length > 0) + "); la regla por nombre (`domain_by_name`) sólo es referencia y difiere en " +
-                      commands.Count(c => (string)c["domain"] != (string)c["domain_by_name"]) + " comandos.");
+        sb.AppendLine("- Total distinct: " + commands.Count);
+        sb.AppendLine("- With a linked capability: " + commands.Count(c => ((string[])c["capabilities"]).Length > 0));
+        sb.AppendLine("- Status `UNKNOWN`: " + commands.Count(c => (string)c["status"] == "UNKNOWN") + " (not analyzed: " + commands.Count(c => (string)c["analysis"] == "sin_analizar") +
+                      "; analyzed without sufficient evidence, with pending research recorded: " + commands.Count(c => (string)c["analysis"] == "analizado_sin_evidencia") + ")");
+        sb.AppendLine("- By status: " + string.Join(", ", commands.GroupBy(c => (string)c["status"]).OrderBy(g => g.Key).Select(g => "`" + g.Key + "` " + g.Count())));
+        sb.AppendLine("- By executor: " + string.Join(", ", commands.GroupBy(c => (string)c["executor"]).OrderBy(g => g.Key).Select(g => "`" + g.Key + "` " + g.Count())));
+        sb.AppendLine("- A command linked to a DYNAMIC_CSHARP_ONLY capability only has an identified public API; it is not complete automation.");
+        sb.AppendLine("- Domain: that of the linked capability (" + commands.Count(c => ((string[])c["capabilities"]).Length > 0) + "); the name rule (`domain_by_name`) is only a reference and differs on " +
+                      commands.Count(c => (string)c["domain"] != (string)c["domain_by_name"]) + " commands.");
         sb.AppendLine();
-        sb.AppendLine("## Por dominio");
+        sb.AppendLine("## By domain");
         sb.AppendLine();
-        sb.AppendLine("| Dominio | Capacidades | Estados | Comandos de la cinta |");
+        sb.AppendLine("| Domain | Capabilities | Statuses | Ribbon commands |");
         sb.AppendLine("|---|---|---|---|");
         for (var f = 1; f <= 37; f++)
         {
@@ -213,21 +213,21 @@ internal static class Program
             sb.AppendLine("| " + d + " | " + caps.Count + " | " + states + " | " + commands.Count(c => (string)c["domain"] == d) + " |");
         }
         sb.AppendLine();
-        sb.AppendLine("## Capacidades");
+        sb.AppendLine("## Capabilities");
         sb.AppendLine();
-        sb.AppendLine("| ID | Capacidad | Estado | Estrategia | Limitaciones |");
+        sb.AppendLine("| ID | Capability | Status | Strategy | Limitations |");
         sb.AppendLine("|---|---|---|---|---|");
         foreach (var c in Bimbridge.Engine.Coverage.CapabilityCatalog.All.OrderBy(c => c.Id, StringComparer.Ordinal))
             sb.AppendLine("| " + c.Id + " | " + c.Name + " | `" + c.Status + "` | " + c.Strategy + " | " + (c.Limitations ?? "").Replace("|", "/") + " |");
         File.WriteAllText(Path.Combine(outDir, "coverage.md"), sb.ToString(), new UTF8Encoding(false));
-        Console.WriteLine("capacidades " + catalog.Count + ", comandos " + commands.Count + ", UNKNOWN " + commands.Count(c => (string)c["status"] == "UNKNOWN"));
+        Console.WriteLine("capabilities " + catalog.Count + ", commands " + commands.Count + ", UNKNOWN " + commands.Count(c => (string)c["status"] == "UNKNOWN"));
         return 0;
     }
 
     /// <summary>
-    /// Indexador completo: todos los símbolos públicos de RevitAPI.dll y RevitAPIUI.dll por versión (revit-symbols-&lt;año&gt;.txt.gz),
-    /// resumen con trazabilidad (SHA-256 de cada ensamblado de referencia y del listado) y diferencias entre versiones
-    /// (introducidos, retirados, modificados, obsoletos nuevos).
+    /// Full indexer: every public symbol of RevitAPI.dll and RevitAPIUI.dll per version (revit-symbols-&lt;year&gt;.txt.gz),
+    /// summary with traceability (SHA-256 of each reference assembly and of the listing) and differences between versions
+    /// (introduced, removed, modified, newly obsolete).
     /// </summary>
     private static int SymbolsMode(string outDir, string root)
     {
@@ -238,7 +238,7 @@ internal static class Program
         {
             var api = FindDll(root, "nice3point.revit.api.revitapi", ver, "RevitAPI.dll");
             var ui = FindDll(root, "nice3point.revit.api.revitapiui", ver, "RevitAPIUI.dll");
-            if (api == null || ui == null) { Console.Error.WriteLine("falta el paquete de referencia " + year + " (" + ver + ")"); return 3; }
+            if (api == null || ui == null) { Console.Error.WriteLine("missing reference package " + year + " (" + ver + ")"); return 3; }
             var lines = Symbols.Extract(api).Select(l => "RevitAPI|" + l).Concat(Symbols.Extract(ui).Select(l => "RevitAPIUI|" + l)).OrderBy(l => l, StringComparer.Ordinal).ToList();
             var sha = Symbols.WriteGz(Path.Combine(outDir, "revit-symbols-" + year + ".txt.gz"), lines);
             var map = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -248,20 +248,20 @@ internal static class Program
                 map[p[0] + "|" + p[1] + "|" + p[2]] = l;
             }
             per[year] = map;
-            var byKind = lines.GroupBy(l => l.Split('|')[1]).ToDictionary(g => g.Key switch { "T" => "tipos", "C" => "constructores", "M" => "metodos", "P" => "propiedades", "F" => "campos", "E" => "eventos", _ => g.Key }, g => (object)g.Count());
+            var byKind = lines.GroupBy(l => l.Split('|')[1]).ToDictionary(g => g.Key switch { "T" => "tipos", "C" => "constructors", "M" => "methods", "P" => "properties", "F" => "campos", "E" => "events", _ => g.Key }, g => (object)g.Count());
             var types = lines.Where(l => l.Split('|')[1] == "T").Select(l => l.Split('|')).ToList();
             summary.Add(new Dictionary<string, object>
             {
-                ["revit"] = year, ["paquete_referencia"] = ver,
+                ["revit"] = year, ["reference_package"] = ver,
                 ["revitapi_sha256"] = Symbols.Sha256(File.ReadAllBytes(api)), ["revitapiui_sha256"] = Symbols.Sha256(File.ReadAllBytes(ui)),
-                ["simbolos"] = lines.Count, ["simbolos_sha256"] = sha, ["por_clase"] = byKind,
-                ["tipos_por_tipo"] = types.GroupBy(p => p[3]).ToDictionary(g => g.Key, g => (object)g.Count()),
-                ["obsoletos"] = lines.Count(l => l.Contains("|obsolete")),
-                ["metodos_estaticos"] = lines.Count(l => l.Split('|')[1] == "M" && l.Contains("|static")),
-                ["espacios_de_nombres"] = types.Select(p => { var n = p[2].Split('+')[0]; var d = n.LastIndexOf('.'); return d > 0 ? n.Substring(0, d) : ""; })
+                ["symbols"] = lines.Count, ["symbols_sha256"] = sha, ["by_class"] = byKind,
+                ["types_by_kind"] = types.GroupBy(p => p[3]).ToDictionary(g => g.Key, g => (object)g.Count()),
+                ["obsolete"] = lines.Count(l => l.Contains("|obsolete")),
+                ["static_methods"] = lines.Count(l => l.Split('|')[1] == "M" && l.Contains("|static")),
+                ["namespaces"] = types.Select(p => { var n = p[2].Split('+')[0]; var d = n.LastIndexOf('.'); return d > 0 ? n.Substring(0, d) : ""; })
                                               .GroupBy(n => n).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => (object)g.Count()),
             });
-            Console.WriteLine(year + ": " + lines.Count + " símbolos (" + string.Join(", ", byKind.Select(kv => kv.Key + " " + kv.Value)) + ")");
+            Console.WriteLine(year + ": " + lines.Count + " symbols (" + string.Join(", ", byKind.Select(kv => kv.Key + " " + kv.Value)) + ")");
         }
         var diffs = new List<Dictionary<string, object>>();
         var years = per.Keys.ToList();
@@ -275,18 +275,18 @@ internal static class Program
             diffs.Add(new Dictionary<string, object>
             {
                 ["de"] = years[i - 1], ["a"] = years[i],
-                ["introducidos"] = added.Count, ["retirados"] = removed.Count, ["modificados"] = changed.Count, ["obsoletos_nuevos"] = newlyObsolete.Count,
-                ["lista_introducidos"] = added, ["lista_retirados"] = removed,
-                ["lista_modificados"] = changed.Select(k => (object)new Dictionary<string, object> { ["antes"] = a[k], ["despues"] = b[k] }).ToList(),
+                ["introduced"] = added.Count, ["removed"] = removed.Count, ["modified"] = changed.Count, ["new_obsolete"] = newlyObsolete.Count,
+                ["introduced_list"] = added, ["removed_list"] = removed,
+                ["modified_list"] = changed.Select(k => (object)new Dictionary<string, object> { ["before"] = a[k], ["after"] = b[k] }).ToList(),
             });
-            Console.WriteLine(years[i - 1] + "→" + years[i] + ": +" + added.Count + " −" + removed.Count + " ~" + changed.Count + " obsoletos nuevos " + newlyObsolete.Count);
+            Console.WriteLine(years[i - 1] + "→" + years[i] + ": +" + added.Count + " −" + removed.Count + " ~" + changed.Count + " newly obsolete " + newlyObsolete.Count);
         }
         var o = new JsonSerializerOptions { WriteIndented = true };
         File.WriteAllText(Path.Combine(outDir, "revit-symbols-summary.json"), JsonSerializer.Serialize(new Dictionary<string, object>
         {
-            ["metodo"] = "System.Reflection.Metadata sobre ensamblados de referencia Nice3point; sin cargar ni ejecutar Revit. Presencia técnica: no implica semántica, precondiciones ni transacciones.",
-            ["formato_listado"] = "Ensamblado|Clase|Símbolo|atributos (T tipo, C constructor, M método, P propiedad, F campo, E evento)",
-            ["versiones"] = summary,
+            ["method"] = "System.Reflection.Metadata over Nice3point reference assemblies; without loading or running Revit. Technical presence: implies no semantics, preconditions or transactions.",
+            ["listing_format"] = "Assembly|Kind|Symbol|attributes (T type, C constructor, M method, P property, F field, E event)",
+            ["versions"] = summary,
         }, o), new UTF8Encoding(false));
         using (var gzOut = File.Create(Path.Combine(outDir, "revit-symbols-diff.json.gz")))
         using (var gz = new System.IO.Compression.GZipStream(gzOut, System.IO.Compression.CompressionLevel.SmallestSize))

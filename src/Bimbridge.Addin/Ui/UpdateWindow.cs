@@ -13,14 +13,14 @@ using Visibility = System.Windows.Visibility;
 namespace Bimbridge.Addin.Ui
 {
     /// <summary>
-    /// Ventana del botón Actualizar: versión en uso, versión nueva encontrada (y dónde), programar la instalación al cerrar Revit,
-    /// volver a la versión anterior. Todo el trabajo pesado lo hace el instalador en modo /actualizar.
+    /// Window of the Update button: version in use, new version found (and where), schedule the installation for when Revit closes,
+    /// go back to the previous version. All the heavy lifting is done by the installer in /actualizar mode.
     /// </summary>
     internal sealed class UpdateWindow
     {
         private readonly Window _win;
         private readonly StackPanel _body = new StackPanel();
-        // Mismo aspecto que Theme.Notice, pero con color variable (progreso, éxito, error).
+        // Same look as Theme.Notice, but with a variable color (progress, success, error).
         private readonly Border _banner = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(14, 10, 14, 11), Margin = new Thickness(0, 0, 0, 12), BorderThickness = new Thickness(3, 0, 0, 0), Visibility = Visibility.Collapsed };
         private readonly TextBlock _bannerText = new TextBlock { TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold };
         private readonly Button _recheck;
@@ -32,20 +32,20 @@ namespace Bimbridge.Addin.Ui
 
         private UpdateWindow(IntPtr owner)
         {
-            _win = Theme.NewWindow("BIMBRIDGE · Actualizaciones", 620, 560);
+            _win = Theme.NewWindow("BIMBRIDGE · Updates", 620, 560);
             try { new WindowInteropHelper(_win) { Owner = owner }; } catch (Exception) { }
             _banner.Child = _bannerText;
 
             var root = new DockPanel();
-            var header = Theme.Header("Actualizaciones", "", out _subtitle, out var pill, out _);
+            var header = Theme.Header("Updates", "", out _subtitle, out var pill, out _);
             pill.Visibility = Visibility.Collapsed;
             DockPanel.SetDock(header, Dock.Top);
             root.Children.Add(header);
 
-            _recheck = Theme.Button("Buscar otra vez");
+            _recheck = Theme.Button("Search again");
             _recheck.Click += async (s, e) => await Recheck();
-            // La acción principal (instalar/descargar) vive en su tarjeta; cerrar es secundario.
-            var close = Theme.Button("Cerrar");
+            // The primary action (install/download) lives on its card; closing is secondary.
+            var close = Theme.Button("Close");
             close.IsCancel = true;
             close.Click += (s, e) => { if (!_busy) _win.Close(); };
             var footer = Theme.Footer(null, new StackPanel { Orientation = Orientation.Horizontal, Children = { _recheck, close } });
@@ -63,62 +63,62 @@ namespace Bimbridge.Addin.Ui
 
         private void Render()
         {
-            _subtitle.Text = "Versión en uso: " + Updates.Format(UpdateService.Running);
+            _subtitle.Text = "Version in use: " + Updates.Format(UpdateService.Running);
             _body.Children.Clear();
             var a = UpdateService.Available;
             var pending = UpdateService.PendingInstallation();
-            // Sólo entra si lo que se muestra cambió (versión encontrada, pendiente, estado en línea), no en cada redibujo.
+            // Only animates in if what is shown changed (version found, pending, online state), not on every redraw.
             var shown = pending + "|" + UpdateService.RestartPending + "|" + a?.VersionText + "|" + UpdateService.OnlineState + "|" + UpdateService.Online?.Tag + "|" + UpdateService.OnlineError;
             if (shown != _shown) { _shown = shown; Theme.Enter(_body); }
             if (pending != null)
             {
-                _body.Children.Add(StatusCard(Theme.Amber, "Instalación pendiente", pending));
+                _body.Children.Add(StatusCard(Theme.Amber, "Installation pending", pending));
                 return;
             }
 
             if (UpdateService.RestartPending)
             {
-                _body.Children.Add(StatusCard(Theme.Amber, "Falta reiniciar Revit",
-                    "La versión " + UpdateService.InstalledVersion + " ya está instalada. Guarde su trabajo, cierre Revit y vuelva a abrirlo para usarla. " +
-                    "Las conversaciones de Claude o Codex usan la versión nueva cuando empiece una nueva."));
+                _body.Children.Add(StatusCard(Theme.Amber, "Revit needs a restart",
+                    "Version " + UpdateService.InstalledVersion + " is already installed. Save your work, close Revit and reopen it to use it. " +
+                    "Claude or Codex conversations use the new version once you start a new one."));
             }
             else if (a != null)
             {
-                var install = Theme.Button("Instalar al cerrar Revit (" + a.VersionText + ")", Theme.Kind.Primary);
+                var install = Theme.Button("Install when Revit closes (" + a.VersionText + ")", Theme.Kind.Primary);
                 install.Margin = new Thickness(0, 14, 0, 0);
                 install.HorizontalAlignment = HorizontalAlignment.Left;
                 install.Click += async (s, e) => await Install(a, false);
-                _body.Children.Add(StatusCard(Theme.Green, "Hay una versión nueva: " + a.VersionText,
-                    "Encontrada en " + a.Source + "\n\nSe instala al cerrar todas las ventanas de Revit y conserva sus opciones (versiones de Revit, permisos de la IA). " +
-                    "La cola de cambios y los registros se conservan. Entra en uso la próxima vez que abra Revit.", install));
+                _body.Children.Add(StatusCard(Theme.Green, "A new version is available: " + a.VersionText,
+                    "Found in " + a.Source + "\n\nIt installs when all Revit windows are closed and keeps your options (Revit versions, AI permissions). " +
+                    "The change queue and the logs are kept. It takes effect the next time you open Revit.", install));
             }
             else
             {
-                _body.Children.Add(StatusCard(Theme.Green, "Está al día",
-                    "No hay instaladores más nuevos que la versión " + Updates.Format(UpdateService.Running) + "."));
+                _body.Children.Add(StatusCard(Theme.Green, "Up to date",
+                    "There are no installers newer than version " + Updates.Format(UpdateService.Running) + "."));
             }
 
             _body.Children.Add(OnlineCard());
 
-            // Cómo llega una versión nueva
+            // How a new version arrives
             var how = new StackPanel();
-            how.Children.Add(Theme.Section("Cómo recibir una versión nueva",
-                "Cuando le pasen un instalador nuevo (Bimbridge.Setup….zip o .exe), sólo déjelo en una de estas carpetas; no hace falta abrirlo ni descomprimirlo. " +
-                "Este botón se pone verde solo, en unos minutos, o al pulsar Buscar otra vez. Después de instalar, los instaladores viejos se mandan a la papelera."));
+            how.Children.Add(Theme.Section("How to get a new version",
+                "When you receive a new installer (Bimbridge.Setup….zip or .exe), just drop it in one of these folders; there is no need to open or unzip it. " +
+                "This button turns green on its own within a few minutes, or when you press Search again. After installing, old installers are sent to the Recycle Bin."));
             var folders = new StackPanel();
             foreach (var f in UpdateService.Folders)
                 folders.Children.Add(new TextBlock { Text = "•  " + f, FontFamily = Theme.Mono, FontSize = 12, Foreground = Theme.B(Theme.Ink), TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 2, 0, 2) });
             how.Children.Add(new Border { Background = Theme.B(Theme.Sunken), CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 8, 12, 8), Margin = new Thickness(0, 10, 0, 0), Child = folders });
             _body.Children.Add(Theme.Card(how));
 
-            // Volver atrás
+            // Roll back
             var prevExe = UpdateService.PreviousSetup;
             if (prevExe != null && !UpdateService.RestartPending)
             {
                 var back = new StackPanel();
-                back.Children.Add(Theme.Section("Volver a la versión " + UpdateService.PreviousVersion,
-                    "Si la versión actual le da problemas, puede volver a la anterior. Se aplica al reiniciar Revit."));
-                var btn = Theme.Button("Volver a " + UpdateService.PreviousVersion, Theme.Kind.Danger);
+                back.Children.Add(Theme.Section("Go back to version " + UpdateService.PreviousVersion,
+                    "If the current version gives you trouble, you can go back to the previous one. It applies when Revit restarts."));
+                var btn = Theme.Button("Go back to " + UpdateService.PreviousVersion, Theme.Kind.Danger);
                 btn.Margin = new Thickness(0, 10, 0, 0);
                 btn.HorizontalAlignment = HorizontalAlignment.Left;
                 var prevVersion = Updates.Parse(UpdateService.PreviousVersion);
@@ -129,39 +129,39 @@ namespace Bimbridge.Addin.Ui
         }
 
         /// <summary>
-        /// 0.9.1: actualización en línea. Sólo se conecta a GitHub cuando la persona pulsa «Buscar en GitHub»; descargar e instalar
-        /// es otro clic. El instalador se verifica (SHA-256 publicado, tamaño y versión) antes de ofrecer la instalación.
+        /// 0.9.1: online update. It only connects to GitHub when the person presses "Check GitHub"; downloading and installing
+        /// is another click. The installer is verified (published SHA-256, size and version) before the installation is offered.
         /// </summary>
         private UIElement OnlineCard()
         {
             var p = new StackPanel();
-            p.Children.Add(Theme.Section("Actualización en línea (GitHub)"));
+            p.Children.Add(Theme.Section("Online update (GitHub)"));
             var state = UpdateService.OnlineState;
             var r = UpdateService.Online;
             string text;
-            if (!UpdateService.OnlineEnabled) text = "Deshabilitada en la configuración de este equipo (actualizacion_online=no).";
-            else if (state == null) text = "Consulta la última versión publicada en github.com/" + UpdateService.Repo + ". Sólo se conecta cuando usted pulsa el botón; no hace falta cuenta de GitHub.";
-            else if (state == "error") text = "No se pudo consultar: " + UpdateService.OnlineError;
-            else if (state == "sin_releases") text = "El repositorio todavía no tiene ninguna versión publicada que se pueda instalar." + (UpdateService.OnlineError != null ? "\n" + UpdateService.OnlineError : "");
-            else if (state == "nueva") text = "Versión publicada: " + r.Tag + (r.Commit != null ? " (commit " + r.Commit.Substring(0, 7) + ")" : "") + (r.Prerelease ? " · prerelease" : "") + ". Es más nueva que la que está usando.";
-            else if (state == "mismo_version_otro_commit") text = "La versión publicada " + r.Tag + " tiene el mismo número que la suya pero otro commit (" + r.Commit.Substring(0, 7) + "; usted usa " + (UpdateService.RunningCommit ?? "?") + "). Puede instalarla si quiere exactamente la publicada.";
-            else if (state == "anterior") text = "La última versión publicada (" + r.Tag + ") es anterior a la que está usando. No hay nada que actualizar.";
-            else text = "Está usando la última versión publicada (" + r.Tag + (r.Commit != null ? ", commit " + r.Commit.Substring(0, 7) : "") + ").";
+            if (!UpdateService.OnlineEnabled) text = "Disabled in this computer's configuration (online_update=no).";
+            else if (state == null) text = "Checks the latest version published at github.com/" + UpdateService.Repo + ". It only connects when you press the button; no GitHub account needed.";
+            else if (state == "error") text = "Could not check: " + UpdateService.OnlineError;
+            else if (state == "no_releases") text = "The repository does not have any installable published version yet." + (UpdateService.OnlineError != null ? "\n" + UpdateService.OnlineError : "");
+            else if (state == "new") text = "Published version: " + r.Tag + (r.Commit != null ? " (commit " + r.Commit.Substring(0, 7) + ")" : "") + (r.Prerelease ? " · prerelease" : "") + ". It is newer than the one you are using.";
+            else if (state == "same_version_other_commit") text = "The published version " + r.Tag + " has the same number as yours but a different commit (" + r.Commit.Substring(0, 7) + "; you are using " + (UpdateService.RunningCommit ?? "?") + "). You can install it if you want exactly the published one.";
+            else if (state == "previous") text = "The latest published version (" + r.Tag + ") is older than the one you are using. There is nothing to update.";
+            else text = "You are using the latest published version (" + r.Tag + (r.Commit != null ? ", commit " + r.Commit.Substring(0, 7) : "") + ").";
             var t = Theme.Label(text, 12.5, false, state == "error" ? Theme.Darken(Theme.Red, 0.8) : Theme.Muted);
             t.Margin = new Thickness(0, 0, 0, 10);
             p.Children.Add(t);
             var row = new StackPanel { Orientation = Orientation.Horizontal };
             if (UpdateService.OnlineEnabled)
             {
-                var check = Theme.Button(state == null ? "Buscar en GitHub" : "Buscar de nuevo en GitHub");
+                var check = Theme.Button(state == null ? "Check GitHub" : "Check GitHub again");
                 check.Margin = new Thickness(0, 0, 8, 0);
                 check.Click += async (s, e) => await CheckOnline();
                 row.Children.Add(check);
-                if (r != null && (state == "nueva" || state == "mismo_version_otro_commit") && !UpdateService.RestartPending)
+                if (r != null && (state == "new" || state == "same_version_other_commit") && !UpdateService.RestartPending)
                 {
-                    var get = Theme.Button("Descargar e instalar " + r.Tag, Theme.Kind.Primary);
+                    var get = Theme.Button("Download and install " + r.Tag, Theme.Kind.Primary);
                     get.Margin = new Thickness(0);
-                    var sameVersion = state == "mismo_version_otro_commit";
+                    var sameVersion = state == "same_version_other_commit";
                     get.Click += async (s, e) => await DownloadAndInstall(r, sameVersion);
                     row.Children.Add(get);
                 }
@@ -173,7 +173,7 @@ namespace Bimbridge.Addin.Ui
         private async Task CheckOnline()
         {
             if (_busy) return;
-            SetBusy(true, "Consultando GitHub…");
+            SetBusy(true, "Checking GitHub…");
             await Task.Run(() => UpdateService.CheckOnline());
             SetBusy(false, null);
             Render();
@@ -182,22 +182,22 @@ namespace Bimbridge.Addin.Ui
         private async Task DownloadAndInstall(OnlineRelease r, bool sameVersion)
         {
             if (_busy) return;
-            SetBusy(true, "Descargando " + r.Tag + " (" + (r.SetupSize / (1024 * 1024)) + " MB) y verificando su SHA-256…");
+            SetBusy(true, "Downloading " + r.Tag + " (" + (r.SetupSize / (1024 * 1024)) + " MB) and verifying its SHA-256…");
             var d = await Task.Run(() => UpdateService.DownloadOnline(r));
             if (d.c == null)
             {
                 SetBusy(false, null);
                 Render();
-                Banner("No se instaló nada: " + d.error, Theme.Red);
+                Banner("Nothing was installed: " + d.error, Theme.Red);
                 return;
             }
-            SetBusy(true, "Verificado. Instalando la versión " + d.c.VersionText + "… (unos segundos)");
-            // Misma versión con otro commit: el instalador sólo lo acepta con /permitir-anterior.
+            SetBusy(true, "Verified. Installing version " + d.c.VersionText + "… (a few seconds)");
+            // Same version with another commit: the installer only accepts it with /permitir-anterior.
             var res = await Task.Run(() => UpdateService.Install(d.c, sameVersion));
             SetBusy(false, null);
             Render();
-            if (res.ok) Banner(res.text + "\nDescargada de " + d.c.Source + " y verificada.", Theme.Green);
-            else Banner("Se descargó y verificó, pero no se pudo instalar: " + res.text, Theme.Red);
+            if (res.ok) Banner(res.text + "\nDownloaded from " + d.c.Source + " and verified.", Theme.Green);
+            else Banner("Downloaded and verified, but could not be installed: " + res.text, Theme.Red);
         }
 
         private static Border StatusCard(Color color, string title, string text, UIElement action = null)
@@ -205,8 +205,8 @@ namespace Bimbridge.Addin.Ui
             var g = new Grid();
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(48) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            var state = color == Theme.Amber ? 2 : title.StartsWith("Hay", StringComparison.Ordinal) ? 1 : 0;
-            // 32 px exactos: el icono es un mapa de bits de 32 y escalarlo lo emborrona.
+            var state = color == Theme.Amber ? 2 : title.StartsWith("A new version", StringComparison.Ordinal) ? 1 : 0;
+            // Exactly 32 px: the icon is a 32 px bitmap and scaling it blurs it.
             g.Children.Add(new Image { Source = Icons.Update(state, 32), Width = 32, Height = 32, VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left });
             var s = new StackPanel();
             s.Children.Add(Theme.Label(title, 15, true));
@@ -222,7 +222,7 @@ namespace Bimbridge.Addin.Ui
         private async Task Recheck()
         {
             if (_busy) return;
-            SetBusy(true, "Buscando instaladores…");
+            SetBusy(true, "Searching for installers…");
             await Task.Run(() => UpdateService.Check());
             SetBusy(false, null);
             Render();
@@ -231,12 +231,12 @@ namespace Bimbridge.Addin.Ui
         private async Task Install(UpdateCandidate c, bool allowOlder)
         {
             if (_busy) return;
-            SetBusy(true, (allowOlder ? "Volviendo a la versión " : "Instalando la versión ") + c.VersionText + "… (unos segundos)");
+            SetBusy(true, (allowOlder ? "Going back to version " : "Installing version ") + c.VersionText + "… (a few seconds)");
             var r = await Task.Run(() => UpdateService.Install(c, allowOlder));
             SetBusy(false, null);
             Render();
             if (r.ok) Banner(r.text, Theme.Green);
-            else Banner("No se pudo instalar: " + r.text, Theme.Red);
+            else Banner("Could not install: " + r.text, Theme.Red);
         }
 
         private void SetBusy(bool on, string text)
@@ -257,7 +257,7 @@ namespace Bimbridge.Addin.Ui
             _banner.BorderBrush = Theme.Tint(c, 0x80);
             var appearing = _banner.Visibility != Visibility.Visible;
             _banner.Visibility = Visibility.Visible;
-            if (appearing) Theme.Enter(_banner); // sólo al aparecer, no en cada cambio de texto
+            if (appearing) Theme.Enter(_banner); // only when appearing, not on every text change
         }
 
         private static System.Collections.Generic.IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
@@ -269,7 +269,7 @@ namespace Bimbridge.Addin.Ui
                 if (child is T t) yield return t;
                 foreach (var d in Descendants<T>(child)) yield return d;
             }
-            // Antes de mostrarse no hay árbol visual: se recorre el lógico.
+            // Before it is shown there is no visual tree: walk the logical one.
             if (n == 0)
                 foreach (var o in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
                 {

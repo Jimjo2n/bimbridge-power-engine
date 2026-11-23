@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- SPDX-License-Identifier: GPL-3.0-only -->
-  <!-- Benchmarks offline del índice de capacidades (0.9.1). No toca Revit: mide construcción, búsqueda, memoria y bytes serializados. -->
+  <!-- Offline benchmarks of the capability index (0.9.1). Does not touch Revit: measures build, search, memory and serialized bytes. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>

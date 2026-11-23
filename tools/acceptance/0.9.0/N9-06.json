@@ -1,0 +1,38 @@
+{
+ "schema": "bimbridge.campaign080/1",
+ "item": "N9-06",
+ "title": "Tagging what was placed",
+ "initial_status": "Disposable LOCAL copy, not workshared, of an authorized public or synthetic model (e.g. an Autodesk sample) with named straight grids and a OneLevelBased lighting fixture family loaded. Revit 2024 with BIMBRIDGE 0.9.0 installed; config.json levels RPW, lab profile with the copy's folder in laboratorio.carpetas and carpetas_documentos with the test PDF folder. NEVER the user's working model.",
+ "status": "BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION",
+ "variables": {
+  "ids_placed": "comma-separated ids from N9-04",
+  "view": "id of the level's RCP"
+ },
+ "steps": [
+  {
+   "name": "tag plan",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "tag",
+      "ids": "${ids_placed}",
+      "view": "${view}"
+     }
+    ],
+    "summary": "campaign 0.9.0 tags"
+   },
+   "save": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "name": "apply",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "write": true
+  }
+ ]
+}

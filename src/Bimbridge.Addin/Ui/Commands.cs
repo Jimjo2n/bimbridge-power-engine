@@ -7,7 +7,7 @@ using Bimbridge.Addin.Revit;
 
 namespace Bimbridge.Addin.Ui
 {
-    /// <summary>Los botones funcionan también sin modelo abierto (Estado, Pausar, Modo, Ayuda).</summary>
+    /// <summary>The buttons also work with no model open (Status, Pause, Mode, Help).</summary>
     public sealed class AlwaysAvailable : IExternalCommandAvailability
     {
         public bool IsCommandAvailable(UIApplication app, CategorySet selected) => true;
@@ -18,12 +18,12 @@ namespace Bimbridge.Addin.Ui
         public static bool Ready()
         {
             if (Runtime.Ready) return true;
-            TaskDialog.Show("BIMBRIDGE - Power Engine", "El MCP está apagado.\n\nRevise %APPDATA%\\Bimbridge\\config.json (enabled) o el registro %LOCALAPPDATA%\\Bimbridge\\addin.log.");
+            TaskDialog.Show("BIMBRIDGE - Power Engine", "The MCP is turned off.\n\nCheck %APPDATA%\\Bimbridge\\config.json (enabled) or the log %LOCALAPPDATA%\\Bimbridge\\addin.log.");
             return false;
         }
     }
 
-    /// <summary>Estado: IAs conectadas, permisos y actividad reciente.</summary>
+    /// <summary>Status: connected AIs, permissions and recent activity.</summary>
     [Transaction(TransactionMode.ReadOnly)]
     public sealed class StatusCommand : IExternalCommand
     {
@@ -35,7 +35,7 @@ namespace Bimbridge.Addin.Ui
         }
     }
 
-    /// <summary>Pausar / Reanudar IA: mientras está en pausa, el add-in rechaza toda petición.</summary>
+    /// <summary>Pause / Resume AI: while paused, the add-in rejects every request.</summary>
     [Transaction(TransactionMode.ReadOnly)]
     public sealed class PauseCommand : IExternalCommand
     {
@@ -48,7 +48,7 @@ namespace Bimbridge.Addin.Ui
         }
     }
 
-    /// <summary>Modo En vivo / Retener.</summary>
+    /// <summary>Live / Hold mode.</summary>
     [Transaction(TransactionMode.ReadOnly)]
     public sealed class ModeCommand : IExternalCommand
     {
@@ -61,7 +61,7 @@ namespace Bimbridge.Addin.Ui
         }
     }
 
-    /// <summary>Cola: revisar, elegir, aplicar o descartar lo que dejó la IA.</summary>
+    /// <summary>Queue: review, choose, apply or discard what the AI left.</summary>
     [Transaction(TransactionMode.Manual)]
     public sealed class QueueCommand : IExternalCommand
     {
@@ -69,7 +69,7 @@ namespace Bimbridge.Addin.Ui
         {
             if (!Guard.Ready()) return Result.Cancelled;
             var doc = data.Application.ActiveUIDocument?.Document;
-            if (doc == null) { TaskDialog.Show("BIMBRIDGE - Power Engine", "Abra un modelo para ver su cola de cambios."); return Result.Cancelled; }
+            if (doc == null) { TaskDialog.Show("BIMBRIDGE - Power Engine", "Open a model to see its change queue."); return Result.Cancelled; }
             var key = DocumentTracker.KeyOf(doc);
             Runtime.Plans.LoadPersisted(key);
             new QueueWindow(data.Application, doc, Runtime.Plans.Held(key)).ShowDialog();
@@ -79,7 +79,7 @@ namespace Bimbridge.Addin.Ui
         }
     }
 
-    /// <summary>Ajustes: Pausa, Modo y bloqueo de C# en una ventana, con su consecuencia. Mismo camino que los botones de la cinta.</summary>
+    /// <summary>Settings: Pause, Mode and C# blocking in one window, with their consequences. Same path as the ribbon buttons.</summary>
     [Transaction(TransactionMode.ReadOnly)]
     public sealed class SettingsCommand : IExternalCommand
     {
@@ -103,7 +103,7 @@ namespace Bimbridge.Addin.Ui
         }
     }
 
-    /// <summary>Actualizar: instala una versión nueva encontrada en Descargas/Escritorio al cerrar Revit, o vuelve a la anterior.</summary>
+    /// <summary>Update: installs a new version found in Downloads/Desktop when Revit closes, or goes back to the previous one.</summary>
     [Transaction(TransactionMode.ReadOnly)]
     public sealed class UpdateCommand : IExternalCommand
     {
@@ -123,8 +123,8 @@ namespace Bimbridge.Addin.Ui
     using Bimbridge.Engine;
 
     /// <summary>
-    /// R03: la ÚNICA vía para crear concesiones. Una persona responde un diálogo de Revit por cada solicitud de la IA.
-    /// Sin solicitudes pendientes, permite revocar las vigentes.
+    /// R03: the ONLY way to create grants. A person answers one Revit dialog for each AI request.
+    /// With no pending requests, it lets the person revoke the active ones.
     /// </summary>
     [Transaction(TransactionMode.ReadOnly)]
     public sealed class AuthorizeCommand : IExternalCommand
@@ -133,17 +133,17 @@ namespace Bimbridge.Addin.Ui
         {
             if (!Guard.Ready()) return Result.Cancelled;
             var g = Runtime.Grants;
-            if (g == null) { TaskDialog.Show("BIMBRIDGE - Power Engine", "El almacén de autorizaciones no está disponible: las tareas que escriben quedan bloqueadas."); return Result.Cancelled; }
-            var who = Environment.UserName + " (diálogo de Revit)";
+            if (g == null) { TaskDialog.Show("BIMBRIDGE - Power Engine", "The authorization store is unavailable: tasks that write stay blocked."); return Result.Cancelled; }
+            var who = Environment.UserName + " (Revit dialog)";
             var pending = g.PendingRequests();
             foreach (var r in pending)
             {
-                var td = new TaskDialog("BIMBRIDGE - Power Engine — autorizar tarea")
+                var td = new TaskDialog("BIMBRIDGE - Power Engine — authorize task")
                 {
-                    MainInstruction = "¿Autorizar la tarea «" + r.Task + "»?",
-                    MainContent = "Pide: " + string.Join(", ", r.Capabilities.Select(Describe)) + "\n" +
-                                  "Documento: " + r.DocTitle + "\nObjetivo: " + (r.Objective ?? "(sin objetivo)") + "\nPedido por: " + r.Client + "\n\n" +
-                                  "El permiso vale sólo para esta tarea y este documento, durante 8 horas. Puede revocarlo con este mismo botón.",
+                    MainInstruction = "Authorize the task «" + r.Task + "»?",
+                    MainContent = "Asks to: " + string.Join(", ", r.Capabilities.Select(Describe)) + "\n" +
+                                  "Document: " + r.DocTitle + "\nObjective: " + (r.Objective ?? "(no objective)") + "\nRequested by: " + r.Client + "\n\n" +
+                                  "The permission is valid only for this task and this document, for 8 hours. You can revoke it with this same button.",
                     CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No | TaskDialogCommonButtons.Cancel,
                     DefaultButton = TaskDialogResult.No,
                 };
@@ -152,26 +152,26 @@ namespace Bimbridge.Addin.Ui
                 if (res == TaskDialogResult.Yes)
                 {
                     var grant = g.Approve(r.Task, r.DocKey, r.DocPrint, r.Capabilities, TimeSpan.FromHours(8), who, DateTime.UtcNow);
-                    TryAudit(who, "concesion", "aprobada", new Dictionary<string, object> { ["concesion"] = grant.Id, ["tarea"] = r.Task, ["doc"] = r.DocKey, ["capacidades"] = r.Capabilities.Cast<object>().ToList() });
+                    TryAudit(who, "lease", "approved", new Dictionary<string, object> { ["lease"] = grant.Id, ["task"] = r.Task, ["doc"] = r.DocKey, ["capabilities"] = r.Capabilities.Cast<object>().ToList() });
                 }
-                else TryAudit(who, "concesion", "rechazada", new Dictionary<string, object> { ["tarea"] = r.Task, ["capacidades"] = r.Capabilities.Cast<object>().ToList() });
+                else TryAudit(who, "lease", "rejected", new Dictionary<string, object> { ["task"] = r.Task, ["capabilities"] = r.Capabilities.Cast<object>().ToList() });
                 g.CloseRequest(r.Id);
             }
             if (pending.Count == 0)
             {
                 var live = g.All().Where(x => x.ValidAt(DateTime.UtcNow)).ToList();
-                if (live.Count == 0) { TaskDialog.Show("BIMBRIDGE - Power Engine", "No hay solicitudes pendientes ni permisos vigentes."); return Result.Succeeded; }
-                var td = new TaskDialog("BIMBRIDGE - Power Engine — permisos vigentes")
+                if (live.Count == 0) { TaskDialog.Show("BIMBRIDGE - Power Engine", "There are no pending requests and no active permissions."); return Result.Succeeded; }
+                var td = new TaskDialog("BIMBRIDGE - Power Engine — active permissions")
                 {
-                    MainInstruction = live.Count + " permisos vigentes",
-                    MainContent = string.Join("\n", live.Take(12).Select(x => "• " + x.Task + ": " + string.Join(", ", x.Capabilities.Select(Describe)) + " (vence " + x.Expires.Substring(0, 16).Replace('T', ' ') + " UTC)")),
+                    MainInstruction = live.Count + " active permissions",
+                    MainContent = string.Join("\n", live.Take(12).Select(x => "• " + x.Task + ": " + string.Join(", ", x.Capabilities.Select(Describe)) + " (expires " + x.Expires.Substring(0, 16).Replace('T', ' ') + " UTC)")),
                     CommonButtons = TaskDialogCommonButtons.Close,
                 };
-                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Revocar todos", "Las tareas en curso se detienen antes de su siguiente unidad.");
+                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Revoke all", "Running tasks stop before their next unit.");
                 if (td.Show() == TaskDialogResult.CommandLink1)
                 {
                     foreach (var x in live) g.Revoke(x.Id, DateTime.UtcNow);
-                    TryAudit(who, "concesion", "revocadas", new Dictionary<string, object> { ["n"] = (long)live.Count });
+                    TryAudit(who, "lease", "revoked_items", new Dictionary<string, object> { ["n"] = (long)live.Count });
                 }
             }
             Runtime.MarkDirty();
@@ -182,36 +182,36 @@ namespace Bimbridge.Addin.Ui
         {
             switch (c)
             {
-                case Capability.Modificar: return "modificar el modelo";
-                case Capability.Guardar: return "guardar";
-                case Capability.Sync: return "sincronizar con el central";
-                case Capability.Exportar: return "exportar archivos (PDF…)";
-                case Capability.ArchivoEscritura: return "escribir archivos";
-                case Capability.ReconciliarNoAplicada: return "repetir unidades dudosas";
-                case Capability.RecetaExterna: return "ejecutar código que no es de las recetas instaladas";
+                case Capability.Modify: return "modify the model";
+                case Capability.Save: return "save";
+                case Capability.Sync: return "sync with central";
+                case Capability.Export: return "export files (PDF…)";
+                case Capability.FileWrite: return "write files";
+                case Capability.ReconcileNotApplied: return "repeat uncertain units";
+                case Capability.ExternalRecipe: return "run code that is not one of the installed recipes";
                 default: return c;
             }
         }
 
-        private static void TryAudit(string who, string op, string estado, Dictionary<string, object> extra)
+        private static void TryAudit(string who, string op, string status, Dictionary<string, object> extra)
         {
-            try { Runtime.Audit?.Append(who, op, estado, extra); }
-            catch (JournalUnavailableException ex) { Runtime.Log("AUDITORÍA no escrita (" + op + "): " + ex.Message); }
+            try { Runtime.Audit?.Append(who, op, status, extra); }
+            catch (JournalUnavailableException ex) { Runtime.Log("AUDIT not written (" + op + "): " + ex.Message); }
         }
     }
 
-    /// <summary>«Bloquear inyección de código C#»: un solo control, persistente. Se aplica a las peticiones nuevas.</summary>
+    /// <summary>"Block C# code injection": one persistent control. It applies to new requests.</summary>
     [Transaction(TransactionMode.ReadOnly)]
     public sealed class TrustCommand : IExternalCommand
     {
         public Result Execute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             if (!Guard.Ready()) return Result.Cancelled;
-            // Permitir amplía lo que la IA puede hacer: la misma confirmación que Ajustes. Bloquear no pregunta.
+            // Allowing widens what the AI can do: the same confirmation as Settings. Blocking does not ask.
             if (Runtime.BlockDynamicCode && !Runtime.ConfirmAllowDynamicCode()) return Result.Cancelled;
             if (!Runtime.ToggleBlockDynamicCode(out var error))
             {
-                TaskDialog.Show(Bimbridge.Protocol.Brand.Product, "No se pudo guardar el cambio en config.json, así que no se aplicó.\n\n" + error);
+                TaskDialog.Show(Bimbridge.Protocol.Brand.Product, "Could not save the change to config.json, so it was not applied.\n\n" + error);
                 return Result.Failed;
             }
             Runtime.OnIdling(data.Application);

@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Pruebas sin Revit: motor, protocolo y el puente completo contra un add-in simulado. -->
+  <!-- Tests without Revit: engine, protocol and the full bridge against a simulated add-in. -->
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <IsPackable>false</IsPackable>
@@ -19,7 +19,7 @@
     <ProjectReference Include="..\..\src\Bimbridge.AgentHost\Bimbridge.AgentHost.csproj" />
     <ProjectReference Include="..\Bimbridge.LeaseProbe\Bimbridge.LeaseProbe.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
-  <!-- 0.9.0 Power Engine: biblioteca Rust nativa (si se compiló con cargo) junto a las pruebas, para comparar C# = FFI = IPC. -->
+  <!-- 0.9.0 Power Engine: native Rust library (if built with cargo) next to the tests, to compare C# = FFI = IPC. -->
   <ItemGroup>
     <None Include="..\..\native\power_engine\target\release\libbimbridge_power_engine.so" Condition="Exists('..\..\native\power_engine\target\release\libbimbridge_power_engine.so')" Link="libbimbridge_power_engine.so" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\native\power_engine\target\release\bimbridge_power_engine.dll" Condition="Exists('..\..\native\power_engine\target\release\bimbridge_power_engine.dll')" Link="bimbridge_power_engine.dll" CopyToOutputDirectory="PreserveNewest" />

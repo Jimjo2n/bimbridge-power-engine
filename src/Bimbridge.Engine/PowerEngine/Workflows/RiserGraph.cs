@@ -8,23 +8,23 @@ namespace BimBridge.PowerEngine.Workflows
 {
     public sealed class RiserNode
     {
-        public string Id, Label, Kind;   // Kind: panel | dispositivo | union | terminal
+        public string Id, Label, Kind;   // Kind: panel | device | junction | terminal
         public string Level; public double LevelElevFt;
-        public bool Terminal => Kind == "terminal" || Kind == "dispositivo";
+        public bool Terminal => Kind == "terminal" || Kind == "device";
     }
 
     public sealed class RiserEdge
     {
         public string From, To, Label;
-        /// <summary>"fisico" = respaldado por un conduit/cable del modelo (PhysicalId); "diagrama" = sólo una línea 2D del riser.</summary>
-        public string Kind = "diagrama";
+        /// <summary>"physical" = backed by a model conduit/cable (PhysicalId); "diagram" = only a 2D riser line.</summary>
+        public string Kind = "diagram";
         public string PhysicalId;
     }
 
     /// <summary>
-    /// Grafo de montantes (riser): niveles, conexiones verticales, extremos abiertos, IDs repetidos, ramas esperadas que faltan,
-    /// y un dibujo 2D (columna por montante, fila por nivel) del que se cuentan cruces de líneas y rótulos atravesados.
-    /// Regla: una conexión de diagrama no es un conduit físico; se informa aparte y nunca cuenta como continuidad física.
+    /// Riser graph: levels, vertical connections, open ends, repeated IDs, missing expected branches,
+    /// and a 2D drawing (one column per riser, one row per level) used to count line crossings and labels crossed by lines.
+    /// Rule: a diagram connection is not a physical conduit; it is reported separately and never counts as physical continuity.
     /// </summary>
     public static class RiserGraph
     {
@@ -40,12 +40,12 @@ namespace BimBridge.PowerEngine.Workflows
             var dangling = edges.Where(e => !idx.ContainsKey(e.From) || !idx.ContainsKey(e.To)).Select(e => (object)(e.From + "→" + e.To)).ToList();
             var good = edges.Where(e => idx.ContainsKey(e.From) && idx.ContainsKey(e.To)).ToList();
 
-            // componentes: diagrama completo frente a sólo físico
+            // components: full diagram versus physical only
             int[] Flat(IEnumerable<RiserEdge> es) => es.SelectMany(e => new[] { idx[e.From], idx[e.To] }).ToArray();
             (int[] Component, int[] Degree) C(int[] e) => engine != null ? engine.Components(idx.Count, e) : GeometryKernels.Components(idx.Count, e);
             var all = C(Flat(good));
-            var phys = C(Flat(good.Where(e => e.Kind == "fisico" && !string.IsNullOrEmpty(e.PhysicalId))));
-            var diagramOnly = good.Where(e => e.Kind != "fisico" || string.IsNullOrEmpty(e.PhysicalId)).Select(e => (object)new Dictionary<string, object> { ["de"] = e.From, ["a"] = e.To, ["rotulo"] = e.Label }).ToList();
+            var phys = C(Flat(good.Where(e => e.Kind == "physical" && !string.IsNullOrEmpty(e.PhysicalId))));
+            var diagramOnly = good.Where(e => e.Kind != "physical" || string.IsNullOrEmpty(e.PhysicalId)).Select(e => (object)new Dictionary<string, object> { ["from"] = e.From, ["to"] = e.To, ["label"] = e.Label }).ToList();
             var open = byId.Values.Where(v => all.Degree[idx[v.Id]] <= 1 && !v.Terminal && v.Kind != "panel").Select(v => (object)v.Id).ToList();
             var isolated = byId.Values.Where(v => all.Degree[idx[v.Id]] == 0).Select(v => (object)v.Id).ToList();
             var missing = (expectedBranches ?? Enumerable.Empty<(string, string)>())
@@ -53,7 +53,7 @@ namespace BimBridge.PowerEngine.Workflows
                 .Select(b => (object)(b.Item1 + "→" + b.Item2)).ToList();
             var vertical = good.Count(e => byId[e.From].Level != byId[e.To].Level);
 
-            // dibujo: columna = componente físico (un montante), fila = elevación del nivel
+            // drawing: column = physical component (one riser), row = level elevation
             var levels = byId.Values.Select(v => (v.Level, v.LevelElevFt)).Distinct().OrderBy(l => l.LevelElevFt).ToList();
             var row = levels.Select((l, i) => (l.Level, i)).ToDictionary(t => t.Level, t => t.i, StringComparer.Ordinal);
             var cols = new Dictionary<int, int>();
@@ -71,7 +71,7 @@ namespace BimBridge.PowerEngine.Workflows
             var contacts = good.Count > 1 ? (engine != null ? engine.SegmentContacts(segs.ToArray()) : GeometryKernels.SegmentContacts(segs.ToArray())) : new List<(int I, int J, int Kind)>();
             var crossings = contacts.Count(c => c.Kind == GeometryKernels.ContactCross);
             var overlaps = contacts.Count(c => c.Kind == GeometryKernels.ContactOverlap);
-            // rótulo de nodo atravesado por una línea que no le pertenece
+            // node label crossed by a line that does not belong to it
             var labelHits = new List<object>();
             foreach (var v in byId.Values)
             {
@@ -85,14 +85,14 @@ namespace BimBridge.PowerEngine.Workflows
             }
             return new Dictionary<string, object>
             {
-                ["nodos"] = (long)byId.Count, ["aristas"] = (long)good.Count, ["niveles"] = levels.Select(l => (object)l.Level).ToList(), ["verticales"] = (long)vertical,
-                ["componentes_diagrama"] = (long)all.Component.Distinct().Count(), ["componentes_fisicos"] = (long)phys.Component.Distinct().Count(),
-                ["solo_diagrama"] = diagramOnly, ["extremos_abiertos"] = open, ["aislados"] = isolated, ["ramas_faltantes"] = missing,
-                ["ids_repetidos_invalidos"] = dupInvalid.Cast<object>().ToList(), ["ids_repetidos_validos"] = dupIds.Where(allowed.Contains).Cast<object>().ToList(),
-                ["aristas_sin_nodo"] = dangling,
-                ["dibujo"] = new Dictionary<string, object> { ["cruces"] = (long)crossings, ["superposiciones"] = (long)overlaps, ["rotulos_atravesados"] = labelHits, ["columnas"] = (long)cols.Count },
-                ["veredicto"] = dupInvalid.Count + missing.Count + open.Count + dangling.Count + labelHits.Count == 0 ? "coherente" : "revisar",
-                ["nota"] = "Una línea de diagrama no prueba un conduit: 'solo_diagrama' lista las conexiones sin elemento físico.",
+                ["nodes"] = (long)byId.Count, ["edges"] = (long)good.Count, ["levels"] = levels.Select(l => (object)l.Level).ToList(), ["verticals"] = (long)vertical,
+                ["diagram_components"] = (long)all.Component.Distinct().Count(), ["physical_components"] = (long)phys.Component.Distinct().Count(),
+                ["diagram_only"] = diagramOnly, ["open_ends"] = open, ["isolated"] = isolated, ["missing_branches"] = missing,
+                ["repeated_invalid_ids"] = dupInvalid.Cast<object>().ToList(), ["repeated_valid_ids"] = dupIds.Where(allowed.Contains).Cast<object>().ToList(),
+                ["edges_without_node"] = dangling,
+                ["drafting"] = new Dictionary<string, object> { ["crossings"] = (long)crossings, ["overlaps"] = (long)overlaps, ["crossed_labels"] = labelHits, ["columns"] = (long)cols.Count },
+                ["verdict"] = dupInvalid.Count + missing.Count + open.Count + dangling.Count + labelHits.Count == 0 ? "coherent" : "review",
+                ["note"] = "A diagram line does not prove a conduit: 'diagram_only' lists the connections without a physical element.",
             };
         }
 

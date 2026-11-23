@@ -1,41 +1,41 @@
 # SPDX-License-Identifier: GPL-3.0-only
-# Compila y prueba todo, y arma dist\ en Windows.
-# Opcional: -RevitRoot "C:\Program Files\Autodesk" para compilar contra las DLL instaladas en vez de los paquetes de referencia.
+# Builds and tests everything, and assembles dist\ on Windows.
+# Optional: -RevitRoot "C:\Program Files\Autodesk" to compile against the installed DLLs instead of the reference packages.
 param([string]$RevitRoot = "", [string]$Python = "python.exe", [switch]$SkipBenchmarks)
 $ErrorActionPreference = "Stop"
-# Sin BOM: los workers reciben JSONL por stdin y lo rechazan con razón si llega con BOM.
+# No BOM: the workers read JSONL on stdin and rightly reject it if it arrives with a BOM.
 $OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 Set-Location $PSScriptRoot
-# F19: $ErrorActionPreference no detiene el script cuando dotnet falla; se comprueba el código de salida de cada paso.
+# F19: $ErrorActionPreference does not stop the script when dotnet fails; the exit code of every step is checked.
 function Run([string]$what) {
   Invoke-Expression $what
-  if ($LASTEXITCODE -ne 0) { throw "Falló ($LASTEXITCODE): $what" }
+  if ($LASTEXITCODE -ne 0) { throw "Failed ($LASTEXITCODE): $what" }
 }
-# Reproducible (beta1): sólo desde un árbol limpio; el commit embebido es exactamente HEAD. $env:BIMBRIDGE_ALLOW_DIRTY=1 para desarrollo.
-if ((git status --porcelain --untracked-files=no) -and $env:BIMBRIDGE_ALLOW_DIRTY -ne "1") { throw "Hay cambios sin confirmar; confirme antes de armar dist\." }
+# Reproducible (beta1): only from a clean tree; the embedded commit is exactly HEAD. $env:BIMBRIDGE_ALLOW_DIRTY=1 for development.
+if ((git status --porcelain --untracked-files=no) -and $env:BIMBRIDGE_ALLOW_DIRTY -ne "1") { throw "There are uncommitted changes; commit before assembling dist\." }
 $env:SourceRevisionId = (git rev-parse HEAD).Trim()
 function Clear-BuildFolder([string]$relative) {
   $root = [IO.Path]::GetFullPath($PSScriptRoot).TrimEnd('\') + '\'
   $path = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $relative))
-  if (!$path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { throw "Ruta fuera del checkout: $path" }
+  if (!$path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { throw "Path outside the checkout: $path" }
   if (Test-Path -LiteralPath $path) {
-    if ((Get-Item -LiteralPath $path).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Ruta de build enlazada: $path" }
+    if ((Get-Item -LiteralPath $path).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Build path is a link: $path" }
     Remove-Item -LiteralPath $path -Recurse -Force
   }
 }
 Clear-BuildFolder dist
 $rustHost = (& rustc -vV | Select-String '^host: ').Line
 if ($LASTEXITCODE -ne 0 -or $rustHost -notmatch '^host: x86_64-pc-windows-(gnu|msvc)$') {
-  throw "Se requiere Rust para Windows x64: $rustHost"
+  throw "Rust for Windows x64 is required: $rustHost"
 }
 $pythonPath = (Get-Command $Python -CommandType Application -ErrorAction Stop).Source
-if ($pythonPath -match '[\\/]WindowsApps[\\/]') { throw "Indique -Python con la ruta de un CPython real" }
+if ($pythonPath -match '[\\/]WindowsApps[\\/]') { throw "Pass -Python with the path of a real CPython" }
 $env:BIMBRIDGE_TEST_PYTHON = $pythonPath
 $env:PATH = "$(Split-Path $pythonPath);$PSScriptRoot/native/power_engine/target/release;$env:PATH"
 Run "cargo test --locked --release --manifest-path native/power_engine/Cargo.toml"
 Run "cargo build --locked --release --manifest-path native/power_engine/Cargo.toml"
 & $pythonPath -B -m unittest discover -s workers/python/tests -v
-if ($LASTEXITCODE -ne 0) { throw "Falló la suite Python" }
+if ($LASTEXITCODE -ne 0) { throw "Python suite failed" }
 Run "dotnet build src/Bimbridge.Scripting -c Release -v q"
 $roslyn = "src/Bimbridge.Scripting/bin/Release/netstandard2.0"
 foreach ($v in 2022..2027) {
@@ -45,24 +45,24 @@ foreach ($v in 2022..2027) {
   $out = "dist/addin/$v/Bimbridge"
   New-Item -ItemType Directory -Force $out | Out-Null
   if ($v -ge 2025) {
-    # Revit 2025–2027: ReadyToRun (código nativo x64 + IL de respaldo) para el runtime del año.
+    # Revit 2025–2027: ReadyToRun (native x64 code + fallback IL) for that year's runtime.
     $r2r = "obj/r2r_$v"
     Clear-BuildFolder $r2r
     Run "dotnet publish src/Bimbridge.Addin -c Release -p:RevitVersion=$v -r win-x64 --self-contained false -p:PublishReadyToRun=true -o $r2r -v q $extra"
     Copy-Item "$r2r/Bimbridge.*.dll" $out
   } else {
-    # Revit 2022–2024 (.NET Framework 4.8): IL; el add-in precompila el motor en segundo plano al arrancar.
+    # Revit 2022–2024 (.NET Framework 4.8): IL; the add-in precompiles the engine in the background at startup.
     Run "dotnet build src/Bimbridge.Addin -c Release -p:RevitVersion=$v -v q $extra"
     Copy-Item "src/Bimbridge.Addin/bin/Release/R$v/Bimbridge.*.dll" $out
   }
   Copy-Item "src/Bimbridge.Addin/Bimbridge.addin" "dist/addin/$v/"
-  New-Item -ItemType Directory -Force "$out/recetas" | Out-Null
-  Copy-Item "src/Bimbridge.Addin/recetas/*.cs" "$out/recetas/"
+  New-Item -ItemType Directory -Force "$out/recipes" | Out-Null
+  Copy-Item "src/Bimbridge.Addin/recipes/*.cs" "$out/recipes/"
   New-Item -ItemType Directory -Force "$out/roslyn" | Out-Null
   Copy-Item "$roslyn/*.dll", "$roslyn/Bimbridge.Scripting.pdb" "$out/roslyn/"
   Remove-Item "$out/Bimbridge.Scripting.dll" -ErrorAction SilentlyContinue
 }
-# Pruebas después de compilar los add-ins (las de exec compilan scripts contra el add-in de cada año).
+# Tests after building the add-ins (the exec tests compile scripts against each year's add-in).
 foreach ($v in 2025..2027) { Run "dotnet build src/Bimbridge.Addin -c Release -p:RevitVersion=$v -v q" }
 Run "dotnet publish src/Bimbridge.Bridge -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o dist/bridge"
 Run "dotnet publish src/Bimbridge.AgentHost -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o dist/bridge"
@@ -72,18 +72,18 @@ New-Item -ItemType Directory -Force $pe | Out-Null
 Copy-Item native/power_engine/target/release/bimbridge_power_engine.dll dist/bridge/
 Copy-Item native/power_engine/target/release/bimbridge-power-engine.exe $pe/
 & $pythonPath -I -B tools/power_engine/vendor_python.py "$pe/python"
-if ($LASTEXITCODE -ne 0) { throw "Falló el empaquetado del Python Worker" }
-$hello = '{"pe":1,"id":"build","trabajo":"hola","args":{"pe_min":1,"pe_max":1}}'
+if ($LASTEXITCODE -ne 0) { throw "Python Worker packaging failed" }
+$hello = '{"pe":1,"id":"build","job":"hello","args":{"pe_min":1,"pe_max":1}}'
 $helloFile = Join-Path $PSScriptRoot "obj\hello.jsonl"
 New-Item -ItemType Directory -Force (Split-Path $helloFile) | Out-Null
 [IO.File]::WriteAllText($helloFile, $hello + "`n", (New-Object System.Text.UTF8Encoding($false)))
 $pyHello = cmd /c "`"`"$pythonPath`" -I -S -B `"$pe/python/run_worker.py`" < `"$helloFile`"`"" | ConvertFrom-Json
-if ($LASTEXITCODE -ne 0 -or $pyHello.codigo -ne "OK" -or "pdf_grids" -notin $pyHello.resultado.capacidades) {
-  throw "El worker Python del payload no anuncia pdf_grids con sus dependencias empaquetadas"
+if ($LASTEXITCODE -ne 0 -or $pyHello.code -ne "OK" -or "pdf_grids" -notin $pyHello.result.capabilities) {
+  throw "The payload Python worker does not advertise pdf_grids with its packaged dependencies"
 }
 $rustHello = cmd /c "`"`"$PSScriptRoot\dist\bridge\power_engine\bimbridge-power-engine.exe`" < `"$helloFile`"`"" | ConvertFrom-Json
-if ($LASTEXITCODE -ne 0 -or $rustHello.codigo -ne "OK" -or "components" -notin $rustHello.resultado.capacidades) {
-  throw "Falló el saludo IPC de Rust en el payload"
+if ($LASTEXITCODE -ne 0 -or $rustHello.code -ne "OK" -or "components" -notin $rustHello.result.capabilities) {
+  throw "Rust IPC handshake failed in the payload"
 }
 $required = @(
   "bridge/Bimbridge.Bridge.exe", "bridge/Bimbridge.AgentHost.exe",
@@ -106,14 +106,14 @@ foreach ($v in 2022..2027) {
 }
 foreach ($file in $required) {
   if (!(Test-Path -LiteralPath "dist/$file" -PathType Leaf) -or (Get-Item -LiteralPath "dist/$file").Length -eq 0) {
-    throw "Falta un componente obligatorio del payload: $file"
+    throw "A required payload component is missing: $file"
   }
 }
 
-# Instalador de doble clic: payload.zip (add-in + puente) dentro de Bimbridge.Setup.exe
+# Double-click installer: payload.zip (add-in + bridge) inside Bimbridge.Setup.exe
 $payload = "src/Bimbridge.Setup/payload.zip"
 if (Test-Path $payload) { Remove-Item $payload }
-# manifest.json: SHA-256 de cada archivo; el instalador lo verifica antes y después de copiar (0.6.0)
+# manifest.json: SHA-256 of every file; the installer verifies it before and after copying (0.6.0)
 $ver = ([xml](Get-Content Directory.Build.props -Raw)).Project.PropertyGroup.Version
 $files = [ordered]@{}
 Push-Location dist
@@ -122,10 +122,10 @@ Get-ChildItem -Recurse -File addin, bridge | Sort-Object FullName | ForEach-Obje
   $files[$rel] = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant()
 }
 Pop-Location
-@{ version = $ver; commit = $env:SourceRevisionId; estado = "NATIVE_ACCEPTANCE_PENDING"; requeridos = $required; archivos = $files } | ConvertTo-Json -Depth 3 | Set-Content -Encoding UTF8 dist/manifest.json
+@{ version = $ver; commit = $env:SourceRevisionId; status = "NATIVE_ACCEPTANCE_PENDING"; required = $required; files = $files } | ConvertTo-Json -Depth 3 | Set-Content -Encoding UTF8 dist/manifest.json
 Compress-Archive -Path dist/addin, dist/bridge, dist/manifest.json -DestinationPath $payload
 $testFilter = if ($SkipBenchmarks) { " --filter 'FullyQualifiedName!~MeasurementTests&FullyQualifiedName!~Bench_'" } else { '' }
 Run "dotnet test tests/Bimbridge.Tests$testFilter -- RunConfiguration.MaxCpuCount=1 xUnit.MaxParallelThreads=1"
 Run "dotnet build src/Bimbridge.Setup -c Release -v q"
 Copy-Item src/Bimbridge.Setup/bin/Release/net48/Bimbridge.Setup.exe dist/
-Write-Host "Instalador: dist/Bimbridge.Setup.exe"
+Write-Host "Installer: dist/Bimbridge.Setup.exe"

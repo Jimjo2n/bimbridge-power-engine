@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Bloqueo fail-closed, persistencia y reconciliación del documento. Sin Revit.</summary>
+    /// <summary>Fail-closed lock, persistence and document reconciliation. No Revit.</summary>
     public class WriteSafetyTests : IDisposable
     {
         private const string Doc = "c:\\lab\\x.rvt";
@@ -32,9 +32,9 @@ namespace Bimbridge.Tests
         public void BlockJson_HasCodeOnlyWhenBlocked()
         {
             var b = new DocWriteBlock { DocKey = Doc };
-            Assert.Null(b.ToJson()["codigo"]);
+            Assert.Null(b.ToJson()["code"]);
             b.Plans.Add("P-1");
-            Assert.Equal(DocWriteBlock.Code, b.ToJson()["codigo"]);
+            Assert.Equal(DocWriteBlock.Code, b.ToJson()["code"]);
         }
 
         [Fact]
@@ -46,7 +46,7 @@ namespace Bimbridge.Tests
             Assert.False(s.CheckWritable(Doc).Blocked);
             s.BeginWrite(p);
             Assert.True(File.Exists(FileOf(s, p.Id)));
-            Assert.True(s.Finish(p, PlanStatus.Aplicado, "ok"));
+            Assert.True(s.Finish(p, PlanStatus.Applied, "ok"));
             Assert.False(File.Exists(FileOf(s, p.Id)));
             Assert.False(s.CheckWritable(Doc).Blocked);
         }
@@ -57,14 +57,14 @@ namespace Bimbridge.Tests
             var s = Store();
             var p = NewPlan();
             s.Add(p);
-            s.BeginWrite(p); // aquí muere Revit
+            s.BeginWrite(p); // Revit dies here
 
             var again = Store();
             Assert.True(again.CheckWritable(Doc).Blocked);
             again.LoadPersisted(Doc);
             var q = again.Get(p.Id);
-            Assert.Equal(Status.Desconocido, q.Status);
-            Assert.NotEqual(PlanStatus.Listo, q.Status);
+            Assert.Equal(Status.Unknown, q.Status);
+            Assert.NotEqual(PlanStatus.Ready, q.Status);
             var other = NewPlan("P-2");
             Assert.Throws<DocWriteBlockedException>(() => again.BeginWrite(other));
             Assert.False(File.Exists(FileOf(again, "P-2")));
@@ -95,11 +95,11 @@ namespace Bimbridge.Tests
         public void IntentWriteFailure_RefusesBeforeTouchingAnything()
         {
             var s = Store();
-            s.WriteFile = (_, __) => throw new IOException("disco lleno");
+            s.WriteFile = (_, __) => throw new IOException("disk full");
             var p = NewPlan();
             var ex = Assert.Throws<PlanStoreException>(() => s.BeginWrite(p));
-            Assert.Contains("disco lleno", ex.Message);
-            Assert.Equal(PlanStatus.Listo, p.Status);
+            Assert.Contains("disk full", ex.Message);
+            Assert.Equal(PlanStatus.Ready, p.Status);
             Assert.Null(p.Reconciliation);
         }
 
@@ -110,10 +110,10 @@ namespace Bimbridge.Tests
             var p = NewPlan();
             s.Add(p);
             GroupAbort.PreserveInterrupted(p, "x");
-            s.WriteFile = (_, __) => throw new UnauthorizedAccessException("denegado");
-            Assert.False(s.Finish(p, Status.Desconocido, "incierto"));
-            Assert.Contains("no es durable", p.StorageWarning);
-            Assert.True(p.Describe(0).ContainsKey("almacenamiento"));
+            s.WriteFile = (_, __) => throw new UnauthorizedAccessException("denied");
+            Assert.False(s.Finish(p, Status.Unknown, "uncertain"));
+            Assert.Contains("it is not durable", p.StorageWarning);
+            Assert.True(p.Describe(0).ContainsKey("storage"));
             Assert.True(s.CheckWritable(Doc).Blocked);
         }
 
@@ -125,7 +125,7 @@ namespace Bimbridge.Tests
             s.Add(p);
             s.BeginWrite(p);
             s.RemoveFile = _ => throw new IOException("en uso");
-            Assert.False(s.Finish(p, PlanStatus.Aplicado, "ok"));
+            Assert.False(s.Finish(p, PlanStatus.Applied, "ok"));
             Assert.NotNull(p.StorageWarning);
             Assert.True(Store().CheckWritable(Doc).Blocked);
         }
@@ -136,7 +136,7 @@ namespace Bimbridge.Tests
             var s = Store();
             var p = NewPlan();
             s.Add(p);
-            s.Finish(p, Status.Desconocido, "sin datos");
+            s.Finish(p, Status.Unknown, "sin datos");
             Assert.NotNull(p.Reconciliation);
             Assert.True(Store().CheckWritable(Doc).Blocked);
         }
@@ -173,7 +173,7 @@ namespace Bimbridge.Tests
             var s = Store();
             s.LockWait = TimeSpan.FromMilliseconds(100);
             Directory.CreateDirectory(s.DocDir(Doc));
-            using (new FileStream(Path.Combine(s.DocDir(Doc), ".bloqueo"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+            using (new FileStream(Path.Combine(s.DocDir(Doc), ".lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
                 Assert.Throws<PlanStoreException>(() => s.BeginWrite(NewPlan()));
         }
 
@@ -198,19 +198,19 @@ namespace Bimbridge.Tests
             var s = Store();
             var p = NewPlan();
             s.BeginWrite(p);
-            p.Status = PlanStatus.EnProceso;
+            p.Status = PlanStatus.InProgress;
             p.Created.AddRange(new long[] { 100, 101 });
             p.AppliedBatches = 1;
             s.Checkpoint(p);
             Assert.Null(p.Reconciliation);
-            Assert.Equal(PlanStatus.EnProceso, p.Status);
+            Assert.Equal(PlanStatus.InProgress, p.Status);
             var again = Store();
             again.LoadPersisted(Doc);
             Assert.Equal(new long[] { 100, 101 }, again.Get(p.Id).Created.ToArray());
-            Assert.Equal(2, ((List<object>)again.Get(p.Id).Reconciliation["ids_creados"]).Count);
+            Assert.Equal(2, ((List<object>)again.Get(p.Id).Reconciliation["created_ids"]).Count);
         }
 
-        // ---- Veredicto ----
+        // ---- Verdict ----
 
         private static ReconcileCheck Eval(Plan p, string value, params long[] existing) =>
             ReconcileEvaluator.Evaluate(p, _ => value, id => existing.Contains(id));
@@ -243,7 +243,7 @@ namespace Bimbridge.Tests
         public void Evaluate_CreationsWithLostIds_IsNotVerifiable()
         {
             var p = NewPlan();
-            p.Entries.Add(new PlanEntry { Op = "place", Key = "nuevo", OpIndex = 1 });
+            p.Entries.Add(new PlanEntry { Op = "place", Key = "new", OpIndex = 1 });
             p.AppliedBatches = 1;
             Assert.False(Eval(p, "a").Verified);
         }
@@ -266,14 +266,14 @@ namespace Bimbridge.Tests
             Assert.Equal(ReconcileCheck.Reverted, Eval(p, "a", 77).Verdict);
         }
 
-        // ---- Liberar ----
+        // ---- Release ----
 
         private Plan Unknown(PlanStore s)
         {
             var p = NewPlan();
             s.Add(p);
             s.BeginWrite(p);
-            s.Finish(p, Status.Desconocido, "incierto");
+            s.Finish(p, Status.Unknown, "uncertain");
             return p;
         }
 
@@ -286,7 +286,7 @@ namespace Bimbridge.Tests
             Assert.True(s.CheckWritable(Doc).Blocked);
             var again = Store();
             again.LoadPersisted(Doc);
-            Assert.Single((List<object>)again.Get(p.Id).Reconciliation["intentos"]);
+            Assert.Single((List<object>)again.Get(p.Id).Reconciliation["attempts"]);
         }
 
         [Fact]
@@ -296,12 +296,12 @@ namespace Bimbridge.Tests
             var p = Unknown(s);
             Assert.True(s.Reconcile(p, new ReconcileCheck { Verdict = ReconcileCheck.Reverted }, "s1"));
             Assert.False(s.CheckWritable(Doc).Blocked);
-            Assert.Equal(PlanStatus.Reconciliado, p.Status);
+            Assert.Equal(PlanStatus.Reconciled, p.Status);
             Assert.True(p.IsFinal);
-            var archived = Directory.GetFiles(Path.Combine(s.DocDir(Doc), "reconciliados"));
+            var archived = Directory.GetFiles(Path.Combine(s.DocDir(Doc), "reconciled"));
             Assert.Single(archived);
             var o = Json.ParseObject(File.ReadAllText(archived[0]));
-            Assert.Equal("s1", ((Dictionary<string, object>)o["registro"])["autor"]);
+            Assert.Equal("s1", ((Dictionary<string, object>)o["record"])["author"]);
             Assert.Equal("P-1", ((Dictionary<string, object>)o["plan"])["id"]);
             Assert.False(Store().CheckWritable(Doc).Blocked);
         }
@@ -311,10 +311,10 @@ namespace Bimbridge.Tests
         {
             var s = Store();
             var p = Unknown(s);
-            s.WriteFile = (_, __) => throw new IOException("disco lleno");
+            s.WriteFile = (_, __) => throw new IOException("disk full");
             Assert.Throws<PlanStoreException>(() => s.Reconcile(p, new ReconcileCheck { Verdict = ReconcileCheck.Applied }, "s1"));
             Assert.True(Store().CheckWritable(Doc).Blocked);
-            Assert.NotEqual(PlanStatus.Reconciliado, p.Status);
+            Assert.NotEqual(PlanStatus.Reconciled, p.Status);
         }
 
         [Fact]
@@ -327,10 +327,10 @@ namespace Bimbridge.Tests
             Assert.Throws<ArgumentException>(() => s.QuarantineCorrupt(s.DocDir(Doc), "..\\P-9.json", "operator", "m"));
             s.QuarantineCorrupt(s.DocDir(Doc), "P-9.json", "operator", "revisé el modelo");
             Assert.False(s.CheckWritable(Doc).Blocked);
-            Assert.Equal(2, Directory.GetFiles(Path.Combine(s.DocDir(Doc), "cuarentena")).Length);
+            Assert.Equal(2, Directory.GetFiles(Path.Combine(s.DocDir(Doc), "quarantine")).Length);
         }
 
-        // ---- Ensayo ----
+        // ---- Trial ----
 
         [Theory]
         [InlineData(true, true, true, TrialGuard.CorrectReverted)]
@@ -341,7 +341,7 @@ namespace Bimbridge.Tests
         public void Trial_FourOutcomes(bool functional, bool rollback, bool restored, string expected) =>
             Assert.Equal(expected, TrialGuard.Classify(functional, rollback, restored));
 
-        // ---- Código del add-in: no compila aquí sin Revit, así que se fija el cableado ----
+        // ---- Add-in code: it does not compile here without Revit, so the wiring is pinned ----
 
         private static string Source(string relative)
         {
@@ -360,15 +360,15 @@ namespace Bimbridge.Tests
             Assert.Contains("Checkpoint(_plan)", Source("src/Bimbridge.Addin/Revit/Writes/PlanApplier.cs"));
         }
 
-        // ---- Descriptor con pid reutilizado ----
+        // ---- Descriptor with reused pid ----
 
         [Fact]
         public void IsAlive_ProtectedProcess_DoesNotThrow()
         {
             if (!OperatingSystem.IsWindows()) return;
-            // pid 4 es System. Que Windows deje abrirlo depende del entorno: un usuario normal recibe acceso denegado (Win32Exception,
-            // que IsAlive trata como «no es un Revit nuestro»), y un runner elevado puede abrirlo (el proceso existe y sigue vivo).
-            // El contrato probado es: nunca lanza, y su respuesta coincide con lo que el sistema permite en este entorno.
+            // pid 4 is System. Whether Windows lets it be opened depends on the environment: a normal user gets access denied (Win32Exception,
+            // which IsAlive treats as "not one of our Revits"), and an elevated runner can open it (the process exists and is alive).
+            // The tested contract is: it never throws, and its answer matches what the OS allows in this environment.
             bool expected;
             try { using (var p = System.Diagnostics.Process.GetProcessById(4)) expected = !p.HasExited; }
             catch (System.ComponentModel.Win32Exception) { expected = false; }
@@ -377,15 +377,15 @@ namespace Bimbridge.Tests
             Assert.Equal(expected, InstanceDescriptor.IsAlive(4));
         }
 
-        // ---- Instalador ----
+        // ---- Installer ----
 
         [Fact]
         public void CodexRestore_OnlyTouchesOurSection()
         {
-            var saved = "model = \"viejo\"\n\n[mcp_servers.bimbridge]\ncommand = \"viejo.exe\"\nstartup_timeout_sec = 9\n";
-            var current = "model = \"nuevo\"\n\n[otra]\nx = 1\n\n[mcp_servers.bimbridge]\ncommand = \"nuevo.exe\"\n";
+            var saved = "model = \"old\"\n\n[mcp_servers.bimbridge]\ncommand = \"viejo.exe\"\nstartup_timeout_sec = 9\n";
+            var current = "model = \"new\"\n\n[otra]\nx = 1\n\n[mcp_servers.bimbridge]\ncommand = \"nuevo.exe\"\n";
             var r = SetupCore.ReplaceTomlSection(current, saved, SetupCore.CodexSection);
-            Assert.Contains("model = \"nuevo\"", r);
+            Assert.Contains("model = \"new\"", r);
             Assert.Contains("[otra]", r);
             Assert.Contains("viejo.exe", r);
             Assert.Contains("startup_timeout_sec = 9", r);

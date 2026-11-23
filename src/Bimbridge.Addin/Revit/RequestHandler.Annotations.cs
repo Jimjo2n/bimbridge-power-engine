@@ -16,8 +16,8 @@ namespace Bimbridge.Addin.Revit
         {
             List<long> ids;
             try { ids = RouteIds(request.Args, "ids"); }
-            catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
-            if (ids.Count == 0 || ids.Count > 100) return Response.Fail(request.Id, Status.Invalido, "indique de 1 a 100 IDs de cotas o etiquetas");
+            catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalid, ex.Message); }
+            if (ids.Count == 0 || ids.Count > 100) return Response.Fail(request.Id, Status.Invalid, "give 1 to 100 dimension or tag IDs");
             var rows = new List<object>();
             var differences = false;
             string error = null;
@@ -32,22 +32,22 @@ namespace Bimbridge.Addin.Revit
                     {
                         var original = doc.GetElement(Ids.ToId(id));
                         var data = AnnotationRepair.Inspect(original);
-                        data["estado"] = "referencias_disponibles";
+                        data["status"] = "available_references";
                         rows.Add(data);
                     }
                     catch (QueryException ex)
                     {
                         differences = true;
-                        rows.Add(new Dictionary<string, object> { ["id"] = id, ["estado"] = "no_evaluable", ["motivo"] = ex.Message });
+                        rows.Add(new Dictionary<string, object> { ["id"] = id, ["status"] = "not_evaluable", ["reason"] = ex.Message });
                     }
                 }
                 rev = _tracker.For(doc)?.Rev ?? 0;
                 return true;
             }, highPriority: false, busyAfter: System.TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!work.Ok) return FromWork(request.Id, work);
-            if (error != null) return Response.Fail(request.Id, Status.Invalido, error);
-            return new Response { Id = request.Id, Rev = rev, Estado = differences ? Status.ConDiferencias : Status.Ok,
-                Datos = new Dictionary<string, object> { ["anotaciones"] = rows } };
+            if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
+            return new Response { Id = request.Id, Rev = rev, State = differences ? Status.CompletedWithDifferences : Status.Ok,
+                Data = new Dictionary<string, object> { ["annotations"] = rows } };
         }
     }
 }

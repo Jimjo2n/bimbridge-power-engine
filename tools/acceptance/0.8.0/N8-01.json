@@ -1,0 +1,47 @@
+{
+ "schema": "bimbridge.campaign080/1",
+ "item": "N8-01",
+ "title": "Correct document identity",
+ "initial_status": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW.",
+ "variables": {
+  "json_path": "path of the .rvt as it appears in JSON (double backslashes)"
+ },
+ "steps": [
+  {
+   "name": "context",
+   "op": "context",
+   "args": {},
+   "contains": [
+    "${json_path}"
+   ]
+  },
+  {
+   "name": "open documents",
+   "op": "docs",
+   "args": {}
+  },
+  {
+   "name": "nonexistent target is rejected",
+   "op": "query",
+   "args": {
+    "doc": "d999",
+    "cat": [
+     "Walls"
+    ],
+    "count": true
+   },
+   "explicit_doc": true,
+   "wait": "target_unavailable"
+  },
+  {
+   "name": "read in the pinned document",
+   "op": "query",
+   "args": {
+    "cat": [
+     "Walls"
+    ],
+    "count": true
+   }
+  }
+ ]
+}

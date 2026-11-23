@@ -16,19 +16,21 @@ namespace Bimbridge.Addin.Revit
 
         internal static Dictionary<string, object> ValidatePreset(object value)
         {
-            if (!(value is Dictionary<string, object> preset)) throw new QueryException("preset_pdf exige un objeto JSON");
+            if (!(value is Dictionary<string, object> preset)) throw new QueryException("pdf_preset requires a JSON object");
+            // Sets saved by 0.9.3/0.9.4 (and old input) use legacy keys (papel, combinar...) and values (ajustar, gris).
+            LegacyAliases.NormalizeRows(new Dictionary<string, object> { ["p"] = preset }, "p", "zoom", "color");
             foreach (var item in preset)
             {
                 var valid = item.Key switch
                 {
-                    "papel" => item.Value is string name && Enum.TryParse(name, true, out ExportPaperFormat format) &&
+                    "paper" => item.Value is string name && Enum.TryParse(name, true, out ExportPaperFormat format) &&
                         Enum.IsDefined(typeof(ExportPaperFormat), format) && !int.TryParse(name, out _),
-                    "zoom" => item.Value is string zoom && (zoom == "100" || zoom == "ajustar"),
-                    "color" => item.Value is string color && (color == "color" || color == "gris"),
-                    "combinar" or "raster" or "ocultar_etiquetas_sin_ref" => item.Value is bool,
+                    "zoom" => item.Value is string zoom && (zoom == "100" || zoom == "adjust"),
+                    "color" => item.Value is string color && (color == "color" || color == "gray"),
+                    "combine" or "raster" or "hide_unreferenced_tags" => item.Value is bool,
                     _ => false,
                 };
-                if (!valid) throw new QueryException("preset_pdf: opción o valor inválido para " + item.Key);
+                if (!valid) throw new QueryException("pdf_preset: invalid option or value for " + item.Key);
             }
             return preset;
         }
@@ -69,7 +71,7 @@ namespace Bimbridge.Addin.Revit
                 var paper = sheet.Outline;
                 if (paper == null || paper.Max.U <= paper.Min.U || paper.Max.V <= paper.Min.V)
                 {
-                    differences.Add(sheet.SheetNumber + ": Revit no proporcionó un contorno de papel evaluable");
+                    differences.Add(sheet.SheetNumber + ": Revit did not provide an evaluable paper outline");
                     continue;
                 }
                 bool Outside(Outline bounds) => !bounds.IsEmpty && PrintSheetSet.OutsidePaper(
@@ -81,7 +83,7 @@ namespace Bimbridge.Addin.Revit
                     using var box = viewport.GetBoxOutline();
                     using var label = viewport.GetLabelOutline();
                     if (Outside(box) || Outside(label))
-                        differences.Add(sheet.SheetNumber + ": viewport " + Ids.ToLong(id) + " o su título excede el contorno de la hoja");
+                        differences.Add(sheet.SheetNumber + ": viewport " + Ids.ToLong(id) + " or its title exceeds the sheet outline");
                 }
             }
         }

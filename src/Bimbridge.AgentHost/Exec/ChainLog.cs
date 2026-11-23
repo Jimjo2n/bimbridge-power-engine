@@ -10,13 +10,13 @@ using Bimbridge.Protocol;
 namespace Bimbridge.AgentHost
 {
     /// <summary>
-    /// Archivo JSONL de sólo anexar con cadena de hash: cada línea lleva <c>seq</c> (1, 2, 3…), <c>prev</c> (hash de la anterior) y
-    /// <c>h</c> = sha256(canónico de la línea sin h). Cada anexo se escribe de una vez y se vacía al disco (WriteThrough + Flush(true)):
-    /// una línea completa en disco es un hecho confirmado; una línea final cortada (caída a mitad de escritura) nunca se confirmó y se
-    /// recorta al abrir. Cualquier otro defecto (línea ilegible en medio, hueco de seq, hash o cadena que no cuadran) es corrupción:
-    /// <see cref="Open"/> lo informa como error y no se recupera nada automáticamente.
-    /// Un solo escritor por archivo: antes de anexar se comprueba que la longitud del archivo es la que este escritor dejó; si otro proceso
-    /// escribió, se lanza <see cref="ConcurrentWriterException"/> y no se escribe.
+    /// Append-only, hash-chained JSONL file: each line carries <c>seq</c> (1, 2, 3…), <c>prev</c> (hash of the previous one) and
+    /// <c>h</c> = sha256(canonical form of the line without h). Each append is written in one go and flushed to disk (WriteThrough + Flush(true)):
+    /// a complete line on disk is a committed fact; a torn final line (crash mid-write) was never committed and is
+    /// trimmed on open. Any other defect (unreadable line in the middle, seq gap, hash or chain mismatch) is corruption:
+    /// <see cref="Open"/> reports it as an error and nothing is recovered automatically.
+    /// One writer per file: before appending, it checks that the file length is the one this writer left; if another process
+    /// wrote, <see cref="ConcurrentWriterException"/> is thrown and nothing is written.
     /// </summary>
     public sealed class ChainLog
     {
@@ -38,18 +38,18 @@ namespace Bimbridge.AgentHost
             return Home.Sha256Hex(OpSemantics.Canonical(copy), 32);
         }
 
-        /// <summary>Máximo de bytes por línea; una línea mayor es corrupción (evita reservar memoria sin límite).</summary>
+        /// <summary>Maximum bytes per line; a longer line is corruption (avoids unbounded memory allocation).</summary>
         public const int MaxLineBytes = 16 * 1024 * 1024;
 
-        /// <summary>Compatibilidad: acumula los registros en una lista (sólo para archivos pequeños).</summary>
+        /// <summary>Compatibility: accumulates the records in a list (small files only).</summary>
         public static ChainLog Open(string path, bool repairTornTail, List<Dictionary<string, object>> records, List<Diagnostic> diags, string label) =>
             Open(path, repairTornTail, r => { records.Add(r); return true; }, diags, label);
 
         /// <summary>
-        /// Lee y valida el archivo EN STREAMING (alpha3, P1-C): memoria acotada por la línea más larga, no por el tamaño del diario.
-        /// Cada registro validado (seq, prev, h) se entrega a <paramref name="onRecord"/>; si devuelve false, se deja de leer
-        /// (el llamador ya añadió su diagnóstico). <paramref name="repairTornTail"/>: recorta físicamente una última línea incompleta
-        /// (sólo el escritor con autoridad). Ante cualquier error el llamador debe descartar lo que haya reconstruido.
+        /// Reads and validates the file BY STREAMING (alpha3, P1-C): memory bounded by the longest line, not by the journal size.
+        /// Each validated record (seq, prev, h) is handed to <paramref name="onRecord"/>; if it returns false, reading stops
+        /// (the caller has already added its diagnostic). <paramref name="repairTornTail"/>: physically trims an incomplete last line
+        /// (only the writer with authority). On any error the caller must discard whatever it has reconstructed.
         /// </summary>
         public static ChainLog Open(string path, bool repairTornTail, Func<Dictionary<string, object>, bool> onRecord, List<Diagnostic> diags, string label)
         {
@@ -80,12 +80,12 @@ namespace Bimbridge.AgentHost
                     }
                     if (stopped) break;
                     line.Write(buf, start, n - start);
-                    if (line.Length > MaxLineBytes) { diags.Add(Diagnostic.Error(label + "_linea_demasiado_larga", "tras seq " + seq + ": más de " + MaxLineBytes + " bytes sin salto")); stopped = true; }
+                    if (line.Length > MaxLineBytes) { diags.Add(Diagnostic.Error(label + "_line_too_long", "after seq " + seq + ": more than " + MaxLineBytes + " bytes without a newline")); stopped = true; }
                     pos += n;
                 }
             }
             if (!stopped && line.Length > 0)
-                diags.Add(Diagnostic.Warn(label + "_linea_final_truncada", line.Length + " bytes sin confirmar tras seq " + seq + (repairTornTail ? "; recortados" : "")));
+                diags.Add(Diagnostic.Warn(label + "_truncated_last_line", line.Length + " uncommitted bytes after seq " + seq + (repairTornTail ? "; trimmed" : "")));
             if (goodEnd < fileLen && repairTornTail && !Diagnostic.AnyError(diags))
                 using (var fs = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.Read)) { fs.SetLength(goodEnd); fs.Flush(true); }
             log.LastSeq = seq; log.LastHash = prev; log._length = goodEnd;
@@ -95,19 +95,20 @@ namespace Bimbridge.AgentHost
             {
                 Dictionary<string, object> rec = null;
                 try { rec = Json.ParseObject(Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length)); } catch (FormatException) { }
-                if (rec == null) { diags.Add(Diagnostic.Error(label + "_linea_ilegible", "tras seq " + seq + (isLast ? " (última línea, completa pero ilegible)" : ""))); return false; }
+                if (rec == null) { diags.Add(Diagnostic.Error(label + "_unreadable_line", "after seq " + seq + (isLast ? " (last line, complete but unreadable)" : ""))); return false; }
                 var s = Arg.GetLong(rec, "seq");
                 var h = Arg.GetString(rec, "h");
                 var p = Arg.GetString(rec, "prev");
-                if (s != seq + 1) { diags.Add(Diagnostic.Error(label + "_seq_no_consecutiva", "esperada " + (seq + 1) + ", leída " + (s?.ToString() ?? "nada"))); return false; }
-                if (p != prev) { diags.Add(Diagnostic.Error(label + "_cadena_rota", "seq " + s + ": prev no coincide")); return false; }
-                if (h == null || h != HashOf(rec)) { diags.Add(Diagnostic.Error(label + "_hash_invalido", "seq " + s + ": contenido alterado")); return false; }
+                if (s != seq + 1) { diags.Add(Diagnostic.Error(label + "_seq_not_consecutive", "expected " + (seq + 1) + ", read " + (s?.ToString() ?? "nothing"))); return false; }
+                if (p != prev) { diags.Add(Diagnostic.Error(label + "_broken_chain", "seq " + s + ": prev does not match")); return false; }
+                if (h == null || h != HashOf(rec)) { diags.Add(Diagnostic.Error(label + "_invalid_hash", "seq " + s + ": content altered")); return false; }
                 seq = s.Value; prev = h;
-                return onRecord(rec);
+                // Verified over the record as stored (legacy key names included); only then normalized to the current vocabulary.
+                return onRecord(LegacyAliases.NormalizeRecord(rec));
             }
         }
 
-        /// <summary>Anexa un registro: le añade seq/prev/h, lo escribe de una vez y lo vacía al disco. Devuelve el registro final.</summary>
+        /// <summary>Appends a record: adds seq/prev/h, writes it in one go and flushes it to disk. Returns the final record.</summary>
         public Dictionary<string, object> Append(Dictionary<string, object> body)
         {
             var rec = new Dictionary<string, object>(body, StringComparer.Ordinal) { ["seq"] = LastSeq + 1, ["prev"] = LastHash };
@@ -116,7 +117,7 @@ namespace Bimbridge.AgentHost
             Directory.CreateDirectory(System.IO.Path.GetDirectoryName(_path));
             using (var fs = new FileStream(_path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 4096, FileOptions.WriteThrough))
             {
-                if (fs.Length != _length) throw new ConcurrentWriterException("otro proceso escribió en " + System.IO.Path.GetFileName(_path) + " (longitud " + fs.Length + ", esperada " + _length + ")");
+                if (fs.Length != _length) throw new ConcurrentWriterException("another process wrote to " + System.IO.Path.GetFileName(_path) + " (length " + fs.Length + ", expected " + _length + ")");
                 fs.Seek(_length, SeekOrigin.Begin);
                 fs.Write(bytes, 0, bytes.Length);
                 fs.Flush(true);
@@ -127,7 +128,7 @@ namespace Bimbridge.AgentHost
             return rec;
         }
 
-        /// <summary>Escribe una línea incompleta (sólo para simular una caída a mitad de escritura en pruebas).</summary>
+        /// <summary>Writes an incomplete line (only to simulate a crash mid-write in tests).</summary>
         internal void AppendTornForTest(Dictionary<string, object> body)
         {
             var bytes = Encoding.UTF8.GetBytes(Json.Write(body));

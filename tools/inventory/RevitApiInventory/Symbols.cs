@@ -12,15 +12,15 @@ using System.Security.Cryptography;
 using System.Text;
 
 /// <summary>
-/// 0.9.1 (indexador completo): todos los símbolos públicos de un ensamblado de referencia, con firma completa, leídos con
-/// System.Reflection.Metadata (sin cargar ni ejecutar Revit). Una línea por símbolo, ordenadas (determinista):
-///   T|Namespace.Tipo|class|struct|interface|enum|delegate|base=…|impl=…|obsolete=…
-///   C|Tipo::.ctor(Param,…)                       constructor
-///   M|Tipo::Nombre(Param,…)|ret=…|static|obsolete=…
-///   P|Tipo::Nombre|type=…|get|set|static
-///   F|Tipo::Nombre|type=…|static|const          (miembros de enum: F|Enum::Miembro|enum)
-///   E|Tipo::Nombre|type=…
-/// Sólo es PRESENCIA técnica: no se infieren precondiciones, transacciones ni comportamiento a partir del nombre.
+/// 0.9.1 (full indexer): every public symbol of a reference assembly, with full signature, read with
+/// System.Reflection.Metadata (without loading or running Revit). One line per symbol, sorted (deterministic):
+///   T|Namespace.Type|class|struct|interface|enum|delegate|base=…|impl=…|obsolete=…
+///   C|Type::.ctor(Param,…)                       constructor
+///   M|Type::Name(Param,…)|ret=…|static|obsolete=…
+///   P|Type::Name|type=…|get|set|static
+///   F|Type::Name|type=…|static|const          (enum members: F|Enum::Member|enum)
+///   E|Type::Name|type=…
+/// This is technical PRESENCE only: no preconditions, transactions or behavior are inferred from the name.
 /// </summary>
 internal static class Symbols
 {
@@ -79,7 +79,7 @@ internal static class Symbols
             else if (a.Constructor.Kind == HandleKind.MethodDefinition)
                 typeName = md.GetString(md.GetTypeDefinition(md.GetMethodDefinition((MethodDefinitionHandle)a.Constructor).GetDeclaringType()).Name);
             if (typeName != "ObsoleteAttribute") continue;
-            // El primer argumento (mensaje) se lee del blob sin decodificar tipos: prolog 0x0001 + SerString.
+            // The first argument (message) is read from the blob without decoding types: prolog 0x0001 + SerString.
             var blob = md.GetBlobReader(a.Value);
             if (blob.Length > 2 && blob.ReadUInt16() == 1)
             {
@@ -126,7 +126,7 @@ internal static class Symbols
                 var m = md.GetMethodDefinition(mh);
                 if ((m.Attributes & MethodAttributes.MemberAccessMask) != MethodAttributes.Public) continue;
                 var name = md.GetString(m.Name);
-                if ((m.Attributes & MethodAttributes.SpecialName) != 0 && name != ".ctor" && name != ".cctor") continue;   // accesores: van en P/E
+                if ((m.Attributes & MethodAttributes.SpecialName) != 0 && name != ".ctor" && name != ".cctor") continue;   // accessors: they go in P/E
                 if (name == ".cctor") continue;
                 var sig = m.DecodeSignature(p, null);
                 var args = string.Join(",", sig.ParameterTypes);
@@ -173,7 +173,7 @@ internal static class Symbols
         return lines;
     }
 
-    /// <summary>Clave estable del símbolo (sin atributos variables): sirve para comparar versiones.</summary>
+    /// <summary>Stable key of the symbol (without variable attributes): used to compare versions.</summary>
     public static string Key(string line)
     {
         var parts = line.Split('|');
@@ -182,7 +182,7 @@ internal static class Symbols
 
     public static string Sha256(byte[] data) { using var s = SHA256.Create(); return Convert.ToHexString(s.ComputeHash(data)).ToLowerInvariant(); }
 
-    /// <summary>Escribe el listado comprimido (gzip determinista: .NET no guarda fecha) y devuelve el SHA-256 del texto sin comprimir.</summary>
+    /// <summary>Writes the compressed listing (deterministic gzip: .NET stores no date) and returns the SHA-256 of the uncompressed text.</summary>
     public static string WriteGz(string path, List<string> lines)
     {
         var text = Encoding.UTF8.GetBytes(string.Join("\n", lines) + "\n");

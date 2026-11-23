@@ -8,11 +8,11 @@ using System.Text.RegularExpressions;
 namespace Bimbridge.Engine.Tasks
 {
     /// <summary>
-    /// Recetas registradas por ARCHIVO (§5): sin una herramienta MCP por receta. Se buscan, en este orden:
-    /// 1. %LOCALAPPDATA%\Bimbridge\recetas\&lt;nombre&gt;.cs (las del usuario o del equipo; ganan);
-    /// 2. la carpeta recetas\ junto al add-in (las que trae el instalador).
-    /// Cada una se identifica por nombre + versión declarada + SHA-256 del archivo. La tarea guarda una copia exacta: si el archivo cambia
-    /// después, la tarea sigue con su copia y una tarea nueva tendrá otra huella.
+    /// Recipes registered by FILE (§5): no MCP tool per recipe. They are looked up, in this order:
+    /// 1. %LOCALAPPDATA%\Bimbridge\recetas\&lt;name&gt;.cs (the user's or the team's; these win);
+    /// 2. the recetas\ folder next to the add-in (the ones shipped by the installer).
+    /// Each is identified by name + declared version + file SHA-256. The task keeps an exact copy: if the file changes
+    /// later, the task continues with its copy and a new task will have another fingerprint.
     /// </summary>
     public sealed class RecipeRegistry
     {
@@ -30,10 +30,10 @@ namespace Bimbridge.Engine.Tasks
 
         public RecipeRegistry(params string[] folders) { _folders = folders.Where(f => !string.IsNullOrEmpty(f)).ToArray(); }
 
-        public static string UserFolder => Home.Sub("recetas");
+        public static string UserFolder => Home.Sub("recipes");
 
         private static readonly Regex VersionRx = new Regex(@"Version\s*=>\s*""([^""]*)""", RegexOptions.Compiled);
-        private static readonly Regex DescRx = new Regex(@"Descripcion\s*=>\s*""([^""]*)""", RegexOptions.Compiled);
+        private static readonly Regex DescRx = new Regex(@"Description\s*=>\s*""([^""]*)""", RegexOptions.Compiled);
 
         public List<Entry> List()
         {
@@ -68,7 +68,7 @@ namespace Bimbridge.Engine.Tasks
             var code = File.ReadAllText(path);
             return new Entry
             {
-                Name = name, Path = path, Origin = folder == UserFolder ? "usuario" : "instalada",
+                Name = name, Path = path, Origin = folder == UserFolder ? "user" : "installed",
                 Version = VersionRx.Match(code) is var m && m.Success ? m.Groups[1].Value : "1",
                 Description = DescRx.Match(code) is var d && d.Success ? d.Groups[1].Value : "",
                 Hash = Home.Sha256Hex(code),

@@ -12,25 +12,25 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// Catálogo del modelo en una llamada (lo que en pyRevit son varios scripts o recorrer el navegador a mano):
+    /// Model catalog in one call (what in pyRevit takes several scripts or browsing by hand):
     /// resumen, categorias, tipos, familias, niveles, vistas, plantillas, laminas, worksets, vinculos, filtros.
-    /// Los conteos usan filtros rápidos de Revit (GetElementCount no abre los elementos) y se reparten en tramos,
-    /// así un modelo grande no congela Revit. Sólo lee.
+    /// Counts use Revit quick filters (GetElementCount does not open the elements) and are split into slices,
+    /// so a large model does not freeze Revit. Read-only.
     /// </summary>
     public sealed class CatalogRunner
     {
         public static readonly string[] Kinds =
-            { "resumen", "categorias", "tipos", "familias", "niveles", "vistas", "plantillas", "laminas", "worksets", "vinculos", "filtros" };
+            { "summary", "categories", "types", "families", "levels", "views", "templates", "sheets", "worksets", "links", "filters" };
 
         private const int DefaultPageSize = 100;
         private const int MaxPageSize = 200;
 
-        private readonly string _que;
+        private readonly string _kind;
         private readonly List<string> _cats;
         private readonly List<string> _lvls;
         private readonly List<string> _extra;
-        private readonly string _buscar;
-        private readonly string _tipoVista;
+        private readonly string _search;
+        private readonly string _viewType;
         private readonly int _page;
         private readonly int _pageSize;
         private readonly bool _mm;
@@ -48,22 +48,20 @@ namespace Bimbridge.Addin.Revit
 
         public CatalogRunner(IDictionary<string, object> a)
         {
-            _que = (Arg.GetString(a, "que") ?? "resumen").Trim().ToLowerInvariant();
-            if (_que == "categorías") _que = "categorias";
-            if (_que == "láminas" || _que == "hojas") _que = "laminas";
-            if (_que == "vínculos" || _que == "links") _que = "vinculos";
-            if (Array.IndexOf(Kinds, _que) < 0) { Error = "que: " + string.Join(", ", Kinds); return; }
+            _kind = (Arg.GetString(a, "kind") ?? "summary").Trim().ToLowerInvariant();
+            _kind = LegacyAliases.Token(_kind);
+            if (Array.IndexOf(Kinds, _kind) < 0) { Error = "kind: " + string.Join(", ", Kinds); return; }
             _cats = Arg.GetStringList(a, "cat");
             _lvls = Arg.GetStringList(a, "lvl");
             _extra = Arg.GetStringList(a, "f");
-            _buscar = Arg.GetString(a, "buscar");
-            _tipoVista = Arg.GetString(a, "tipo");
+            _search = Arg.GetString(a, "search");
+            _viewType = Arg.GetString(a, "type");
             _page = (int)(Arg.GetLong(a, "page") ?? 1);
             _pageSize = (int)(Arg.GetLong(a, "page_size") ?? DefaultPageSize);
             _mm = string.Equals(Arg.GetString(a, "units"), "mm", StringComparison.OrdinalIgnoreCase);
-            if (_page < 1) Error = "page empieza en 1";
-            else if (_pageSize < 1 || _pageSize > MaxPageSize) Error = "page_size entre 1 y " + MaxPageSize;
-            else if (_extra.Count > 6) Error = "f admite hasta 6 parámetros extra";
+            if (_page < 1) Error = "page starts at 1";
+            else if (_pageSize < 1 || _pageSize > MaxPageSize) Error = "page_size between 1 and " + MaxPageSize;
+            else if (_extra.Count > 6) Error = "f accepts up to 6 extra parameters";
         }
 
         public bool Step(UIApplication app, Stopwatch sw, int budgetMs, DocumentTracker tracker)
@@ -81,7 +79,7 @@ namespace Bimbridge.Addin.Revit
             }
             else if (!ReferenceEquals(doc, _doc) && doc.Title != _doc.Title)
             {
-                Error = "El documento activo cambió durante la consulta; repítala.";
+                Error = "The active document changed during the query; repeat it.";
                 return true;
             }
             var deadline = sw.ElapsedMilliseconds + budgetMs;
@@ -94,22 +92,22 @@ namespace Bimbridge.Addin.Revit
             return true;
         }
 
-        /// <summary>Filtrar por texto, ordenar y paginar: fuera del hilo de Revit.</summary>
+        /// <summary>Filter by text, sort and paginate: outside the Revit thread.</summary>
         public Dictionary<string, object> Finish()
         {
-            var d = new Dictionary<string, object> { ["que"] = _que };
-            if (_que == "resumen")
+            var d = new Dictionary<string, object> { ["kind"] = _kind };
+            if (_kind == "summary")
             {
                 foreach (var kv in _summary) d[kv.Key] = kv.Value;
-                d["categorias_top"] = _catCounts.OrderByDescending(k => k.Value).Take(25)
+                d["top_categories"] = _catCounts.OrderByDescending(k => k.Value).Take(25)
                     .ToDictionary(k => k.Key, k => (object)k.Value);
-                d["sugerencia"] = "catalog que=categorias|tipos|vistas|laminas… para el detalle; query cat=… para elementos";
+                d["suggestion"] = "catalog kind=categories|types|views|sheets… for detail; query cat=… for elements";
                 return d;
             }
             IEnumerable<object[]> rows = _rows;
-            if (!string.IsNullOrWhiteSpace(_buscar))
+            if (!string.IsNullOrWhiteSpace(_search))
             {
-                var b = _buscar.Trim();
+                var b = _search.Trim();
                 rows = rows.Where(r => r.Any(c => c is string s && s.IndexOf(b, StringComparison.OrdinalIgnoreCase) >= 0));
             }
             var list = rows.ToList();
@@ -124,42 +122,42 @@ namespace Bimbridge.Addin.Revit
             return d;
         }
 
-        // ---------------- planificación por tipo ----------------
+        // ---------------- planning by kind ----------------
 
         private void Plan()
         {
-            switch (_que)
+            switch (_kind)
             {
-                case "resumen": PlanSummary(); break;
-                case "categorias": PlanCategories(); break;
-                case "tipos": PlanTypes(); break;
-                case "familias": PlanFamilies(); break;
-                case "niveles": PlanLevels(); break;
-                case "vistas": PlanViews(); break;
-                case "plantillas": PlanTemplates(); break;
-                case "laminas": PlanSheets(); break;
+                case "summary": PlanSummary(); break;
+                case "categories": PlanCategories(); break;
+                case "types": PlanTypes(); break;
+                case "families": PlanFamilies(); break;
+                case "levels": PlanLevels(); break;
+                case "views": PlanViews(); break;
+                case "templates": PlanTemplates(); break;
+                case "sheets": PlanSheets(); break;
                 case "worksets": PlanWorksets(); break;
-                case "vinculos": PlanLinks(); break;
-                case "filtros": PlanFilters(); break;
+                case "links": PlanLinks(); break;
+                case "filters": PlanFilters(); break;
             }
         }
 
         private void PlanSummary()
         {
             var doc = _doc;
-            _summary["documento"] = doc.Title;
+            _summary["document"] = doc.Title;
             _units.Enqueue(() =>
             {
                 var views = new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>().ToList();
-                _summary["niveles"] = (long)new FilteredElementCollector(doc).OfClass(typeof(Level)).GetElementCount();
-                _summary["vistas"] = (long)views.Count(v => !v.IsTemplate && !(v is ViewSheet) && IsListed(v.ViewType));
-                _summary["plantillas"] = (long)views.Count(v => v.IsTemplate);
-                _summary["laminas"] = (long)views.Count(v => v is ViewSheet);
-                _summary["familias"] = (long)new FilteredElementCollector(doc).OfClass(typeof(Family)).GetElementCount();
-                _summary["tipos_de_familia"] = (long)new FilteredElementCollector(doc).OfClass(typeof(FamilySymbol)).GetElementCount();
+                _summary["levels"] = (long)new FilteredElementCollector(doc).OfClass(typeof(Level)).GetElementCount();
+                _summary["views"] = (long)views.Count(v => !v.IsTemplate && !(v is ViewSheet) && IsListed(v.ViewType));
+                _summary["templates"] = (long)views.Count(v => v.IsTemplate);
+                _summary["sheets"] = (long)views.Count(v => v is ViewSheet);
+                _summary["families"] = (long)new FilteredElementCollector(doc).OfClass(typeof(Family)).GetElementCount();
+                _summary["family_types"] = (long)new FilteredElementCollector(doc).OfClass(typeof(FamilySymbol)).GetElementCount();
                 var links = new FilteredElementCollector(doc).OfClass(typeof(RevitLinkInstance)).Cast<RevitLinkInstance>().ToList();
-                _summary["vinculos_revit"] = (long)links.Count;
-                _summary["vinculos_cargados"] = (long)links.Count(l => l.GetLinkDocument() != null);
+                _summary["revit_links"] = (long)links.Count;
+                _summary["loaded_links"] = (long)links.Count(l => l.GetLinkDocument() != null);
                 if (doc.IsWorkshared)
                     _summary["worksets"] = (long)new FilteredWorksetCollector(doc).OfKind(WorksetKind.UserWorkset).ToWorksets().Count;
             });
@@ -168,13 +166,13 @@ namespace Bimbridge.Addin.Revit
 
         private void PlanCategories()
         {
-            _cols = new[] { "cat", "nombre", "clase", "elementos" };
+            _cols = new[] { "cat", "name", "class", "elements" };
             EnqueueCategoryCounts(c => c.CategoryType == CategoryType.Model || c.CategoryType == CategoryType.Annotation, (c, n) =>
-                _rows.Add(new object[] { BicName(c), c.Name, c.CategoryType == CategoryType.Model ? "modelo" : "anotacion", n }));
+                _rows.Add(new object[] { BicName(c), c.Name, c.CategoryType == CategoryType.Model ? "model" : "annotation", n }));
             _sort = (a, b) => ((long)b[3]).CompareTo((long)a[3]);
         }
 
-        /// <summary>Un tramo por cada ~40 categorías: GetElementCount usa el índice de categorías y no abre los elementos.</summary>
+        /// <summary>One slice per ~40 categories: GetElementCount uses the category index and does not open the elements.</summary>
         private void EnqueueCategoryCounts(Func<Category, bool> include, Action<Category, long> row)
         {
             var doc = _doc;
@@ -193,7 +191,7 @@ namespace Bimbridge.Addin.Revit
                         long n;
                         try { n = new FilteredElementCollector(doc).OfCategoryId(c.Id).WhereElementIsNotElementType().GetElementCount(); }
                         catch (Exception) { continue; }
-                        if (n == 0 && string.IsNullOrEmpty(_buscar)) continue;
+                        if (n == 0 && string.IsNullOrEmpty(_search)) continue;
                         _catCounts[BicName(c)] = n;
                         row?.Invoke(c, n);
                     }
@@ -204,14 +202,14 @@ namespace Bimbridge.Addin.Revit
         private void PlanTypes()
         {
             var doc = _doc;
-            _cols = new[] { "id", "cat", "fam", "type", "instancias" };
+            _cols = new[] { "id", "cat", "fam", "type", "instances" };
             var bics = Categories();
             if (Error != null) return;
             FilteredElementCollector types = new FilteredElementCollector(doc).WhereElementIsElementType();
             types = bics.Count > 0 ? types.WherePasses(new ElementMulticategoryFilter(bics)) : types.OfClass(typeof(FamilySymbol));
             var typeIds = types.ToElementIds().ToList();
             var counts = new Dictionary<long, long>();
-            // Conteo de instancias por tipo: GetTypeId es barato; con categoría se recorre sólo esa categoría.
+            // Instance count per type: GetTypeId is cheap; with a category only that category is scanned.
             FilteredElementCollector inst = new FilteredElementCollector(doc).WhereElementIsNotElementType();
             inst = bics.Count > 0 ? inst.WherePasses(new ElementMulticategoryFilter(bics)) : inst.OfClass(typeof(FamilyInstance));
             var instIds = inst.ToElementIds().ToList();
@@ -253,7 +251,7 @@ namespace Bimbridge.Addin.Revit
         private void PlanFamilies()
         {
             var doc = _doc;
-            _cols = new[] { "id", "nombre", "cat", "tipos", "en_sitio" };
+            _cols = new[] { "id", "name", "cat", "types", "in_place" };
             var bics = Categories();
             if (Error != null) return;
             var wanted = new HashSet<long>(bics.Select(b => Ids.ToLong(new ElementId(b))));
@@ -279,27 +277,27 @@ namespace Bimbridge.Addin.Revit
         private void PlanLevels()
         {
             var doc = _doc;
-            _cols = new[] { "id", "nombre", "elev", "elev_txt", "z" };
+            _cols = new[] { "id", "name", "elev", "elev_txt", "z" };
             _units.Enqueue(() =>
             {
                 foreach (var l in new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>())
                     _rows.Add(new object[] { Ids.ToLong(l.Id), l.Name, Len(l.Elevation), Lengths.FeetInches16(l.Elevation), Len(l.ProjectElevation) });
             });
             _sort = (a, b) => Convert.ToDouble(a[4], CultureInfo.InvariantCulture).CompareTo(Convert.ToDouble(b[4], CultureInfo.InvariantCulture));
-            _summary["nota"] = "elev = cota mostrada en Revit; z = cota interna (la que usan x,y,z de query y geo)";
+            _summary["note"] = "elev = elevation shown in Revit; z = internal elevation (the one used by x,y,z in query and geo)";
         }
 
         private void PlanViews()
         {
             var doc = _doc;
-            var cols = new List<string> { "id", "nombre", "tipo", "nivel", "plantilla", "escala", "hoja" };
+            var cols = new List<string> { "id", "name", "type", "level", "template", "scale", "sheet" };
             cols.AddRange(_extra);
             _cols = cols.ToArray();
             ViewType? only = null;
-            if (!string.IsNullOrWhiteSpace(_tipoVista))
+            if (!string.IsNullOrWhiteSpace(_viewType))
             {
-                only = ParseViewType(_tipoVista);
-                if (only == null) { Error = "tipo: plano, rcp, seccion, alzado, 3d, detalle, dibujo, leyenda, tabla, area o estructural"; return; }
+                only = ParseViewType(_viewType);
+                if (only == null) { Error = "type: plan, rcp, section, elevation, 3d, detail, drafting, legend, schedule, area or structural"; return; }
             }
             Dictionary<long, string> sheetOf = null;
             Dictionary<long, string> names = null;
@@ -340,7 +338,7 @@ namespace Bimbridge.Addin.Revit
         private void PlanTemplates()
         {
             var doc = _doc;
-            _cols = new[] { "id", "nombre", "tipo", "usada_por" };
+            _cols = new[] { "id", "name", "type", "used_by" };
             _units.Enqueue(() =>
             {
                 var all = new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>().ToList();
@@ -363,7 +361,7 @@ namespace Bimbridge.Addin.Revit
         private void PlanSheets()
         {
             var doc = _doc;
-            var cols = new List<string> { "id", "numero", "nombre", "vistas", "cajetin" };
+            var cols = new List<string> { "id", "number", "name", "views", "titleblock" };
             cols.AddRange(_extra);
             _cols = cols.ToArray();
             _units.Enqueue(() =>
@@ -392,8 +390,8 @@ namespace Bimbridge.Addin.Revit
         private void PlanWorksets()
         {
             var doc = _doc;
-            if (!doc.IsWorkshared) { Error = "el modelo no usa worksets"; return; }
-            _cols = new[] { "id", "nombre", "abierto", "visible", "editable", "propietario", "elementos" };
+            if (!doc.IsWorkshared) { Error = "the model does not use worksets"; return; }
+            _cols = new[] { "id", "name", "open", "visible", "editable", "owner_name", "elements" };
             var worksets = new FilteredWorksetCollector(doc).OfKind(WorksetKind.UserWorkset).ToWorksets().ToList();
             for (var i = 0; i < worksets.Count; i += 8)
             {
@@ -415,7 +413,7 @@ namespace Bimbridge.Addin.Revit
         private void PlanLinks()
         {
             var doc = _doc;
-            _cols = new[] { "id", "nombre", "clase", "cargado", "ruta", "vista" };
+            _cols = new[] { "id", "name", "class", "loaded", "path", "view" };
             _units.Enqueue(() =>
             {
                 foreach (var li in new FilteredElementCollector(doc).OfClass(typeof(RevitLinkInstance)).Cast<RevitLinkInstance>())
@@ -431,7 +429,7 @@ namespace Bimbridge.Addin.Revit
                     try { linked = ii.IsLinked; } catch (Exception) { continue; }
                     var typeName = doc.GetElement(ii.GetTypeId())?.Name ?? ii.Name;
                     var view = ii.OwnerViewId != ElementId.InvalidElementId ? doc.GetElement(ii.OwnerViewId)?.Name : null;
-                    _rows.Add(new object[] { Ids.ToLong(ii.Id), typeName, linked ? "cad_vinculado" : "cad_importado", linked ? (object)true : null,
+                    _rows.Add(new object[] { Ids.ToLong(ii.Id), typeName, linked ? "linked_cad" : "imported_cad", linked ? (object)true : null,
                         linked ? LinkPath(doc, ii.GetTypeId()) : null, view });
                 }
             });
@@ -445,7 +443,7 @@ namespace Bimbridge.Addin.Revit
         private void PlanFilters()
         {
             var doc = _doc;
-            _cols = new[] { "id", "nombre", "categorias", "vistas", "plantillas" };
+            _cols = new[] { "id", "name", "categories", "views", "templates" };
             _units.Enqueue(() =>
             {
                 var inViews = new Dictionary<long, long>();
@@ -476,14 +474,14 @@ namespace Bimbridge.Addin.Revit
             _sort = (a, b) => string.Compare(a[1] as string, b[1] as string, StringComparison.OrdinalIgnoreCase);
         }
 
-        // ---------------- utilidades ----------------
+        // ---------------- utilities ----------------
 
         private List<BuiltInCategory> Categories()
         {
             var list = new List<BuiltInCategory>();
             foreach (var name in _cats)
             {
-                if (!QueryRunner.TryCategory(name, out var bic)) { Error = "categoría desconocida: " + name + " (use nombres como LightingFixtures, ElectricalFixtures)"; return list; }
+                if (!QueryRunner.TryCategory(name, out var bic)) { Error = "unknown category: " + name + " (use names like LightingFixtures, ElectricalFixtures)"; return list; }
                 list.Add(bic);
             }
             return list;
@@ -491,7 +489,7 @@ namespace Bimbridge.Addin.Revit
 
         private object Len(double ft) => _mm ? Math.Round(ft * 304.8, 1) : Math.Round(ft, 4);
 
-        /// <summary>Nombre que acepta cat= en las otras herramientas (LightingFixtures), no el nombre traducido de la interfaz.</summary>
+        /// <summary>Name that cat= accepts in the other tools (LightingFixtures), not the localized UI name.</summary>
         public static string BicName(Category c)
         {
             BuiltInCategory bic;
@@ -522,20 +520,20 @@ namespace Bimbridge.Addin.Revit
 
         public static ViewType? ParseViewType(string s)
         {
-            switch ((s ?? "").Trim().ToLowerInvariant())
+            switch (LegacyAliases.Token((s ?? "").Trim().ToLowerInvariant()))   // 0.9.3 names (planta, techo, seccion...)
             {
-                case "plano": case "planta": case "floorplan": return ViewType.FloorPlan;
-                case "rcp": case "techo": case "ceilingplan": return ViewType.CeilingPlan;
-                case "seccion": case "sección": case "section": return ViewType.Section;
-                case "alzado": case "elevation": return ViewType.Elevation;
+                case "plan": case "floorplan":  return ViewType.FloorPlan;
+                case "rcp": case "ceiling": case "ceilingplan": return ViewType.CeilingPlan;
+                case "section":   return ViewType.Section;
+                case "elevation":  return ViewType.Elevation;
                 case "3d": case "threed": return ViewType.ThreeD;
-                case "detalle": case "detail": return ViewType.Detail;
-                case "dibujo": case "drafting": case "draftingview": return ViewType.DraftingView;
-                case "leyenda": case "legend": return ViewType.Legend;
-                case "tabla": case "schedule": return ViewType.Schedule;
-                case "area": case "área": case "areaplan": return ViewType.AreaPlan;
-                case "estructural": case "engineeringplan": return ViewType.EngineeringPlan;
-                case "hoja": case "lamina": case "sheet": return ViewType.DrawingSheet;
+                case "detail":  return ViewType.Detail;
+                case "drafting":  case "draftingview": return ViewType.DraftingView;
+                case "legend":  return ViewType.Legend;
+                case "schedule":  return ViewType.Schedule;
+                case "area":  case "areaplan": return ViewType.AreaPlan;
+                case "structural": case "engineeringplan": return ViewType.EngineeringPlan;
+                case "sheet":   return ViewType.DrawingSheet;
                 default: return null;
             }
         }
@@ -544,18 +542,18 @@ namespace Bimbridge.Addin.Revit
         {
             switch (t)
             {
-                case ViewType.FloorPlan: return "plano";
+                case ViewType.FloorPlan: return "plan";
                 case ViewType.CeilingPlan: return "rcp";
-                case ViewType.Section: return "seccion";
-                case ViewType.Elevation: return "alzado";
+                case ViewType.Section: return "section";
+                case ViewType.Elevation: return "elevation";
                 case ViewType.ThreeD: return "3d";
-                case ViewType.Detail: return "detalle";
-                case ViewType.DraftingView: return "dibujo";
-                case ViewType.Legend: return "leyenda";
-                case ViewType.Schedule: return "tabla";
+                case ViewType.Detail: return "detail";
+                case ViewType.DraftingView: return "drafting";
+                case ViewType.Legend: return "legend";
+                case ViewType.Schedule: return "schedule";
                 case ViewType.AreaPlan: return "area";
-                case ViewType.EngineeringPlan: return "estructural";
-                case ViewType.DrawingSheet: return "hoja";
+                case ViewType.EngineeringPlan: return "structural";
+                case ViewType.DrawingSheet: return "sheet";
                 default: return t.ToString();
             }
         }
@@ -574,7 +572,7 @@ namespace Bimbridge.Addin.Revit
             return n;
         }
 
-        /// <summary>Vista → número de la hoja donde está (viewports y tablas colocadas).</summary>
+        /// <summary>View → number of the sheet it is on (viewports and placed schedules).</summary>
         public static Dictionary<long, string> SheetNumbers(Document doc)
         {
             var map = new Dictionary<long, string>();

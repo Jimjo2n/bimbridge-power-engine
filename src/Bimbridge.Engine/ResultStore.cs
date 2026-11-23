@@ -10,20 +10,20 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Resultados completos guardados en disco con un handle corto (R055, F14). Lo largo no se pega en la conversación:
-    /// se devuelve un resumen + "res rXXXX", y cualquier cliente (también uno nuevo tras compactar su contexto) lo pagina con
-    /// "res rXXXX desde=… n=…". Los archivos viven 7 días en %LOCALAPPDATA%\Bimbridge\resultados.
-    /// El puente y el add-in comparten la carpeta (mismo usuario y PC).
+    /// Full results stored on disk with a short handle (R055, F14). Long output is not pasted into the conversation:
+    /// a summary + "res rXXXX" is returned, and any client (including a new one after compacting its context) pages it with
+    /// "res rXXXX desde=… n=…". Files live 7 days in %LOCALAPPDATA%\Bimbridge\resultados.
+    /// The bridge and the add-in share the folder (same user and PC).
     /// </summary>
     public static class ResultStore
     {
         private static int _seq;
         public const int KeepDays = 7;
-        public const string JsonFragmentFormat = "json_fragmentos: concatene las líneas sin separador";
+        public const string JsonFragmentFormat = "json_fragmentos: concatenate the lines with no separator";
 
-        public static string Folder => Home.Sub("resultados");
+        public static string Folder => Home.Sub("results");
 
-        /// <summary>Guarda el texto y devuelve su handle (r + fecha corta + secuencia; prefijo distinto por proceso).</summary>
+        /// <summary>Saves the text and returns its handle (r + short date + sequence; distinct prefix per process).</summary>
         public static string Save(string text, string origin = "a")
         {
             Directory.CreateDirectory(Folder);
@@ -63,14 +63,14 @@ namespace Bimbridge.Engine
             var id = Save(FragmentJson(json), "b");
             var summary = new Dictionary<string, object>
             {
-                ["res"] = id, ["formato_res"] = JsonFragmentFormat, ["lectura"] = "res " + id + " desde=0 n=2",
+                ["res"] = id, ["result_format"] = JsonFragmentFormat, ["read"] = "res " + id + " from=0 n=2",
             };
-            foreach (var key in new[] { "codigo", "estado" })
+            foreach (var key in new[] { "code", "status" })
                 if (result.TryGetValue(key, out var value)) summary[key] = value;
             return Json.Write(summary);
         }
 
-        /// <summary>Lee líneas [from, from+count). total = líneas totales; null si no existe.</summary>
+        /// <summary>Reads lines [from, from+count). total = total lines; null if it does not exist.</summary>
         public static string Read(string id, int from, int count, out int total)
         {
             total = 0;
@@ -103,7 +103,7 @@ namespace Bimbridge.Engine
             catch (Exception) { }
         }
 
-        /// <summary>Si el texto pasa de <paramref name="maxChars"/>, lo guarda y devuelve el inicio + el handle para leer el resto.</summary>
+        /// <summary>If the text exceeds <paramref name="maxChars"/>, saves it and returns the beginning + the handle to read the rest.</summary>
         public static string Shorten(string text, int maxChars, string origin, out string id)
         {
             id = null;
@@ -118,7 +118,7 @@ namespace Bimbridge.Engine
                 sb.Append(l).Append('\n');
                 shown++;
             }
-            sb.Append("… (" + shown + " de " + lines.Length + " líneas; resto con: res " + id + " desde=" + shown + ")");
+            sb.Append("… (" + shown + " of " + lines.Length + " lines; rest with: res " + id + " from=" + shown + ")");
             return sb.ToString();
         }
     }

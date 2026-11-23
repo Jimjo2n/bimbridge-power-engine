@@ -1,127 +1,127 @@
-# Entrega consolidada 0.9.0+commit — informe de implementación
+# Consolidated delivery 0.9.0+commit — implementation report
 
-Rama: `feat/power-engine-consolidation-0.9.0`. Base: `main` en `efe37385dd8efdf2be1e675c1d765d4a15126761` (importación saneada).
-Versión del producto: `0.9.0` + commit (sin nueva numeración). Decisiones: [D45–D50](ARCHITECTURE_DECISIONS.md).
+Branch: `feat/power-engine-consolidation-0.9.0`. Base: `main` at `efe37385dd8efdf2be1e675c1d765d4a15126761` (sanitized import).
+Product version: `0.9.0` + commit (no new numbering). Decisions: [D45–D50](ARCHITECTURE_DECISIONS.md).
 
-Estados: `PASS`, `PARTIAL`, `NOT_TESTED`, `BLOCKED`. «Nativo» significa dentro de Revit. **No se ejecutó ninguna prueba nativa en esta entrega:** no se usó la instancia activa de Revit ni ningún modelo, y no se instaló nada sobre el add-in en uso.
+Statuses: `PASS`, `PARTIAL`, `NOT_TESTED`, `BLOCKED`. «Native» means inside Revit. **No native test was run in this delivery:** the active Revit instance and models were not used, and nothing was installed over the add-in in use.
 
-## 1. Funcionalidad, commit, pruebas y estado
+## 1. Feature, commit, tests and status
 
-| Issue | Cambio | Commit | Pruebas de regresión | Offline | Nativo |
+| Issue | Change | Commit | Regression tests | Offline | Native |
 |---|---|---|---|---|---|
-| #21 | Lectura de `clave.bin` tolerante a violaciones de compartición transitorias (ventana de 3 s, sólo HResult 32/33). Otros errores terminan en `GrantKeyException` sin el secreto. La creación de la clave tiene errores tipados. | `5bd2017` | `Rc3Tests`: inicialización concurrente sin abortar el host, violación transitoria (barrera), violación persistente (fail-closed, sin regenerar), acceso denegado sin reintento | PASS (15 pruebas, 10/10 corridas; suite completa en el worktree limpio) | NOT_TESTED |
-| #1 | El umbral de inactividad sólo cierra sesiones sin solicitudes en curso. Una conexión rota se cierra siempre. Motivo `inactividad`. Sin subir el timeout global. | `d649162` | `SessionLifecycleTests`: solicitud de 4× el umbral sin latidos entrega su resultado; una sesión ociosa expira; un cliente que desaparece a mitad cierra la sesión y el host sigue aceptando conexiones | PASS (36 pruebas relacionadas, 3/3) | NOT_TESTED |
-| #2 | `QuerySnapshotStore`: una lectura del modelo y páginas desde memoria con `cursor=`, ligadas a sesión, documento y revisión. TTL, presupuesto de memoria con LRU, cursores obsoletos rechazados. El puente y el AgentHost usan el cursor. | `42125ed` | `QuerySnapshotTests`: igualdad de filas contra la lectura clásica (5 100 filas, mm y where), vínculo con sesión, documento y revisión, fail-closed, TTL, LRU, límite por sesión | PASS | NOT_TESTED |
-| #7 | `JobStore.Run` explícitamente supervisado (devuelve void). CS4014 es error de compilación. Auditadas las 4 llamadas sin await del add-in. | `d6a61c3` | `JobSupervisionTests`: excepción → `desconocido` con motivo; sin resultado → `desconocido`; cancelación; manejador final una sola vez | PASS | NOT_TESTED |
-| #3 | Identidad nominal obligatoria para operar (lectura y registro libres). Alias duplicados rechazados. `ctx desregistrar=true`. Config `identidad_obligatoria`. El AgentHost se declara por configuración. | `1e1e8b8` | `AgentIdentityGateTests` (tubería real y registro); pruebas E2E con agente único por conexión | PASS | NOT_TESTED |
-| #4 | Correlación agent_id, session_id, request_id, trace_id, job_id y transaction_id por AsyncLocal, en cada línea del diario. `_traza` del cliente y traza por ejecución del AgentHost. | `1e1e8b8` | `AgentIdentityGateTests`: correlación, traza oculta al manejador, job y transacción, huella estable | PASS | NOT_TESTED |
-| #9 | Caché de compilación Roslyn con single-flight y contadores. C# dinámico sigue habilitado por defecto; el control «Bloquear inyección de código C#» no cambia. | `5fcf373` | `CompileCacheTests`: concurrencia con barreras (compila una vez), los fallos no se guardan | PASS | NOT_TESTED |
-| #5 | Panel: sección «Motor C#» desde memoria; agentes con agent_id y «sólo lectura» con motivo. | `5fcf373` | Compilación del add-in 2022–2026 | PARTIAL (faltan tabla con filtros, historial, cancelación desde el panel y notificaciones de operaciones largas) | NOT_TESTED (prueba visual pendiente de autorización) |
-| #6 | Aceptación nativa | — | — | — | BLOCKED: requiere autorización y un modelo desechable |
-| #8 | Benchmarks | — | Medición offline de recorridos (sección 3) | PARTIAL | NOT_TESTED |
-| Docs | ADR D45–D50, protocolo de identidad, CHANGELOG, este informe | `ff52c87` y el commit de este informe | — | — | — |
+| #21 | Reading `clave.bin` tolerates transient sharing violations (3 s window, only HResult 32/33). Other errors end in `GrantKeyException` without the secret. Key creation has typed errors. | `5bd2017` | `Rc3Tests`: concurrent initialization without aborting the host, transient violation (barrier), persistent violation (fail-closed, no regeneration), access denied without retry | PASS (15 tests, 10/10 runs; full suite in the clean worktree) | NOT_TESTED |
+| #1 | The idle threshold only closes sessions without requests in progress. A broken connection is always closed. Reason `inactividad`. Without raising the global timeout. | `d649162` | `SessionLifecycleTests`: a request of 4× the threshold without heartbeats delivers its result; an idle session expires; a client that disappears midway closes the session and the host keeps accepting connections | PASS (36 related tests, 3/3) | NOT_TESTED |
+| #2 | `QuerySnapshotStore`: one model read and pages served from memory with `cursor=`, bound to session, document and revision. TTL, memory budget with LRU, stale cursors rejected. The bridge and the AgentHost use the cursor. | `42125ed` | `QuerySnapshotTests`: row equality against the classic read (5,100 rows, mm and where), binding to session, document and revision, fail-closed, TTL, LRU, per-session limit | PASS | NOT_TESTED |
+| #7 | `JobStore.Run` explicitly supervised (returns void). CS4014 is a compile error. The add-in's 4 un-awaited calls were audited. | `d6a61c3` | `JobSupervisionTests`: exception → `desconocido` with reason; no result → `desconocido`; cancellation; final handler only once | PASS | NOT_TESTED |
+| #3 | Mandatory named identity to operate (hello and registration free). Duplicate aliases rejected. `ctx desregistrar=true`. Config `identidad_obligatoria`. The AgentHost declares itself via configuration. | `1e1e8b8` | `AgentIdentityGateTests` (real pipe and registration); E2E tests with a unique agent per connection | PASS | NOT_TESTED |
+| #4 | Correlation of agent_id, session_id, request_id, trace_id, job_id and transaction_id via AsyncLocal, on every journal line. Client `_traza` and a per-run trace from the AgentHost. | `1e1e8b8` | `AgentIdentityGateTests`: correlation, trace hidden from the handler, job and transaction, stable fingerprint | PASS | NOT_TESTED |
+| #9 | Roslyn compilation cache with single-flight and counters. Dynamic C# is still enabled by default; the «Block C# code injection» control does not change. | `5fcf373` | `CompileCacheTests`: concurrency with barriers (compiles once), failures are not cached | PASS | NOT_TESTED |
+| #5 | Panel: «C# engine» section from memory; agents with agent_id and «read-only» with a reason. | `5fcf373` | Add-in build 2022–2026 | PARTIAL (missing table with filters, history, cancellation from the panel and long-operation notifications) | NOT_TESTED (visual test pending authorization) |
+| #6 | Native acceptance | — | — | — | BLOCKED: requires authorization and a disposable model |
+| #8 | Benchmarks | — | Offline measurement of traversals (section 3) | PARTIAL | NOT_TESTED |
+| Docs | ADR D45–D50, identity protocol, CHANGELOG, this report | `ff52c87` and the commit of this report | — | — | — |
 
-## 2. Evidencia de compilación y pruebas
+## 2. Build and test evidence
 
-Build reproducible con `build.ps1` en un worktree limpio (HEAD exacto, prioridad baja), commit `1e1e8b890d71941dc118aeef5be476fbd8d971b1`:
+Reproducible build with `build.ps1` in a clean worktree (exact HEAD, low priority), commit `1e1e8b890d71941dc118aeef5be476fbd8d971b1`:
 
-| Paso | Resultado |
+| Step | Result |
 |---|---|
 | Rust (`cargo test --locked --release`) | 13/13 |
-| Python worker (`unittest`) | 31 OK, 2 omitidas |
-| Add-ins Revit 2022, 2023, 2024 (net48) y 2025, 2026 (net8, ReadyToRun) | compilados contra los paquetes de referencia |
-| Suite .NET | **635/635** |
-| Instalador | `dist/Bimbridge.Setup.exe` generado |
+| Python worker (`unittest`) | 31 OK, 2 skipped |
+| Revit add-ins 2022, 2023, 2024 (net48) and 2025, 2026 (net8, ReadyToRun) | compiled against the reference packages |
+| .NET suite | **635/635** |
+| Installer | `dist/Bimbridge.Setup.exe` generated |
 
-El build del commit final se registra en el paquete de auditoría (`SHA256SUMS`, manifiesto y log). En un clon de desarrollo sin `build.ps1`, las pruebas de `ScriptingTests` y las de la librería Rust fallan porque falta compilar los add-ins de todos los años o la DLL nativa. Es un problema de entorno, y `build.ps1` lo resuelve.
+The build of the final commit is recorded in the audit package (`SHA256SUMS`, manifest and log). In a development clone without `build.ps1`, the `ScriptingTests` and Rust library tests fail because the add-ins for all years or the native DLL have not been built. It is an environment problem, and `build.ps1` resolves it.
 
-## 3. Rendimiento (#2)
+## 3. Performance (#2)
 
-- **Antes:** cada página repetía la consulta completa en el hilo de Revit. La lectura completa de comentarios hacía 51 llamadas y 51 recorridos (19 727 ms, frente a 3 232 ms de pyRevit con 1 llamada; dato del issue).
-- **Ahora:** 1 recorrido del modelo y 50 páginas desde memoria. Offline, 50 páginas de 100 filas se sirven en mucho menos de 2 s (umbral holgado de la prueba). El dato real depende de la máquina y no se publica como benchmark.
-- **Pendiente (NOT_TESTED):** medición nativa equivalente frente a pyRevit (mismo modelo, mismos parámetros, orden alternado, frío y caliente, mediana, p95 con muestra suficiente). No se declara superioridad sin ella.
+- **Before:** each page repeated the full query on the Revit thread. Reading all comments took 51 calls and 51 traversals (19,727 ms, versus 3,232 ms for pyRevit with 1 call; figure from the issue).
+- **Now:** 1 model traversal and 50 pages from memory. Offline, 50 pages of 100 rows are served in well under 2 s (the test's generous threshold). The real figure depends on the machine and is not published as a benchmark.
+- **Pending (NOT_TESTED):** equivalent native measurement against pyRevit (same model, same parameters, alternating order, cold and warm, median, p95 with a sufficient sample). No superiority is claimed without it.
 
-## 4. Informe al coordinador (sección 21)
+## 4. Report to the coordinator (section 21)
 
-1. **Commit inicial real de GitHub:** `efe37385dd8efdf2be1e675c1d765d4a15126761` (`main`). No avanzó durante la entrega.
-2. **Cambios locales previos:** el historial original (14 commits hasta `a291cc6`) en una carpeta local aparte, y trabajo de Codex sin confirmar en `bimbridge-codex\src` (rama `chore/github-foundation`: README, LICENSE, CI, docs). Ambos quedaron intactos.
-3. **Reconciliación:** clon nuevo del repositorio saneado y rama derivada de `efe3738`. Sólo se transportaron cambios de producto nuevos, escritos y probados sobre el clon. Sin `--allow-unrelated-histories`, sin force-push, sin bundle histórico ni archivos excluidos.
-4. **URL de la rama:** https://github.com/Jimjo2n/bimbridge-power-engine/tree/feat/power-engine-consolidation-0.9.0
-5. **URL del pull request:** pendiente. Esta sesión no tiene acceso a la API (no hay `gh` y el conector no está autorizado). Se puede abrir desde https://github.com/Jimjo2n/bimbridge-power-engine/compare/main...feat/power-engine-consolidation-0.9.0
-6. **Commit final:** el del paquete de auditoría (rama HEAD al cerrar la entrega).
-7. **¿Se resolvió la inicialización de claves?** Sí, offline: suite completa en un build limpio, sin abortos. Falta confirmar el CI de Windows en GitHub, que no se pudo consultar.
-8. **Causa raíz:** una violación de compartición transitoria de Windows sobre un `clave.bin` recién publicado (otro handle, el indexador o el antivirus), tratada como error fatal. Además, la prueba multihilo lanzaba la excepción en un `Thread` sin capturar, lo que abortaba el host de pruebas.
-9. **¿Se resolvió el timeout?** Sí: una sesión con solicitudes en curso no expira por inactividad, sin subir el timeout global.
-10. **¿Se eliminó el recorrido repetido?** Sí: con cursor, 1 recorrido por lectura completa.
-11. **Mejora de rendimiento:** de 51 a 1 recorridos del modelo. Los ms nativos quedan NOT_TESTED.
-12. **Identidad y observabilidad:** alias obligatorio para operar, rechazo de duplicados, desregistro y seis ids de correlación en el diario. En el panel: agent_id, sólo lectura con motivo y la sección Motor C#.
-13. **Nuevas funciones BIM completas:** ninguna nueva en esta entrega. Se priorizaron las puertas de calidad P0 y la multiagencia.
-14. **Workflows end-to-end que funcionan:** los existentes (plan/commit, consulta, tareas) siguen pasando la suite. PDF→Revit no se amplió.
-15. **Pruebas nativas ejecutadas:** ninguna.
-16. **Pruebas que no pudieron ejecutarse:** aceptación nativa (#6) en Revit 2022–2026, prueba visual del panel, benchmark nativo frente a pyRevit, CI de GitHub (sin acceso a la API).
-17. **CI Windows:** no consultado. El build local equivalente (build.ps1, Windows) pasa.
-18. **Regresiones abiertas:** ninguna conocida offline. #5 está incompleto (ver sección 1).
-19. **Objetivos del roadmap alcanzados:** las puertas P0 (#21, #1, #2), concurrencia (#7), identidad y correlación (#3, #4) y la caché de compilación (#9).
-20. **Para acercarse a 1.0.0:** aceptación nativa autorizada (#6) con modelo desechable; benchmark nativo equivalente (#8); completar el panel (#5: tabla de agentes con filtros, historial, cancelación segura y notificación de operaciones largas); propagar la traza a los workers de Python y Rust; ampliar los workflows BIM y PDF→Revit con escenarios sintéticos verificables; CI de GitHub en verde con el PR.
+1. **Real initial GitHub commit:** `efe37385dd8efdf2be1e675c1d765d4a15126761` (`main`). It did not move during the delivery.
+2. **Earlier local changes:** the original history (14 commits up to `a291cc6`) in a separate local folder, and uncommitted Codex work in `bimbridge-codex\src` (branch `chore/github-foundation`: README, LICENSE, CI, docs). Both were left intact.
+3. **Reconciliation:** fresh clone of the sanitized repository and a branch derived from `efe3738`. Only new product changes, written and tested on the clone, were carried over. No `--allow-unrelated-histories`, no force-push, no historical bundle and no excluded files.
+4. **Branch URL:** https://github.com/Jimjo2n/bimbridge-power-engine/tree/feat/power-engine-consolidation-0.9.0
+5. **Pull request URL:** pending. This session has no API access (no `gh` and the connector is not authorized). It can be opened from https://github.com/Jimjo2n/bimbridge-power-engine/compare/main...feat/power-engine-consolidation-0.9.0
+6. **Final commit:** the one in the audit package (branch HEAD when closing the delivery).
+7. **Was key initialization resolved?** Yes, offline: full suite on a clean build, without aborts. The Windows CI on GitHub, which could not be queried, is still to be confirmed.
+8. **Root cause:** a transient Windows sharing violation on a just-published `clave.bin` (another handle, the indexer or the antivirus), treated as a fatal error. In addition, the multithreaded test threw the exception on an uncaught `Thread`, which aborted the test host.
+9. **Was the timeout resolved?** Yes: a session with requests in progress does not expire for inactivity, without raising the global timeout.
+10. **Was the repeated traversal removed?** Yes: with a cursor, 1 traversal per full read.
+11. **Performance improvement:** from 51 to 1 model traversals. Native ms remain NOT_TESTED.
+12. **Identity and observability:** mandatory alias to operate, duplicate rejection, deregistration and six correlation ids in the journal. In the panel: agent_id, read-only with a reason and the C# engine section.
+13. **New complete BIM features:** none new in this delivery. The P0 quality gates and multi-agent support were prioritized.
+14. **End-to-end workflows that work:** the existing ones (plan/commit, query, tasks) still pass the suite. PDF→Revit was not extended.
+15. **Native tests run:** none.
+16. **Tests that could not be run:** native acceptance (#6) on Revit 2022–2026, the panel visual test, the native benchmark against pyRevit, GitHub CI (no API access).
+17. **Windows CI:** not queried. The equivalent local build (build.ps1, Windows) passes.
+18. **Open regressions:** none known offline. #5 is incomplete (see section 1).
+19. **Roadmap goals reached:** the P0 gates (#21, #1, #2), concurrency (#7), identity and correlation (#3, #4) and the compilation cache (#9).
+20. **To get closer to 1.0.0:** authorized native acceptance (#6) with a disposable model; equivalent native benchmark (#8); complete the panel (#5: agents table with filters, history, safe cancellation and long-operation notification); propagate the trace to the Python and Rust workers; extend the BIM and PDF→Revit workflows with verifiable synthetic scenarios; green GitHub CI on the PR.
 
-## 5. Recomendación sobre los issues
+## 5. Recommendation on the issues
 
-- Cerrar tras el CI del PR: #21, #1, #2, #7, #3, #4.
-- Mantener abiertos: #5 (PARTIAL), #6 (BLOCKED), #8 (PARTIAL), #9 (mejora entregada; falta validación multiversión nativa).
+- Close after the PR CI: #21, #1, #2, #7, #3, #4.
+- Keep open: #5 (PARTIAL), #6 (BLOCKED), #8 (PARTIAL), #9 (improvement delivered; native multi-version validation missing).
 
-## 6. Cierre de la consolidación y pendientes para la siguiente versión
+## 6. Consolidation close-out and items pending for the next version
 
-Autor y mantenedor: Jose Jimenez ([Jimjo2n](https://github.com/Jimjo2n)). Los commits posteriores a `521f7cf` usan la identidad Git configurada en esta máquina.
+Author and maintainer: Jose Jimenez ([Jimjo2n](https://github.com/Jimjo2n)). Commits after `521f7cf` use the Git identity configured on this machine.
 
-### 6.1 Correcciones tras los controles de GitHub en `521f7cf`
+### 6.1 Fixes after the GitHub checks on `521f7cf`
 
-- **Repository checks:** faltaba el encabezado `SPDX-License-Identifier: GPL-3.0-only` en cinco archivos de prueba nuevos. Añadido siguiendo la convención existente. Los controles del repositorio (`check_repository.py`, `inspect_history.py`, pruebas del repositorio) pasan en local.
-- **Windows distribution, `WriteSafetyTests.IsAlive_ProtectedProcess_DoesNotThrow`:** la prueba suponía que Windows siempre niega abrir el pid 4 (System). Eso depende del entorno: un usuario normal recibe acceso denegado, y `IsAlive` lo trata como «no es nuestro Revit». Un runner elevado puede abrirlo, y entonces el proceso existe y está vivo. El comportamiento de `IsAlive` es correcto; se corrigió el supuesto de la prueba, que ahora exige que nunca lance y que coincida con lo que el sistema permite en ese entorno. **Hipótesis:** se dedujo del código y de la diferencia de entorno, sin poder leer el registro de la ejecución (sin acceso a la API). Se confirma con el resultado del control en GitHub.
+- **Repository checks:** the `SPDX-License-Identifier: GPL-3.0-only` header was missing from five new test files. Added following the existing convention. The repository checks (`check_repository.py`, `inspect_history.py`, repository tests) pass locally.
+- **Windows distribution, `WriteSafetyTests.IsAlive_ProtectedProcess_DoesNotThrow`:** the test assumed that Windows always refuses to open pid 4 (System). That depends on the environment: a normal user gets access denied, and `IsAlive` treats it as «not our Revit». An elevated runner can open it, and then the process exists and is alive. The behavior of `IsAlive` is correct; the test's assumption was fixed, and it now requires that it never throws and that it matches what the system allows in that environment. **Hypothesis:** deduced from the code and the environment difference, without being able to read the run log (no API access). It is confirmed by the result of the GitHub check.
 
-### 6.2 Pendientes
+### 6.2 Pending
 
-| Issue | Estado real | Prioridad | Depende de | Criterio de aceptación |
+| Issue | Actual status | Priority | Depends on | Acceptance criterion |
 |---|---|---|---|---|
-| #5 panel | PARTIAL. Hecho: resumen, agentes con agent_id y «sólo lectura», sección «Motor C#» desde memoria, rendimiento (mediana, p95 con ≥20 muestras), recuperación y actividad. Falta: tabla de agentes con búsqueda, filtros y ordenamiento; vista detallada e historial por agente; cancelación segura de trabajos desde el panel; control de nuevas autorizaciones; estadísticas de Rust y Python; **notificación de operación larga** (propuesta no implementada: debe indicar agente, operación, documento, tiempo transcurrido y estado comprobado, y explicar que Revit está procesando y conviene dejarlo trabajar, sin afirmar salud ni fin de escritura sin evidencia). | Alta | Estados de sesión y trabajo (hechos en #1/#7) | Prueba funcional del modelo de vista sin Revit, más prueba visual nativa autorizada |
-| #6 aceptación nativa | BLOCKED. No se ejecutó nada dentro de Revit. | Alta | Autorización explícita para una instancia y un modelo desechable de prueba | Campaña con commit, versión de Revit, modelo, fecha, resultado y evidencia saneada, Revit 2022–2026 según disponibilidad |
-| #8 rendimiento | PARTIAL. Verificado offline: la lectura completa pasa de 51 recorridos del modelo a 1, y las 50 páginas siguientes salen de memoria. Falta medir dentro de Revit. | Alta | #6 | Mismo modelo, parámetros y unidades; orden alternado, frío y caliente; mediana, p95 con muestra suficiente, llamadas, tiempo de API, serialización, memoria; comparación con pyRevit sin digest |
-| #9 C# dinámico | Mejora entregada (single-flight). Falta validación multiversión dentro de Revit y telemetría de entrada al dispatcher. | Media | #6 | Compilación fría y caliente medida en Revit 2022–2026 |
-| Traza en workers | La traza llega al AgentHost; Python y Rust no la registran. | Media | — | `trace_id` en los diarios de los workers |
-| Workflows BIM y PDF→Revit | Sin ampliar en esta entrega. | Media | #6 para ejecución | Escenario sintético reproducible con incertidumbre explícita |
-| Scheduler (equidad entre agentes, colas por documento) | No iniciado. | Baja | Perfiles nativos de #8 | Medición que lo justifique |
+| #5 panel | PARTIAL. Done: summary, agents with agent_id and «read-only», «C# engine» section from memory, performance (median, p95 with ≥20 samples), recovery and activity. Missing: agents table with search, filters and sorting; detailed view and per-agent history; safe job cancellation from the panel; control of new authorizations; Rust and Python statistics; **long-operation notification** (proposal not implemented: it must state agent, operation, document, elapsed time and verified status, and explain that Revit is processing and it is best to let it work, without claiming health or the end of a write without evidence). | High | Session and job states (done in #1/#7) | Functional test of the view model without Revit, plus an authorized native visual test |
+| #6 native acceptance | BLOCKED. Nothing was run inside Revit. | High | Explicit authorization for a test instance and a disposable test model | Campaign with commit, Revit version, model, date, result and sanitized evidence, Revit 2022–2026 as available |
+| #8 performance | PARTIAL. Verified offline: the full read goes from 51 model traversals to 1, and the following 50 pages come from memory. Measuring inside Revit is missing. | High | #6 | Same model, parameters and units; alternating order, cold and warm; median, p95 with a sufficient sample, calls, API time, serialization, memory; comparison with pyRevit without digest |
+| #9 dynamic C# | Improvement delivered (single-flight). Multi-version validation inside Revit and dispatcher-entry telemetry are missing. | Medium | #6 | Cold and warm compilation measured on Revit 2022–2026 |
+| Trace in workers | The trace reaches the AgentHost; Python and Rust do not record it. | Medium | — | `trace_id` in the workers' journals |
+| BIM and PDF→Revit workflows | Not extended in this delivery. | Medium | #6 for execution | Reproducible synthetic scenario with explicit uncertainty |
+| Scheduler (fairness between agents, per-document queues) | Not started. | Low | Native profiles from #8 | A measurement that justifies it |
 
-### 6.3 Cierres propuestos (tras el CI del PR)
+### 6.3 Proposed closures (after the PR CI)
 
-#21 (`5bd2017`), #1 (`d649162`), #2 (`42125ed`, con medición nativa pendiente en #8), #7 (`d6a61c3`), #3 y #4 (`1e1e8b8`). Ninguno se cierra sólo por una prueba aislada: se enlaza el commit, la prueba de regresión y el resultado del control en GitHub.
+#21 (`5bd2017`), #1 (`d649162`), #2 (`42125ed`, with native measurement pending in #8), #7 (`d6a61c3`), #3 and #4 (`1e1e8b8`). None is closed on an isolated test alone: the commit, the regression test and the result of the GitHub check are linked.
 
-### 6.4 Regresiones
+### 6.4 Regressions
 
-Ninguna descubierta. Los dos fallos de GitHub eran de metadatos y de un supuesto de entorno de una prueba.
+None discovered. The two GitHub failures were about metadata and an environment assumption in a test.
 
-### 6.5 Protecciones de la rama
+### 6.5 Branch protections
 
-El repositorio es privado. Si GitHub no ofrece reglas de protección de rama en el plan vigente, el procedimiento de revisión mientras tanto es: todo cambio por pull request hacia `main`, controles de GitHub Actions en verde sobre el commit exacto, revisión del mantenedor (CODEOWNERS) y sin push directo a `main`.
+The repository is private. If GitHub does not offer branch protection rules on the current plan, the review procedure in the meantime is: every change via pull request to `main`, green GitHub Actions checks on the exact commit, maintainer review (CODEOWNERS) and no direct push to `main`.
 
-## 7. Revisión del PR #22 e issue #27
+## 7. Review of PR #22 and issue #27
 
-Bloqueos señalados por la coordinación sobre `3e09581`, resueltos en esta rama. Los SHA de cada cambio están en el historial del PR; el SHA final y sus checks se publican en el propio PR.
+Blockers raised by the coordination on `3e09581`, resolved in this branch. The SHAs of each change are in the PR history; the final SHA and its checks are published on the PR itself.
 
-| Bloqueo | Cambio | Evidencia offline | Estado |
+| Blocker | Change | Offline evidence | Status |
 |---|---|---|---|
-| #27, fallo intermitente de la prueba de 8 procesos en Windows CI | Causa confirmada en el log del run 42882010373: un escritor agotó la espera de 10 s del bloqueo de auditoría. Group commit entre procesos (D53), harness supervisado (plazo único, terminación, liberación, cadena verificada aunque falle un hijo) | 8 pruebas deterministas de group commit; R02 (8×50, 401 líneas, 50 por proceso, cid únicos); medición 8×50 y 8×1500 sin fallos | Resuelto offline; pendiente de varios CI verdes en Windows sobre el SHA final |
-| Lecturas anónimas con `identidad_obligatoria=true` | Política única: sin nombre sólo `hello`, `ping` y el registro (D49) | Rechazo de las 9 lecturas y de `ctx` sin `agente=`; registro y lectura atribuida en el diario; alias duplicado; sesiones concurrentes; modo heredado marcado | Resuelto offline |
-| Reutilización de `session_id` y `request_id` al reconectar | Id único por instancia con 64 bits aleatorios (D51) | 200 reconexiones con el mismo pid sin repetir `session_id` ni `request_id` | Resuelto offline |
-| «Presupuesto de memoria» medido en celdas | Bytes estimados sobre una proyección compacta, con límites global y por documento y descartes informados (D52) | Textos largos, LRU por documento y global, 64 escrituras concurrentes de 16 agentes sobre 5 documentos, vencimiento y cierre | Resuelto offline (estimación, no medición del heap) |
+| #27, intermittent failure of the 8-process test on Windows CI | Cause confirmed in the log of run 42882010373: a writer exhausted the 10 s wait for the audit lock. Cross-process group commit (D53), supervised harness (single deadline, termination, release, chain verified even if a child fails) | 8 deterministic group commit tests; R02 (8×50, 401 lines, 50 per process, unique cids); 8×50 and 8×1500 measurements without failures | Resolved offline; pending several green Windows CI runs on the final SHA |
+| Anonymous reads with `identidad_obligatoria=true` | Single policy: without a name only `hello`, `ping` and registration (D49) | Rejection of the 9 reads and of `ctx` without `agente=`; registration and attributed read in the journal; duplicate alias; concurrent sessions; legacy mode marked | Resolved offline |
+| Reuse of `session_id` and `request_id` on reconnect | Unique id per instance with 64 random bits (D51) | 200 reconnections with the same pid without repeating `session_id` or `request_id` | Resolved offline |
+| «Memory budget» measured in cells | Estimated bytes over a compact projection, with global and per-document limits and reported evictions (D52) | Long texts, per-document and global LRU, 64 concurrent writes from 16 agents over 5 documents, expiry and close | Resolved offline (estimate, not a heap measurement) |
 
-Medición local de la auditoría, con el mismo harness antes y después:
+Local audit measurement, with the same harness before and after:
 
-| Escenario | Antes | Después |
+| Scenario | Before | After |
 |---|---|---|
-| 8×50: tiempo de las escrituras | ≈21,7 s | ≈9,3 s |
-| 8×50: espera del bloqueo p95 / máx. | 1,3–1,8 s / 4,7 s | 0,14–0,26 s / 0,28 s |
-| 8×1500: tiempo total | 438,8 s | 274,9 s |
-| 8×1500: throughput | ≈27,6 escrituras/s | ≈44 escrituras/s |
+| 8×50: write time | ≈21.7 s | ≈9.3 s |
+| 8×50: lock wait p95 / max | 1.3–1.8 s / 4.7 s | 0.14–0.26 s / 0.28 s |
+| 8×1500: total time | 438.8 s | 274.9 s |
+| 8×1500: throughput | ≈27.6 writes/s | ≈44 writes/s |
 
-El perfil mostró que el fsync de la línea cuesta ≈1 ms. Lo caro era la reescritura atómica de la cabeza (≈19 ms), la relectura de la cola y la apertura de archivos con el antivirus activo, y eso es lo que el lote amortiza. Las cifras son de una sola máquina de desarrollo y no son un benchmark nativo.
+Profiling showed that the line fsync costs ≈1 ms. The expensive part was the atomic rewrite of the head (≈19 ms), re-reading the tail and opening files with the antivirus active, and that is what the batch amortizes. The figures come from a single development machine and are not a native benchmark.
 
-Pruebas no ejecutadas: ninguna dentro de Revit. La campaña nativa única de 0.9.1 sigue pendiente de autorización.
+Tests not run: none inside Revit. The single 0.9.1 native campaign is still pending authorization.

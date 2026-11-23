@@ -8,10 +8,10 @@ using System.Text;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Órdenes de una línea para el perfil compacto: "q LF lvl=LEVEL05 g=lvl,type elev>9".
-    /// - primera palabra = verbo; palabras sueltas = posicionales;
-    /// - clave=valor = argumento (con alias cortos); comillas para valores con espacios;
-    /// - campo&gt;n, campo~txt, campo!=x, campo? y !campo = condiciones where (en query).
+    /// One-line commands for the compact profile: "q LF lvl=LEVEL05 g=lvl,type elev>9".
+    /// - first word = verb; bare words = positionals;
+    /// - key=value = argument (with short aliases); quotes for values with spaces;
+    /// - field&gt;n, field~txt, field!=x, field? and !field = where conditions (in query).
     /// </summary>
     public sealed class Command
     {
@@ -61,7 +61,7 @@ namespace Bimbridge.Engine
             return c;
         }
 
-        /// <summary>Condición tipo where si el token tiene &gt;, &lt;, ~, != o termina en ? o empieza con !.</summary>
+        /// <summary>A where condition if the token has &gt;, &lt;, ~, != or ends with ? or starts with !.</summary>
         private static bool IsCondition(string tok, int equals)
         {
             if (tok.Length < 2) return false;
@@ -78,9 +78,11 @@ namespace Bimbridge.Engine
         {
             if (v.Length > 0 && (v[0] == '[' || v[0] == '{'))
             {
-                try { return Bimbridge.Protocol.Json.Parse(v); } catch (Exception) { /* texto tal cual */ }
+                try { return Bimbridge.Protocol.Json.Parse(v); } catch (Exception) { /* plain text as is */ }
             }
-            if (v == "true" || v == "sí" || v == "si") return true;
+            var ek = Bimbridge.Protocol.LegacyAliases.Token(key);
+            var userValue = ek == "value" || ek == "text" || ek == "name";   // the user's text: a legacy "sí" is not a flag there
+            if (v == "true" || v == "yes" || (!userValue && Bimbridge.Protocol.LegacyAliases.IsLegacyYes(v))) return true;
             if (v == "false" || v == "no") return false;
             if (key != "ids" && key != "lvl" && key != "type" && key != "name" && key != "value"
                 && long.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out var l)) return l;
@@ -113,7 +115,7 @@ namespace Bimbridge.Engine
             return list;
         }
 
-        /// <summary>Varias órdenes: una por línea o separadas por ";;".</summary>
+        /// <summary>Several commands: one per line or separated by ";;".</summary>
         public static List<string> SplitLines(string text)
         {
             var lines = new List<string>();
@@ -175,7 +177,7 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Plan en líneas: "op ids clave=valor" → [{op, ids, …}]. Si el texto es JSON, se usa tal cual.</summary>
+        /// <summary>Plan as lines: "op ids key=value" → [{op, ids, …}]. If the text is JSON, it is used as is.</summary>
         public static List<object> ParseOps(string text)
         {
             var t = (text ?? "").Trim();

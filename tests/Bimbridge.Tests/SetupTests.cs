@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Instalador: detecta Revit, instala por versión, conserva la config, Codex y desinstala.</summary>
+    /// <summary>Installer: detects Revit, installs per version, keeps the config, Codex, and uninstalls.</summary>
     public class SetupTests : IDisposable
     {
         [Fact]
@@ -95,7 +95,7 @@ namespace Bimbridge.Tests
             var dll = Path.Combine(_p.AddinsDir("2024"), "Bimbridge", "Bimbridge.Addin.dll");
             var record = File.ReadAllText(_p.InstallRecord);
             var ex = Assert.Throws<IOException>(() => core.Install(PayloadWithoutBridge(), new InstallOptions { Versions = { "2024" }, Levels = "RPW" }, "0.6.0"));
-            Assert.Contains("estado anterior", ex.Message);
+            Assert.Contains("previous state", ex.Message);
             Assert.Equal("dll2024", File.ReadAllText(dll));
             Assert.Equal(record, File.ReadAllText(_p.InstallRecord));
         }
@@ -109,7 +109,7 @@ namespace Bimbridge.Tests
             using (new FileStream(_p.BridgeExe, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
                 var ex = Assert.Throws<IOException>(() => core.Install(Payload(), new InstallOptions { Versions = { "2024" }, Levels = "RPW" }, "0.6.0"));
-                Assert.Contains("No se cambió nada", ex.Message);
+                Assert.Contains("Nothing was changed", ex.Message);
             }
             Assert.Equal(record, File.ReadAllText(_p.InstallRecord));
         }
@@ -124,11 +124,11 @@ namespace Bimbridge.Tests
         [Fact]
         public void Update_KeepsMcpOff_AndCodexExtraKeys()
         {
-            // F19/A31: el usuario apagó el MCP y añadió claves propias a la sección de Codex.
+            // F19/A31: the user turned off the MCP and added their own keys to the Codex section.
             Directory.CreateDirectory(Path.GetDirectoryName(_p.ConfigFile));
             File.WriteAllText(_p.ConfigFile, "{\"enabled\":false,\"levels\":\"R\"}");
             Directory.CreateDirectory(Path.GetDirectoryName(_p.CodexConfig));
-            File.WriteAllText(_p.CodexConfig, "[mcp_servers.bimbridge]\ncommand = \"viejo.exe\"\nstartup_timeout_sec = 30\n\n[mcp_servers.bimbridge.env]\nBIMBRIDGE_PROFILE = \"completo\"\n\n[otra]\nx = 1\n");
+            File.WriteAllText(_p.CodexConfig, "[mcp_servers.bimbridge]\ncommand = \"viejo.exe\"\nstartup_timeout_sec = 30\n\n[mcp_servers.bimbridge.env]\nBIMBRIDGE_PROFILE = \"complete\"\n\n[otra]\nx = 1\n");
             var core = new SetupCore(_p);
             core.Install(Payload(), new InstallOptions { Versions = { "2024" }, Levels = "RPW", Codex = true }, "0.5.0");
             var cfg = Json.ParseObject(File.ReadAllText(_p.ConfigFile));
@@ -137,18 +137,18 @@ namespace Bimbridge.Tests
             var toml = File.ReadAllText(_p.CodexConfig);
             Assert.Contains("startup_timeout_sec = 30", toml);
             Assert.Contains("[mcp_servers.bimbridge.env]", toml);
-            Assert.Contains("BIMBRIDGE_PROFILE = \"completo\"", toml);
+            Assert.Contains("BIMBRIDGE_PROFILE = \"complete\"", toml);
             Assert.Contains("[otra]", toml);
             Assert.DoesNotContain("viejo.exe", toml);
             Assert.Contains("Bimbridge.Bridge.exe", toml);
-            // Reinstalar no duplica nada.
+            // Reinstalling duplicates nothing.
             core.Install(Payload(), new InstallOptions { Versions = { "2024" }, Levels = "RPW", Codex = true }, "0.5.0");
             var toml2 = File.ReadAllText(_p.CodexConfig);
             Assert.Equal(1, toml2.Split(new[] { "startup_timeout_sec" }, StringSplitOptions.None).Length - 1);
             Assert.Equal(1, toml2.Split(new[] { "[mcp_servers.bimbridge.env]" }, StringSplitOptions.None).Length - 1);
         }
 
-        /// <summary>Paquete con manifest.json (como lo genera build.sh). tamper = archivo cuyo contenido no coincide con el hash.</summary>
+        /// <summary>Package with manifest.json (as build.sh generates it). tamper = file whose content does not match the hash.</summary>
         private static ZipArchive SignedPayload(string tamper = null, string missing = null)
         {
             var files = new System.Collections.Generic.Dictionary<string, string>();
@@ -164,8 +164,8 @@ namespace Bimbridge.Tests
             var manifest = new System.Collections.Generic.Dictionary<string, object>
             {
                 ["version"] = "0.9.0",
-                ["requeridos"] = files.Keys.Cast<object>().ToList(),
-                ["archivos"] = files.ToDictionary(kv => kv.Key, kv => (object)Sha(kv.Value)),
+                ["required"] = files.Keys.Cast<object>().ToList(),
+                ["files"] = files.ToDictionary(kv => kv.Key, kv => (object)Sha(kv.Value)),
             };
             var ms = new MemoryStream();
             using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, true))
@@ -178,7 +178,7 @@ namespace Bimbridge.Tests
             return new ZipArchive(ms, ZipArchiveMode.Read);
         }
 
-        /// <summary>0.9.0: el Power Engine del paquete (DLL Rust y Python Worker) se instala junto al puente, verificado por hash.</summary>
+        /// <summary>0.9.0: the package's Power Engine (Rust DLL and Python Worker) is installed next to the bridge, verified by hash.</summary>
         [Fact]
         public void PowerEngine_FilesInstalledNextToBridge_AndTamperIsRejected()
         {
@@ -201,14 +201,14 @@ namespace Bimbridge.Tests
             Assert.False(File.Exists(_p.BridgeExe));
         }
 
-        /// <summary>El payload REAL que arma build.sh (si existe) pasa su propia verificación e instala los 5 años con hashes registrados.</summary>
+        /// <summary>The REAL payload built by build.sh (if present) passes its own verification and installs all 5 years with recorded hashes.</summary>
         [Fact]
         public void RealPayload_FromBuild_VerifiesAndInstalls()
         {
             var d = AppContext.BaseDirectory;
             while (d != null && !File.Exists(Path.Combine(d, "Bimbridge.sln"))) d = Path.GetDirectoryName(d);
             var payload = Path.Combine(d, "src", "Bimbridge.Setup", "payload.zip");
-            if (!File.Exists(payload)) return; // sin build.sh no hay payload: no aplica
+            if (!File.Exists(payload)) return; // without build.sh there is no payload: not applicable
             using (var zip = ZipFile.OpenRead(payload))
             {
                 var manifest = SetupCore.ReadPayloadManifest(zip);
@@ -217,8 +217,8 @@ namespace Bimbridge.Tests
                 core.Install(zip, new InstallOptions { Versions = SetupCore.SupportedVersions.ToList(), Levels = "RPW" }, "0.6.0");
                 var diag = core.Diagnose();
                 foreach (var v in SetupCore.SupportedVersions)
-                    Assert.Equal(true, ((System.Collections.Generic.Dictionary<string, object>)((System.Collections.Generic.Dictionary<string, object>)diag["addin"])[v])["coinciden"]);
-                Assert.True(File.Exists(Path.Combine(_p.AddinsDir("2026"), "Bimbridge", "recetas", "etiquetar_luces.cs")));
+                    Assert.Equal(true, ((System.Collections.Generic.Dictionary<string, object>)((System.Collections.Generic.Dictionary<string, object>)diag["addin"])[v])["match"]);
+                Assert.True(File.Exists(Path.Combine(_p.AddinsDir("2026"), "Bimbridge", "recipes", "tag_lights.cs")));
                 Assert.True(File.Exists(Path.Combine(_p.BinDir, "Bimbridge.AgentHost.exe")));
                 Assert.True(File.Exists(Path.Combine(_p.BinDir, "power_engine", "bimbridge-power-engine.exe")));
             }
@@ -230,11 +230,11 @@ namespace Bimbridge.Tests
             var core = new SetupCore(_p);
             var ex = Assert.Throws<InvalidDataException>(() =>
                 core.Install(SignedPayload("addin/2024/Bimbridge/Bimbridge.Addin.dll"), new InstallOptions { Versions = { "2024" }, Levels = "RPW" }, "0.6.0"));
-            Assert.Contains("hash distinto", ex.Message);
+            Assert.Contains("hash mismatch", ex.Message);
             Assert.False(Directory.Exists(_p.AddinsDir("2024")));
             Assert.False(File.Exists(_p.BridgeExe));
             Assert.Null(core.ReadInstalled());
-            // Un archivo manipulado de un año NO elegido no impide instalar los elegidos.
+            // A tampered file for a year NOT selected does not prevent installing the selected ones.
             core.Install(SignedPayload("addin/2022/Bimbridge/Bimbridge.Addin.dll"), new InstallOptions { Versions = { "2024" }, Levels = "RPW" }, "0.6.0");
             Assert.True(File.Exists(Path.Combine(_p.AddinsDir("2024"), "Bimbridge.addin")));
         }
@@ -243,50 +243,50 @@ namespace Bimbridge.Tests
         public void Diagnose_ReportsHashes_ChangedFiles_PendingRestart_LoadedVersion_AndConfig()
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_p.ConfigFile));
-            // Modo directo autorizado (W + runner auto) y un MCP apagado por el usuario: una actualización no los cambia.
+            // Authorized direct mode (W + auto runner) and an MCP turned off by the user: an update does not change them.
             File.WriteAllText(_p.ConfigFile, "{\"levels\":\"RPW\",\"runner\":\"auto\",\"enabled\":false}");
             var core = new SetupCore(_p);
             core.Install(SignedPayload(), new InstallOptions { Versions = { "2024", "2026" }, Levels = "RPW" }, "0.6.0");
             var d = core.Diagnose();
-            Assert.Equal("0.6.0", d["instalada"]);
+            Assert.Equal("0.6.0", d["installed"]);
             var addin = (System.Collections.Generic.Dictionary<string, object>)d["addin"];
             var y24 = (System.Collections.Generic.Dictionary<string, object>)addin["2024"];
-            Assert.Equal(true, y24["coinciden"]);
-            Assert.Equal(false, y24["reinicio_pendiente"]);
-            Assert.Equal("no instalado", addin["2023"]);
+            Assert.Equal(true, y24["match"]);
+            Assert.Equal(false, y24["restart_pending"]);
+            Assert.Equal("not installed", addin["2023"]);
             var cfg = (System.Collections.Generic.Dictionary<string, object>)d["config"];
             Assert.Equal(false, cfg["enabled"]);
             Assert.Equal("RPW", cfg["levels"]);
             Assert.Equal("auto", cfg["runner"]);
 
-            // Alguien cambia la DLL y queda un archivo apartado en uso: el diagnóstico lo dice.
+            // Someone changes the DLL and a set-aside file is left in use: the diagnostics report it.
             var dll = Path.Combine(_p.AddinsDir("2026"), "Bimbridge", "Bimbridge.Addin.dll");
-            File.WriteAllText(dll, "otra");
-            File.WriteAllText(dll + Updates.LeftoverMark + "1", "vieja");
+            File.WriteAllText(dll, "other");
+            File.WriteAllText(dll + Updates.LeftoverMark + "1", "old");
             d = core.Diagnose();
             var y26 = (System.Collections.Generic.Dictionary<string, object>)((System.Collections.Generic.Dictionary<string, object>)d["addin"])["2026"];
-            Assert.Equal(false, y26["coinciden"]);
-            Assert.Equal(true, y26["reinicio_pendiente"]);
-            Assert.Contains("cambió", string.Join(",", (System.Collections.Generic.List<object>)y26["diferencias"]));
+            Assert.Equal(false, y26["match"]);
+            Assert.Equal(true, y26["restart_pending"]);
+            Assert.Contains("changed", string.Join(",", (System.Collections.Generic.List<object>)y26["differences"]));
 
-            // Revit abierto con el add-in cargado: el descriptor del proceso actual cuenta como "vivo".
+            // Revit open with the add-in loaded: the current process descriptor counts as "alive".
             var inst = Path.Combine(_p.Home, "instances");
             Directory.CreateDirectory(inst);
             var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
             File.WriteAllText(Path.Combine(inst, pid + ".json"), Json.Write(new InstanceDescriptor { Pid = pid, RevitVersion = "2026", PipeName = "x", Protocol = 1, AddinVersion = "0.5.0.0", StartedUtc = "2026-10-20T00:00:00Z" }.ToJson()));
             d = core.Diagnose();
-            var open = (System.Collections.Generic.List<object>)d["revit_abiertos"];
+            var open = (System.Collections.Generic.List<object>)d["open_revits"];
             Assert.Single(open);
-            Assert.Equal(false, ((System.Collections.Generic.Dictionary<string, object>)open[0])["coincide_con_instalada"]);
+            Assert.Equal(false, ((System.Collections.Generic.Dictionary<string, object>)open[0])["matches_installed"]);
         }
 
         [Fact]
         public void Install_Update_Uninstall()
         {
-            // Config previa del usuario con otros valores: deben conservarse.
+            // User's previous config with other values: must be kept.
             Directory.CreateDirectory(Path.GetDirectoryName(_p.ConfigFile));
             File.WriteAllText(_p.ConfigFile, "{\"levels\":\"R\",\"journal_days\":30}");
-            // Codex con otra configuración: no se toca.
+            // Codex with another configuration: left untouched.
             Directory.CreateDirectory(Path.GetDirectoryName(_p.CodexConfig));
             File.WriteAllText(_p.CodexConfig, "model = \"gpt-5\"\n\n[mcp_servers.otro]\ncommand = \"x.exe\"\n");
 
@@ -309,7 +309,7 @@ namespace Bimbridge.Tests
             Assert.Equal("0.2.0", info.ProductVersion);
             Assert.Equal(new[] { "2024", "2025" }, info.Versions.ToArray());
 
-            // Actualizar: sólo 2025, sólo lectura, sin Codex. 2024 se quita; la sección de Codex también.
+            // Update: only 2025, read-only, no Codex. 2024 is removed; so is the Codex section.
             core.Install(Payload(), new InstallOptions { Versions = { "2025" }, Levels = "R", Codex = false }, "0.2.1");
             Assert.False(File.Exists(Path.Combine(_p.AddinsDir("2024"), "Bimbridge.addin")));
             Assert.Equal("R", Json.ParseObject(File.ReadAllText(_p.ConfigFile))["levels"]);
@@ -318,12 +318,12 @@ namespace Bimbridge.Tests
             Assert.Contains("[mcp_servers.otro]", toml);
             Assert.Equal(1, toml.Split(new[] { "[mcp_servers.otro]" }, StringSplitOptions.None).Length - 1);
 
-            // Reinstalar con Codex dos veces no duplica la sección.
+            // Reinstalling with Codex twice does not duplicate the section.
             core.Install(Payload(), new InstallOptions { Versions = { "2025" }, Levels = "RP", Codex = true }, "0.2.1");
             core.Install(Payload(), new InstallOptions { Versions = { "2025" }, Levels = "RP", Codex = true }, "0.2.1");
             Assert.Equal(2, File.ReadAllText(_p.CodexConfig).Split(new[] { SetupCore.CodexSection }, StringSplitOptions.None).Length);
 
-            // Desinstalar conservando datos y luego todo.
+            // Uninstall keeping data, then everything.
             File.WriteAllText(Path.Combine(_p.Home, "addin.log"), "x");
             core.Uninstall(removeData: false);
             Assert.False(File.Exists(Path.Combine(_p.AddinsDir("2025"), "Bimbridge.addin")));
@@ -365,7 +365,7 @@ namespace Bimbridge.Tests
     using Bimbridge.Setup;
     using Xunit;
 
-    /// <summary>Botón Actualizar: buscar instaladores, elegir el más nuevo, guardar actual + anterior y reciclar los viejos.</summary>
+    /// <summary>Update button: find installers, pick the newest, keep current + previous and recycle the old ones.</summary>
     [Collection("updates")]
     public class UpdateTests : IDisposable
     {
@@ -375,7 +375,7 @@ namespace Bimbridge.Tests
         public UpdateTests()
         {
             Directory.CreateDirectory(_root);
-            // En Linux no hay un Bimbridge.Setup.exe real: el "exe" de prueba es un texto con su versión.
+            // On Linux there is no real Bimbridge.Setup.exe: the test "exe" is a text with its version.
             Updates.VersionReader = f =>
             {
                 var t = File.ReadAllText(f);
@@ -416,8 +416,8 @@ namespace Bimbridge.Tests
             FakeZip(Path.Combine(p.Downloads, "Bimbridge.Setup_0.2.1.zip"), "0.2.1");
             FakeZip(Path.Combine(p.Downloads, "Bimbridge.Setup_0.2.3 (1).zip"), "0.2.3");
             FakeExe(Path.Combine(p.Desktop, "Bimbridge.Setup_0.2.2", "Bimbridge.Setup.exe"), "0.2.2");
-            FakeExe(Path.Combine(p.Desktop, "otra cosa.exe"), "9.9.9");                       // no empieza por el prefijo
-            File.WriteAllText(Path.Combine(p.Downloads, "Bimbridge.Setup.exe"), "no soy un instalador");  // nombre correcto, no es nuestro
+            FakeExe(Path.Combine(p.Desktop, "otra cosa.exe"), "9.9.9");                       // does not start with the prefix
+            File.WriteAllText(Path.Combine(p.Downloads, "Bimbridge.Setup.exe"), "no soy un instalador");  // correct name, not ours
 
             var found = Updates.Scan(Updates.Folders(p), p.UpdatesTemp);
             Assert.Equal(new[] { "0.2.1", "0.2.2", "0.2.3" }, found.Select(c => c.VersionText).OrderBy(x => x).ToArray());
@@ -425,11 +425,11 @@ namespace Bimbridge.Tests
             var best = Updates.Newest(found, new Version(0, 2, 1));
             Assert.Equal("0.2.3", best.VersionText);
             Assert.EndsWith("(1).zip", best.Source);
-            Assert.True(File.Exists(best.Exe));                       // extraído para ejecutarlo
-            Assert.Null(Updates.Newest(found, new Version(0, 2, 3)));  // ya al día
+            Assert.True(File.Exists(best.Exe));                       // extracted to run it
+            Assert.Null(Updates.Newest(found, new Version(0, 2, 3)));  // already up to date
 
             var old = Updates.Superseded(found, new Version(0, 2, 3), p.UpdatesDir);
-            Assert.Equal(3, old.Count);                                // los tres van a la papelera tras instalar 0.2.3
+            Assert.Equal(3, old.Count);                                // the three go to the recycle bin after installing 0.2.3
         }
 
         [Fact]
@@ -447,7 +447,7 @@ namespace Bimbridge.Tests
             Assert.False(File.Exists(p.CachedSetup("0.2.0")));
             Assert.Single(removed);
 
-            // La caché propia nunca se manda a la papelera.
+            // Our own cache is never sent to the recycle bin.
             var found = Updates.Scan(Updates.Folders(p), p.UpdatesTemp);
             Assert.Empty(Updates.Superseded(found, new Version(0, 2, 2), p.UpdatesDir));
         }
@@ -463,7 +463,7 @@ namespace Bimbridge.Tests
         }
 
         [Fact]
-        public void CopyOver_SobrescribeDestinoSoloLectura()
+        public void CopyOver_OverwritesReadOnlyTarget()
         {
             var dir = Path.Combine(Path.GetTempPath(), "bimbridge-copyover-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);

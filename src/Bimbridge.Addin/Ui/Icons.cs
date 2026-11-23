@@ -8,9 +8,9 @@ using System.Windows.Media.Imaging;
 namespace Bimbridge.Addin.Ui
 {
     /// <summary>
-    /// Iconos del ribbon dibujados en código (vectoriales, nítidos a 16 y 32 px), sin archivos de imagen.
-    /// Cada icono se dibuja en un lienzo de 32×32 y se escala. Los bordes rectos caen en coordenadas pares para que
-    /// coincidan con píxeles enteros tanto a 32 px como a 16 px (escala 0,5). Paleta de la marca: marino, blanco y estados.
+    /// Ribbon icons drawn in code (vector, crisp at 16 and 32 px), with no image files.
+    /// Each icon is drawn on a 32×32 canvas and scaled. Straight edges fall on even coordinates so that
+    /// they line up with whole pixels both at 32 px and at 16 px (scale 0.5). Brand palette: navy, white and states.
     /// </summary>
     internal static class Icons
     {
@@ -21,8 +21,8 @@ namespace Bimbridge.Addin.Ui
             dc.DrawEllipse(Theme.B(state), null, new Point(24, 22), 5, 5);
         });
 
-        /// <summary>Cuadro de transición de Estado (t en [0,1]): el punto ya tiene el color nuevo desde el primer cuadro (nunca se mezclan
-        /// dos colores de estado) y un anillo de ese color sale de él y se desvanece. t = 1 no dibuja anillo. <paramref name="from"/> no se dibuja.</summary>
+        /// <summary>Status transition frame (t in [0,1]): the dot already has the new color from the first frame (two state colors
+        /// are never blended) and a ring of that color grows out of it and fades. t = 1 draws no ring. <paramref name="from"/> is not drawn.</summary>
         public static ImageSource Status(Color from, Color to, double t, int size) => Render(size, dc =>
         {
             Monitor(dc);
@@ -32,29 +32,29 @@ namespace Bimbridge.Addin.Ui
             if (a > 0) dc.DrawEllipse(null, new Pen(Theme.B(Color.FromArgb(a, to.R, to.G, to.B)), 1.5), new Point(24, 22), 7 + 3 * t, 7 + 3 * t);
         });
 
-        // Monitor: "la conexión con la IA".
+        // Monitor: "the connection with the AI".
         private static void Monitor(DrawingContext dc)
         {
             Fill(dc, Theme.Navy, Rounded(2, 4, 24, 18, 3));
             Fill(dc, Theme.Sunken, Rounded(4, 6, 20, 14, 1.5));
-            // Trazo "IA" dentro del monitor
+            // "AI" strokes inside the monitor
             Fill(dc, Theme.NavySoft, Rounded(8, 10, 8, 2, 1));
             Fill(dc, Theme.NavySoft, Rounded(8, 14, 12, 2, 1));
             Fill(dc, Theme.Navy, Rounded(12, 22, 4, 4, 0));
             Fill(dc, Theme.Navy, Rounded(8, 26, 12, 2, 1));
         }
 
-        // Pausa <-> reanudar: cada barra se transforma en una mitad del triángulo (vértice a vértice).
+        // Pause <-> resume: each bar morphs into one half of the triangle (vertex to vertex).
         private static readonly Point[] BarL = { new Point(10, 10), new Point(14, 10), new Point(14, 22), new Point(10, 22) };
         private static readonly Point[] BarR = { new Point(18, 10), new Point(22, 10), new Point(22, 22), new Point(18, 22) };
         private static readonly Point[] TriL = { new Point(13, 10), new Point(18.5, 13.3), new Point(18.5, 18.7), new Point(13, 22) };
         private static readonly Point[] TriR = { new Point(18, 13), new Point(23, 16), new Point(23, 16), new Point(18, 19) };
 
-        /// <summary>Cuadro de transición de Pausar (t en [0,1] hacia <paramref name="paused"/>): el círculo ya tiene el color final; sólo la forma
-        /// cambia (barras que se vuelven triángulo, o al revés).</summary>
+        /// <summary>Pause transition frame (t in [0,1] towards <paramref name="paused"/>): the circle already has the final color; only the shape
+        /// changes (bars turning into a triangle, or the other way round).</summary>
         public static ImageSource Pause(bool paused, double t, int size) => Render(size, dc =>
         {
-            var k = paused ? t : 1 - t; // 0 = barras de pausa, 1 = triángulo de reanudar
+            var k = paused ? t : 1 - t; // 0 = pause bars, 1 = resume triangle
             dc.DrawEllipse(Theme.B(paused ? Theme.Red : Theme.Slate), null, new Point(16, 16), 14, 14);
             dc.DrawGeometry(Theme.B(Theme.White), null, Quad(BarL, TriL, k));
             dc.DrawGeometry(Theme.B(Theme.White), null, Quad(BarR, TriR, k));
@@ -81,7 +81,7 @@ namespace Bimbridge.Addin.Ui
             dc.DrawEllipse(Theme.B(c), null, new Point(16, 16), 14, 14);
             if (paused)
             {
-                // Triángulo "reanudar" (desplazado 1 a la derecha para que se vea centrado)
+                // "Resume" triangle (shifted 1 to the right so it looks centered)
                 var g = new StreamGeometry();
                 using (var ctx = g.Open())
                 {
@@ -99,7 +99,7 @@ namespace Bimbridge.Addin.Ui
             }
         });
 
-        /// <summary>Modo: en vivo (verde, flecha directa al modelo) o retener (ámbar, cambios apilados).</summary>
+        /// <summary>Mode: live (green, arrow straight to the model) or hold (amber, stacked changes).</summary>
         public static ImageSource Mode(bool hold, int size) => Render(size, dc =>
         {
             var c = hold ? Theme.Amber : Theme.Green;
@@ -107,8 +107,8 @@ namespace Bimbridge.Addin.Ui
             ModeGlyph(dc, hold);
         });
 
-        /// <summary>Cuadro de transición de Modo (t en [0,1] hacia <paramref name="hold"/>): el fondo ya tiene el color final; el dibujo viejo
-        /// se desvanece y el nuevo aparece por opacidad, creciendo de 0,92 a 1.</summary>
+        /// <summary>Mode transition frame (t in [0,1] towards <paramref name="hold"/>): the background already has the final color; the old glyph
+        /// fades out and the new one fades in, growing from 0.92 to 1.</summary>
         public static ImageSource Mode(bool hold, double t, int size) => Render(size, dc =>
         {
             Fill(dc, hold ? Theme.Amber : Theme.Green, Rounded(2, 2, 28, 28, 7));
@@ -147,10 +147,10 @@ namespace Bimbridge.Addin.Ui
             }
         }
 
-        /// <summary>Cola: tres tarjetas apiladas con un globo rojo con el número de cambios en espera.</summary>
+        /// <summary>Queue: three stacked cards with a red badge showing the number of waiting changes.</summary>
         public static ImageSource Queue(int count, int size) => Queue(count, 1, size);
 
-        /// <summary>Cuadro de transición de Cola (t en [0,1]): el globo con el número nuevo crece de 0,85 a 1 (nunca desde 0).</summary>
+        /// <summary>Queue transition frame (t in [0,1]): the badge with the new number grows from 0.85 to 1 (never from 0).</summary>
         public static ImageSource Queue(int count, double t, int size) => Render(size, dc =>
         {
             Fill(dc, Color.FromArgb(0x66, Theme.Slate.R, Theme.Slate.G, Theme.Slate.B), Rounded(8, 4, 18, 6, 2));
@@ -161,23 +161,23 @@ namespace Bimbridge.Addin.Ui
             if (count > 0)
             {
                 var text = count > 99 ? "99+" : count.ToString(CultureInfo.InvariantCulture);
-                // Borde blanco de radio R tangente a los lados derecho y superior: el globo entero queda en [0,32] (y en 16 px a escala 0,5).
-                // R entero => centro en coordenada par/entera, nítido a 32 y 16 px.
+                // White border of radius R tangent to the right and top edges: the whole badge stays within [0,32] (and within 16 px at scale 0.5).
+                // Integer R => center on an even/integer coordinate, crisp at 32 and 16 px.
                 var R = text.Length > 1 ? 10.0 : 9.0;
                 var r = R - 1.2;
                 var c = new Point(32 - R, R);
                 var s = 0.85 + 0.15 * t;
-                if (s < 1) dc.PushTransform(new ScaleTransform(s, s, c.X, c.Y)); // s <= 1 alrededor del centro: nunca sale del lienzo
+                if (s < 1) dc.PushTransform(new ScaleTransform(s, s, c.X, c.Y)); // s <= 1 around the center: never leaves the canvas
                 dc.DrawEllipse(Theme.B(Theme.White), null, c, R, R);
                 dc.DrawEllipse(Theme.B(Theme.Red), null, c, r, r);
-                // Sólo el globo crece: el texto escalado por debajo de 1 pierde el ajuste de píxel ("+" borroso), así que va siempre a tamaño real.
+                // Only the badge grows: text scaled below 1 loses pixel snapping (blurry "+"), so it is always drawn at full size.
                 if (s < 1) dc.Pop();
                 var ft = new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
                     new Typeface(Theme.Font, FontStyles.Normal, FontWeights.Bold, FontStretches.Normal), text.Length > 2 ? 7.5 : 10, Theme.B(Theme.White), 1.0);
-                // "99+" puede ser más ancho que el círculo rojo: se estrecha en horizontal (no hay cara condensada garantizada en WPF).
+                // "99+" can be wider than the red circle: it is narrowed horizontally (WPF guarantees no condensed face).
                 var maxW = 2 * r - 3;
                 var sx = ft.Width > maxW ? maxW / ft.Width : 1;
-                System.Diagnostics.Debug.Assert(c.X + R <= 32 && c.Y - R >= 0 && ft.Width * sx <= maxW + 1e-9, "globo de la cola fuera del lienzo");
+                System.Diagnostics.Debug.Assert(c.X + R <= 32 && c.Y - R >= 0 && ft.Width * sx <= maxW + 1e-9, "queue badge outside the canvas");
                 if (sx < 1) dc.PushTransform(new ScaleTransform(sx, 1, c.X, c.Y));
                 dc.DrawText(ft, new Point(c.X - ft.Width / 2, c.Y - ft.Height / 2));
                 if (sx < 1) dc.Pop();
@@ -205,14 +205,14 @@ namespace Bimbridge.Addin.Ui
             dc.DrawText(ft, new Point(Math.Round(16 - ft.Width / 2), Math.Round(16 - ft.Height / 2)));
         });
 
-        /// <summary>Actualizar: flecha circular. state 0 al día (azul), 1 hay versión nueva (globo verde), 2 falta reiniciar (globo ámbar).</summary>
+        /// <summary>Update: circular arrow. state 0 up to date (blue), 1 new version available (green badge), 2 restart pending (amber badge).</summary>
         public static ImageSource Update(int state, int size) => Update(state, 1, size);
 
-        /// <summary>Cuadro de transición de Actualizar (t en [0,1]): el globo aparece creciendo de 0,85 a 1 y entrando por opacidad (nunca desde 0). t = 1 es el icono quieto.</summary>
+        /// <summary>Update transition frame (t in [0,1]): the badge appears growing from 0.85 to 1 and fading in (never from 0). t = 1 is the still icon.</summary>
         public static ImageSource Update(int state, double t, int size) => Render(size, dc =>
         {
             var pen = new Pen(Theme.B(Theme.Navy), 3.4) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
-            // Arco de ~300° alrededor de (15,17), radio 10
+            // ~300° arc around (15,17), radius 10
             var g = new StreamGeometry();
             using (var ctx = g.Open())
             {
@@ -221,7 +221,7 @@ namespace Bimbridge.Addin.Ui
             }
             g.Freeze();
             dc.DrawGeometry(null, pen, g);
-            // Punta de flecha en el inicio del arco
+            // Arrowhead at the start of the arc
             var head = new StreamGeometry();
             using (var ctx = head.Open())
             {
@@ -236,7 +236,7 @@ namespace Bimbridge.Addin.Ui
                 var c = state == 1 ? Theme.Green : Theme.Amber;
                 var s = 0.85 + 0.15 * t;
                 if (t < 1) { dc.PushOpacity(t); dc.PushTransform(new ScaleTransform(s, s, 24, 24)); }
-                // Globo centrado en (24,24): cae en el píxel (12,12) a 16 px.
+                // Badge centered on (24,24): lands on pixel (12,12) at 16 px.
                 dc.DrawEllipse(Theme.B(Theme.White), null, new Point(24, 24), 8, 8);
                 dc.DrawEllipse(Theme.B(c), null, new Point(24, 24), 6.5, 6.5);
                 var w = new Pen(Theme.B(Theme.White), 2.0) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
@@ -255,7 +255,7 @@ namespace Bimbridge.Addin.Ui
             }
         });
 
-        // ---------------- utilidades ----------------
+        // ---------------- utilities ----------------
 
         private static Geometry Rounded(double x, double y, double w, double h, double r)
         {

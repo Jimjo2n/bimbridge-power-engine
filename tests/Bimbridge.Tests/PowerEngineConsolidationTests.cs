@@ -12,7 +12,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Revisión consolidada: C# dinámico por defecto con bloqueo, identidad de agentes y rebranding visible. Sin Revit.</summary>
+    /// <summary>Consolidated review: dynamic C# by default with a block switch, agent identity and visible rebranding. No Revit.</summary>
     public class PowerEngineConsolidationTests : IDisposable
     {
         private readonly string _root = Path.Combine(Path.GetTempPath(), "bimbridge-pe-" + Guid.NewGuid().ToString("N").Substring(0, 8));
@@ -33,7 +33,7 @@ namespace Bimbridge.Tests
             return dir;
         }
 
-        // ---- C# dinámico ----
+        // ---- Dynamic C# ----
 
         [Fact]
         public void DynamicCode_AllowedByDefault()
@@ -57,7 +57,7 @@ namespace Bimbridge.Tests
         public void DynamicCode_BlockPersists_AndKeepsOtherKeys()
         {
             var cfg = Path.Combine(_root, "config.json");
-            File.WriteAllText(cfg, "{\"levels\":\"RPW\",\"carpetas_documentos\":[\"C:\\\\x\"]}");
+            File.WriteAllText(cfg, "{\"levels\":\"RPW\",\"document_folders\":[\"C:\\\\x\"]}");
             DynamicCodePolicy.SaveBlocked(cfg, true);
             Assert.True(DynamicCodePolicy.LoadBlocked(cfg));
             var c = EngineConfig.Load(cfg);
@@ -91,13 +91,13 @@ namespace Bimbridge.Tests
         [Fact]
         public void PipeStaysUserOnly()
         {
-            // Sin conexiones remotas anónimas: la tubería sólo admite al usuario actual (no se toca con el nuevo valor por defecto).
+            // No anonymous remote connections: the pipe only admits the current user (unchanged by the new default).
             var app = Source("src/Bimbridge.Addin/App.cs");
             Assert.Contains("PipeOptions.CurrentUserOnly", app);
             Assert.Contains("new PipeAccessRule(me, PipeAccessRights.FullControl, AccessControlType.Allow)", app);
         }
 
-        // ---- Identidad ----
+        // ---- Identity ----
 
         [Fact]
         public void Agent_NameIsNeverInheritedBetweenSessions()
@@ -111,7 +111,7 @@ namespace Bimbridge.Tests
             Assert.Equal(AgentIdentity.SourceConfig, a.IdentitySource);
             Assert.Null(b.AgentName);
             Assert.Equal(AgentIdentity.SourceNone, b.IdentitySource);
-            Assert.StartsWith("(sin nombre)", b.DisplayName);
+            Assert.StartsWith("(unnamed)", b.DisplayName);
         }
 
         [Fact]
@@ -121,8 +121,8 @@ namespace Bimbridge.Tests
             var a = reg.Open("claude-code", 1);
             var b = reg.Open("claude-code", 1);
             Assert.False(reg.Register(a, "   ", null, null));
-            Assert.True(reg.Register(a, "ENTORNO DE PRUEBAS\n", "chat 7", "modelo-x"));
-            Assert.Equal("ENTORNO DE PRUEBAS", a.AgentName);
+            Assert.True(reg.Register(a, "TEST ENVIRONMENT\n", "chat 7", "modelo-x"));
+            Assert.Equal("TEST ENVIRONMENT", a.AgentName);
             Assert.Equal(AgentIdentity.SourceRegister, a.IdentitySource);
             Assert.Equal("chat 7", a.Conversation);
             Assert.Null(b.AgentName);
@@ -136,22 +136,22 @@ namespace Bimbridge.Tests
             var reg = new SessionRegistry(() => t);
             var s = reg.Open("codex", 3);
             reg.RequestStarted(s, "query", "d1");
-            Assert.Equal("ejecutando", AgentIdentity.Presence(s, t));
+            Assert.Equal("running_now", AgentIdentity.Presence(s, t));
             await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Task.Run(() => reg.RequestStarted(s, "q", null))));
             await Task.WhenAll(Enumerable.Range(0, 21).Select(i => Task.Run(() => reg.RequestFinished(s, 10, i == 0))));
             Assert.Equal(0, s.Active);
             Assert.Equal(21, s.Requests);
             Assert.Equal(1, s.Errors);
             Assert.Equal(210, s.TotalMs);
-            Assert.Equal("activo", AgentIdentity.Presence(s, t.AddSeconds(30)));
-            Assert.Equal("inactivo", AgentIdentity.Presence(s, t.AddMinutes(5)));
+            Assert.Equal("active", AgentIdentity.Presence(s, t.AddSeconds(30)));
+            Assert.Equal("inactive", AgentIdentity.Presence(s, t.AddMinutes(5)));
         }
 
         [Fact]
         public void Agent_ClosedHistoryIsBounded_AndNotCountedAsConnected()
         {
             var reg = new SessionRegistry();
-            for (var i = 0; i < SessionRegistry.ClosedMax + 10; i++) reg.Close(reg.Open("c", i), "conexion_cerrada");
+            for (var i = 0; i < SessionRegistry.ClosedMax + 10; i++) reg.Close(reg.Open("c", i), "connection_closed");
             Assert.Equal(0, reg.Count);
             Assert.Equal(SessionRegistry.ClosedMax, reg.Closed().Count);
         }
@@ -160,14 +160,14 @@ namespace Bimbridge.Tests
         public void Agent_Wiring_JournalCarriesAttribution()
         {
             var host = Source("src/Bimbridge.Engine/PipeHost.cs");
-            foreach (var k in new[] { "extra[\"agente\"]", "extra[\"cliente\"]", "extra[\"traza\"]", "RequestStarted(", "RequestFinished(" })
+            foreach (var k in new[] { "extra[\"agent\"]", "extra[\"client\"]", "extra[\"trace\"]", "RequestStarted(", "RequestFinished(" })
                 Assert.Contains(k, host);
-            Assert.Contains("[\"agente\"] = AgentName", Source("src/Bimbridge.Bridge/RevitConnection.cs"));
+            Assert.Contains("[\"agent\"] = AgentName", Source("src/Bimbridge.Bridge/RevitConnection.cs"));
             Assert.Contains("Sessions.TryRegister(session", Source("src/Bimbridge.Addin/Revit/RequestHandler.cs"));
-            Assert.Contains("corr.WriteTo(extra)", host);   // issue #4: ids de correlación en cada línea del diario
+            Assert.Contains("corr.WriteTo(extra)", host);   // issue #4: correlation ids on every journal line
         }
 
-        // ---- Consultas ----
+        // ---- Queries ----
 
         [Theory]
         [InlineData("{\"cat\":[\"LightingFixtures\"],\"count\":true}", true)]
@@ -186,21 +186,21 @@ namespace Bimbridge.Tests
             var h = Source("src/Bimbridge.Addin/Revit/RequestHandler.cs");
             Assert.Contains("request.Args.ContainsKey(\"ops\")", h);
             Assert.True(h.IndexOf("await PlanOp(session, new Request", StringComparison.Ordinal) < h.IndexOf("await CommitPlan(session, request, ct)", StringComparison.Ordinal));
-            Assert.Contains("plan_en_el_mismo_viaje", h);
+            Assert.Contains("plan_in_same_round_trip", h);
         }
 
         [Fact]
         public void ReviewFixes_Wiring()
         {
             var h = Source("src/Bimbridge.Addin/Revit/RequestHandler.cs");
-            Assert.Contains("commit ops= no admite clave=", h);
-            Assert.Contains("commit NO ejecutado en este viaje", h);
+            Assert.Contains("commit ops= does not accept key=", h);
+            Assert.Contains("commit NOT run in this round trip", h);
             var host = Source("src/Bimbridge.Engine/PipeHost.cs");
             Assert.True(host.IndexOf("_sessions.Touch(session)", StringComparison.Ordinal) > host.IndexOf("req.Op == Wire.OpPing", StringComparison.Ordinal),
-                "el latido no debe contar como actividad");
+                "the heartbeat must not count as activity");
             var compact = Source("src/Bimbridge.Bridge/CompactTools.cs");
             Assert.Contains("Name = \"commit\", ReadOnly = false, Destructive = true, Idempotent = false", compact);
-            Assert.Contains("_revit.AgentSource = \"registro\"", compact);
+            Assert.Contains("_revit.AgentSource = AgentIdentity.SourceRegister", compact);
             Assert.Contains("DynamicCodePolicy.Decide(Ui.Runtime.BlockDynamicCode)", Source("src/Bimbridge.Addin/Revit/RequestHandler.Tasks.cs"));
         }
 
@@ -211,11 +211,11 @@ namespace Bimbridge.Tests
         {
             Assert.True(Brand.IsOwnTransaction("BIMBRIDGE · ensayo · P-1"));
             Assert.False(Brand.IsOwnTransaction("Mover"));
-            Assert.True(Brand.IsTemporaryTransaction("BIMBRIDGE temporal exec"));
+            Assert.True(Brand.IsTemporaryTransaction("BIMBRIDGE temporary exec"));
             Assert.False(Brand.IsTemporaryTransaction("BIMBRIDGE · ensayo"));
         }
 
-        /// <summary>El nombre anterior sólo aparece en LegacyMigration.cs (lo usa para encontrar y mover instalaciones viejas).</summary>
+        /// <summary>The previous name only appears in LegacyMigration.cs (it uses it to find and move old installations).</summary>
         [Fact]
         public void Brand_NoLegacyNameOutsideMigration()
         {

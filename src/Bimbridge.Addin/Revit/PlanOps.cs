@@ -7,9 +7,9 @@ using Bimbridge.Engine;
 namespace Bimbridge.Addin.Revit
 {
     /// <summary>
-    /// Fachada de escritura (fase 3) para el commit directo y para el botón Aplicar cola. Todo corre en el hilo de Revit.
-    /// Planificar: <see cref="PlanBuilder"/> (27 operaciones, validadas contra el modelo sin tocarlo).
-    /// Aplicar: <see cref="PlanApplier"/> (conflictos, un TransactionGroup = un Deshacer, @n, verificación).
+    /// Write facade (phase 3) for direct commit and for the Apply queue button. Everything runs on the Revit thread.
+    /// Plan: <see cref="PlanBuilder"/> (27 operations, validated against the model without touching it).
+    /// Apply: <see cref="PlanApplier"/> (conflicts, one TransactionGroup = one Undo, @n, verification).
     /// </summary>
     public static class PlanOps
     {
@@ -17,25 +17,25 @@ namespace Bimbridge.Addin.Revit
 
         public sealed class ApplyResult
         {
-            public string Status;      // PlanStatus.Aplicado / Conflicto / Revertido
+            public string Status;      // PlanStatus.Applied / Conflict / RolledBack
             public string Detail;
             public int Changed;
             public int Deleted;
             public int Created;
             public List<string> Skipped = new List<string>();
             public List<string> Warnings = new List<string>();
-            /// <summary>rc3: aplicado, pero su resultado no quedó en la auditoría (requiere reconciliar).</summary>
+            /// <summary>rc3: applied, but its result was not recorded in the audit (requires reconciliation).</summary>
             public bool AuditIncomplete;
-            /// <summary>alpha3, commit modo=ensayo: verificación temporal, estado literal del grupo y restauración comprobada.</summary>
+            /// <summary>alpha3, commit modo=ensayo: temporary verification, literal group status and verified restoration.</summary>
             public Dictionary<string, object> Trial;
         }
 
-        /// <summary>Valor canónico actual de (elemento, campo); guardas para las creaciones.</summary>
+        /// <summary>Current canonical value of (element, field); guards for creations.</summary>
         public static string Current(Document doc, PlanEntry entry) => new PlanApplier(doc, null, 1, null).Current(entry);
 
         public static ApplyResult Apply(Document doc, Plan plan, int subBatch, string label) => new PlanApplier(doc, plan, subBatch, label).Run();
 
-        /// <summary>alpha3: aplica el plan con el MISMO motor (conflictos, lotes, @n, fallos), relee, y revierte el grupo entero.</summary>
+        /// <summary>alpha3: applies the plan with the SAME engine (conflicts, batches, @n, failures), re-reads, and rolls back the whole group.</summary>
         public static ApplyResult Trial(Document doc, Plan plan, int subBatch, string label) => new PlanApplier(doc, plan, subBatch, label) { Trial = true }.Run();
     }
 }

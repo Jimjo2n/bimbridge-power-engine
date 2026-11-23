@@ -1,28 +1,28 @@
-# Informe de pruebas — 0.7.0-alpha1
+# Test report — 0.7.0-alpha1
 
-Fecha: 2026-10-26 · Entorno: contenedor Linux, .NET 8.0, **sin Revit**. Todo lo que sigue es simulado; nada es validación nativa.
+Date: 2026-10-26 · Environment: Linux container, .NET 8.0, **without Revit**. Everything below is simulated; nothing is native validation.
 
-## Resultado
-- Suite completa (rc3 + 0.7.0): **325/326**, corrida final `evidencia/dotnet_test_completo.log`.
-- Pruebas AgentHost nuevas: **54/54**.
-- La única falla es `Rc3Tests.Key_ConcurrentInitialisation_ProducesOneKey`, una prueba de rc3. **Ya falla en la base 7be12ad** (2 de 3 corridas aisladas en un worktree limpio de 7be12ad). Causa probable: carrera al crear `clave.bin` de GrantStore con 16 hilos; una instancia queda con otra clave y rechaza una concesión válida. Falla **cerrada** (niega, nunca concede de más). No se tocó por el mandato de no reabrir 0.6.1; queda como defecto conocido.
-- Corridas anteriores bajo carga: `EndToEndTests.HeldCommit_WaitsForUser…` (rc3) falló 1 vez y pasa aislada; ver `evidencia/dotnet_test_corrida1_flaky_e2e.log`. Tres pruebas nuevas eran sensibles a la carga (TTL de lease 600 ms, carrera de cola, plan demasiado corto) y se corrigieron en la prueba, no en el código.
-- Solución completa en Release: 0 errores.
+## Result
+- Full suite (rc3 + 0.7.0): **325/326**, final run `evidencia/dotnet_test_completo.log`.
+- New AgentHost tests: **54/54**.
+- The only failure is `Rc3Tests.Key_ConcurrentInitialisation_ProducesOneKey`, an rc3 test. **It already fails on base 7be12ad** (2 of 3 isolated runs in a clean worktree of 7be12ad). Probable cause: a race when creating GrantStore's `clave.bin` with 16 threads; one instance ends up with another key and rejects a valid grant. It fails **closed** (denies, never grants too much). Not touched per the mandate not to reopen 0.6.1; it remains a known defect.
+- Earlier runs under load: `EndToEndTests.HeldCommit_WaitsForUser…` (rc3) failed once and passes in isolation; see `evidencia/dotnet_test_corrida1_flaky_e2e.log`. Three new tests were load-sensitive (600 ms lease TTL, queue race, plan too short) and were fixed in the test, not in the code.
+- Full solution in Release: 0 errors.
 
-## Mapa sección 9 → pruebas
-| Requisito | Prueba |
+## Section 9 → tests map
+| Requirement | Test |
 |---|---|
-| AH-01 seis caídas (mitad tx, tras commit, tras ejecutar, en verificación, tras verificar, en checkpoint) | AgentHostProcessTests.AH01_* (procesos hijos reales, SIGKILL) |
-| AH-01 efecto compactado sin evidencia / parcial / verificación fallida tras recuperar | AH01_CompactedModel…, AH01_Partial…, AH01_FailedVerificationAfterRecovery_IsFailure_NotSuccess |
-| AH-02 modelo durable entre procesos | AH02_* |
-| AH-03 estado corrupto | AgentHostAlphaTests.AH03_* (diario medio, checkpoint, transición ilegal, op desconocida, fencing, WAL roto/corrupto) |
-| AH-04 propiedad exclusiva / zombi | AH04_* (dos procesos compiten, lease vencido, zombi con fencing viejo) |
-| AH-05 vacío | AH05_* |
-| Servicio | AgentHostServiceTests (5) incluido proceso de servicio matado y recuperado sin duplicados |
-| Documentos | AgentHostDocumentTests (9) |
-| 1 000 operaciones con fallos e interrupciones | AgentHostScenarioTests.Scenario1000_SevenForcedTerminations_CompletesSafely_WithFullReport |
+| AH-01 six crashes (mid tx, after commit, after run, during verification, after verification, during checkpoint) | AgentHostProcessTests.AH01_* (real child processes, SIGKILL) |
+| AH-01 compacted effect without evidence / partial / failed verification after recovery | AH01_CompactedModel…, AH01_Partial…, AH01_FailedVerificationAfterRecovery_IsFailure_NotSuccess |
+| AH-02 durable model across processes | AH02_* |
+| AH-03 corrupt state | AgentHostAlphaTests.AH03_* (middle of journal, checkpoint, illegal transition, unknown op, fencing, broken/corrupt WAL) |
+| AH-04 exclusive ownership / zombie | AH04_* (two processes compete, expired lease, zombie with old fencing) |
+| AH-05 empty | AH05_* |
+| Service | AgentHostServiceTests (5) including a killed service process recovered without duplicates |
+| Documents | AgentHostDocumentTests (9) |
+| 1,000 operations with failures and interruptions | AgentHostScenarioTests.Scenario1000_SevenForcedTerminations_CompletesSafely_WithFullReport |
 
-## Pruebas AgentHost (salida literal)
+## AgentHost tests (literal output)
 ```
 Passed Bimbridge.Tests.AgentHostAlphaTests.AH03_CheckpointAheadOfJournal_IsRejected [19 ms]
 Passed Bimbridge.Tests.AgentHostAlphaTests.AH03_CorruptedMiddleRecord_RefusesRecovery [34 ms]
@@ -80,9 +80,10 @@ Passed Bimbridge.Tests.AgentHostServiceTests.Service_ProcessKilled_NewServicePro
 Passed Bimbridge.Tests.AgentHostServiceTests.Service_SubmitRunInspectReport_Idempotent_StructuredErrors [2 s]
 ```
 
-## Escenario de 1 000 operaciones — log literal
-Diseño: 2 consultas, 980 escrituras en 10 niveles con cadenas de 5 dependencias, 10 QC, 8 escrituras sobre nivel inexistente (4 con permitir_vacio). Fallos deliberados: 3 rechazos, 5 transitorios recuperables, 2 no recuperables, 5 resultados esperados erróneos, 1 QC con 2 desviaciones. Siete SIGKILL reales en 7 procesos; el octavo termina.
-Resultado esperado y obtenido: **944 verificadas · 15 fallidas · 41 bloqueadas**, cero duplicados (cada escritura tiene como máximo una transacción en el modelo), 8 fencing distintos.
+## 1,000-operation scenario — literal log
+Design: 2 queries, 980 writes on 10 levels with chains of 5 dependencies, 10 QC checks, 8 writes on a non-existent level (4 with permitir_vacio). Deliberate faults: 3 rejections, 5 recoverable transients, 2 unrecoverable, 5 wrong expected results, 1 QC with 2 deviations. Seven real SIGKILLs across 7 processes; the eighth finishes.
+Expected and obtained result: **944 verified · 15 failed · 41 blocked**, zero duplicates (each write has at most one transaction in the model), 8 distinct fencing tokens.
+The log below is the literal program output of that version and is kept verbatim (the program's messages were in Spanish at the time).
 ```
 $ agenthost escenario <dir>
 escenario 6d05df091eb3aecc8979 · 1000 operaciones · 988 escrituras · 1030 dependencias
@@ -147,9 +148,9 @@ recuperaciones en el diario:
 dueños (fencing): 1, 2, 3, 4, 5, 6, 7, 8
 líneas del diario: 2936 · transacciones del modelo: 940
 ```
-Evidencia completa: `evidencia/escenario_1000_diario.jsonl` (diario encadenado), `evidencia/escenario_1000_informe.json` (informe por operación con fuente y evidencia).
+Full evidence: `evidencia/escenario_1000_diario.jsonl` (chained journal), `evidencia/escenario_1000_informe.json` (per-operation report with source and evidence).
 
-## Resumen de la corrida final
+## Final run summary
 ```
 
 Test Run Failed.

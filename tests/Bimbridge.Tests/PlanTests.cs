@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>Planes y cola retenida (inyección asíncrona), sin Revit.</summary>
+    /// <summary>Plans and held queue (asynchronous injection), no Revit.</summary>
     public class PlanTests : IDisposable
     {
         private readonly string _root = Path.Combine(Path.GetTempPath(), "bimbridge-cola-" + Guid.NewGuid().ToString("N").Substring(0, 8));
@@ -21,7 +21,7 @@ namespace Bimbridge.Tests
 
         private Plan NewPlan(PlanStore s, string session, params (long id, string before, string after)[] entries)
         {
-            var p = new Plan { Id = s.NewId(), SessionId = session, Client = session, DocKey = "C:\\modelos\\Tampa.rvt", DocTitle = "Tampa", CreatedUtc = _now, Summary = "prueba" };
+            var p = new Plan { Id = s.NewId(), SessionId = session, Client = session, DocKey = "C:\\modelos\\Tampa.rvt", DocTitle = "Tampa", CreatedUtc = _now, Summary = "test" };
             foreach (var e in entries) p.Entries.Add(new PlanEntry { Id = e.id, Op = "set_elevation", Key = "elev", Before = e.before, After = e.after, Target = double.Parse(e.after) });
             s.Add(p);
             return p;
@@ -57,19 +57,19 @@ namespace Bimbridge.Tests
             var s = NewStore();
             var a = NewPlan(s, "S-claude", (1, "10", "11"));
             var b = NewPlan(s, "S-codex", (2, "10", "12"));
-            s.Hold(b);           // llega primero b
+            s.Hold(b);           // b arrives first
             _now = _now.AddSeconds(5);
             s.Hold(a);
 
-            // "Reinicio de Revit": almacén nuevo que lee el disco.
+            // "Revit restart": new store that reads the disk.
             var s2 = NewStore();
-            Assert.Equal(2, s2.LoadPersisted("c:\\MODELOS\\tampa.rvt")); // la ruta no distingue mayúsculas
+            Assert.Equal(2, s2.LoadPersisted("c:\\MODELOS\\tampa.rvt")); // the path is case-insensitive
             var held = s2.Held("C:\\modelos\\Tampa.rvt");
             Assert.Equal(new[] { b.Id, a.Id }, held.Select(p => p.Id).ToArray());
             Assert.Equal("11", held[1].Entries[0].After);
             Assert.Equal(11.0, Convert.ToDouble(held[1].Entries[0].Target));
 
-            s2.Finish(held[0], PlanStatus.Aplicado, "ok");
+            s2.Finish(held[0], PlanStatus.Applied, "ok");
             Assert.Single(Directory.GetFiles(s2.DocDir("C:\\modelos\\Tampa.rvt"), "P-*.json"));
             Assert.Equal(0, NewStore().LoadPersisted("C:\\otro.rvt"));
         }
@@ -83,8 +83,8 @@ namespace Bimbridge.Tests
             s.Hold(held);
             _now = _now.AddHours(3);
             Assert.Equal(1, s.ExpireOld(TimeSpan.FromMinutes(15)));
-            Assert.Equal(PlanStatus.Vencido, ready.Status);
-            Assert.Equal(PlanStatus.Retenido, held.Status);
+            Assert.Equal(PlanStatus.Expired, ready.Status);
+            Assert.Equal(PlanStatus.Held, held.Status);
         }
 
         [Fact]
@@ -94,7 +94,7 @@ namespace Bimbridge.Tests
             var p = NewPlan(s, "S", (1, "10", "11"), (2, "10", "12"));
             var model = new Dictionary<long, string> { [1] = "10", [2] = "10" };
             Assert.Empty(p.FindConflicts(e => model[e.Id]));
-            model[2] = "9.5"; // el usuario movió la luminaria 2 mientras el plan esperaba
+            model[2] = "9.5"; // the user moved fixture 2 while the plan was waiting
             var c = p.FindConflicts(e => model[e.Id]);
             Assert.Single(c);
             Assert.Equal(2, c[0].Id);
@@ -120,8 +120,8 @@ namespace Bimbridge.Tests
             var b = NewPlan(s, "S-claude", (2, "1", "2"));
             NewPlan(s, "S-codex", (3, "1", "2"));
             s.Hold(a); s.Hold(b);
-            Assert.Equal(2, s.DiscardHeld(a.DocKey, "usuario"));
-            Assert.Equal(PlanStatus.Descartado, a.Status);
+            Assert.Equal(2, s.DiscardHeld(a.DocKey, "user"));
+            Assert.Equal(PlanStatus.Discarded, a.Status);
             Assert.Empty(s.Held(a.DocKey));
             Assert.Equal(2, s.ForSession("S-claude").Count);
             Assert.Equal(0, NewStore().LoadPersisted(a.DocKey));
@@ -145,9 +145,9 @@ namespace Bimbridge.Tests
             var s = NewStore();
             var p = NewPlan(s, "S", Enumerable.Range(1, 40).Select(i => ((long)i, "10", "11")).ToArray());
             var d = p.Describe(5);
-            Assert.Equal(5, ((List<object>)d["filas"]).Count);
-            Assert.Equal(35L, d["filas_omitidas"]);
-            Assert.Equal(40L, d["cambios"]);
+            Assert.Equal(5, ((List<object>)d["rows"]).Count);
+            Assert.Equal(35L, d["skipped_rows"]);
+            Assert.Equal(40L, d["changes"]);
         }
     }
 }

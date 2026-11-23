@@ -6,14 +6,14 @@ using Xunit;
 
 namespace Bimbridge.Tests
 {
-    /// <summary>P0 de Codex (2026-10-28): ningún ensayo revierte un grupo sobre un documento con cambios sin guardar.</summary>
+    /// <summary>Codex P0 (2026-10-28): no trial rolls back a group on a document with unsaved changes.</summary>
     public class TrialGuardTests
     {
         [Theory]
-        [InlineData(true, true, "ensayado")]
-        [InlineData(false, true, "revertido")]
-        [InlineData(true, false, "desconocido")]
-        [InlineData(false, false, "desconocido")]
+        [InlineData(true, true, "trialed")]
+        [InlineData(false, true, "reverted")]
+        [InlineData(true, false, "unknown")]
+        [InlineData(false, false, "unknown")]
         public void TrialStatusRequiresBothFunctionalSuccessAndRestoration(bool functional, bool restored, string expected)
         {
             Assert.Equal(expected, TrialGuard.TrialStatus(functional, restored));
@@ -67,9 +67,9 @@ namespace Bimbridge.Tests
         [Fact]
         public void Refuses_WhenModified_AllowsWhenClean()
         {
-            Assert.StartsWith(TrialGuard.Code, TrialGuard.Refuse(true, "commit modo=ensayo"));
-            Assert.Contains("No se modificó nada", TrialGuard.Refuse(true, "exec modo=ensayo"));
-            Assert.Null(TrialGuard.Refuse(false, "commit modo=ensayo"));
+            Assert.StartsWith(TrialGuard.Code, TrialGuard.Refuse(true, "commit mode=trial"));
+            Assert.Contains("Nothing was modified", TrialGuard.Refuse(true, "exec mode=trial"));
+            Assert.Null(TrialGuard.Refuse(false, "commit mode=trial"));
             Assert.False(TrialGuard.MayOpenTemporaryGroup(true));
             Assert.True(TrialGuard.MayOpenTemporaryGroup(false));
         }
@@ -81,13 +81,13 @@ namespace Bimbridge.Tests
             return File.ReadAllText(Path.Combine(d.FullName, "src", "Bimbridge.Addin", "Revit", rel));
         }
 
-        // Las rutas del add-in no se pueden ejecutar sin Revit: se comprueba en el código que la guardia va ANTES del grupo,
-        // dentro del hilo de Revit (RunMain/OnRevit), y que no se toca IsModified. La prueba nativa NRT-04N lo confirma en Revit.
+        // The add-in paths cannot run without Revit: the code is checked to place the guard BEFORE the group,
+        // inside the Revit thread (RunMain/OnRevit), and that IsModified is not touched. Native test NRT-04N confirms it in Revit.
         [Fact]
         public void CommitTrial_GuardRunsBeforePlanOpsTrial()
         {
             var s = Src("RequestHandler.cs");
-            var g = s.IndexOf("TrialGuard.Refuse(doc.IsModified, \"commit modo=ensayo\")", System.StringComparison.Ordinal);
+            var g = s.IndexOf("TrialGuard.Refuse(doc.IsModified, \"commit mode=trial\")", System.StringComparison.Ordinal);
             var t = s.IndexOf("PlanOps.Trial(doc", System.StringComparison.Ordinal);
             var main = s.LastIndexOf("RunMain(", g, System.StringComparison.Ordinal);
             Assert.True(g > 0 && t > g && main > 0 && main < g);
@@ -97,7 +97,7 @@ namespace Bimbridge.Tests
         public void ExecTrial_GuardRunsBeforeTransactionGroup()
         {
             var s = Src("RequestHandler.Exec.cs");
-            var g = s.IndexOf("TrialGuard.Refuse(doc.IsModified, \"exec modo=ensayo\")", System.StringComparison.Ordinal);
+            var g = s.IndexOf("TrialGuard.Refuse(doc.IsModified, \"exec mode=trial\")", System.StringComparison.Ordinal);
             var grp = s.IndexOf("group = new TransactionGroup(doc, txName)", System.StringComparison.Ordinal);
             Assert.True(g > 0 && grp > g);
         }
@@ -106,10 +106,10 @@ namespace Bimbridge.Tests
         public void TemporaryGroups_CaptureAndTaskQc_AreSkippedWhenModified()
         {
             var c = Src("Capture.cs");
-            Assert.True(c.IndexOf("MayOpenTemporaryGroup(doc.IsModified)", System.StringComparison.Ordinal) < c.IndexOf("new TransactionGroup(doc, DocumentTracker.TemporaryPrefix + \" captura\")", System.StringComparison.Ordinal));
+            Assert.True(c.IndexOf("MayOpenTemporaryGroup(doc.IsModified)", System.StringComparison.Ordinal) < c.IndexOf("new TransactionGroup(doc, DocumentTracker.TemporaryPrefix + \" capture\")", System.StringComparison.Ordinal));
             var t = Src("RequestHandler.Tasks.cs");
             var gi = t.IndexOf("MayOpenTemporaryGroup(doc.IsModified)", System.StringComparison.Ordinal);
-            Assert.True(gi > 0 && gi < t.IndexOf("\" qc tarea\")", System.StringComparison.Ordinal));
+            Assert.True(gi > 0 && gi < t.IndexOf("\" qc task\")", System.StringComparison.Ordinal));
         }
 
         [Fact]

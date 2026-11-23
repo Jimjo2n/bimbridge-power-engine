@@ -17,7 +17,7 @@ namespace Bimbridge.Tests
                 ["total"] = 20L, ["cols"] = new List<object> { "id", "fam", "lvl", "ws" }, ["rows"] = rows,
                 ["ids"] = new List<object> { 1L, 2L, 3L, 4L, 9L },
             });
-            Assert.Contains("fijo: fam=LTG_DOWNLIGHT-SURFACE - ROUND; ws=DIST", t);
+            Assert.Contains("fixed: fam=LTG_DOWNLIGHT-SURFACE - ROUND; ws=DIST", t);
             Assert.Contains("ids: 1-4,9", t);
             Assert.Contains("id|lvl#", t);
             Assert.Contains("lvl#: 1=LEVEL05, 2=LEVEL06", t);
@@ -43,16 +43,16 @@ namespace Bimbridge.Tests
         public void CommandsPreserveSeparatorsAndOperatorsInsideArgumentValues()
         {
             var commands = Command.SplitLines("""
-                # comentario con corchete [
-                chk tabla_audit tabla="Anda > 1?" celdas_esperadas=[
-                  {"fila":0,"columna":0,"texto":"A;;B \"C\""}
+                # comment with bracket [
+                chk schedule_audit schedule="Anda > 1?" expected_cells=[
+                  {"row":0,"column":0,"text":"A;;B \"C\""}
                 ] ;; q LF elev>=9
                 """);
             Assert.Equal(2, commands.Count);
             var check = Command.Parse(commands[0]);
-            Assert.Equal("Anda > 1?", check.Args["tabla"]);
-            var cell = (Dictionary<string, object>)Assert.Single((List<object>)check.Args["celdas_esperadas"]);
-            Assert.Equal("A;;B \"C\"", cell["texto"]);
+            Assert.Equal("Anda > 1?", check.Args["schedule"]);
+            var cell = (Dictionary<string, object>)Assert.Single((List<object>)check.Args["expected_cells"]);
+            Assert.Equal("A;;B \"C\"", cell["text"]);
             Assert.Equal("elev>=9", Assert.Single(Command.Parse(commands[1]).Where));
         }
     }

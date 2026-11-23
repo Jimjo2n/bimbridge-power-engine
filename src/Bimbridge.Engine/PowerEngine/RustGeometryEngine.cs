@@ -7,10 +7,10 @@ using System.Threading;
 namespace BimBridge.PowerEngine
 {
     /// <summary>
-    /// Power Engine — acceso FFI al Rust Geometry Engine (bimbridge_power_engine.dll / libbimbridge_power_engine.so).
-    /// Mismo contrato de datos que <see cref="GeometryKernels"/>: búferes planos que reserva C#; Rust no conserva punteros.
-    /// Si la biblioteca no está, <see cref="Available"/> es false y el dispatcher usa C# (degradación controlada).
-    /// Corre DENTRO del proceso que lo llama (AgentHost), nunca dentro de Revit.
+    /// Power Engine — FFI access to the Rust Geometry Engine (bimbridge_power_engine.dll / libbimbridge_power_engine.so).
+    /// Same data contract as <see cref="GeometryKernels"/>: flat buffers allocated by C#; Rust keeps no pointers.
+    /// If the library is missing, <see cref="Available"/> is false and the dispatcher uses C# (controlled degradation).
+    /// Runs INSIDE the calling process (AgentHost), never inside Revit.
     /// </summary>
     public static class RustGeometryEngine
     {
@@ -32,18 +32,18 @@ namespace BimBridge.PowerEngine
             try
             {
                 var p = pe_protocol();
-                return p >= PowerEngineContracts.MinSupported && p <= PowerEngineContracts.ProtocolVersion ? null : "contrato " + p + " incompatible";
+                return p >= PowerEngineContracts.MinSupported && p <= PowerEngineContracts.ProtocolVersion ? null : "incompatible contract " + p;
             }
-            catch (DllNotFoundException ex) { return "biblioteca no encontrada: " + ex.Message; }
-            catch (EntryPointNotFoundException ex) { return "biblioteca incompatible: " + ex.Message; }
-            catch (BadImageFormatException ex) { return "arquitectura incompatible: " + ex.Message; }
+            catch (DllNotFoundException ex) { return "library not found: " + ex.Message; }
+            catch (EntryPointNotFoundException ex) { return "incompatible library: " + ex.Message; }
+            catch (BadImageFormatException ex) { return "incompatible architecture: " + ex.Message; }
         });
 
         public static bool Available => _probe.Value == null;
         public static string Unavailable => _probe.Value;
         public static string Version { get { var v = pe_version(); return v / 10000 + "." + v / 100 % 100 + "." + v % 100; } }
 
-        /// <summary>Bandera de cancelación fijada en memoria para que Rust la lea mientras C# puede activarla desde otro hilo.</summary>
+        /// <summary>Cancellation flag pinned in memory so Rust can read it while C# may set it from another thread.</summary>
         private sealed class CancelFlag : IDisposable
         {
             private readonly byte[] _b = new byte[1];
@@ -62,16 +62,16 @@ namespace BimBridge.PowerEngine
         private static void Check(int rc, string what, CancellationToken ct)
         {
             if (rc == Ok) return;
-            if (rc == Cancelled) throw new OperationCanceledException("Rust " + what + ": cancelado", ct);
-            if (rc == Invalid) throw new ArgumentException("Rust " + what + ": datos inválidos (mismas reglas que GeometryKernels)");
-            throw new InvalidOperationException("Rust " + what + ": error interno del motor (código " + rc + ")");
+            if (rc == Cancelled) throw new OperationCanceledException("Rust " + what + ": cancelled", ct);
+            if (rc == Invalid) throw new ArgumentException("Rust " + what + ": invalid data (same rules as GeometryKernels)");
+            throw new InvalidOperationException("Rust " + what + ": internal engine error (code " + rc + ")");
         }
 
         private static UIntPtr U(int n) => new UIntPtr((uint)n);
 
         public static double[] Transform3(double[] xyz, double[] m, CancellationToken ct = default(CancellationToken))
         {
-            if (m == null || m.Length != 12) throw new ArgumentException("matriz 3×4 (12 valores)");
+            if (m == null || m.Length != 12) throw new ArgumentException("3×4 matrix (12 values)");
             var o = new double[xyz.Length];
             using (var c = new CancelFlag(ct)) Check(pe_transform3(xyz, U(xyz.Length / 3), m, o, c.Ptr), "transform3", ct);
             return o;

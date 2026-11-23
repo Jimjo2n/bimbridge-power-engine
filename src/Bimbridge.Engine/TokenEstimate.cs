@@ -2,12 +2,12 @@
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// 0.8.0: tokens ESTIMADOS a partir de caracteres. El tokenizador real sólo lo conoce el cliente (Claude/Codex); toda cifra que salga
-    /// de aquí se etiqueta como estimación, nunca como medida.
+    /// 0.8.0: tokens ESTIMATED from characters. Only the client (Claude/Codex) knows the real tokenizer; every figure coming
+    /// from here is labeled as an estimate, never as a measurement.
     /// </summary>
     public static class TokenEstimate
     {
-        public const string Method = "ESTIMADO: caracteres/4; el tokenizador real sólo lo conoce el cliente";
+        public const string Method = "ESTIMATED: characters/4; only the client knows the real tokenizer";
         public static long FromChars(long chars) => chars <= 0 ? 0 : (chars + 3) / 4;
     }
 }

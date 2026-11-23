@@ -6,26 +6,26 @@ using System.Threading;
 namespace BimBridge.PowerEngine
 {
     /// <summary>
-    /// Power Engine — núcleos geométricos de referencia en C#. Operan sobre instantáneas inmutables en búferes planos
-    /// (x,y[,z] consecutivos), igual que el Rust Geometry Engine, para comparar resultados exactos y tiempos con los mismos datos.
-    /// Son también la ruta por defecto cuando el volumen es pequeño (el coste de transferir a Rust no compensa) o Rust no está.
-    /// Unidades: las del llamador (pies internos de Revit en BIMBRIDGE). Ninguna función toca Revit.
+    /// Power Engine — reference geometry kernels in C#. They operate on immutable snapshots in flat buffers
+    /// (consecutive x,y[,z]), like the Rust Geometry Engine, to compare exact results and timings on the same data.
+    /// They are also the default path when the volume is small (the cost of transferring to Rust does not pay off) or Rust is absent.
+    /// Units: the caller's (Revit internal feet in BIMBRIDGE). No function touches Revit.
     /// </summary>
     public static class GeometryKernels
     {
-        /// <summary>La cancelación se consulta por trabajo hecho (puntos visitados), igual que Rust (WORK_CHECK).</summary>
+        /// <summary>Cancellation is checked by work done (points visited), like Rust (WORK_CHECK).</summary>
         public const int WorkCheck = 1 << 16;
 
-        // ---------------- transformaciones ----------------
+        // ---------------- transforms ----------------
 
         /// <summary>
-        /// Aplica una transformación afín 3D (matriz 3×4 por filas: [a b c tx; d e f ty; g h i tz]) a n puntos xyz.
-        /// Sirve para vínculos (Transform de un RevitLinkInstance) y para registro plano→modelo (z = 0).
+        /// Applies a 3D affine transform (3×4 row-major matrix: [a b c tx; d e f ty; g h i tz]) to n xyz points.
+        /// Used for links (Transform of a RevitLinkInstance) and for plan→model registration (z = 0).
         /// </summary>
         public static double[] Transform3(double[] xyz, double[] m, CancellationToken ct = default(CancellationToken))
         {
-            if (m == null || m.Length != 12) throw new ArgumentException("matriz 3×4 (12 valores)");
-            CheckFinite(m, "matriz");
+            if (m == null || m.Length != 12) throw new ArgumentException("3×4 matrix (12 values)");
+            CheckFinite(m, "matrix");
             var n = xyz.Length / 3;
             var o = new double[n * 3];
             for (var i = 0; i < n; i++)
@@ -39,7 +39,7 @@ namespace BimBridge.PowerEngine
             return o;
         }
 
-        /// <summary>Composición de dos matrices 3×4 (primero b, luego a): a∘b.</summary>
+        /// <summary>Composition of two 3×4 matrices (first b, then a): a∘b.</summary>
         public static double[] Compose(double[] a, double[] b)
         {
             var r = new double[12];
@@ -53,28 +53,28 @@ namespace BimBridge.PowerEngine
 
         public static void CheckFinite(double[] v, string what)
         {
-            for (var i = 0; i < v.Length; i++) if (double.IsNaN(v[i]) || double.IsInfinity(v[i])) throw new ArgumentException(what + ": valor no finito en la posición " + i);
+            for (var i = 0; i < v.Length; i++) if (double.IsNaN(v[i]) || double.IsInfinity(v[i])) throw new ArgumentException(what + ": non-finite value at position " + i);
         }
 
-        // ---------------- índice espacial (rejilla uniforme ordenada) ----------------
+        // ---------------- spatial index (sorted uniform grid) ----------------
 
         /// <summary>
-        /// Rejilla uniforme 2D/3D compacta: celdas ordenadas por clave con índices contiguos (sin diccionarios en la búsqueda caliente).
-        /// Construcción O(n log n), consulta por vecindad 3×3(×3).
+        /// Compact 2D/3D uniform grid: cells sorted by key with contiguous indices (no dictionaries in the hot lookup).
+        /// O(n log n) construction, 3×3(×3) neighborhood query.
         /// </summary>
         public sealed class Grid
         {
             public readonly int Dim;
             public readonly double Cell;
             private readonly double[] _p;
-            private readonly long[] _keys;     // clave de celda ordenada
-            private readonly int[] _idx;       // índice del punto, en el orden de _keys
+            private readonly long[] _keys;     // sorted cell key
+            private readonly int[] _idx;       // point index, in _keys order
             private readonly double _ox, _oy, _oz;
 
             public Grid(double[] pts, int dim, double cell)
             {
-                if (dim != 2 && dim != 3) throw new ArgumentException("dim 2 o 3");
-                if (!(cell > 0) || double.IsInfinity(cell)) throw new ArgumentException("tamaño de celda > 0");
+                if (dim != 2 && dim != 3) throw new ArgumentException("dim 2 or 3");
+                if (!(cell > 0) || double.IsInfinity(cell)) throw new ArgumentException("cell size > 0");
                 Dim = dim; Cell = cell; _p = pts;
                 var n = pts.Length / dim;
                 double ox = double.MaxValue, oy = double.MaxValue, oz = double.MaxValue;
@@ -89,7 +89,7 @@ namespace BimBridge.PowerEngine
             private static long Pack(long cx, long cy, long cz) => ((cx + (1L << 20)) << 42) | ((cy + (1L << 20)) << 21) | (cz + (1L << 20));
             private long Key(double x, double y, double z) => Pack(CellOf(x, _ox), CellOf(y, _oy), Dim == 3 ? CellOf(z, _oz) : 0);
 
-            /// <summary>Llama a <paramref name="visit"/> con cada punto de las celdas vecinas (incluida la propia) de (x,y,z).</summary>
+            /// <summary>Calls <paramref name="visit"/> with each point in the neighboring cells (including its own) of (x,y,z).</summary>
             public int Near(double x, double y, double z, Action<int> visit)
             {
                 var visited = 0;
@@ -120,15 +120,15 @@ namespace BimBridge.PowerEngine
             }
         }
 
-        // ---------------- vecino más cercano ----------------
+        // ---------------- nearest neighbor ----------------
 
         /// <summary>
-        /// Para cada punto de consulta, el índice del punto de referencia más cercano dentro de <paramref name="maxDist"/> (−1 si
-        /// no hay) y su distancia. Rejilla de celda = maxDist: exacto dentro del radio.
+        /// For each query point, the index of the nearest reference point within <paramref name="maxDist"/> (−1 if
+        /// none) and its distance. Grid with cell = maxDist: exact within the radius.
         /// </summary>
         public static (int[] Index, double[] Dist) Nearest(double[] query, double[] reference, int dim, double maxDist, CancellationToken ct = default(CancellationToken))
         {
-            CheckFinite(query, "consulta"); CheckFinite(reference, "referencia");
+            CheckFinite(query, "query"); CheckFinite(reference, "reference");
             var g = new Grid(reference, dim, maxDist);
             var n = query.Length / dim;
             var idx = new int[n]; var dist = new double[n];
@@ -145,16 +145,16 @@ namespace BimBridge.PowerEngine
             return (idx, dist);
         }
 
-        // ---------------- emparejamiento uno a uno ----------------
+        // ---------------- one-to-one matching ----------------
 
         /// <summary>
-        /// Emparejamiento uno a uno esperado↔observado por distancia creciente (voraz global, determinista): cada par candidato a
-        /// menos de <paramref name="tol"/> se ordena por (distancia, i, j) y se acepta si ninguno de los dos está usado.
-        /// Devuelve, por cada esperado, el observado asignado o −1. Es la base de "omitidas / desplazadas / adicionales".
+        /// One-to-one expected↔observed matching by increasing distance (global greedy, deterministic): every candidate pair
+        /// closer than <paramref name="tol"/> is sorted by (distance, i, j) and accepted if neither of the two is used.
+        /// Returns, for each expected point, the assigned observed point or −1. It is the basis of "missing / displaced / extra".
         /// </summary>
         public static int[] Match(double[] expected, double[] observed, int dim, double tol, CancellationToken ct = default(CancellationToken))
         {
-            CheckFinite(expected, "esperados"); CheckFinite(observed, "observados");
+            CheckFinite(expected, "expected"); CheckFinite(observed, "observed");
             var g = new Grid(observed, dim, tol);
             var ne = expected.Length / dim; var no = observed.Length / dim;
             var cand = new List<(double D, int I, int J)>();
@@ -174,12 +174,12 @@ namespace BimBridge.PowerEngine
             return res;
         }
 
-        // ---------------- duplicados ----------------
+        // ---------------- duplicates ----------------
 
-        /// <summary>Grupos de puntos a menos de <paramref name="tol"/> entre sí (cierre transitivo). Devuelve un id de grupo por punto (el menor índice del grupo).</summary>
+        /// <summary>Groups of points closer than <paramref name="tol"/> to each other (transitive closure). Returns a group id per point (the lowest index in the group).</summary>
         public static int[] Duplicates(double[] pts, int dim, double tol, CancellationToken ct = default(CancellationToken))
         {
-            CheckFinite(pts, "puntos");
+            CheckFinite(pts, "points");
             var n = pts.Length / dim;
             var uf = new UnionFind(n);
             var g = new Grid(pts, dim, tol);
@@ -202,21 +202,21 @@ namespace BimBridge.PowerEngine
             private readonly int[] _p;
             public UnionFind(int n) { _p = new int[n]; for (var i = 0; i < n; i++) _p[i] = i; }
             public int Find(int x) { while (_p[x] != x) { _p[x] = _p[_p[x]]; x = _p[x]; } return x; }
-            /// <summary>La raíz es siempre el menor índice (resultado determinista, igual en Rust).</summary>
+            /// <summary>The root is always the lowest index (deterministic result, same in Rust).</summary>
             public void Union(int a, int b) { a = Find(a); b = Find(b); if (a == b) return; if (a < b) _p[b] = a; else _p[a] = b; }
         }
 
-        // ---------------- intersecciones de segmentos 2D ----------------
+        // ---------------- 2D segment intersections ----------------
 
         public const int ContactCross = 1, ContactTouch = 2, ContactOverlap = 3;
 
         /// <summary>
-        /// Todas las parejas de segmentos 2D (x1,y1,x2,y2 por segmento) que se cruzan, se tocan o se superponen, con su tipo.
-        /// Rejilla por cajas (celda = longitud media). Pares ordenados (i&lt;j), sin repetir. Misma clasificación que Draw2D.
+        /// All pairs of 2D segments (x1,y1,x2,y2 per segment) that cross, touch or overlap, with their kind.
+        /// Box grid (cell = mean length). Ordered pairs (i&lt;j), no repeats. Same classification as Draw2D.
         /// </summary>
         public static List<(int I, int J, int Kind)> SegmentContacts(double[] segs, double eps = 1e-7, CancellationToken ct = default(CancellationToken))
         {
-            CheckFinite(segs, "segmentos");
+            CheckFinite(segs, "segments");
             var n = segs.Length / 4;
             var res = new List<(int, int, int)>();
             if (n < 2) return res;
@@ -258,13 +258,13 @@ namespace BimBridge.PowerEngine
 
         private static double Sq(double v) => v * v;
 
-        /// <summary>0 ninguno, 1 cruce, 2 contacto en un punto, 3 superposición colineal.</summary>
+        /// <summary>0 none, 1 cross, 2 single-point touch, 3 collinear overlap.</summary>
         public static int Classify(double[] s, int i, int j, double eps)
         {
             double p1x = s[4 * i], p1y = s[4 * i + 1], p2x = s[4 * i + 2], p2y = s[4 * i + 3];
             double q1x = s[4 * j], q1y = s[4 * j + 1], q2x = s[4 * j + 2], q2y = s[4 * j + 3];
             var lp = Math.Sqrt(Sq(p2x - p1x) + Sq(p2y - p1y)); var lq = Math.Sqrt(Sq(q2x - q1x) + Sq(q2y - q1y));
-            if (lp < eps || lq < eps) return 0;   // degenerados: los descarta el validador, aquí no cuentan
+            if (lp < eps || lq < eps) return 0;   // degenerate: the validator rejects them, they do not count here
             var scale = Math.Max(1.0, Math.Max(Math.Max(Math.Abs(p1x), Math.Abs(p1y)), Math.Max(Math.Abs(q1x), Math.Abs(q1y))));
             var tol = eps * scale;
             double Cr(double ox, double oy, double ax, double ay, double bx, double by) => (ax - ox) * (by - oy) - (ay - oy) * (bx - ox);
@@ -286,9 +286,9 @@ namespace BimBridge.PowerEngine
             return 0;
         }
 
-        // ---------------- grafos ----------------
+        // ---------------- graphs ----------------
 
-        /// <summary>Componentes conexas de un grafo no dirigido (id = menor nodo del componente) y grado de cada nodo.</summary>
+        /// <summary>Connected components of an undirected graph (id = lowest node in the component) and degree of each node.</summary>
         public static (int[] Component, int[] Degree) Components(int nodes, int[] edges)
         {
             var uf = new UnionFind(nodes);
@@ -296,7 +296,7 @@ namespace BimBridge.PowerEngine
             for (var e = 0; e + 1 < edges.Length; e += 2)
             {
                 int a = edges[e], b = edges[e + 1];
-                if (a < 0 || b < 0 || a >= nodes || b >= nodes) throw new ArgumentException("arista " + e / 2 + " con nodo fuera de rango");
+                if (a < 0 || b < 0 || a >= nodes || b >= nodes) throw new ArgumentException("edge " + e / 2 + " has a node out of range");
                 uf.Union(a, b); deg[a]++; if (b != a) deg[b]++;
             }
             var c = new int[nodes];

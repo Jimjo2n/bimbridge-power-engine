@@ -2,33 +2,33 @@
   {
     "de": 2022,
     "a": 2023,
-    "introducidos": 755,
-    "retirados": 423,
-    "modificados": 50,
-    "obsoletos_nuevos": 47
+    "introduced": 755,
+    "removed": 423,
+    "modified": 50,
+    "new_obsolete": 47
   },
   {
     "de": 2023,
     "a": 2024,
-    "introducidos": 823,
-    "retirados": 126,
-    "modificados": 40,
-    "obsoletos_nuevos": 35
+    "introduced": 823,
+    "removed": 126,
+    "modified": 40,
+    "new_obsolete": 35
   },
   {
     "de": 2024,
     "a": 2025,
-    "introducidos": 754,
-    "retirados": 257,
-    "modificados": 22,
-    "obsoletos_nuevos": 16
+    "introduced": 754,
+    "removed": 257,
+    "modified": 22,
+    "new_obsolete": 16
   },
   {
     "de": 2025,
     "a": 2026,
-    "introducidos": 867,
-    "retirados": 112,
-    "modificados": 99,
-    "obsoletos_nuevos": 92
+    "introduced": 867,
+    "removed": 112,
+    "modified": 99,
+    "new_obsolete": 92
   }
 ]

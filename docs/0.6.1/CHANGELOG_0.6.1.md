@@ -1,30 +1,30 @@
-# Cambios 0.6.1 (desde v0.6.0)
+# Changes in 0.6.1 (since v0.6.0)
 
-Comprobado: `prueba` = prueba automática sin Revit; `procesos` = prueba con procesos del SO reales; `compila` = compila contra la API 2022–2026; `nativo` = dentro de Revit. **Nada de 0.6.1 es `nativo`.**
+Verified: `test` = automated test without Revit; `processes` = test with real OS processes; `compiles` = compiles against the 2022–2026 API; `native` = inside Revit. **Nothing in 0.6.1 is `native`.**
 
-| Cambio | Comprobado |
+| Change | Verified |
 |---|---|
-| Lease entre procesos: `lease.lock` abierto con `FileShare.None` alrededor de leer-comprobar-escribir (misma PC) | procesos (20 concurrentes → 1 ganador) |
-| Fencing token monotónico en `lease.json`; renovación lo conserva; otra adquisición lo sube; liberar no borra el archivo | procesos + prueba |
-| `RenewLease`, `ValidateOwnership`, `GetCurrentLease`; `lease.json` antiguo sin campo = fencing 0 | prueba |
-| Almacén de leases corrupto o bloqueo no obtenido → error explícito, nunca "libre" | prueba |
-| El ejecutor valida dueño+fencing antes de cada lote y barrera; renovación fallida → `interrumpida` ("lease perdido") sin ejecutar más | prueba (robo de lease a mitad: 0 lotes después) |
-| `AuditLog`: auditoría síncrona (WriteThrough+Flush), encadenada por sha256, `Verify` detecta líneas borradas/alteradas/cortadas | prueba |
-| `exec`: se audita ANTES de ejecutar; si la auditoría falla, el código que escribe se rechaza (fail closed). `aplicar_cola` también va a auditoría | compila |
-| Telemetría (`Journal`) cuenta líneas perdidas y errores en vez de callarlos | prueba |
-| Análisis semántico de capacidades en Roslyn (`CompileWithCapabilities`) | prueba (7 patrones hostiles) |
-| Perfiles `TrustedInteractive` / `RestrictedAutonomous`; tareas y recetas rechazan capacidades no concedidas al iniciar y al reanudar; concesiones (`capacidades=`) entran en la huella | prueba (política) / compila (cableado) |
-| Puente: el servidor del pipe debe ser el PID de Revit anunciado y el ejecutable Revit | prueba (regla) / compila (Win32) |
-| Versión 0.6.1 | — |
+| Cross-process lease: `lease.lock` opened with `FileShare.None` around read-check-write (same PC) | processes (20 concurrent → 1 winner) |
+| Monotonic fencing token in `lease.json`; renewal keeps it; another acquisition increments it; release does not delete the file | processes + test |
+| `RenewLease`, `ValidateOwnership`, `GetCurrentLease`; old `lease.json` without the field = fencing 0 | test |
+| Corrupt lease store or lock not obtained → explicit error, never "free" | test |
+| The runner validates owner+fencing before each batch and barrier; failed renewal → `interrumpida` ("lease lost") without running anything else | test (lease stolen midway: 0 batches afterwards) |
+| `AuditLog`: synchronous audit (WriteThrough+Flush), chained by sha256, `Verify` detects deleted/altered/truncated lines | test |
+| `exec`: audited BEFORE running; if the audit fails, code that writes is rejected (fail closed). `aplicar_cola` also goes to the audit | compiles |
+| Telemetry (`Journal`) counts lost lines and errors instead of hiding them | test |
+| Semantic capability analysis in Roslyn (`CompileWithCapabilities`) | test (7 hostile patterns) |
+| `TrustedInteractive` / `RestrictedAutonomous` profiles; tasks and recipes reject ungranted capabilities at start and on resume; grants (`capacidades=`) are part of the fingerprint | test (policy) / compiles (wiring) |
+| Bridge: the pipe server must be the announced Revit PID and the Revit executable | test (rule) / compiles (Win32) |
+| Version 0.6.1 | — |
 
-## rc3 (revisión crítica de rc2)
+## rc3 (critical review of rc2)
 
-| Cambio | Comprobado |
+| Change | Verified |
 |---|---|
-| Clave de concesiones: formato v1, lectura rc2, creación atómica, inválida/ausente sin regenerar | prueba + procesos |
-| Huella de documento estricta en concesiones | prueba |
-| Recetas: sin instanciar en `tarea iniciar`; `RecipeGate` en constructor/Preparar/MoveNext/Verificar/Postcondicion; autorización previa en el motor | prueba (backend simulado) + compila |
-| `revit_transaccion` (Transaction/SubTransaction/TransactionGroup/PostCommand) siempre denegada al código autónomo | prueba |
-| AuditLog: cabeza, relectura del último registro, fecha, cuarentena con intenciones pendientes | prueba |
-| AuditGate: resultado `auditoria_incompleta`; exec `aplicado_error_resultado` | prueba + compila |
-| AgentHost 0.7.0 (inicio) con backend simulado | prueba |
+| Grant key: v1 format, rc2 read support, atomic creation, invalid/missing without regenerating | test + processes |
+| Strict document fingerprint in grants | test |
+| Recipes: not instantiated in `tarea iniciar`; `RecipeGate` in constructor/Preparar/MoveNext/Verificar/Postcondicion; prior authorization in the engine | test (simulated backend) + compiles |
+| `revit_transaccion` (Transaction/SubTransaction/TransactionGroup/PostCommand) always denied to autonomous code | test |
+| AuditLog: head, re-read of the last record, date, quarantine with pending intents | test |
+| AuditGate: `auditoria_incompleta` result; exec `aplicado_error_resultado` | test + compiles |
+| AgentHost 0.7.0 (start) with simulated backend | test |

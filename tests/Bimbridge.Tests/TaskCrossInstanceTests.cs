@@ -12,8 +12,8 @@ using static Bimbridge.Tests.TaskEngineTests;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// Dos Revit sobre la misma carpeta de tareas: quien no tiene el lease no toca tarea.json (ni al cancelar/anotar/reconciliar/archivar,
-    /// ni el motor que perdió la tarea al detenerse); el motor que termina bien guarda ANTES de soltar el lease.
+    /// Two Revits on the same tasks folder: whoever does not hold the lease does not touch tarea.json (not on cancel/note/reconcile/archive,
+    /// nor the engine that lost the task when it stops); the engine that finishes cleanly saves BEFORE releasing the lease.
     /// </summary>
     public class TaskCrossInstanceTests
     {
@@ -21,9 +21,9 @@ namespace Bimbridge.Tests
 
         private static TaskRecord Draft(string id, int n, string state) => new TaskRecord
         {
-            Id = id, Objective = "prueba", RecipeName = "fake", RecipeVersion = "1", RecipeHash = "h", ContentHash = "c-" + n, State = state,
+            Id = id, Objective = "test", RecipeName = "fake", RecipeVersion = "1", RecipeHash = "h", ContentHash = "c-" + n, State = state,
             Args = new Dictionary<string, object> { ["n"] = (long)n },
-            Docs = new List<TaskDoc> { new TaskDoc { Key = "archivo:c:\\practica.rvt", Title = "practica", Generation = "inst#1" } },
+            Docs = new List<TaskDoc> { new TaskDoc { Key = "archivo:c:\\practica.rvt", Title = "practice", Generation = "inst#1" } },
             Policy = new Dictionary<string, object>(),
         };
 
@@ -32,38 +32,38 @@ namespace Bimbridge.Tests
             Authority = new AllowAll(), Delay = (d, ct) => Task.Delay(5, ct), MaxWait = TimeSpan.FromSeconds(20), BudgetMs = 200,
         };
 
-        /// <summary>Fix 4: con el lease vigente de OTRO Revit, cancelar/anotar/reconciliar/archivar desde aquí no cambia ni mueve la tarea.</summary>
+        /// <summary>Fix 4: with ANOTHER Revit's valid lease, cancel/note/reconcile/archive from here neither changes nor moves the task.</summary>
         [Fact]
         public void HeldByOtherInstance_ManagerDoesNotTouchTask()
         {
             var root = TempRoot();
             var store = new TaskStore(root);
-            store.Create(Draft("ajena", 5, TaskState.Interrumpida), "// fake");
-            Assert.True(store.TryLease("ajena", "inst:B", "B", TimeSpan.FromHours(1), DateTime.UtcNow, out _));
-            var file = Path.Combine(store.Dir("ajena"), "tarea.json");
+            store.Create(Draft("foreign", 5, TaskState.Interrupted), "// fake");
+            Assert.True(store.TryLease("foreign", "inst:B", "B", TimeSpan.FromHours(1), DateTime.UtcNow, out _));
+            var file = Path.Combine(store.Dir("foreign"), "task.json");
             var before = File.ReadAllText(file);
             var mgr = new TaskManager(new TaskStore(root), "A", t => new FakeBackend(new FakeModel())) { Authority = new AllowAll() };
 
-            var t1 = mgr.Cancel("ajena", out var busy);
+            var t1 = mgr.Cancel("foreign", out var busy);
             Assert.NotNull(busy);
-            Assert.Contains("otro Revit", busy);
-            Assert.Equal(TaskState.Interrumpida, t1.State);
-            Assert.Contains("otro Revit", mgr.Note("ajena", "nota", "prueba"));
-            Assert.Contains("otro Revit", mgr.Reconcile("ajena", null, true, "comprobado", "prueba"));
-            Assert.Contains("otro Revit", mgr.Archive("ajena"));
+            Assert.Contains("another Revit", busy);
+            Assert.Equal(TaskState.Interrupted, t1.State);
+            Assert.Contains("another Revit", mgr.Note("foreign", "note", "test"));
+            Assert.Contains("another Revit", mgr.Reconcile("foreign", null, true, "checked", "test"));
+            Assert.Contains("another Revit", mgr.Archive("foreign"));
 
-            Assert.True(store.Exists("ajena"));
+            Assert.True(store.Exists("foreign"));
             Assert.Equal(before, File.ReadAllText(file));
         }
 
-        /// <summary>Fix 5: el motor que pierde el lease (otro dueño lo toma con fencing mayor y guarda su tarea.json) no pisa ese tarea.json al detenerse.</summary>
+        /// <summary>Fix 5: the engine that loses the lease (another owner takes it with a higher fencing token and saves its tarea.json) does not overwrite that tarea.json when it stops.</summary>
         [Fact]
         public async Task LeaseLost_RunnerDoesNotOverwriteNewOwnersTaskJson()
         {
             var root = TempRoot();
             var store = new TaskStore(root);
             var thief = new TaskStore(root);
-            var t = Draft("robada", 200, TaskState.EnCola);
+            var t = Draft("stolen", 200, TaskState.Queued);
             store.Create(t, "// fake");
             var m = new FakeModel { MsPerUnit = 50 };
             var stolen = false;
@@ -71,22 +71,22 @@ namespace Bimbridge.Tests
             m.OnVisit = v =>
             {
                 if (v != 3) return;
-                // Tras vencer (now+2h) otro dueño la toma: fencing nuevo.
-                Assert.True(thief.TryLease("robada", "inst:B", "B", TimeSpan.FromHours(3), DateTime.UtcNow.AddHours(2), out var l));
+                // After expiry (now+2h) another owner takes it: new fencing token.
+                Assert.True(thief.TryLease("stolen", "inst:B", "B", TimeSpan.FromHours(3), DateTime.UtcNow.AddHours(2), out var l));
                 Assert.True(l.Fencing >= 2);
                 stolen = true;
             };
             var runner = Runner(store, m, t);
-            // El nuevo dueño guarda su tarea.json en el siguiente punto de autoridad (RenewLease → Now), ya pasado el checkpoint del lote 3.
-            // Fuera del lote: el Preflight por unidad también llama a Now, pero dentro de lock(m.Lock) en el mismo hilo.
+            // The new owner saves its tarea.json at the next authority point (RenewLease -> Now), after the batch 3 checkpoint.
+            // Outside the batch: the per-unit Preflight also calls Now, but inside lock(m.Lock) on the same thread.
             runner.Now = () =>
             {
                 if (stolen && !marked && !Monitor.IsEntered(m.Lock))
                 {
                     marked = true;
-                    var other = thief.Load("robada");
+                    var other = thief.Load("stolen");
                     other.ConfirmSeq = 424242;
-                    other.Decisions.Add(new Dictionary<string, object> { ["t"] = "x", ["texto"] = "marcador-B", ["quien"] = "B" });
+                    other.Decisions.Add(new Dictionary<string, object> { ["t"] = "x", ["text"] = "marcador-B", ["who"] = "B" });
                     thief.Save(other);
                 }
                 return DateTime.UtcNow;
@@ -95,23 +95,23 @@ namespace Bimbridge.Tests
             await runner.RunAsync(CancellationToken.None);
 
             Assert.True(marked);
-            Assert.Equal(TaskState.Interrumpida, runner.Task_.State);
-            Assert.Contains("lease perdido", runner.Task_.Reason);
-            var onDisk = store.Load("robada");
+            Assert.Equal(TaskState.Interrupted, runner.Task_.State);
+            Assert.Contains("lease lost",runner.Task_.Reason);
+            var onDisk = store.Load("stolen");
             Assert.Equal(424242, onDisk.ConfirmSeq);
-            Assert.Contains(onDisk.Decisions, d => (d["texto"] as string) == "marcador-B");
-            var lease = store.ReadLease("robada");
+            Assert.Contains(onDisk.Decisions, d => (d["text"] as string) == "marcador-B");
+            var lease = store.ReadLease("stolen");
             Assert.Equal("inst:B", lease.Owner);
             Assert.False(lease.Released);
         }
 
-        /// <summary>Fix 5: el motor que termina bien hace el último checkpoint con el lease aún suyo (antes de soltarlo).</summary>
+        /// <summary>Fix 5: the engine that finishes cleanly takes the last checkpoint while it still holds the lease (before releasing it).</summary>
         [Fact]
         public async Task NormalFinish_LastCheckpointBeforeLeaseRelease()
         {
             var root = TempRoot();
             var store = new TaskStore(root);
-            var t = Draft("normal", 5, TaskState.EnCola);
+            var t = Draft("normal", 5, TaskState.Queued);
             store.Create(t, "// fake");
             var leaseAtSave = new List<TaskStore.Lease>();
             store.FaultBeforeSave = id => leaseAtSave.Add(store.ReadLease(id));
@@ -119,13 +119,13 @@ namespace Bimbridge.Tests
 
             await runner.RunAsync(CancellationToken.None);
 
-            Assert.True(runner.Task_.State == TaskState.Aplicada, runner.Task_.Reason);
+            Assert.True(runner.Task_.State == TaskState.Applied, runner.Task_.Reason);
             var last = leaseAtSave.Last();
             Assert.NotNull(last);
             Assert.Equal("inst:A", last.Owner);
-            Assert.False(last.Released, "el último tarea.json se escribió después de soltar el lease");
+            Assert.False(last.Released, "the last task.json was written after releasing the lease");
             Assert.True(store.ReadLease("normal").Released);
-            Assert.Equal(TaskState.Aplicada, store.Load("normal").State);
+            Assert.Equal(TaskState.Applied, store.Load("normal").State);
         }
     }
 }

@@ -1,0 +1,57 @@
+{
+ "schema": "bimbridge.campaign080/1",
+ "item": "N8-04b",
+ "title": "2D drafting: detail component and dimension",
+ "initial_status": "Disposable LOCAL copy, not workshared, of a public model (e.g. an Autodesk sample). Revit 2024 with BIMBRIDGE 0.8.0 installed; config.json levels RPW. After N8-04.",
+ "variables": {
+  "drafting_view": "id of BB-N8-04 DRAFTING (catalog from N8-04)",
+  "component": "\"Family: Type\" of a loaded detail component",
+  "parallel_lines": "two ids of parallel detail lines from BB-N8-04"
+ },
+ "steps": [
+  {
+   "name": "component and dimension",
+   "op": "plan",
+   "args": {
+    "ops": [
+     {
+      "op": "detail_component",
+      "view": "${drafting_view}",
+      "type": "${component}",
+      "point": [
+       3,
+       -3
+      ]
+     },
+     {
+      "op": "dimension",
+      "view": "${drafting_view}",
+      "refs": "${parallel_lines}",
+      "line": [
+       [
+        0,
+        -1
+       ],
+       [
+        10,
+        -1
+       ]
+      ]
+     }
+    ],
+    "summary": "campaign 0.8.0"
+   },
+   "save": {
+    "plan": "plan_id"
+   }
+  },
+  {
+   "name": "apply",
+   "op": "commit",
+   "args": {
+    "plan_id": "${plan}"
+   },
+   "write": true
+  }
+ ]
+}

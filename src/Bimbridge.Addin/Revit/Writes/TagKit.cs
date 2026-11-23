@@ -9,9 +9,9 @@ using Bimbridge.Engine;
 namespace Bimbridge.Addin.Revit.Writes
 {
     /// <summary>
-    /// Cómo están etiquetados los elementos en una vista: quién ya tiene tag (regla: un tag por elemento) y con qué estilo
-    /// (tipo, desplazamiento de la cabeza respecto al elemento, leader, orientación). Lo usan el plan (tag) y el aplicador
-    /// (tag sobre elementos que crea el mismo plan, @n), así un tag nuevo se ve igual que sus vecinos.
+    /// How elements are tagged in a view: which ones already have a tag (rule: one tag per element) and in what style
+    /// (type, head offset from the element, leader, orientation). Used by the plan (tag) and the applier
+    /// (tags on elements created by the same plan, @n), so a new tag looks like its neighbors.
     /// </summary>
     internal sealed class TagKit
     {
@@ -39,12 +39,12 @@ namespace Bimbridge.Addin.Revit.Writes
 
         private TagKit(Document doc, View view) { _doc = doc; View = view; }
 
-        /// <summary>Lee los tags de la vista (una pasada con filtro rápido: ~ms incluso con cientos de tags).</summary>
+        /// <summary>Reads the view's tags (one pass with a quick filter: ~ms even with hundreds of tags).</summary>
         public static TagKit For(Document doc, View view)
         {
             var kit = new TagKit(doc, view);
             if (view == null) return kit;
-            // Filtro rápido por vista dueña (incluye tags ocultos, que también cuentan para "un tag por elemento").
+            // Quick filter by owner view (includes hidden tags, which also count for "one tag per element").
             foreach (var t in new FilteredElementCollector(doc).OfClass(typeof(IndependentTag)).WherePasses(new ElementOwnerViewFilter(view.Id)).Cast<IndependentTag>())
             {
                 ICollection<ElementId> local;
@@ -68,7 +68,7 @@ namespace Bimbridge.Addin.Revit.Writes
             return kit;
         }
 
-        /// <summary>Un tag más en esta vista (para no etiquetar dos veces lo mismo dentro del mismo plan).</summary>
+        /// <summary>One more tag in this view (so the same element is not tagged twice within the same plan).</summary>
         public void Remember(long elemId, long tagCategoryId, Style s)
         {
             Tagged.Add(elemId);
@@ -78,17 +78,17 @@ namespace Bimbridge.Addin.Revit.Writes
         }
 
         /// <summary>
-        /// Tipo, cabeza, leader y orientación del tag para <paramref name="e"/>: el tipo pedido, el más usado en la vista para su categoría,
-        /// o el predeterminado; desplazamiento = mediana de los tags del mismo tipo en la vista, o <paramref name="offsetPaper"/> (pulgadas de papel).
+        /// Type, head, leader and orientation of the tag for <paramref name="e"/>: the requested type, the most used in the view for its category,
+        /// or the default; offset = median of the same-type tags in the view, or <paramref name="offsetPaper"/> (paper inches).
         /// </summary>
         public bool TryChoose(Element e, ElementType forcedType, double[] offsetPaper, bool? leaderArg, string orientArg, int scale,
             out Choice choice, out string why)
         {
             choice = null; why = null;
             var loc = WriteKit.LocationOf(e);
-            if (loc == null) { why = "no tiene posición"; return false; }
+            if (loc == null) { why = "it has no position"; return false; }
             var tagBic = PlanBuilder.TagCategoryFor(e.Category);
-            if (tagBic == BuiltInCategory.INVALID && forcedType == null) { why = "su categoría no tiene tags"; return false; }
+            if (tagBic == BuiltInCategory.INVALID && forcedType == null) { why = "its category has no tags"; return false; }
             var tagCatId = tagBic == BuiltInCategory.INVALID ? -1 : Ids.ToLong(new ElementId(tagBic));
             _styles.TryGetValue(tagCatId, out var sameCat);
 
@@ -99,7 +99,7 @@ namespace Bimbridge.Addin.Revit.Writes
             {
                 ElementId def = null;
                 try { def = _doc.GetDefaultFamilyTypeId(new ElementId(tagBic)); } catch (Exception) { }
-                if (def == null || def == ElementId.InvalidElementId) { why = "no hay tipo de tag cargado para su categoría (dé tag_type)"; return false; }
+                if (def == null || def == ElementId.InvalidElementId) { why = "no tag type is loaded for its category (give tag_type)"; return false; }
                 typeId = Ids.ToLong(def);
             }
 
@@ -110,14 +110,14 @@ namespace Bimbridge.Addin.Revit.Writes
                 dx = Median(same.Select(s => s.Dx)); dy = Median(same.Select(s => s.Dy));
                 leader = same.Count(s => s.Leader) * 2 > same.Count;
                 vertical = same.Count(s => s.Vertical) * 2 > same.Count;
-                note = "copiado de " + same.Count + " tags del mismo tipo en la vista";
+                note = "copied from " + same.Count + " tags of the same type in the view";
             }
             else
             {
                 dx = offsetPaper != null ? offsetPaper[0] / 12.0 * scale : 0;
                 dy = offsetPaper != null ? offsetPaper[1] / 12.0 * scale : 0;
                 leader = false; vertical = false;
-                note = offsetPaper == null ? "sin tags de referencia en la vista: cabeza sobre el elemento" : null;
+                note = offsetPaper == null ? "no reference tags in the view: head on the element" : null;
             }
             if (leaderArg.HasValue) leader = leaderArg.Value;
             if (orientArg != null) vertical = orientArg == "vertical";

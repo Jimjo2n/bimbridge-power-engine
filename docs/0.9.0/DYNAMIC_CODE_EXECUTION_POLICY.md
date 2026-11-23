@@ -1,41 +1,41 @@
-# Política de ejecución dinámica de C#
+# Dynamic C# execution policy
 
-Estado: NATIVE_ACCEPTANCE_PENDING para esta revisión.
+Status: NATIVE_ACCEPTANCE_PENDING for this revision.
 
-## Comportamiento
+## Behavior
 
-| Control | Valor por defecto | Efecto |
+| Control | Default | Effect |
 |---|---|---|
-| **Bloquear inyección de código C#** (cinta BIMBRIDGE, panel Autoridad) | desactivado | `exec` corre para los agentes locales autorizados |
-| Activado | — | Todo `exec` nuevo (consulta, ensayo, ejecutar) se rechaza con `inyeccion_csharp_bloqueada` antes de compilar |
+| **Block C# code injection** (BIMBRIDGE ribbon, Authority panel) | off | `exec` runs for authorized local agents |
+| On | — | Every new `exec` (consulta, ensayo, ejecutar) is rejected with `inyeccion_csharp_bloqueada` before compiling |
 
-- Persiste en `%APPDATA%\Bimbridge\config.json` como `"bloquear_inyeccion_csharp": true|false`. Si el archivo está dañado, se trata como bloqueado (fail-closed).
-- Si no se puede guardar el cambio, el botón no lo aplica y lo dice.
-- Se aplica a las peticiones nuevas. No interrumpe lo que ya entró en el hilo de Revit.
-- Queda en la auditoría (`bloquear_inyeccion_csharp: bloqueado|permitido`), con la persona como autor.
+- Persists in `%APPDATA%\Bimbridge\config.json` as `"bloquear_inyeccion_csharp": true|false`. If the file is damaged, it is treated as blocked (fail-closed).
+- If the change cannot be saved, the button does not apply it and says so.
+- It applies to new requests. It does not interrupt what has already entered the Revit thread.
+- It is recorded in the audit (`bloquear_inyeccion_csharp: bloqueado|permitido`), with the person as author.
 
-## Quién es un «agente local autorizado»
+## Who is an «authorized local agent»
 
-1. Un proceso del **mismo usuario de Windows**. La tubería usa `PipeOptions.CurrentUserOnly` y una ACL que sólo admite a ese usuario. No hay escucha de red.
-2. Con el **nivel** de `config.json`: `exec ejecutar` y `ensayo` exigen W; `consulta` exige R. `runner: apagado` sigue apagando todo `exec`.
+1. A process of the **same Windows user**. The pipe uses `PipeOptions.CurrentUserOnly` and an ACL that only admits that user. There is no network listener.
+2. With the **level** from `config.json`: `exec ejecutar` and `ensayo` require W; `consulta` requires R. `runner: apagado` still turns off all `exec`.
 
-Desactivar el bloqueo **no** abre `exec` a conexiones externas ni anónimas: no existen.
+Turning the block off does **not** open `exec` to external or anonymous connections: they do not exist.
 
-## Qué se eliminó
+## What was removed
 
-- «Código confiable» de 4 horas, sólo en memoria. Lo sustituye el control único y persistente.
-- La autorización por SHA-256 de cada script (`codigo_autorizado`) en la ruta de `exec`. `ProfilePolicy.DenyDynamicCode` sigue en el código, pero ya no se llama desde `exec`.
+- The 4-hour, memory-only «Trusted code». It is replaced by the single persistent control.
+- Per-script SHA-256 authorization (`codigo_autorizado`) on the `exec` path. `ProfilePolicy.DenyDynamicCode` is still in the code, but is no longer called from `exec`.
 
-## Qué se conserva
+## What is kept
 
-- Auditoría durable antes de correr código que escribe; sin auditoría no se ejecuta.
-- `ReferencePolicy` para DLL extra (`refs=`).
-- Recetas y tareas autónomas con el perfil restringido y sus concesiones.
-- Reglas de hilo de Revit: la compilación con Roslyn va fuera del hilo; la ejecución, en el `ExternalEvent` del dispatcher.
-- Caché de compilación existente (`ScriptHost`, clave por contenido). No se amplió en esta revisión.
+- Durable audit before running code that writes; without the audit it does not run.
+- `ReferencePolicy` for extra DLLs (`refs=`).
+- Autonomous recipes and tasks with the restricted profile and their grants.
+- Revit thread rules: Roslyn compilation happens off the thread; execution, in the dispatcher's `ExternalEvent`.
+- Existing compilation cache (`ScriptHost`, content-based key). It was not extended in this revision.
 
-## Límites (no es un sandbox)
+## Limits (it is not a sandbox)
 
-El código corre en el proceso de Revit con los permisos del usuario. Un `TransactionGroup` revierte cambios del documento, no archivos, red, guardados ni otros documentos. Las operaciones tipadas (`plan`/`commit`) siguen siendo la vía con garantías verificables: diff, conflicto, intención durable, reconciliación.
+The code runs in the Revit process with the user's permissions. A `TransactionGroup` rolls back document changes, not files, network, saves or other documents. Typed operations (`plan`/`commit`) remain the path with verifiable guarantees: diff, conflict, durable intent, reconciliation.
 
-**Riesgo de organización:** habilitar C# por defecto puede chocar con la política de seguridad del entorno donde se instala. La configuración debe revisarse antes del uso en producción.
+**Organizational risk:** enabling C# by default may clash with the security policy of the environment where it is installed. The configuration must be reviewed before production use.

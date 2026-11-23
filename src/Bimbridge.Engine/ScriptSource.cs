@@ -9,12 +9,12 @@ using System.Text.RegularExpressions;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Arma el código C# que compila el runner general (R003). Acepta tres formas:
-    ///   expresión  →  doc.Title                                   (devuelve su valor)
-    ///   cuerpo     →  var n = 0; foreach (...) n++; return n;     (cuerpo de un método con doc, uidoc, app, uiapp, args, ctx)
-    ///   clase      →  public static class X { public static object Run(ScriptContext ctx) { ... } }
-    /// Las líneas "using X;" del principio se suben a la cabecera. #line hace que los errores citen líneas del código del usuario.
-    /// No hay lista blanca: compila contra la API pública completa de la versión de Revit cargada.
+    /// Builds the C# code compiled by the general runner (R003). Accepts three forms:
+    ///   expression →  doc.Title                                   (returns its value)
+    ///   body       →  var n = 0; foreach (...) n++; return n;     (body of a method with doc, uidoc, app, uiapp, args, ctx)
+    ///   class      →  public static class X { public static object Run(ScriptContext ctx) { ... } }
+    /// Leading "using X;" lines are hoisted to the header. #line makes errors cite lines of the user's code.
+    /// There is no allow-list: it compiles against the full public API of the loaded Revit version.
     /// </summary>
     public static class ScriptSource
     {
@@ -29,7 +29,7 @@ namespace Bimbridge.Engine
             "Autodesk.Revit.DB.Electrical", "Autodesk.Revit.DB.Structure", "Autodesk.Revit.UI", "Bimbridge.Addin.Scripting",
         };
 
-        /// <summary>Nombres que el cuerpo ya tiene definidos (no declararlos de nuevo).</summary>
+        /// <summary>Names the body already has defined (do not declare them again).</summary>
         public static readonly string[] Predefined = { "ctx", "doc", "uidoc", "app", "uiapp", "args" };
 
         public sealed class Wrapped
@@ -41,9 +41,9 @@ namespace Bimbridge.Engine
         }
 
         private static readonly Regex UsingLine = new Regex(@"^\s*using\s+(static\s+)?[A-Za-z_][\w\.]*(\s*=\s*[A-Za-z_][\w\.<>, ]*)?\s*;\s*$", RegexOptions.Compiled);
-        /// <summary>Receta por pasos (0.6.0): una clase que hereda de Receta. Se compila tal cual dentro del espacio de nombres de scripts.</summary>
-        private static readonly Regex RecipeForm = new Regex(@"\bclass\s+\w+\s*:\s*(Bimbridge\.Addin\.Scripting\.)?Receta\b", RegexOptions.Compiled);
-        public const string RecipeBaseType = "Bimbridge.Addin.Scripting.Receta";
+        /// <summary>Step-by-step recipe (0.6.0): a class that inherits from Recipe. Compiled as is inside the scripts namespace.</summary>
+        private static readonly Regex RecipeForm = new Regex(@"\bclass\s+\w+\s*:\s*(Bimbridge\.Addin\.Scripting\.)?Recipe\b", RegexOptions.Compiled);
+        public const string RecipeBaseType = "Bimbridge.Addin.Scripting.Recipe";
 
         public static bool IsRecipe(string code) => code != null && RecipeForm.IsMatch(code);
 
@@ -51,12 +51,12 @@ namespace Bimbridge.Engine
 
         public static Wrapped Wrap(string code, string className)
         {
-            if (string.IsNullOrWhiteSpace(code)) throw new ArgumentException("código vacío");
+            if (string.IsNullOrWhiteSpace(code)) throw new ArgumentException("empty code");
             code = code.Replace("\r\n", "\n").Trim('\n', ' ', '\t');
             var w = new Wrapped { ClassName = className };
             var lines = code.Split('\n').ToList();
             var userStart = 0;
-            // using al principio (también tras comentarios //): se suben fuera de la clase. Los comentarios no se pierden: sólo se saltan.
+            // Leading usings (also after // comments) are hoisted out of the class. Comments are not lost: they are only skipped.
             while (userStart < lines.Count && (UsingLine.IsMatch(lines[userStart]) || lines[userStart].Trim().Length == 0 || lines[userStart].TrimStart().StartsWith("//", StringComparison.Ordinal)))
             {
                 if (UsingLine.IsMatch(lines[userStart])) w.HoistedUsings.Add(lines[userStart].Trim());
@@ -69,7 +69,7 @@ namespace Bimbridge.Engine
 
             if (RecipeForm.IsMatch(body) || ClassForm.IsMatch(body))
             {
-                w.Kind = RecipeForm.IsMatch(body) ? "receta" : "clase";
+                w.Kind = RecipeForm.IsMatch(body) ? "recipe" : "class";
                 sb.Append("namespace ").Append(Namespace).Append(" {\n");
                 sb.Append("#line ").Append(userStart + 1).Append(" \"script\"\n");
                 sb.Append(body).Append("\n#line default\n}\n");
@@ -78,7 +78,7 @@ namespace Bimbridge.Engine
             }
 
             var isExpr = IsExpression(body);
-            w.Kind = isExpr ? "expresión" : "cuerpo";
+            w.Kind = isExpr ? "expression" : "body";
             sb.Append("namespace ").Append(Namespace).Append(" {\n");
             sb.Append("public static class ").Append(className).Append(" {\n");
             sb.Append("public static object ").Append(EntryMethod).Append("(").Append(ContextType).Append(" ctx) {\n");
@@ -93,7 +93,7 @@ namespace Bimbridge.Engine
             return w;
         }
 
-        /// <summary>Una sola línea sin ';' ni llaves y sin palabras de sentencia = expresión.</summary>
+        /// <summary>A single line with no ';' or braces and no statement keywords = expression.</summary>
         public static bool IsExpression(string body)
         {
             var t = body.Trim();
@@ -103,22 +103,22 @@ namespace Bimbridge.Engine
             return true;
         }
 
-        /// <summary>Huella para la caché de compilación: código + versión de Revit + versión del add-in + referencias.</summary>
+        /// <summary>Fingerprint for the compilation cache: code + Revit version + add-in version + references.</summary>
         public static string CacheKey(string source, string revitVersion, string addinVersion, string referencesFingerprint) =>
             Home.Sha256Hex(source + "\u0001" + revitVersion + "\u0001" + addinVersion + "\u0001" + referencesFingerprint, 24);
 
-        /// <summary>Carpeta de scripts guardados con nombre (para repetirlos sin reenviar el código).</summary>
+        /// <summary>Folder of named saved scripts (to rerun them without resending the code).</summary>
         public static string ScriptsFolder => Home.Sub("scripts");
 
         public static string SafeName(string name)
         {
-            if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("nombre vacío");
+            if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("empty name");
             var n = name.Trim();
-            if (n.Length > 60) throw new ArgumentException("nombre de script de hasta 60 caracteres");
+            if (n.Length > 60) throw new ArgumentException("script name of up to 60 characters");
             foreach (var c in n)
                 if (!(char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '.'))
-                    throw new ArgumentException("nombre de script: letras, números, _ - .");
-            if (n.Contains("..")) throw new ArgumentException("nombre de script inválido");
+                    throw new ArgumentException("script name: letters, digits, _ - .");
+            if (n.Contains("..")) throw new ArgumentException("invalid script name");
             return n;
         }
 

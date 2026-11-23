@@ -7,15 +7,15 @@ using System.Text;
 
 namespace Bimbridge.Engine.Coverage
 {
-    /// <summary>Filtro de búsqueda de capacidades. Todo es opcional; se combinan con Y.</summary>
+    /// <summary>Capability search filter. Everything is optional; filters are combined with AND.</summary>
     public sealed class CapabilityQuery
     {
-        public string Text;          // palabras (es/en, id, subdominio, comando)
+        public string Text;          // words (es/en, id, subdomain, command)
         public string Domain;        // F01..F37
         public string Status;        // CoverageStatus
-        public string Strategy;      // prefijo: typed, query, doc, exec, engine, postcommand, none…
-        public int? Version;         // 2022..2027, según la capacidad
-        public string Category;      // categoría Revit
+        public string Strategy;      // prefix: typed, query, doc, exec, engine, postcommand, none…
+        public int? Version;         // 2022..2027, depending on the capability
+        public string Category;      // Revit category
         public string DocumentKind;  // project | family | any
         public string Priority;      // P0..P3
         public int Page = 1;
@@ -24,10 +24,10 @@ namespace Bimbridge.Engine.Coverage
     }
 
     /// <summary>
-    /// 0.9.1: índice inmutable del catálogo de capacidades. Se construye UNA vez por proceso (perezoso) a partir de datos ya
-    /// compilados: no hay reflexión ni lectura de ensamblados de Revit, ni recorrido del modelo, y no entra al hilo de Revit.
-    /// Índices por id, dominio, estado, estrategia, versión, categoría, tipo de documento y palabras. Las búsquedas devuelven filas
-    /// compactas paginadas; el contrato completo sólo se serializa al pedirlo por id.
+    /// 0.9.1: immutable index of the capability catalog. Built ONCE per process (lazily) from already compiled
+    /// data: no reflection, no reading of Revit assemblies, no model traversal, and it does not enter the Revit thread.
+    /// Indexes by id, domain, status, strategy, version, category, document kind and words. Searches return compact
+    /// paginated rows; the full contract is only serialized when requested by id.
     /// </summary>
     public sealed class CapabilityIndex
     {
@@ -50,7 +50,7 @@ namespace Bimbridge.Engine.Coverage
             _all = entries.ToArray();
             for (var i = 0; i < _all.Length; i++)
             {
-                if (_byId.ContainsKey(_all[i].Id)) throw new ArgumentException("id de capacidad repetido: " + _all[i].Id);
+                if (_byId.ContainsKey(_all[i].Id)) throw new ArgumentException("repeated capability id: " + _all[i].Id);
                 _byId[_all[i].Id] = i;
             }
             _byDomain = Group(c => new[] { c.Domain });
@@ -65,8 +65,8 @@ namespace Bimbridge.Engine.Coverage
         }
 
         /// <summary>
-        /// AUD-16: huella del contenido canónico COMPLETO (SHA-256 del contrato íntegro de cada capacidad, en orden de id): cualquier
-        /// cambio de nombre, límites, verificador, pruebas, comandos, versiones… cambia la huella. Perezosa: no cuesta en la carga.
+        /// AUD-16: fingerprint of the FULL canonical content (SHA-256 of each capability's whole contract, in id order): any
+        /// change of name, limits, verifier, tests, commands, versions… changes the fingerprint. Lazy: costs nothing at load.
         /// </summary>
         private string ComputeVersion()
         {
@@ -105,7 +105,7 @@ namespace Bimbridge.Engine.Coverage
             return tmp.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray(), StringComparer.OrdinalIgnoreCase);
         }
 
-        /// <summary>Palabras normalizadas (minúsculas, sin acentos, partidas por no-alfanuméricos y CamelCase), de 2+ caracteres.</summary>
+        /// <summary>Normalized words (lowercase, no accents, split on non-alphanumerics and CamelCase), 2+ characters long.</summary>
         public static IEnumerable<string> Tokens(string text)
         {
             if (string.IsNullOrEmpty(text)) yield break;
@@ -125,7 +125,7 @@ namespace Bimbridge.Engine.Coverage
 
         public CapabilityEntry Get(string id) => id != null && _byId.TryGetValue(id.Trim(), out var i) ? _all[i] : null;
 
-        /// <summary>Busca y pagina. Intersección de listas ordenadas (sin recorrer el catálogo si hay algún filtro indexado).</summary>
+        /// <summary>Searches and paginates. Intersection of sorted lists (without scanning the catalog if any indexed filter is present).</summary>
         public (IReadOnlyList<CapabilityEntry> Page, int Total) Search(CapabilityQuery q)
         {
             q = q ?? new CapabilityQuery();
@@ -141,8 +141,8 @@ namespace Bimbridge.Engine.Coverage
             if (!q.Relevance && !string.IsNullOrWhiteSpace(q.Text))
                 foreach (var t in Tokens(q.Text).Distinct())
                 {
-                    // prefijo: "circ" encuentra "circuito"; se acota a las claves del índice de palabras (no al catálogo).
-                    // Búsqueda binaria del primer token >= t en las claves ordenadas y recorrido sólo mientras compartan el prefijo.
+                    // prefix: "circ" finds "circuit"; bounded to the keys of the word index (not the catalog).
+                    // Binary search for the first token >= t in the sorted keys, scanning only while they share the prefix.
                     var lo = Array.BinarySearch(_tokenKeys, t, StringComparer.Ordinal);
                     if (lo < 0) lo = ~lo;
                     var hits = new HashSet<int>();
@@ -163,13 +163,13 @@ namespace Bimbridge.Engine.Coverage
 
         private static readonly string[][] VdcAliases =
         {
-            new[] { "luminaria", "luminarias", "fixture", "fixtures", "lighting" },
-            new[] { "vinculo", "vinculos", "link", "links", "linked" },
-            new[] { "choque", "choques", "clash", "clashes", "interferencia", "interference" },
-            new[] { "tuberia", "tuberias", "pipe", "pipes", "piping" },
-            new[] { "lamina", "laminas", "sheet", "sheets" },
-            new[] { "etiqueta", "etiquetas", "tag", "tags" },
-            new[] { "cota", "cotas", "dimension", "dimensions" },
+            new[] { "fixture", "fixtures", "fixture", "fixtures", "lighting" },
+            new[] { "link", "links", "link", "links", "linked" },
+            new[] { "clash", "clashes", "clash", "clashes", "interference", "interference" },
+            new[] { "pipe", "pipes", "pipe", "pipes", "piping" },
+            new[] { "sheet", "sheets", "sheet", "sheets" },
+            new[] { "tag", "tags_list", "tag", "tags" },
+            new[] { "dimension", "dimensions", "dimension", "dimensions" },
         };
 
         private IEnumerable<int> Rank(IEnumerable<int> ids, string text)
@@ -197,23 +197,23 @@ namespace Bimbridge.Engine.Coverage
                 .OrderByDescending(x => x.Score).ThenBy(x => _all[x.Index].Id, StringComparer.Ordinal).Select(x => x.Index);
         }
 
-        /// <summary>Fila compacta para descubrimiento (lo mínimo para decidir; el contrato completo va aparte).</summary>
+        /// <summary>Compact row for discovery (the minimum to decide; the full contract is separate).</summary>
         public static List<object> Row(CapabilityEntry c) => new List<object> { c.Id, c.Name, c.Status.ToString(), c.Strategy ?? "none" };
-        public static readonly List<object> RowColumns = new List<object> { "id", "capacidad", "estado", "estrategia" };
+        public static readonly List<object> RowColumns = new List<object> { "id", "capability", "status", "strategy" };
 
-        /// <summary>Contrato completo (sólo bajo demanda).</summary>
+        /// <summary>Full contract (on demand only).</summary>
         public static Dictionary<string, object> Contract(CapabilityEntry c) => new Dictionary<string, object>
         {
-            ["id"] = c.Id, ["dominio"] = c.Domain, ["subdominio"] = c.Subdomain, ["nombre"] = c.Name, ["nombre_en"] = c.NameEn, ["operacion"] = c.Operation,
-            ["resultado_esperado"] = c.Expected, ["categorias"] = (c.Categories ?? new string[0]).Cast<object>().ToList(), ["documento"] = c.DocumentKind,
-            ["estrategia"] = c.Strategy, ["ejecutor"] = ExecutorOf(c), ["api"] = (c.ApiSurfaces ?? new string[0]).Cast<object>().ToList(),
-            ["versiones"] = c.MinVersion + "–" + c.MaxVersion, ["estado"] = c.Status.ToString(), ["implementacion"] = (c.Implementation ?? new string[0]).Cast<object>().ToList(),
-            ["pruebas"] = (c.Tests ?? new string[0]).Cast<object>().ToList(), ["verificador"] = c.Verifier, ["idempotencia"] = c.Idempotency, ["recuperacion"] = c.Recovery,
-            ["limitaciones"] = c.Limitations, ["comandos_cinta"] = (c.PostableCommands ?? new string[0]).Cast<object>().ToList(), ["prioridad"] = c.Priority,
-            ["verificacion_nativa"] = c.Status == CoverageStatus.NATIVE_VERIFIED ? "si" : "pendiente",
+            ["id"] = c.Id, ["domain"] = c.Domain, ["subdomain"] = c.Subdomain, ["name"] = c.Name, ["name_en"] = c.NameEn, ["operation"] = c.Operation,
+            ["expected_result"] = c.Expected, ["categories"] = (c.Categories ?? new string[0]).Cast<object>().ToList(), ["document"] = c.DocumentKind,
+            ["strategy"] = c.Strategy, ["executor"] = ExecutorOf(c), ["api"] = (c.ApiSurfaces ?? new string[0]).Cast<object>().ToList(),
+            ["versions"] = c.MinVersion + "–" + c.MaxVersion, ["status"] = c.Status.ToString(), ["implementation"] = (c.Implementation ?? new string[0]).Cast<object>().ToList(),
+            ["tests_list"] = (c.Tests ?? new string[0]).Cast<object>().ToList(), ["verifier_name"] = c.Verifier, ["idempotency"] = c.Idempotency, ["recovery"] = c.Recovery,
+            ["limitations"] = c.Limitations, ["ribbon_commands"] = (c.PostableCommands ?? new string[0]).Cast<object>().ToList(), ["priority"] = c.Priority,
+            ["native_verification"] = c.Status == CoverageStatus.NATIVE_VERIFIED ? "yes" : "pending",
         };
 
-        /// <summary>Ejecutor oficial de la directiva (Capability → Executor) derivado de la estrategia.</summary>
+        /// <summary>Official executor of the directive (Capability → Executor) derived from the strategy.</summary>
         public static string ExecutorOf(CapabilityEntry c)
         {
             switch (StrategyKind(c.Strategy))
@@ -221,7 +221,7 @@ namespace Bimbridge.Engine.Coverage
                 case "typed": return c.Strategy != null && c.Strategy.Contains("+") ? "TYPED_COMPOSITE" : "DIRECT_REVIT_API";
                 case "query": case "doc": case "fam": return "DIRECT_REVIT_API";
                 case "exec": return "DYNAMIC_CSHARP";
-                case "engine": return c.Implementation != null && c.Implementation.Any(f => f.Contains("PowerEngine/Workflows") || f.Contains("Pdf")) ? "PYTHON_DOCUMENT" : "ENGINE_INTERNAL";   // garantía del motor: no ejecuta nada en Revit
+                case "engine": return c.Implementation != null && c.Implementation.Any(f => f.Contains("PowerEngine/Workflows") || f.Contains("Pdf")) ? "PYTHON_DOCUMENT" : "ENGINE_INTERNAL";   // engine guarantee: runs nothing in Revit
                 case "rust": return "RUST_GEOMETRY";
                 case "postcommand": return c.Status == CoverageStatus.UNSUPPORTED_BY_PUBLIC_API ? "MANUAL_HANDOFF" : "NATIVE_UI_ASSISTED";
                 case "manual": return "MANUAL_HANDOFF";

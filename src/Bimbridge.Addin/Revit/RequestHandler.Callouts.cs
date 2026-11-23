@@ -14,9 +14,9 @@ namespace Bimbridge.Addin.Revit
     {
         private async Task<Response> CalloutCheck(Session session, Request request, CancellationToken ct)
         {
-            var viewId = Arg.GetLong(request.Args, "vista");
+            var viewId = Arg.GetLong(request.Args, "view");
             if (!viewId.HasValue || viewId.Value <= 0)
-                return Response.Fail(request.Id, Status.Invalido, "indique el ID positivo de la vista");
+                return Response.Fail(request.Id, Status.Invalid, "give the positive ID of the view");
             var rows = new List<object>();
             var refresh = new List<long>();
             string error = null;
@@ -28,7 +28,7 @@ namespace Bimbridge.Addin.Revit
                 if (doc == null) return true;
                 if (!(doc.GetElement(Ids.ToId(viewId.Value)) is View view) || view.IsTemplate)
                 {
-                    error = "no existe esa vista en el documento destino";
+                    error = "that view does not exist in the target document";
                     return true;
                 }
                 var notes = LightingCallout.InView(doc, view.Id).Select(note => (Note: note, Config: LightingCallout.Read(note)))
@@ -39,27 +39,27 @@ namespace Bimbridge.Addin.Revit
                     foreach (var (note, config) in group)
                     {
                         var id = Ids.ToLong(note.Id);
-                        var row = new Dictionary<string, object> { ["id"] = id, ["texto"] = note.Text, ["uid_luminaria"] = group.Key };
+                        var row = new Dictionary<string, object> { ["id"] = id, ["text"] = note.Text, ["fixture_uid"] = group.Key };
                         rows.Add(row);
                         if (duplicates)
                         {
-                            row["estado"] = "duplicada";
+                            row["status"] = "duplicated";
                             differences = true;
                             continue;
                         }
                         try
                         {
                             var state = LightingCallout.Observe(doc, config);
-                            row["luminaria_id"] = state.Id;
-                            row["texto_esperado"] = state.Text;
+                            row["fixture_id"] = state.Id;
+                            row["expected_text"] = state.Text;
                             var current = LightingCallout.IsCurrent(note, config, state.Text, state.Point, state.TypeUid);
-                            row["estado"] = current ? "vigente" : "desactualizada";
+                            row["status"] = current ? "current_valid" : "outdated";
                             if (!current) { differences = true; refresh.Add(id); }
                         }
                         catch (QueryException ex)
                         {
-                            row["estado"] = "origen_no_evaluable";
-                            row["motivo"] = ex.Message;
+                            row["status"] = "origin_not_evaluable";
+                            row["reason"] = ex.Message;
                             differences = true;
                         }
                     }
@@ -68,16 +68,16 @@ namespace Bimbridge.Addin.Revit
                 return true;
             }, highPriority: false, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!work.Ok) return FromWork(request.Id, work);
-            if (error != null) return Response.Fail(request.Id, Status.Invalido, error);
-            var result = new Dictionary<string, object> { ["vista"] = viewId.Value, ["total"] = (long)rows.Count, ["llamadas"] = rows };
+            if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
+            var result = new Dictionary<string, object> { ["view"] = viewId.Value, ["total"] = (long)rows.Count, ["calls"] = rows };
             const string set = "$llamadas_desactualizadas";
             if (refresh.Count > 0)
             {
                 session.Sets.Save(set, refresh, TargetId, TargetTitle);
-                result["conjunto_para_regenerar"] = set;
+                result["set_to_regenerate"] = set;
             }
             else session.Sets.Remove(set);
-            return new Response { Id = request.Id, Rev = revision, Datos = result, Estado = differences ? Status.ConDiferencias : Status.Ok };
+            return new Response { Id = request.Id, Rev = revision, Data = result, State = differences ? Status.CompletedWithDifferences : Status.Ok };
         }
     }
 }

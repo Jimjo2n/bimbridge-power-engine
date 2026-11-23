@@ -14,10 +14,10 @@ using System.Windows.Shapes;
 namespace Bimbridge.Addin.Ui
 {
     /// <summary>
-    /// Sistema visual común del instalador y de las ventanas del complemento (todo en código, sin XAML, para compilar igual en
-    /// net48, net8 y net10). Superficies claras y tranquilas, azul marino como color de acción y rojo sólo como acento de marca;
-    /// verde, ámbar y rojo para estados. Movimiento mínimo y con propósito: respuesta al pulsar, entrada de pantallas que cambian
-    /// de contenido (ocasional) y nada en lo que se repite muchas veces al día. Respeta "reducir animaciones" de Windows.
+    /// Shared visual system for the installer and the add-in windows (all in code, no XAML, so it builds the same on
+    /// net48, net8 and net10). Light, calm surfaces, navy as the action color and red only as a brand accent;
+    /// green, amber and red for states. Minimal, purposeful motion: press feedback, entry of screens whose content
+    /// changes (occasional) and nothing on what repeats many times a day. Honors Windows "reduce animations".
     /// </summary>
     internal static class Theme
     {
@@ -33,25 +33,25 @@ namespace Bimbridge.Addin.Ui
         public static readonly Color Line = Color.FromRgb(0xE3, 0xE7, 0xEE);
         public static readonly Color Page = Color.FromRgb(0xF5, 0xF6, 0xF8);
         public static readonly Color White = Colors.White;
-        /// <summary>Superficie hundida (zonas de lectura, código, fondos de fila al pasar el ratón).</summary>
+        /// <summary>Sunken surface (reading areas, code, row backgrounds on mouse hover).</summary>
         public static readonly Color Sunken = Color.FromRgb(0xEE, 0xF1, 0xF5);
 
         public static SolidColorBrush B(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
         public static SolidColorBrush Tint(Color c, byte alpha = 0x22) => B(Color.FromArgb(alpha, c.R, c.G, c.B));
         public static Color Darken(Color c, double f = 0.8) => Color.FromRgb((byte)(c.R * f), (byte)(c.G * f), (byte)(c.B * f));
 
-        // ---------------- Tipografía y medidas (rejilla de 4/8) ----------------
+        // ---------------- Typography and sizes (4/8 grid) ----------------
         public static readonly FontFamily Font = new FontFamily("Segoe UI Variable Text, Segoe UI");
         public static readonly FontFamily Mono = new FontFamily("Cascadia Mono, Consolas");
         public const double Gutter = 24;
         public const double Radius = 10;
-        /// <summary>Radio de botones, avisos, zonas hundidas y segmentos.</summary>
+        /// <summary>Radius of buttons, notices, sunken areas and segments.</summary>
         public const double RadiusSmall = 8;
-        /// <summary>Separador único del nombre del producto en cabeceras.</summary>
+        /// <summary>Single product-name eyebrow used in headers.</summary>
         public const string ProductEyebrow = "BIMBRIDGE · Power Engine";
 
-        // ---------------- Movimiento ----------------
-        /// <summary>Windows con animaciones desactivadas o alto contraste: sin desplazamientos (las respuestas siguen siendo inmediatas).</summary>
+        // ---------------- Motion ----------------
+        /// <summary>Windows with animations off or high contrast: no movement (feedback stays immediate).</summary>
         public static bool ReducedMotion => ReduceMotionOverride || WindowsReducedMotion;
 
         public static bool WindowsReducedMotion
@@ -59,13 +59,13 @@ namespace Bimbridge.Addin.Ui
             get { try { return !SystemParameters.ClientAreaAnimation || SystemParameters.HighContrast; } catch (Exception) { return false; } }
         }
 
-        /// <summary>Preferencia «Movimiento: Reducido» del complemento (Ajustes). Se suma a la de Windows; nunca la anula.</summary>
+        /// <summary>The add-in's "Motion: Reduced" preference (Settings). Adds to the Windows one; never overrides it.</summary>
         public static bool ReduceMotionOverride;
 
-        /// <summary>El último cambio vino del teclado: se responde al instante, sin animar.</summary>
+        /// <summary>The last change came from the keyboard: respond instantly, without animating.</summary>
         public static bool FromKeyboard => InputManager.Current.MostRecentInputDevice is KeyboardDevice;
 
-        // ease-out fuerte (cubic-bezier(0.23, 1, 0.32, 1)): arranca rápido, la interfaz responde en el primer cuadro.
+        // strong ease-out (cubic-bezier(0.23, 1, 0.32, 1)): starts fast, the UI responds on the first frame.
         private static readonly KeySpline EaseOutSpline = Frozen(new KeySpline(0.23, 1, 0.32, 1));
         private static KeySpline Frozen(KeySpline k) { k.Freeze(); return k; }
 
@@ -75,8 +75,8 @@ namespace Bimbridge.Addin.Ui
         };
 
         /// <summary>
-        /// Entrada de una pantalla nueva (cambio de paso, resultado): opacidad y 8 px hacia arriba, 220 ms ease-out.
-        /// Ocasional, por eso se anima; con movimiento reducido sólo aparece.
+        /// Entry of a new screen (step change, result): opacity and 8 px upward, 220 ms ease-out.
+        /// Occasional, which is why it animates; with reduced motion it just appears.
         /// </summary>
         public static void Enter(UIElement e, double dy = 8, int ms = 220)
         {
@@ -89,8 +89,8 @@ namespace Bimbridge.Addin.Ui
         }
 
         /// <summary>
-        /// Respuesta al pulsar: escala (0.97 botones, 0.99 superficies grandes) en 100 ms al bajar, vuelta en 160 ms al soltar o salir.
-        /// Nunca bloquea el clic.
+        /// Press feedback: scale (0.97 buttons, 0.99 large surfaces) in 100 ms on press, back in 160 ms on release or leave.
+        /// Never blocks the click.
         /// </summary>
         public static void Pressable(FrameworkElement e, double scale = 0.97)
         {
@@ -108,14 +108,14 @@ namespace Bimbridge.Addin.Ui
             e.MouseLeave += (_, __) => Go(1, 160);
         }
 
-        // ---------------- Foco de teclado ----------------
+        // ---------------- Keyboard focus ----------------
         private static readonly System.Collections.Generic.Dictionary<double, Style> _focus = new System.Collections.Generic.Dictionary<double, Style>();
-        /// <summary>Anillo de foco para controles de 8 px de radio (botones, segmentos). Ver <see cref="FocusRingFor"/>.</summary>
+        /// <summary>Focus ring for controls with an 8 px radius (buttons, segments). See <see cref="FocusRingFor"/>.</summary>
         public static Style FocusRing => FocusRingFor(RadiusSmall);
 
         /// <summary>
-        /// Anillo de foco visible (2 px marino, 3 px fuera del control) concéntrico con un control de radio <paramref name="radius"/>:
-        /// el anillo usa radius + 3 para que la separación sea igual en las esquinas.
+        /// Visible focus ring (2 px navy, 3 px outside the control) concentric with a control of radius <paramref name="radius"/>:
+        /// the ring uses radius + 3 so the gap is the same at the corners.
         /// </summary>
         public static Style FocusRingFor(double radius)
         {
@@ -135,7 +135,7 @@ namespace Bimbridge.Addin.Ui
             return _focus[radius] = s;
         }
 
-        // ---------------- Ventana y estructura ----------------
+        // ---------------- Window and structure ----------------
         public static Window NewWindow(string title, double width, double height)
         {
             var w = new Window
@@ -159,7 +159,7 @@ namespace Bimbridge.Addin.Ui
             return w;
         }
 
-        /// <summary>Marca: cuadro marino redondeado con el puente (dos pilares y el tablero rojo).</summary>
+        /// <summary>Brand mark: rounded navy square with the bridge (two piers and the red deck).</summary>
         public static UIElement BrandMark(double size = 36)
         {
             var g = new Grid { Width = size, Height = size };
@@ -170,23 +170,23 @@ namespace Bimbridge.Addin.Ui
                 var r = new Rectangle { Width = w, Height = h, Fill = B(col), RadiusX = 1, RadiusY = 1 };
                 Canvas.SetLeft(r, x); Canvas.SetTop(r, y); c.Children.Add(r);
             }
-            Rect(1, 6, 18, 3.2, Red);           // tablero
-            Rect(3.5, 9.2, 2.6, 9, White);      // pilar
-            Rect(13.9, 9.2, 2.6, 9, White);     // pilar
+            Rect(1, 6, 18, 3.2, Red);           // deck
+            Rect(3.5, 9.2, 2.6, 9, White);      // pier
+            Rect(13.9, 9.2, 2.6, 9, White);     // pier
             Rect(1, 2, 18, 1.6, Tint(White, 0x88).Color);
             g.Children.Add(c);
             return g;
         }
 
         /// <summary>
-        /// Cabecera con el producto como antetítulo (se omite si el título ya nombra BIMBRIDGE, para no repetirlo).
+        /// Header with the product as eyebrow (omitted if the title already names BIMBRIDGE, to avoid repeating it).
         /// </summary>
         public static Border Header(string title, string subtitle, out TextBlock subtitleBlock, out Border pill, out TextBlock pillText)
             => Header((title ?? "").IndexOf("BIMBRIDGE", StringComparison.OrdinalIgnoreCase) >= 0 ? null : ProductEyebrow, title, subtitle, out subtitleBlock, out pill, out pillText);
 
         /// <summary>
-        /// Cabecera: superficie blanca con la marca, antetítulo opcional en pequeño (null = sin antetítulo), título y subtítulo;
-        /// píldora de estado a la derecha. Una línea fina la separa del contenido (sin banda de color que compita con el contenido).
+        /// Header: white surface with the brand mark, optional small eyebrow (null = no eyebrow), title and subtitle;
+        /// status pill on the right. A thin line separates it from the content (no color band competing with the content).
         /// </summary>
         public static Border Header(string eyebrow, string title, string subtitle, out TextBlock subtitleBlock, out Border pill, out TextBlock pillText)
         {
@@ -240,7 +240,7 @@ namespace Bimbridge.Addin.Ui
             return s;
         }
 
-        /// <summary>Tarjeta: superficie blanca, borde casi invisible y sombra muy suave. El contenido va en un hijo para que la sombra no lo difumine.</summary>
+        /// <summary>Card: white surface, nearly invisible border and a very soft shadow. The content goes in a child so the shadow does not blur it.</summary>
         public static Border Card(UIElement child, Thickness? padding = null)
         {
             var inner = new Border { Padding = padding ?? new Thickness(18, 16, 18, 16), Child = child };
@@ -256,7 +256,7 @@ namespace Bimbridge.Addin.Ui
             };
         }
 
-        /// <summary>Título de sección dentro de una tarjeta, con número opcional de paso (1, 2, 3…).</summary>
+        /// <summary>Section title inside a card, with an optional step number (1, 2, 3…).</summary>
         public static UIElement Section(string title, string hint = null, string step = null)
         {
             var g = new Grid { Margin = new Thickness(0, 0, 0, 4) };
@@ -276,7 +276,7 @@ namespace Bimbridge.Addin.Ui
             return g;
         }
 
-        /// <summary>Número de paso (1, 2, 3…): círculo de 22 px teñido de marino. Único estilo para secciones y listas de pasos.</summary>
+        /// <summary>Step number (1, 2, 3…): 22 px navy-tinted circle. The single style for sections and step lists.</summary>
         public static Border StepBadge(string n) => new Border
         {
             Width = 22, Height = 22, CornerRadius = new CornerRadius(11), Background = Tint(Navy, 0x18),
@@ -296,10 +296,10 @@ namespace Bimbridge.Addin.Ui
             };
         }
 
-        /// <summary>Punto de estado (vivo/pausa/error) para filas y cabeceras.</summary>
+        /// <summary>Status dot (live/paused/error) for rows and headers.</summary>
         public static Ellipse Dot(Color color, double size = 8) => new Ellipse { Width = size, Height = size, Fill = B(color), VerticalAlignment = VerticalAlignment.Center };
 
-        /// <summary>Aviso en línea con barra de color a la izquierda (informativo, advertencia o error).</summary>
+        /// <summary>Inline notice with a color bar on the left (info, warning or error).</summary>
         public static Border Notice(string text, Color color, out TextBlock textBlock)
         {
             textBlock = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap };
@@ -315,7 +315,7 @@ namespace Bimbridge.Addin.Ui
             return b;
         }
 
-        /// <summary>Recolorea un aviso creado con <see cref="Notice"/> (progreso, éxito, error) sin rehacerlo.</summary>
+        /// <summary>Recolors a notice created with <see cref="Notice"/> (progress, success, error) without rebuilding it.</summary>
         public static void SetNotice(Border border, TextBlock textBlock, Color color)
         {
             textBlock.Foreground = B(Darken(color, 0.72));
@@ -324,8 +324,8 @@ namespace Bimbridge.Addin.Ui
         }
 
         /// <summary>
-        /// Píldora de estado (la de <see cref="Header"/>): color + palabras, con punto opcional delante. Se puede llamar muchas veces;
-        /// no anima (cambia a menudo).
+        /// Status pill (the one in <see cref="Header"/>): color + words, with an optional leading dot. Can be called many times;
+        /// it does not animate (it changes often).
         /// </summary>
         public static void SetPill(Border pill, TextBlock pillText, Color color, string text, bool dot = false)
         {
@@ -351,7 +351,7 @@ namespace Bimbridge.Addin.Ui
             }
         }
 
-        /// <summary>Marca de resultado vectorial: visto (hecho) o guion (sin cambios / omitido), sin fondo.</summary>
+        /// <summary>Vector result mark: check (done) or dash (no changes / skipped), no background.</summary>
         public static FrameworkElement ResultMark(Color color, bool check = true, double size = 14)
         {
             var p = new Path
@@ -364,17 +364,17 @@ namespace Bimbridge.Addin.Ui
             return new Viewbox { Width = size, Height = size, Child = p, VerticalAlignment = VerticalAlignment.Top };
         }
 
-        /// <summary>Línea divisoria fina entre grupos de una tarjeta.</summary>
+        /// <summary>Thin divider between groups in a card.</summary>
         public static Border Divider() => new Border { Height = 1, Background = B(Line), Margin = new Thickness(0, 12, 0, 12), SnapsToDevicePixels = true };
 
-        /// <summary>Cifras alineadas (tabulares) para que los números que cambian no bailen.</summary>
+        /// <summary>Aligned (tabular) figures so changing numbers do not jitter.</summary>
         public static TextBlock Tabular(TextBlock t)
         {
             System.Windows.Documents.Typography.SetNumeralAlignment(t, FontNumeralAlignment.Tabular);
             return t;
         }
 
-        /// <summary>Dato destacado: cifra grande con cifras tabulares, etiqueta y subetiqueta opcional.</summary>
+        /// <summary>Highlighted stat: large number with tabular figures, label and optional sublabel.</summary>
         public static StackPanel Stat(string value, string label, string sublabel = null) => Stat(value, label, sublabel, out _);
 
         public static StackPanel Stat(string value, string label, string sublabel, out TextBlock valueBlock)
@@ -387,7 +387,7 @@ namespace Bimbridge.Addin.Ui
             return s;
         }
 
-        /// <summary>Zona de lectura hundida (rutas, comandos, detalles técnicos).</summary>
+        /// <summary>Sunken reading area (paths, commands, technical details).</summary>
         public static Border Inset(UIElement child) => new Border
         {
             Background = B(Sunken),
@@ -398,7 +398,7 @@ namespace Bimbridge.Addin.Ui
             Child = child,
         };
 
-        /// <summary>Barra de progreso fina (4 px, marino sobre hundido). Indeterminada sólo mientras de verdad se trabaja.</summary>
+        /// <summary>Thin progress bar (4 px, navy on sunken). Indeterminate only while real work is happening.</summary>
         public static ProgressBar ProgressLine(bool indeterminate = true) => new ProgressBar
         {
             IsIndeterminate = indeterminate,
@@ -408,7 +408,7 @@ namespace Bimbridge.Addin.Ui
             BorderThickness = new Thickness(0),
         };
 
-        /// <summary>Nota del pie (izquierda de <see cref="Footer"/>): pequeña, apagada, ajusta líneas.</summary>
+        /// <summary>Footer note (left of <see cref="Footer"/>): small, muted, wraps.</summary>
         public static TextBlock FooterNote(string text = "") => new TextBlock
         {
             Text = text, FontSize = 12, Foreground = B(Muted), TextWrapping = TextWrapping.Wrap,
@@ -416,16 +416,16 @@ namespace Bimbridge.Addin.Ui
         };
 
         /// <summary>
-        /// Filtro segmentado sobre RadioButtons reales (Tab entra una vez, flechas mueven, Espacio elige). Elegido: fondo hundido y
-        /// texto Ink seminegrita; el resto, discreto. Sin animación (se usa muchas veces). Construirlo una vez y no rehacerlo al
-        /// refrescar, para no perder el foco. <paramref name="onSelect"/> recibe el texto elegido (no se llama al crear).
+        /// Segmented filter over real RadioButtons (Tab enters once, arrows move, Space selects). Selected: sunken background and
+        /// semibold Ink text; the rest, subdued. No animation (used many times). Build it once and do not rebuild it on
+        /// refresh, so focus is not lost. <paramref name="onSelect"/> receives the selected text (not called on creation).
         /// </summary>
         public static StackPanel Segmented(string[] options, string selected, Action<string> onSelect)
         {
             var panel = new StackPanel { Orientation = Orientation.Horizontal };
             KeyboardNavigation.SetTabNavigation(panel, KeyboardNavigationMode.Once);
             KeyboardNavigation.SetDirectionalNavigation(panel, KeyboardNavigationMode.Cycle);
-            var group = "seg" + Guid.NewGuid().ToString("N");
+            var group = "sec" + Guid.NewGuid().ToString("N");
 
             var t = new ControlTemplate(typeof(RadioButton));
             var bd = new FrameworkElementFactory(typeof(Border), "bd");
@@ -464,9 +464,9 @@ namespace Bimbridge.Addin.Ui
         }
 
         /// <summary>
-        /// Detalle plegable ligero (divulgación progresiva): cabecera con chevron sobre un ToggleButton real y contenido debajo.
-        /// Al abrir, el contenido entra con <see cref="Enter"/> (opacidad + 4 px, sin animar la altura); al cerrar desaparece al
-        /// instante (salir más rápido que entrar). El chevron gira 90° en 160 ms. Devuelve el panel; Children[0] es el ToggleButton.
+        /// Lightweight collapsible detail (progressive disclosure): header with a chevron over a real ToggleButton and content below.
+        /// On open, the content enters with <see cref="Enter"/> (opacity + 4 px, height not animated); on close it disappears
+        /// instantly (exit faster than enter). The chevron rotates 90° in 160 ms. Returns the panel; Children[0] is the ToggleButton.
         /// </summary>
         public static StackPanel Disclosure(string title, UIElement content, bool expanded = false)
         {
@@ -515,9 +515,9 @@ namespace Bimbridge.Addin.Ui
         public enum Kind { Primary, Secondary, Danger, Quiet, DangerSolid }
 
         /// <summary>
-        /// Botón: esquinas de 8 px, respuesta al pulsar, anillo de foco y estados hover/deshabilitado sin animación (se usan mucho).
-        /// Danger = destructivo discreto (texto rojo); DangerSolid = sólo para la confirmación final de algo destructivo.
-        /// Deshabilitado: colores explícitos (hundido, línea, texto apagado), nunca un bloque gris por opacidad.
+        /// Button: 8 px corners, press feedback, focus ring and hover/disabled states without animation (they are used a lot).
+        /// Danger = subdued destructive (red text); DangerSolid = only for the final confirmation of something destructive.
+        /// Disabled: explicit colors (sunken, line, muted text), never a grey block by opacity.
         /// </summary>
         public static Button Button(string text, Kind kind = Kind.Secondary)
         {
@@ -573,8 +573,8 @@ namespace Bimbridge.Addin.Ui
         }
 
         /// <summary>
-        /// Opción seleccionable como tarjeta (sobre un RadioButton o CheckBox real: teclado, grupo e IsChecked siguen funcionando).
-        /// Marcada: borde marino y fondo apenas teñido; indicador circular (radio) o cuadrado (casilla) a la izquierda.
+        /// Selectable option as a card (over a real RadioButton or CheckBox: keyboard, group and IsChecked keep working).
+        /// Checked: navy border and a faintly tinted background; circular (radio) or square (checkbox) indicator on the left.
         /// </summary>
         public static T Choice<T>(T toggle, string title, string hint) where T : ToggleButton
         {
@@ -647,7 +647,7 @@ namespace Bimbridge.Addin.Ui
             toggle.FocusVisualStyle = FocusRingFor(Radius);
             toggle.HorizontalContentAlignment = HorizontalAlignment.Stretch;
             toggle.Margin = new Thickness(0, 8, 0, 0);
-            Pressable(toggle, 0.99); // superficie grande: 0.97 se nota demasiado
+            Pressable(toggle, 0.99); // large surface: 0.97 is too noticeable
             return toggle;
         }
 
@@ -666,8 +666,8 @@ namespace Bimbridge.Addin.Ui
             var s = (raw ?? "").ToLowerInvariant();
             if (s.Contains("claude")) return "Claude";
             if (s.Contains("codex")) return "Codex";
-            if (s.Contains("probe") || s.Contains("prueba")) return "Prueba";
-            if (s.Length == 0) return "IA";
+            if (s.Contains("probe") || s.Contains("prueba")) return "Probe";
+            if (s.Length == 0) return "AI";
             return char.ToUpperInvariant(raw[0]) + raw.Substring(1);
         }
 
@@ -682,9 +682,9 @@ namespace Bimbridge.Addin.Ui
         public static string Ago(DateTime utc)
         {
             var d = DateTime.UtcNow - utc;
-            if (d.TotalSeconds < 60) return "hace un momento";
-            if (d.TotalMinutes < 60) return "hace " + (int)d.TotalMinutes + " min";
-            if (d.TotalHours < 24) return "hace " + (int)d.TotalHours + " h";
+            if (d.TotalSeconds < 60) return "just now";
+            if (d.TotalMinutes < 60) return (int)d.TotalMinutes + " min ago";
+            if (d.TotalHours < 24) return (int)d.TotalHours + " h ago";
             return utc.ToLocalTime().ToString("dd/MM HH:mm");
         }
 
@@ -697,7 +697,7 @@ namespace Bimbridge.Addin.Ui
             Focusable = false,
         };
 
-        /// <summary>Pie fijo: nota a la izquierda y botones a la derecha, sobre superficie blanca con línea fina superior.</summary>
+        /// <summary>Fixed footer: note on the left and buttons on the right, on a white surface with a thin top line.</summary>
         public static Border Footer(UIElement note, UIElement buttons)
         {
             var g = new Grid { Margin = new Thickness(Gutter, 12, Gutter, 14) };

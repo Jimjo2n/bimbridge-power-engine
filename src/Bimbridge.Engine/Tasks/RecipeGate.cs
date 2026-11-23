@@ -4,17 +4,17 @@ using System;
 namespace Bimbridge.Engine.Tasks
 {
     /// <summary>
-    /// Frontera de ejecución de recetas (rc3). TODO código de una receta —constructor e inicializadores estáticos, propiedades,
-    /// Preparar, el enumerador de Unidades (cada MoveNext), Ejecutar y Verificar— corre a través de <see cref="Run"/>:
+    /// Recipe execution boundary (rc3). ALL of a recipe's code (constructor and static initializers, properties,
+    /// Prepare, the Units enumerator (each MoveNext), Run and Verify) runs through <see cref="Run"/>:
     ///
-    /// 1. antes de ejecutar, <c>authorize</c> (lease de tarea, lease de documento y concesiones vigentes) debe devolver null;
-    ///    si no, la receta no llega a ejecutarse;
-    /// 2. en fases de lectura/planificación (todo salvo Ejecutar), un contador de escrituras del modelo (en Revit: la revisión del
-    ///    DocumentTracker, que sube con cada transacción confirmada, más "hay una transacción abierta") debe quedar igual; si cambia,
-    ///    la fase falla con <c>escritura_en_fase_de_lectura</c> y la tarea se detiene.
+    /// 1. before running, <c>authorize</c> (task lease, document lease and current grants) must return null;
+    ///    otherwise the recipe never runs;
+    /// 2. in read/planning phases (everything except Run), a model write counter (in Revit: the revision of the
+    ///    DocumentTracker, which goes up with each committed transaction, plus "a transaction is open") must stay the same; if it changes,
+    ///    the phase fails with <c>escritura_en_fase_de_lectura</c> and the task stops.
     ///
-    /// Esto no es un sandbox: lo que la receta pueda hacer fuera del modelo lo limita el analizador (conjunto cerrado de recetas
-    /// instaladas, receta_externa, capacidades siempre denegadas). La frontera garantiza el ORDEN: autorización antes de código.
+    /// This is not a sandbox: what the recipe can do outside the model is limited by the analyzer (closed set of installed
+    /// recipes, receta_externa, always-denied capabilities). The boundary guarantees ORDER: authorization before code.
     /// </summary>
     public sealed class RecipeGate
     {
@@ -23,41 +23,41 @@ namespace Bimbridge.Engine.Tasks
 
         public RecipeGate(Func<string> authorize, Func<long> writeCounter)
         {
-            _authorize = authorize ?? (() => "sin autoridad configurada");
+            _authorize = authorize ?? (() => "no authority configured");
             _writeCounter = writeCounter ?? (() => 0);
         }
 
-        /// <summary>Fases en las que la receta NO puede modificar el modelo.</summary>
-        public static bool IsReadPhase(string phase) => phase != Phase.Ejecutar;
+        /// <summary>Phases in which the recipe can NOT modify the model.</summary>
+        public static bool IsReadPhase(string phase) => phase != Phase.Run;
 
         public static class Phase
         {
             public const string Constructor = "constructor";
-            public const string Preparar = "preparar";
-            public const string Enumerar = "enumerar";
-            public const string Ejecutar = "ejecutar";
-            public const string Verificar = "verificar";
-            public const string Postcondicion = "postcondicion";
+            public const string Prepare = "prepare";
+            public const string Enumerate = "enumerate";
+            public const string Run = "run";
+            public const string Verify = "verify";
+            public const string Postcondition = "postcondition";
         }
 
-        /// <summary>Ejecuta <paramref name="body"/> sólo si la autoridad lo permite. Devuelve null o el motivo del rechazo/fallo.
-        /// Las excepciones de la receta se propagan (el llamador ya las convierte en fallo de la tarea).</summary>
+        /// <summary>Runs <paramref name="body"/> only if the authority allows it. Returns null or the reason for the refusal/failure.
+        /// Recipe exceptions propagate (the caller already turns them into a task failure).</summary>
         public string Run(string phase, Action body)
         {
             var why = _authorize();
-            if (why != null) return "autorizacion_requerida (" + phase + "): " + why + ". La receta no se ejecutó.";
+            if (why != null) return "authorization_required (" + phase + "): " + why + ". The recipe was not run.";
             var before = _writeCounter();
             body();
             if (IsReadPhase(phase))
             {
                 var after = _writeCounter();
                 if (after != before)
-                    return "escritura_en_fase_de_lectura: la receta modificó el modelo durante '" + phase + "' (sólo Ejecutar puede escribir, dentro de la transacción del motor). La tarea se detiene.";
+                    return "write_in_read_phase: the recipe modified the model during '" + phase + "' (only Run may write, inside the engine's transaction). The task stops.";
             }
             return null;
         }
 
-        /// <summary>Crea la receta (constructor + inicializadores) dentro de la frontera.</summary>
+        /// <summary>Creates the recipe (constructor + initializers) inside the boundary.</summary>
         public string Create<T>(Func<T> factory, out T recipe) where T : class
         {
             T r = null;

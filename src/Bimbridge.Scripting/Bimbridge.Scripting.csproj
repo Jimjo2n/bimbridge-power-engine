@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    Compilador del runner general (exec). Sólo depende de Roslyn y de la BCL: no conoce Revit.
-    Se distribuye en la carpeta roslyn\ junto con sus dependencias y se carga sólo la primera vez que se usa exec:
-      Revit 2022–2024 (.NET Framework 4.8): AssemblyResolve sobre esa carpeta.
-      Revit 2025–2026 (.NET 8): contexto de carga propio (AssemblyLoadContext), para no chocar con otro Roslyn ya cargado en Revit.
+    Compiler for the general runner (exec). Depends only on Roslyn and the BCL: knows nothing about Revit.
+    Shipped in the roslyn\ folder with its dependencies and loaded only the first time exec is used:
+      Revit 2022–2024 (.NET Framework 4.8): AssemblyResolve over that folder.
+      Revit 2025–2026 (.NET 8): its own load context (AssemblyLoadContext), so it does not clash with another Roslyn already loaded in Revit.
   -->
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>

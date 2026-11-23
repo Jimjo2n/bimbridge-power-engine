@@ -309,7 +309,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: NewDimension s\u00F3lo crea cotas lineales; las dem\u00E1s necesitan API espec\u00EDfica por versi\u00F3n"
+    "pending_research": "research pending: NewDimension only creates linear dimensions; the others need version-specific API"
   },
   {
     "command": "AlignmentStationLabelTypes",
@@ -329,7 +329,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: NewDimension s\u00F3lo crea cotas lineales; las dem\u00E1s necesitan API espec\u00EDfica por versi\u00F3n"
+    "pending_research": "research pending: NewDimension only creates linear dimensions; the others need version-specific API"
   },
   {
     "command": "AlignmentStationSet",
@@ -349,7 +349,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: NewDimension s\u00F3lo crea cotas lineales; las dem\u00E1s necesitan API espec\u00EDfica por versi\u00F3n"
+    "pending_research": "research pending: NewDimension only creates linear dimensions; the others need version-specific API"
   },
   {
     "command": "AllowableBarTypes",
@@ -389,7 +389,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: motor de render sin API p\u00FAblica de lanzamiento; SunAndShadowSettings s\u00ED existe para el sol"
+    "pending_research": "research pending: render engine has no public launch API; SunAndShadowSettings does exist for the sun"
   },
   {
     "command": "AnalyticalAutomation",
@@ -480,7 +480,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "AngularDimension",
@@ -500,7 +500,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: NewDimension s\u00F3lo crea cotas lineales; las dem\u00E1s necesitan API espec\u00EDfica por versi\u00F3n"
+    "pending_research": "research pending: NewDimension only creates linear dimensions; the others need version-specific API"
   },
   {
     "command": "AngularDimensionTypes",
@@ -520,7 +520,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: NewDimension s\u00F3lo crea cotas lineales; las dem\u00E1s necesitan API espec\u00EDfica por versi\u00F3n"
+    "pending_research": "research pending: NewDimension only creates linear dimensions; the others need version-specific API"
   },
   {
     "command": "ApplyCoping",
@@ -540,7 +540,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "ApplyTemplatePropertiesToCurrentView",
@@ -580,7 +580,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: NewDimension s\u00F3lo crea cotas lineales; las dem\u00E1s necesitan API espec\u00EDfica por versi\u00F3n"
+    "pending_research": "research pending: NewDimension only creates linear dimensions; the others need version-specific API"
   },
   {
     "command": "ArcWire",
@@ -620,7 +620,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: modelado in situ no tiene API p\u00FAblica de edici\u00F3n de familia in situ; colocaci\u00F3n en cara/plano son opciones de place"
+    "pending_research": "research pending: in-place modeling has no public API for editing in-place families; placement on face/plane are place options"
   },
   {
     "command": "ArchitecturalFloor",
@@ -719,7 +719,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de cargas anal\u00EDticas el\u00E9ctricas introducida en versiones recientes; verificar por versi\u00F3n"
+    "pending_research": "research pending: electrical analytical load API introduced in recent versions; verify per version"
   },
   {
     "command": "AreaBoundary",
@@ -859,7 +859,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: sin API equivalente verificada"
+    "pending_research": "research pending: no verified equivalent API"
   },
   {
     "command": "AutomaticBeamSystem",
@@ -975,7 +975,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: parte en API de StructuralFramingUtils; sin verificar por herramienta"
+    "pending_research": "research pending: partly in the StructuralFramingUtils API; not verified per tool"
   },
   {
     "command": "BeamOrColumnJoins",
@@ -995,7 +995,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: parte en API de StructuralFramingUtils; sin verificar por herramienta"
+    "pending_research": "research pending: partly in the StructuralFramingUtils API; not verified per tool"
   },
   {
     "command": "BeamSystemSymbol",
@@ -1035,7 +1035,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "BottomChord",
@@ -1114,7 +1114,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: parte en API de StructuralFramingUtils; sin verificar por herramienta"
+    "pending_research": "research pending: partly in the StructuralFramingUtils API; not verified per tool"
   },
   {
     "command": "BrowserOrganization",
@@ -1170,7 +1170,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de informes de presi\u00F3n no identificada; zonas y an\u00E1lisis de sistemas cambian entre 2022 y 2026"
+    "pending_research": "research pending: pressure report API not identified; zones and system analysis change between 2022 and 2026"
   },
   {
     "command": "BuildingOrSpaceTypeSettings",
@@ -1190,7 +1190,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de informes de presi\u00F3n no identificada; zonas y an\u00E1lisis de sistemas cambian entre 2022 y 2026"
+    "pending_research": "research pending: pressure report API not identified; zones and system analysis change between 2022 and 2026"
   },
   {
     "command": "BuildingPad",
@@ -1247,7 +1247,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"
+    "pending_research": "research pending: Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"
   },
   {
     "command": "CableTrayFitting",
@@ -1267,7 +1267,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"
+    "pending_research": "research pending: Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"
   },
   {
     "command": "Callout",
@@ -1307,7 +1307,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: cada herramienta tiene una API distinta o ninguna; sin verificar"
+    "pending_research": "research pending: each tool has a different API or none; not verified"
   },
   {
     "command": "Camera",
@@ -1541,7 +1541,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: sin API p\u00FAblica identificada para estos di\u00E1logos"
+    "pending_research": "research pending: no public API identified for these dialogs"
   },
   {
     "command": "ColorFillLegend",
@@ -1641,7 +1641,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"
+    "pending_research": "research pending: Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"
   },
   {
     "command": "ConduitFitting",
@@ -1661,7 +1661,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"
+    "pending_research": "research pending: Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"
   },
   {
     "command": "ConnectionSettings",
@@ -1701,7 +1701,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "Control",
@@ -1758,7 +1758,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: RevitLinkType.Reload/Unload existen; modelos de coordinaci\u00F3n y FormIt sin verificar"
+    "pending_research": "research pending: RevitLinkType.Reload/Unload exist; coordination models and FormIt not verified"
   },
   {
     "command": "CoordinationModelAutodeskDocs",
@@ -1776,7 +1776,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: RevitLinkType.Reload/Unload existen; modelos de coordinaci\u00F3n y FormIt sin verificar"
+    "pending_research": "research pending: RevitLinkType.Reload/Unload exist; coordination models and FormIt not verified"
   },
   {
     "command": "CoordinationModelChanges",
@@ -1793,7 +1793,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: RevitLinkType.Reload/Unload existen; modelos de coordinaci\u00F3n y FormIt sin verificar"
+    "pending_research": "research pending: RevitLinkType.Reload/Unload exist; coordination models and FormIt not verified"
   },
   {
     "command": "CoordinationModelLocal",
@@ -1811,7 +1811,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: RevitLinkType.Reload/Unload existen; modelos de coordinaci\u00F3n y FormIt sin verificar"
+    "pending_research": "research pending: RevitLinkType.Reload/Unload exist; coordination models and FormIt not verified"
   },
   {
     "command": "CoordinationReviewUseCurrentProject",
@@ -1891,7 +1891,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "CopeSkewed",
@@ -1911,7 +1911,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "Copy",
@@ -2012,7 +2012,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "CreateAnAreaBasedLoad",
@@ -2031,7 +2031,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de cargas anal\u00EDticas el\u00E9ctricas introducida en versiones recientes; verificar por versi\u00F3n"
+    "pending_research": "research pending: electrical analytical load API introduced in recent versions; verify per version"
   },
   {
     "command": "CreateAnalyticalLink",
@@ -2105,7 +2105,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: RevitLinkType.Reload/Unload existen; modelos de coordinaci\u00F3n y FormIt sin verificar"
+    "pending_research": "research pending: RevitLinkType.Reload/Unload exist; coordination models and FormIt not verified"
   },
   {
     "command": "CreateGroup",
@@ -2225,7 +2225,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: montantes v\u00EDa CurtainGrid/Mullion; sistema por cara depende de masas; sin verificar"
+    "pending_research": "research pending: mullions via CurtainGrid/Mullion; system by face depends on masses; not verified"
   },
   {
     "command": "CurtainWallMullion",
@@ -2245,7 +2245,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: montantes v\u00EDa CurtainGrid/Mullion; sistema por cara depende de masas; sin verificar"
+    "pending_research": "research pending: mullions via CurtainGrid/Mullion; system by face depends on masses; not verified"
   },
   {
     "command": "CutBy",
@@ -2305,7 +2305,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "CutThrough",
@@ -2325,7 +2325,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "CutToClipboard",
@@ -2365,7 +2365,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: sin API p\u00FAblica identificada para estos asistentes"
+    "pending_research": "research pending: no public API identified for these wizards"
   },
   {
     "command": "Data",
@@ -2425,7 +2425,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: RevitLinkType.Reload/Unload existen; modelos de coordinaci\u00F3n y FormIt sin verificar"
+    "pending_research": "research pending: RevitLinkType.Reload/Unload exist; coordination models and FormIt not verified"
   },
   {
     "command": "Default3DView",
@@ -2625,7 +2625,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: NewDimension s\u00F3lo crea cotas lineales; las dem\u00E1s necesitan API espec\u00EDfica por versi\u00F3n"
+    "pending_research": "research pending: NewDimension only creates linear dimensions; the others need version-specific API"
   },
   {
     "command": "DiameterDimensionTypes",
@@ -2645,7 +2645,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: NewDimension s\u00F3lo crea cotas lineales; las dem\u00E1s necesitan API espec\u00EDfica por versi\u00F3n"
+    "pending_research": "research pending: NewDimension only creates linear dimensions; the others need version-specific API"
   },
   {
     "command": "DisplaceElements",
@@ -2665,7 +2665,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: no hay m\u00E9todo p\u00FAblico de recorte; posible v\u00EDa LocationCurve.Curve por categor\u00EDa, a validar por tipo de elemento"
+    "pending_research": "research pending: there is no public trim method; possible via LocationCurve.Curve per category, to be validated per element type"
   },
   {
     "command": "Door",
@@ -2745,7 +2745,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: modelado in situ no tiene API p\u00FAblica de edici\u00F3n de familia in situ; colocaci\u00F3n en cara/plano son opciones de place"
+    "pending_research": "research pending: in-place modeling has no public API for editing in-place families; placement on face/plane are place options"
   },
   {
     "command": "DrawOnWorkPlane",
@@ -2765,7 +2765,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: modelado in situ no tiene API p\u00FAblica de edici\u00F3n de familia in situ; colocaci\u00F3n en cara/plano son opciones de place"
+    "pending_research": "research pending: in-place modeling has no public API for editing in-place families; placement on face/plane are place options"
   },
   {
     "command": "Duct",
@@ -2805,7 +2805,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"
+    "pending_research": "research pending: Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"
   },
   {
     "command": "DuctConnector",
@@ -2825,7 +2825,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"
+    "pending_research": "research pending: Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"
   },
   {
     "command": "DuctFitting",
@@ -2845,7 +2845,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"
+    "pending_research": "research pending: Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"
   },
   {
     "command": "DuctLegend",
@@ -2905,7 +2905,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de informes de presi\u00F3n no identificada; zonas y an\u00E1lisis de sistemas cambian entre 2022 y 2026"
+    "pending_research": "research pending: pressure report API not identified; zones and system analysis change between 2022 and 2026"
   },
   {
     "command": "DuplicateAsDependent",
@@ -3104,7 +3104,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: sin API p\u00FAblica identificada para estos di\u00E1logos"
+    "pending_research": "research pending: no public API identified for these dialogs"
   },
   {
     "command": "ElectricalAnalyticalLoadTypeSettings",
@@ -3159,7 +3159,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"
+    "pending_research": "research pending: Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"
   },
   {
     "command": "ElectricalEquipment",
@@ -3239,7 +3239,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: IndependentTag cubre algunas; verificar tipos de etiqueta por categor\u00EDa"
+    "pending_research": "research pending: IndependentTag covers some; verify tag types per category"
   },
   {
     "command": "ElevationTags",
@@ -3259,7 +3259,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: cada herramienta tiene una API distinta o ninguna; sin verificar"
+    "pending_research": "research pending: each tool has a different API or none; not verified"
   },
   {
     "command": "EnergySettings",
@@ -3298,7 +3298,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de cargas anal\u00EDticas el\u00E9ctricas introducida en versiones recientes; verificar por versi\u00F3n"
+    "pending_research": "research pending: electrical analytical load API introduced in recent versions; verify per version"
   },
   {
     "command": "ExitRevit",
@@ -3495,7 +3495,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: sin API p\u00FAblica identificada para estos asistentes"
+    "pending_research": "research pending: no public API identified for these wizards"
   },
   {
     "command": "ExportFBX",
@@ -3595,7 +3595,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: sin API p\u00FAblica identificada para estos asistentes"
+    "pending_research": "research pending: no public API identified for these wizards"
   },
   {
     "command": "ExportImagesandAnimationsWalkthrough",
@@ -3615,7 +3615,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: sin API p\u00FAblica identificada para estos asistentes"
+    "pending_research": "research pending: no public API identified for these wizards"
   },
   {
     "command": "ExportODBCDatabase",
@@ -3635,7 +3635,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: sin API p\u00FAblica identificada para estos asistentes"
+    "pending_research": "research pending: no public API identified for these wizards"
   },
   {
     "command": "ExportOptionsExportSetupsDGN",
@@ -3733,7 +3733,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: sin API p\u00FAblica identificada para estos asistentes"
+    "pending_research": "research pending: no public API identified for these wizards"
   },
   {
     "command": "ExportReportsSchedule",
@@ -3873,7 +3873,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de creaci\u00F3n de estos barridos no confirmada en el listado; requiere investigaci\u00F3n por versi\u00F3n"
+    "pending_research": "research pending: creation API for these sweeps not confirmed in the listing; needs per-version research"
   },
   {
     "command": "FillPatterns",
@@ -3953,7 +3953,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: factible con TextNote.Text \u002B set_param, pero sin contrato ni verificador todav\u00EDa"
+    "pending_research": "research pending: feasible with TextNote.Text \u002B set_param, but no contract or verifier yet"
   },
   {
     "command": "FireAlarm",
@@ -4033,7 +4033,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de creaci\u00F3n de estos barridos no confirmada en el listado; requiere investigaci\u00F3n por versi\u00F3n"
+    "pending_research": "research pending: creation API for these sweeps not confirmed in the listing; needs per-version research"
   },
   {
     "command": "FloorPlan",
@@ -4167,7 +4167,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: superficies topogr\u00E1ficas (2022\u20132023) y Toposolid (2024\u002B) tienen APIs distintas; cada herramienta requiere su verificaci\u00F3n"
+    "pending_research": "research pending: topography surfaces (2022\u20132023) and Toposolid (2024\u002B) have different APIs; each tool needs its own verification"
   },
   {
     "command": "GraphicalColumnSchedule",
@@ -4187,7 +4187,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: sin API de creaci\u00F3n identificada"
+    "pending_research": "research pending: no creation API identified"
   },
   {
     "command": "GrayInactiveWorksets",
@@ -4267,7 +4267,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de creaci\u00F3n de estos barridos no confirmada en el listado; requiere investigaci\u00F3n por versi\u00F3n"
+    "pending_research": "research pending: creation API for these sweeps not confirmed in the listing; needs per-version research"
   },
   {
     "command": "HalftoneOrUnderlay",
@@ -4287,7 +4287,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: cada herramienta tiene una API distinta o ninguna; sin verificar"
+    "pending_research": "research pending: each tool has a different API or none; not verified"
   },
   {
     "command": "HideBoundaryOpenEnds",
@@ -4306,7 +4306,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: cada herramienta tiene una API distinta o ninguna; sin verificar"
+    "pending_research": "research pending: each tool has a different API or none; not verified"
   },
   {
     "command": "HideCategory",
@@ -4366,7 +4366,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "IdsOfSelection",
@@ -4426,7 +4426,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: RevitLinkType.Reload/Unload existen; modelos de coordinaci\u00F3n y FormIt sin verificar"
+    "pending_research": "research pending: RevitLinkType.Reload/Unload exist; coordination models and FormIt not verified"
   },
   {
     "command": "ImportImage",
@@ -4486,7 +4486,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: RevitLinkType.Reload/Unload existen; modelos de coordinaci\u00F3n y FormIt sin verificar"
+    "pending_research": "research pending: RevitLinkType.Reload/Unload exist; coordination models and FormIt not verified"
   },
   {
     "command": "InPlaceMass",
@@ -4526,7 +4526,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: RevitLinkType.Reload/Unload existen; modelos de coordinaci\u00F3n y FormIt sin verificar"
+    "pending_research": "research pending: RevitLinkType.Reload/Unload exist; coordination models and FormIt not verified"
   },
   {
     "command": "InsertCoupler",
@@ -4564,7 +4564,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: RevitLinkType.Reload/Unload existen; modelos de coordinaci\u00F3n y FormIt sin verificar"
+    "pending_research": "research pending: RevitLinkType.Reload/Unload exist; coordination models and FormIt not verified"
   },
   {
     "command": "Insulation",
@@ -4604,7 +4604,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: cada herramienta tiene una API distinta o ninguna; sin verificar"
+    "pending_research": "research pending: each tool has a different API or none; not verified"
   },
   {
     "command": "JoinGeometry",
@@ -4644,7 +4644,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de creaci\u00F3n de estos barridos no confirmada en el listado; requiere investigaci\u00F3n por versi\u00F3n"
+    "pending_research": "research pending: creation API for these sweeps not confirmed in the listing; needs per-version research"
   },
   {
     "command": "KeyboardShortcuts",
@@ -4684,7 +4684,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: IndependentTag cubre algunas; verificar tipos de etiqueta por categor\u00EDa"
+    "pending_research": "research pending: IndependentTag covers some; verify tag types per category"
   },
   {
     "command": "KeynotingSettings",
@@ -4744,7 +4744,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: superficies topogr\u00E1ficas (2022\u20132023) y Toposolid (2024\u002B) tienen APIs distintas; cada herramienta requiere su verificaci\u00F3n"
+    "pending_research": "research pending: topography surfaces (2022\u20132023) and Toposolid (2024\u002B) have different APIs; each tool needs its own verification"
   },
   {
     "command": "LaunchAsApp",
@@ -4815,7 +4815,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: regi\u00F3n de m\u00E1scara = FilledRegion con tipo de m\u00E1scara (no verificado); leyendas sin API de creaci\u00F3n directa"
+    "pending_research": "research pending: masking region = FilledRegion with a masking type (not verified); legends have no direct creation API"
   },
   {
     "command": "LegendComponent",
@@ -4835,7 +4835,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: regi\u00F3n de m\u00E1scara = FilledRegion con tipo de m\u00E1scara (no verificado); leyendas sin API de creaci\u00F3n directa"
+    "pending_research": "research pending: masking region = FilledRegion with a masking type (not verified); legends have no direct creation API"
   },
   {
     "command": "Level",
@@ -4995,7 +4995,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: NewDimension s\u00F3lo crea cotas lineales; las dem\u00E1s necesitan API espec\u00EDfica por versi\u00F3n"
+    "pending_research": "research pending: NewDimension only creates linear dimensions; the others need version-specific API"
   },
   {
     "command": "LinearMultiRebarAnnotation",
@@ -5035,7 +5035,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: cada herramienta tiene una API distinta o ninguna; sin verificar"
+    "pending_research": "research pending: each tool has a different API or none; not verified"
   },
   {
     "command": "LinkCAD",
@@ -5071,7 +5071,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: RevitLinkType.Reload/Unload existen; modelos de coordinaci\u00F3n y FormIt sin verificar"
+    "pending_research": "research pending: RevitLinkType.Reload/Unload exist; coordination models and FormIt not verified"
   },
   {
     "command": "LinkIFC",
@@ -5171,7 +5171,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: superficies topogr\u00E1ficas (2022\u20132023) y Toposolid (2024\u002B) tienen APIs distintas; cada herramienta requiere su verificaci\u00F3n"
+    "pending_research": "research pending: topography surfaces (2022\u20132023) and Toposolid (2024\u002B) have different APIs; each tool needs its own verification"
   },
   {
     "command": "LoadAsGroup",
@@ -5211,7 +5211,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: sin API equivalente verificada"
+    "pending_research": "research pending: no verified equivalent API"
   },
   {
     "command": "LoadAutodeskFamily",
@@ -5231,7 +5231,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: servicio en la nube sin API p\u00FAblica conocida"
+    "pending_research": "research pending: cloud service with no known public API"
   },
   {
     "command": "LoadCases",
@@ -5441,7 +5441,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: IndependentTag cubre algunas; verificar tipos de etiqueta por categor\u00EDa"
+    "pending_research": "research pending: IndependentTag covers some; verify tag types per category"
   },
   {
     "command": "Loads",
@@ -5577,7 +5577,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: parte en API de StructuralFramingUtils; sin verificar por herramienta"
+    "pending_research": "research pending: partly in the StructuralFramingUtils API; not verified per tool"
   },
   {
     "command": "ManageCloudModels",
@@ -5613,7 +5613,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: RevitLinkType.Reload/Unload existen; modelos de coordinaci\u00F3n y FormIt sin verificar"
+    "pending_research": "research pending: RevitLinkType.Reload/Unload exist; coordination models and FormIt not verified"
   },
   {
     "command": "ManageImages",
@@ -5653,7 +5653,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: RevitLinkType.Reload/Unload existen; modelos de coordinaci\u00F3n y FormIt sin verificar"
+    "pending_research": "research pending: RevitLinkType.Reload/Unload exist; coordination models and FormIt not verified"
   },
   {
     "command": "ManageTemplates",
@@ -5713,7 +5713,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: regi\u00F3n de m\u00E1scara = FilledRegion con tipo de m\u00E1scara (no verificado); leyendas sin API de creaci\u00F3n directa"
+    "pending_research": "research pending: masking region = FilledRegion with a masking type (not verified); legends have no direct creation API"
   },
   {
     "command": "MatchTypeProperties",
@@ -5753,7 +5753,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: regi\u00F3n de m\u00E1scara = FilledRegion con tipo de m\u00E1scara (no verificado); leyendas sin API de creaci\u00F3n directa"
+    "pending_research": "research pending: masking region = FilledRegion with a masking type (not verified); legends have no direct creation API"
   },
   {
     "command": "MaterialAssets",
@@ -5773,7 +5773,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: AppearanceAssetElement existe pero la edici\u00F3n de recursos tiene restricciones por versi\u00F3n; no verificado"
+    "pending_research": "research pending: AppearanceAssetElement exists but asset editing has per-version restrictions; not verified"
   },
   {
     "command": "MaterialKeynote",
@@ -5793,7 +5793,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: IndependentTag cubre algunas; verificar tipos de etiqueta por categor\u00EDa"
+    "pending_research": "research pending: IndependentTag covers some; verify tag types per category"
   },
   {
     "command": "MaterialTag",
@@ -5813,7 +5813,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: IndependentTag cubre algunas; verificar tipos de etiqueta por categor\u00EDa"
+    "pending_research": "research pending: IndependentTag covers some; verify tag types per category"
   },
   {
     "command": "MaterialTakeoff",
@@ -5873,7 +5873,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: IndependentTag cubre algunas; verificar tipos de etiqueta por categor\u00EDa"
+    "pending_research": "research pending: IndependentTag covers some; verify tag types per category"
   },
   {
     "command": "MeasureBetweenTwoReferences",
@@ -5893,7 +5893,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: IndependentTag cubre algunas; verificar tipos de etiqueta por categor\u00EDa"
+    "pending_research": "research pending: IndependentTag covers some; verify tag types per category"
   },
   {
     "command": "MechanicalControlDevice",
@@ -5952,7 +5952,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de informes de presi\u00F3n no identificada; zonas y an\u00E1lisis de sistemas cambian entre 2022 y 2026"
+    "pending_research": "research pending: pressure report API not identified; zones and system analysis change between 2022 and 2026"
   },
   {
     "command": "MergeSurfaces",
@@ -5969,7 +5969,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: superficies topogr\u00E1ficas (2022\u20132023) y Toposolid (2024\u002B) tienen APIs distintas; cada herramienta requiere su verificaci\u00F3n"
+    "pending_research": "research pending: topography surfaces (2022\u20132023) and Toposolid (2024\u002B) have different APIs; each tool needs its own verification"
   },
   {
     "command": "MirrorDrawAxis",
@@ -6049,7 +6049,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: parte en API de StructuralFramingUtils; sin verificar por herramienta"
+    "pending_research": "research pending: partly in the StructuralFramingUtils API; not verified per tool"
   },
   {
     "command": "ModelInPlace",
@@ -6069,7 +6069,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: modelado in situ no tiene API p\u00FAblica de edici\u00F3n de familia in situ; colocaci\u00F3n en cara/plano son opciones de place"
+    "pending_research": "research pending: in-place modeling has no public API for editing in-place families; placement on face/plane are place options"
   },
   {
     "command": "ModelLine",
@@ -6149,7 +6149,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: IndependentTag cubre algunas; verificar tipos de etiqueta por categor\u00EDa"
+    "pending_research": "research pending: IndependentTag covers some; verify tag types per category"
   },
   {
     "command": "MultiPointRouting",
@@ -6169,7 +6169,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"
+    "pending_research": "research pending: Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"
   },
   {
     "command": "Multiplanar",
@@ -6189,7 +6189,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: cada herramienta tiene una API distinta o ninguna; sin verificar"
+    "pending_research": "research pending: each tool has a different API or none; not verified"
   },
   {
     "command": "MultiplePaths",
@@ -6209,7 +6209,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: dependen del modo de edici\u00F3n activo de la interfaz; sin API p\u00FAblica equivalente identificada para cada uno"
+    "pending_research": "research pending: depend on the active UI edit mode; no equivalent public API identified for each"
   },
   {
     "command": "MultipleValuesIndication",
@@ -6229,7 +6229,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: IndependentTag cubre algunas; verificar tipos de etiqueta por categor\u00EDa"
+    "pending_research": "research pending: IndependentTag covers some; verify tag types per category"
   },
   {
     "command": "NavigationBar",
@@ -6289,7 +6289,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: edici\u00F3n de formas conceptuales en familias de masa; algunas tienen API (FamilyItemFactory), otras s\u00F3lo UI"
+    "pending_research": "research pending: editing conceptual forms in mass families; some have API (FamilyItemFactory), others UI only"
   },
   {
     "command": "NewFamily",
@@ -6469,7 +6469,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"
+    "pending_research": "research pending: Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"
   },
   {
     "command": "OpenBuildingComponent",
@@ -6682,7 +6682,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de informes de presi\u00F3n no identificada; zonas y an\u00E1lisis de sistemas cambian entre 2022 y 2026"
+    "pending_research": "research pending: pressure report API not identified; zones and system analysis change between 2022 and 2026"
   },
   {
     "command": "Optimize",
@@ -6798,7 +6798,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: complemento de Autodesk con su propia API; no inventariado"
+    "pending_research": "research pending: Autodesk add-in with its own API; not inventoried"
   },
   {
     "command": "PAndIDSettings",
@@ -6818,7 +6818,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: complemento de Autodesk con su propia API; no inventariado"
+    "pending_research": "research pending: Autodesk add-in with its own API; not inventoried"
   },
   {
     "command": "PDF",
@@ -6856,7 +6856,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: edici\u00F3n de formas conceptuales en familias de masa; algunas tienen API (FamilyItemFactory), otras s\u00F3lo UI"
+    "pending_research": "research pending: editing conceptual forms in mass families; some have API (FamilyItemFactory), others UI only"
   },
   {
     "command": "PanelByBoundary",
@@ -6875,7 +6875,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: edici\u00F3n de formas conceptuales en familias de masa; algunas tienen API (FamilyItemFactory), otras s\u00F3lo UI"
+    "pending_research": "research pending: editing conceptual forms in mass families; some have API (FamilyItemFactory), others UI only"
   },
   {
     "command": "PanelByExtrusion",
@@ -6894,7 +6894,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: edici\u00F3n de formas conceptuales en familias de masa; algunas tienen API (FamilyItemFactory), otras s\u00F3lo UI"
+    "pending_research": "research pending: editing conceptual forms in mass families; some have API (FamilyItemFactory), others UI only"
   },
   {
     "command": "PanelSchedules",
@@ -6934,7 +6934,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"
+    "pending_research": "research pending: Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"
   },
   {
     "command": "ParallelPipes",
@@ -6954,7 +6954,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"
+    "pending_research": "research pending: Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"
   },
   {
     "command": "ParametersService",
@@ -6993,7 +6993,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: superficies topogr\u00E1ficas (2022\u20132023) y Toposolid (2024\u002B) tienen APIs distintas; cada herramienta requiere su verificaci\u00F3n"
+    "pending_research": "research pending: topography surfaces (2022\u20132023) and Toposolid (2024\u002B) have different APIs; each tool needs its own verification"
   },
   {
     "command": "PasteFromClipboard",
@@ -7132,7 +7132,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: dependen del modo de edici\u00F3n activo de la interfaz; sin API p\u00FAblica equivalente identificada para cada uno"
+    "pending_research": "research pending: depend on the active UI edit mode; no equivalent public API identified for each"
   },
   {
     "command": "Pin",
@@ -7192,7 +7192,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"
+    "pending_research": "research pending: Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"
   },
   {
     "command": "PipeConnector",
@@ -7212,7 +7212,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"
+    "pending_research": "research pending: Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"
   },
   {
     "command": "PipeFitting",
@@ -7232,7 +7232,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Document.NewElbowFitting/NewTeeFitting y conectores de familia; requieren contrato de conectividad (F16) antes de tiparlos"
+    "pending_research": "research pending: Document.NewElbowFitting/NewTeeFitting and family connectors; they need a connectivity contract (F16) before being typed"
   },
   {
     "command": "PipeLegend",
@@ -7292,7 +7292,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de informes de presi\u00F3n no identificada; zonas y an\u00E1lisis de sistemas cambian entre 2022 y 2026"
+    "pending_research": "research pending: pressure report API not identified; zones and system analysis change between 2022 and 2026"
   },
   {
     "command": "PlaceAComponent",
@@ -7332,7 +7332,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: RevitLinkType.Reload/Unload existen; modelos de coordinaci\u00F3n y FormIt sin verificar"
+    "pending_research": "research pending: RevitLinkType.Reload/Unload exist; coordination models and FormIt not verified"
   },
   {
     "command": "PlaceDetailGroup",
@@ -7372,7 +7372,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: edici\u00F3n de formas conceptuales en familias de masa; algunas tienen API (FamilyItemFactory), otras s\u00F3lo UI"
+    "pending_research": "research pending: editing conceptual forms in mass families; some have API (FamilyItemFactory), others UI only"
   },
   {
     "command": "PlaceOnStairOrRamp",
@@ -7432,7 +7432,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: cada herramienta tiene una API distinta o ninguna; sin verificar"
+    "pending_research": "research pending: each tool has a different API or none; not verified"
   },
   {
     "command": "Plate",
@@ -7452,7 +7452,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "PlumbingEquipment",
@@ -7671,7 +7671,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: superficies topogr\u00E1ficas (2022\u20132023) y Toposolid (2024\u002B) tienen APIs distintas; cada herramienta requiere su verificaci\u00F3n"
+    "pending_research": "research pending: topography surfaces (2022\u20132023) and Toposolid (2024\u002B) have different APIs; each tool needs its own verification"
   },
   {
     "command": "PropertyLineData",
@@ -7689,7 +7689,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: superficies topogr\u00E1ficas (2022\u20132023) y Toposolid (2024\u002B) tienen APIs distintas; cada herramienta requiere su verificaci\u00F3n"
+    "pending_research": "research pending: topography surfaces (2022\u20132023) and Toposolid (2024\u002B) have different APIs; each tool needs its own verification"
   },
   {
     "command": "PublishCoordinates",
@@ -7729,7 +7729,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: sin API p\u00FAblica identificada para estos di\u00E1logos"
+    "pending_research": "research pending: no public API identified for these dialogs"
   },
   {
     "command": "PurgeUnused",
@@ -7769,7 +7769,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: NewDimension s\u00F3lo crea cotas lineales; las dem\u00E1s necesitan API espec\u00EDfica por versi\u00F3n"
+    "pending_research": "research pending: NewDimension only creates linear dimensions; the others need version-specific API"
   },
   {
     "command": "RadialDimensionTypes",
@@ -7789,7 +7789,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: NewDimension s\u00F3lo crea cotas lineales; las dem\u00E1s necesitan API espec\u00EDfica por versi\u00F3n"
+    "pending_research": "research pending: NewDimension only creates linear dimensions; the others need version-specific API"
   },
   {
     "command": "Railing",
@@ -7846,7 +7846,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: dependen del modo de edici\u00F3n activo de la interfaz; sin API p\u00FAblica equivalente identificada para cada uno"
+    "pending_research": "research pending: depend on the active UI edit mode; no equivalent public API identified for each"
   },
   {
     "command": "RebarBendingDetail",
@@ -7924,7 +7924,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: dependen del modo de edici\u00F3n activo de la interfaz; sin API p\u00FAblica equivalente identificada para cada uno"
+    "pending_research": "research pending: depend on the active UI edit mode; no equivalent public API identified for each"
   },
   {
     "command": "Redo",
@@ -8124,7 +8124,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "RemoveHiddenLinesByElement",
@@ -8144,7 +8144,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: cada herramienta tiene una API distinta o ninguna; sin verificar"
+    "pending_research": "research pending: each tool has a different API or none; not verified"
   },
   {
     "command": "RemovePaint",
@@ -8164,7 +8164,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: edici\u00F3n de formas conceptuales en familias de masa; algunas tienen API (FamilyItemFactory), otras s\u00F3lo UI"
+    "pending_research": "research pending: editing conceptual forms in mass families; some have API (FamilyItemFactory), others UI only"
   },
   {
     "command": "Render",
@@ -8184,7 +8184,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: motor de render sin API p\u00FAblica de lanzamiento; SunAndShadowSettings s\u00ED existe para el sol"
+    "pending_research": "research pending: render engine has no public launch API; SunAndShadowSettings does exist for the sun"
   },
   {
     "command": "RenderGallery",
@@ -8204,7 +8204,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: motor de render sin API p\u00FAblica de lanzamiento; SunAndShadowSettings s\u00ED existe para el sol"
+    "pending_research": "research pending: render engine has no public launch API; SunAndShadowSettings does exist for the sun"
   },
   {
     "command": "RenderInCloud",
@@ -8224,7 +8224,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: motor de render sin API p\u00FAblica de lanzamiento; SunAndShadowSettings s\u00ED existe para el sol"
+    "pending_research": "research pending: render engine has no public launch API; SunAndShadowSettings does exist for the sun"
   },
   {
     "command": "RepairCentralModel",
@@ -8244,7 +8244,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: sin API p\u00FAblica identificada para ambos di\u00E1logos; requiere flujo manual"
+    "pending_research": "research pending: no public API identified for either dialog; requires a manual workflow"
   },
   {
     "command": "RepeatComponent",
@@ -8264,7 +8264,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: modelado in situ no tiene API p\u00FAblica de edici\u00F3n de familia in situ; colocaci\u00F3n en cara/plano son opciones de place"
+    "pending_research": "research pending: in-place modeling has no public API for editing in-place families; placement on face/plane are place options"
   },
   {
     "command": "RepeatingDetailComponent",
@@ -8284,7 +8284,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: regi\u00F3n de m\u00E1scara = FilledRegion con tipo de m\u00E1scara (no verificado); leyendas sin API de creaci\u00F3n directa"
+    "pending_research": "research pending: masking region = FilledRegion with a masking type (not verified); legends have no direct creation API"
   },
   {
     "command": "ReportSharedCoordinates",
@@ -8360,7 +8360,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: sin API p\u00FAblica identificada para ambos di\u00E1logos; requiere flujo manual"
+    "pending_research": "research pending: no public API identified for either dialog; requires a manual workflow"
   },
   {
     "command": "RevealObstacles",
@@ -8400,7 +8400,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: WallSweep.Create existe en algunas versiones; muro por cara depende de masas; sin verificar"
+    "pending_research": "research pending: WallSweep.Create exists in some versions; wall by face depends on masses; not verified"
   },
   {
     "command": "ReviewWarnings",
@@ -8500,7 +8500,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de creaci\u00F3n de estos barridos no confirmada en el listado; requiere investigaci\u00F3n por versi\u00F3n"
+    "pending_research": "research pending: creation API for these sweeps not confirmed in the listing; needs per-version research"
   },
   {
     "command": "RoofByFootprint",
@@ -8892,7 +8892,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "SawCutWeb",
@@ -8912,7 +8912,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "Scale",
@@ -8932,7 +8932,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: Revit s\u00F3lo escala ciertos elementos 2D, im\u00E1genes y v\u00EDnculos; sin m\u00E9todo gen\u00E9rico en la API"
+    "pending_research": "research pending: Revit only scales certain 2D elements, images and links; no generic API method"
   },
   {
     "command": "ScheduleOrQuantities",
@@ -8972,7 +8972,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "no se ha identificado una API p\u00FAblica de creaci\u00F3n de cajas de referencia; investigar antes de clasificar"
+    "pending_research": "no public API for creating scope boxes has been identified; investigate before classifying"
   },
   {
     "command": "Section",
@@ -9012,7 +9012,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: cada herramienta tiene una API distinta o ninguna; sin verificar"
+    "pending_research": "research pending: each tool has a different API or none; not verified"
   },
   {
     "command": "Security",
@@ -9132,7 +9132,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: dependen del modo de edici\u00F3n activo de la interfaz; sin API p\u00FAblica equivalente identificada para cada uno"
+    "pending_research": "research pending: depend on the active UI edit mode; no equivalent public API identified for each"
   },
   {
     "command": "SharedParameters",
@@ -9172,7 +9172,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: cada herramienta tiene una API distinta o ninguna; sin verificar"
+    "pending_research": "research pending: each tool has a different API or none; not verified"
   },
   {
     "command": "ShearStuds",
@@ -9192,7 +9192,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "SheetIssuesOrRevisions",
@@ -9252,7 +9252,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "ShowBoundaryOpenEnds",
@@ -9271,7 +9271,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: cada herramienta tiene una API distinta o ninguna; sin verificar"
+    "pending_research": "research pending: each tool has a different API or none; not verified"
   },
   {
     "command": "ShowDisconnects",
@@ -9311,7 +9311,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: cada herramienta tiene una API distinta o ninguna; sin verificar"
+    "pending_research": "research pending: each tool has a different API or none; not verified"
   },
   {
     "command": "ShowHistory",
@@ -9331,7 +9331,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: sin API p\u00FAblica identificada para estos di\u00E1logos"
+    "pending_research": "research pending: no public API identified for these dialogs"
   },
   {
     "command": "ShowLastReport",
@@ -9371,7 +9371,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: edici\u00F3n de formas conceptuales en familias de masa; algunas tienen API (FamilyItemFactory), otras s\u00F3lo UI"
+    "pending_research": "research pending: editing conceptual forms in mass families; some have API (FamilyItemFactory), others UI only"
   },
   {
     "command": "ShowMassFormAndFloors",
@@ -9391,7 +9391,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: edici\u00F3n de formas conceptuales en familias de masa; algunas tienen API (FamilyItemFactory), otras s\u00F3lo UI"
+    "pending_research": "research pending: editing conceptual forms in mass families; some have API (FamilyItemFactory), others UI only"
   },
   {
     "command": "ShowMassSurfaceTypes",
@@ -9411,7 +9411,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: edici\u00F3n de formas conceptuales en familias de masa; algunas tienen API (FamilyItemFactory), otras s\u00F3lo UI"
+    "pending_research": "research pending: editing conceptual forms in mass families; some have API (FamilyItemFactory), others UI only"
   },
   {
     "command": "ShowMassZonesAndShades",
@@ -9431,7 +9431,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: edici\u00F3n de formas conceptuales en familias de masa; algunas tienen API (FamilyItemFactory), otras s\u00F3lo UI"
+    "pending_research": "research pending: editing conceptual forms in mass families; some have API (FamilyItemFactory), others UI only"
   },
   {
     "command": "ShowWarningsInViews",
@@ -9530,7 +9530,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: superficies topogr\u00E1ficas (2022\u20132023) y Toposolid (2024\u002B) tienen APIs distintas; cada herramienta requiere su verificaci\u00F3n"
+    "pending_research": "research pending: topography surfaces (2022\u20132023) and Toposolid (2024\u002B) have different APIs; each tool needs its own verification"
   },
   {
     "command": "Slab",
@@ -9550,7 +9550,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: parte en API de StructuralFramingUtils; sin verificar por herramienta"
+    "pending_research": "research pending: partly in the StructuralFramingUtils API; not verified per tool"
   },
   {
     "command": "SlabEdgeFloor",
@@ -9570,7 +9570,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de creaci\u00F3n de estos barridos no confirmada en el listado; requiere investigaci\u00F3n por versi\u00F3n"
+    "pending_research": "research pending: creation API for these sweeps not confirmed in the listing; needs per-version research"
   },
   {
     "command": "Snaps",
@@ -9610,7 +9610,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de creaci\u00F3n de estos barridos no confirmada en el listado; requiere investigaci\u00F3n por versi\u00F3n"
+    "pending_research": "research pending: creation API for these sweeps not confirmed in the listing; needs per-version research"
   },
   {
     "command": "SolidBlend",
@@ -9810,7 +9810,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: IndependentTag cubre algunas; verificar tipos de etiqueta por categor\u00EDa"
+    "pending_research": "research pending: IndependentTag covers some; verify tag types per category"
   },
   {
     "command": "SpatialGrid",
@@ -9910,7 +9910,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: edici\u00F3n de formas conceptuales en familias de masa; algunas tienen API (FamilyItemFactory), otras s\u00F3lo UI"
+    "pending_research": "research pending: editing conceptual forms in mass families; some have API (FamilyItemFactory), others UI only"
   },
   {
     "command": "SplitSurface",
@@ -9927,7 +9927,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: superficies topogr\u00E1ficas (2022\u20132023) y Toposolid (2024\u002B) tienen APIs distintas; cada herramienta requiere su verificaci\u00F3n"
+    "pending_research": "research pending: topography surfaces (2022\u20132023) and Toposolid (2024\u002B) have different APIs; each tool needs its own verification"
   },
   {
     "command": "SplitWithGap",
@@ -9947,7 +9947,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: no hay m\u00E9todo p\u00FAblico de recorte; posible v\u00EDa LocationCurve.Curve por categor\u00EDa, a validar por tipo de elemento"
+    "pending_research": "research pending: there is no public trim method; possible via LocationCurve.Curve per category, to be validated per element type"
   },
   {
     "command": "SpotCoordinate",
@@ -10367,7 +10367,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: parte en API de StructuralFramingUtils; sin verificar por herramienta"
+    "pending_research": "research pending: partly in the StructuralFramingUtils API; not verified per tool"
   },
   {
     "command": "StructuralRebar",
@@ -10424,7 +10424,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: clase de ajustes estructurales a localizar en el listado por versi\u00F3n"
+    "pending_research": "research pending: structural settings class still to be located in the per-version listing"
   },
   {
     "command": "StructuralTrusses",
@@ -10481,7 +10481,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: superficies topogr\u00E1ficas (2022\u20132023) y Toposolid (2024\u002B) tienen APIs distintas; cada herramienta requiere su verificaci\u00F3n"
+    "pending_research": "research pending: topography surfaces (2022\u20132023) and Toposolid (2024\u002B) have different APIs; each tool needs its own verification"
   },
   {
     "command": "SubstitutionSettings",
@@ -10498,7 +10498,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: dependen del modo de edici\u00F3n activo de la interfaz; sin API p\u00FAblica equivalente identificada para cada uno"
+    "pending_research": "research pending: depend on the active UI edit mode; no equivalent public API identified for each"
   },
   {
     "command": "SunSettings",
@@ -10518,7 +10518,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: motor de render sin API p\u00FAblica de lanzamiento; SunAndShadowSettings s\u00ED existe para el sol"
+    "pending_research": "research pending: render engine has no public launch API; SunAndShadowSettings does exist for the sun"
   },
   {
     "command": "SweepWall",
@@ -10538,7 +10538,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: WallSweep.Create existe en algunas versiones; muro por cara depende de masas; sin verificar"
+    "pending_research": "research pending: WallSweep.Create exists in some versions; wall by face depends on masses; not verified"
   },
   {
     "command": "SwitchJoinOrder",
@@ -10677,7 +10677,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de informes de presi\u00F3n no identificada; zonas y an\u00E1lisis de sistemas cambian entre 2022 y 2026"
+    "pending_research": "research pending: pressure report API not identified; zones and system analysis change between 2022 and 2026"
   },
   {
     "command": "SystemsAnalysis",
@@ -10697,7 +10697,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de informes de presi\u00F3n no identificada; zonas y an\u00E1lisis de sistemas cambian entre 2022 y 2026"
+    "pending_research": "research pending: pressure report API not identified; zones and system analysis change between 2022 and 2026"
   },
   {
     "command": "TabViews",
@@ -10993,7 +10993,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: superficies topogr\u00E1ficas (2022\u20132023) y Toposolid (2024\u002B) tienen APIs distintas; cada herramienta requiere su verificaci\u00F3n"
+    "pending_research": "research pending: topography surfaces (2022\u20132023) and Toposolid (2024\u002B) have different APIs; each tool needs its own verification"
   },
   {
     "command": "Toposolid",
@@ -11028,7 +11028,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: superficies topogr\u00E1ficas (2022\u20132023) y Toposolid (2024\u002B) tienen APIs distintas; cada herramienta requiere su verificaci\u00F3n"
+    "pending_research": "research pending: topography surfaces (2022\u20132023) and Toposolid (2024\u002B) have different APIs; each tool needs its own verification"
   },
   {
     "command": "ToposolidSmoothShading",
@@ -11045,7 +11045,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: superficies topogr\u00E1ficas (2022\u20132023) y Toposolid (2024\u002B) tienen APIs distintas; cada herramienta requiere su verificaci\u00F3n"
+    "pending_research": "research pending: topography surfaces (2022\u20132023) and Toposolid (2024\u002B) have different APIs; each tool needs its own verification"
   },
   {
     "command": "Toposurface",
@@ -11082,7 +11082,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: no se ha localizado una API p\u00FAblica equivalente al di\u00E1logo; candidato: ElementTransformUtils.CopyElements entre documentos para tipos (no equivale a todas las categor\u00EDas del di\u00E1logo)"
+    "pending_research": "research pending: no public API equivalent to the dialog has been found; candidate: ElementTransformUtils.CopyElements between documents for types (does not cover every category of the dialog)"
   },
   {
     "command": "TrimOrExtendMultipleElements",
@@ -11102,7 +11102,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: no hay m\u00E9todo p\u00FAblico de recorte; posible v\u00EDa LocationCurve.Curve por categor\u00EDa, a validar por tipo de elemento"
+    "pending_research": "research pending: there is no public trim method; possible via LocationCurve.Curve per category, to be validated per element type"
   },
   {
     "command": "TrimOrExtendSingleElement",
@@ -11122,7 +11122,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: no hay m\u00E9todo p\u00FAblico de recorte; posible v\u00EDa LocationCurve.Curve por categor\u00EDa, a validar por tipo de elemento"
+    "pending_research": "research pending: there is no public trim method; possible via LocationCurve.Curve per category, to be validated per element type"
   },
   {
     "command": "TrimOrExtendToCorner",
@@ -11142,7 +11142,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: no hay m\u00E9todo p\u00FAblico de recorte; posible v\u00EDa LocationCurve.Curve por categor\u00EDa, a validar por tipo de elemento"
+    "pending_research": "research pending: there is no public trim method; possible via LocationCurve.Curve per category, to be validated per element type"
   },
   {
     "command": "TypeProperties",
@@ -11262,7 +11262,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: IndependentTag cubre algunas; verificar tipos de etiqueta por categor\u00EDa"
+    "pending_research": "research pending: IndependentTag covers some; verify tag types per category"
   },
   {
     "command": "VerticalOpening",
@@ -11500,7 +11500,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: cada herramienta tiene una API distinta o ninguna; sin verificar"
+    "pending_research": "research pending: each tool has a different API or none; not verified"
   },
   {
     "command": "Wall",
@@ -11540,7 +11540,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: WallSweep.Create existe en algunas versiones; muro por cara depende de masas; sin verificar"
+    "pending_research": "research pending: WallSweep.Create exists in some versions; wall by face depends on masses; not verified"
   },
   {
     "command": "WallJoins",
@@ -11620,7 +11620,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de Advance Steel (Autodesk.Advance.*) fuera de RevitAPI.dll; no inventariada aqu\u00ED"
+    "pending_research": "research pending: Advance Steel API (Autodesk.Advance.*) outside RevitAPI.dll; not inventoried here"
   },
   {
     "command": "Window",
@@ -11699,7 +11699,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de informes de presi\u00F3n no identificada; zonas y an\u00E1lisis de sistemas cambian entre 2022 y 2026"
+    "pending_research": "research pending: pressure report API not identified; zones and system analysis change between 2022 and 2026"
   },
   {
     "command": "ZoneBySketch",
@@ -11715,7 +11715,7 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de informes de presi\u00F3n no identificada; zonas y an\u00E1lisis de sistemas cambian entre 2022 y 2026"
+    "pending_research": "research pending: pressure report API not identified; zones and system analysis change between 2022 and 2026"
   },
   {
     "command": "ZoneBySpace",
@@ -11731,6 +11731,6 @@
     "status": "UNKNOWN",
     "analysis": "analizado_sin_evidencia",
     "executor": "UNAVAILABLE",
-    "pending_research": "investigaci\u00F3n pendiente: API de informes de presi\u00F3n no identificada; zonas y an\u00E1lisis de sistemas cambian entre 2022 y 2026"
+    "pending_research": "research pending: pressure report API not identified; zones and system analysis change between 2022 and 2026"
   }
 ]

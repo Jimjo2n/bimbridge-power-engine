@@ -17,10 +17,10 @@ using System.Security.Principal;
 namespace Bimbridge.Addin
 {
     /// <summary>
-    /// Punto de entrada que Revit carga por el manifiesto Bimbridge.addin.
-    /// Arranca sin preguntas (sección 5.1) y añade la pestaña "BIMBRIDGE" al ribbon:
-    /// Estado, Pausar IA, Modo En vivo/Retener, Cola y Ayuda.
-    /// Si algo falla al arrancar, se registra y Revit sigue normal: el MCP nunca impide abrir Revit.
+    /// Entry point that Revit loads through the Bimbridge.addin manifest.
+    /// Starts without prompts (section 5.1) and adds the "BIMBRIDGE" tab to the ribbon:
+    /// Status, Pause AI, Live/Hold mode, Queue and Help.
+    /// If anything fails at startup it is logged and Revit carries on normally: the MCP never stops Revit from opening.
     /// </summary>
     public sealed class App : IExternalApplication
     {
@@ -42,7 +42,7 @@ namespace Bimbridge.Addin
 
                 var config = EngineConfig.Load(warn: Log);
                 Runtime.Log = Log;
-                try { UpdateService.Start(config); } catch (Exception ex) { Log("Actualizaciones: " + ex.Message); }
+                try { UpdateService.Start(config); } catch (Exception ex) { Log("Updates: " + ex.Message); }
                 try
                 {
                     ZipUpdateCommand.KeysConfig = config?.UpdateKeys ?? new System.Collections.Generic.List<string>();
@@ -50,10 +50,10 @@ namespace Bimbridge.Addin
                     var zipResult = ZipUpdateCommand.TakeResult();
                     if (zipResult != null) Log(zipResult);
                 }
-                catch (Exception ex) { Log("Actualizar desde ZIP: " + ex.Message); }
+                catch (Exception ex) { Log("Update from ZIP: " + ex.Message); }
                 if (!config.Enabled)
                 {
-                    Log("MCP desactivado por configuración (enabled=false).");
+                    Log("MCP disabled by configuration (enabled=false).");
                     return Result.Succeeded;
                 }
 
@@ -66,9 +66,9 @@ namespace Bimbridge.Addin
 
                 _journal = new Journal(Journal.DefaultDirectory, config.JournalDays);
                 try { Ui.Runtime.Grants = new GrantStore(); }
-                catch (Exception gex) when (gex is IOException || gex is UnauthorizedAccessException || gex is GrantStore.GrantKeyException) { Log("Concesiones no disponibles: " + gex.Message + ". Las tareas que escriben no se autorizarán."); }
+                catch (Exception gex) when (gex is IOException || gex is UnauthorizedAccessException || gex is GrantStore.GrantKeyException) { Log("Grants unavailable: " + gex.Message + ". Tasks that write will not be authorized."); }
                 try { Ui.Runtime.Audit = new AuditLog(AuditLog.DefaultPath); }
-                catch (Exception aex) when (aex is IOException || aex is UnauthorizedAccessException) { Log("Auditoría durable no disponible: " + aex.Message + ". Se rechazará el código que escribe."); }
+                catch (Exception aex) when (aex is IOException || aex is UnauthorizedAccessException) { Log("Durable audit unavailable: " + aex.Message + ". Code that writes will be rejected."); }
                 _main = new MainThread(config.MainThreadBudgetMs, Log);
                 _main.Create();
                 _tracker = new DocumentTracker();
@@ -115,11 +115,11 @@ namespace Bimbridge.Addin
                 };
                 _descriptor.Write();
                 Warmup.Start(Log);
-                Log("Listo: Revit " + revitVersion + ", pipe " + pipeName + ", niveles " + config.Levels + ", retener " + (hold.On ? "SÍ" : "NO"));
+                Log("Ready: Revit " + revitVersion + ", pipe " + pipeName + ", levels " + config.Levels + ", hold " + (hold.On ? "YES" : "NO"));
             }
             catch (Exception ex)
             {
-                Log("Error al arrancar (Revit sigue normal): " + ex);
+                Log("Startup error (Revit carries on normally): " + ex);
             }
             return Result.Succeeded;
         }
@@ -139,23 +139,23 @@ namespace Bimbridge.Addin
             }
             catch (Exception ex)
             {
-                Log("Error al cerrar: " + ex.Message);
+                Log("Shutdown error: " + ex.Message);
             }
             return Result.Succeeded;
         }
 
-        // 0.8.0: la pestaña pasa a llamarse BIMBRIDGE (antes con el nombre heredado).
+        // 0.8.0: the tab is now called BIMBRIDGE (previously it had the legacy name).
         private const string TabName = "BIMBRIDGE";
 
         /// <summary>
-        /// Pestaña propia "BIMBRIDGE": Conexión (Estado, Pausar IA), Cambios de la IA (Modo, Cola) y Ayuda (Ajustes, Cómo funciona, Versión).
-        /// Los iconos se dibujan en código y se actualizan en Idling según el estado.
+        /// Own "BIMBRIDGE" tab: Connection (Status, Pause AI), AI changes (Mode, Queue) and Help (Settings, How it works, Version).
+        /// Icons are drawn in code and refreshed on Idling according to the current state.
         /// </summary>
         private void CreateRibbon(UIControlledApplication app)
         {
             try
             {
-                try { app.CreateRibbonTab(TabName); } catch (Autodesk.Revit.Exceptions.ArgumentException) { /* ya existe */ }
+                try { app.CreateRibbonTab(TabName); } catch (Autodesk.Revit.Exceptions.ArgumentException) { /* already exists */ }
                 var dll = Assembly.GetExecutingAssembly().Location;
                 var always = typeof(AlwaysAvailable).FullName;
 
@@ -172,71 +172,71 @@ namespace Bimbridge.Addin
                     return d;
                 }
 
-                var conn = app.CreateRibbonPanel(TabName, "Conexión");
-                Runtime.StatusButton = conn.AddItem(Btn("BimbridgeStatus", "Power Engine\nEstado", typeof(StatusCommand),
-                    "Ver qué IAs están conectadas, qué pueden hacer y qué hicieron.",
-                    "Verde: hay al menos una IA conectada. Gris: esperando a que Claude o Codex se conecten. Rojo: la IA está en pausa.",
+                var conn = app.CreateRibbonPanel(TabName, "Connection");
+                Runtime.StatusButton = conn.AddItem(Btn("BimbridgeStatus", "Power Engine\nStatus", typeof(StatusCommand),
+                    "See which AIs are connected, what they can do and what they did.",
+                    "Green: at least one AI is connected. Grey: waiting for Claude or Codex to connect. Red: the AI is paused.",
                     Icons.Status(Theme.Slate, 32), Icons.Status(Theme.Slate, 16))) as PushButton;
-                Runtime.PauseButton = conn.AddItem(Btn("BimbridgePause", "Pausar\nIA", typeof(PauseCommand),
-                    "Detener a la IA al instante. Púlselo otra vez para reanudar.",
-                    "Mientras está en pausa, Revit rechaza toda petición de la IA (lecturas y cambios). La IA recibe el aviso de que usted la pausó.",
+                Runtime.PauseButton = conn.AddItem(Btn("BimbridgePause", "Pause\nAI", typeof(PauseCommand),
+                    "Stop the AI instantly. Press it again to resume.",
+                    "While paused, Revit rejects every AI request (reads and changes). The AI is told that you paused it.",
                     Icons.Pause(false, 32), Icons.Pause(false, 16))) as PushButton;
 
-                var changes = app.CreateRibbonPanel(TabName, "Cambios de la IA");
-                Runtime.ModeButton = changes.AddItem(Btn("BimbridgeMode", "Modo\nEn vivo", typeof(ModeCommand),
-                    "Elegir si los cambios aprobados se aplican al momento o esperan en la cola.",
-                    "En vivo (verde): lo que usted apruebe en la conversación se aplica al momento.\nRetener (ámbar): los cambios esperan en la cola y el modelo no se toca hasta que usted los aplique desde Cola. Útil para seguir trabajando sin interrupciones.",
+                var changes = app.CreateRibbonPanel(TabName, "AI changes");
+                Runtime.ModeButton = changes.AddItem(Btn("BimbridgeMode", "Mode\nLive", typeof(ModeCommand),
+                    "Choose whether approved changes are applied immediately or wait in the queue.",
+                    "Live (green): what you approve in the conversation is applied immediately.\nHold (amber): changes wait in the queue and the model is not touched until you apply them from Queue. Useful to keep working without interruptions.",
                     Icons.Mode(false, 32), Icons.Mode(false, 16))) as PushButton;
-                Runtime.QueueButton = changes.AddItem(Btn("BimbridgeQueue", "Cola\nvacía", typeof(QueueCommand),
-                    "Revisar, aplicar o descartar los cambios que esperan.",
-                    "Muestra cada cambio con su antes y después. Si algo cambió mientras esperaba, ese plan se omite y la IA se entera. Cada plan se deshace con un Ctrl+Z. No guarda ni sincroniza.",
+                Runtime.QueueButton = changes.AddItem(Btn("BimbridgeQueue", "Queue\nempty", typeof(QueueCommand),
+                    "Review, apply or discard the changes that are waiting.",
+                    "Shows each change with its before and after. If something changed while it was waiting, that plan is skipped and the AI is told. Each plan is undone with one Ctrl+Z. Does not save or sync.",
                     Icons.Queue(0, 32), Icons.Queue(0, 16), anyTime: false)) as PushButton;
 
-                var sec = app.CreateRibbonPanel(TabName, "Autoridad");
-                Runtime.AuthorizeButton = sec.AddItem(Btn("BimbridgeAuthorize", "Autorizar\ntareas", typeof(AuthorizeCommand),
-                    "Revisar lo que las tareas de la IA piden hacer y autorizarlo o no.",
-                    "Una tarea que modifica el modelo, guarda, sincroniza o exporta necesita su permiso para ESA tarea y ESE documento, durante 8 horas. " +
-                    "La IA puede pedirlo pero no concederlo. También permite revocar permisos vigentes.",
+                var sec = app.CreateRibbonPanel(TabName, "Authority");
+                Runtime.AuthorizeButton = sec.AddItem(Btn("BimbridgeAuthorize", "Authorize\ntasks", typeof(AuthorizeCommand),
+                    "Review what the AI's tasks ask to do and authorize it or not.",
+                    "A task that modifies the model, saves, syncs or exports needs your permission for THAT task and THAT document, for 8 hours. " +
+                    "The AI can ask for it but cannot grant it. You can also revoke active permissions here.",
                     Icons.Status(Theme.Slate, 32), Icons.Status(Theme.Slate, 16), anyTime: false)) as PushButton;
-                Runtime.TrustButton = sec.AddItem(Btn("BimbridgeTrust", "Bloquear\ninyección C#", typeof(TrustCommand),
-                    "Bloquear o permitir que la IA ejecute código C# dinámico (exec).",
-                    "Por defecto la IA local autorizada puede ejecutar C# dinámico, auditado. Pulse para bloquearlo: toda petición nueva de exec se rechaza. " +
-                    "Para volver a permitirlo, púlselo otra vez y confirme (No por defecto). " +
-                    "El cambio queda guardado en config.json. No detiene lo que ya está dentro de Revit. Las operaciones tipadas (plan/commit) siguen disponibles.",
+                Runtime.TrustButton = sec.AddItem(Btn("BimbridgeTrust", "Block\nC# injection", typeof(TrustCommand),
+                    "Block or allow the AI to run dynamic C# code (exec).",
+                    "By default the authorized local AI can run dynamic C#, audited. Press to block it: every new exec request is rejected. " +
+                    "To allow it again, press it again and confirm (No by default). " +
+                    "The change is saved in config.json. It does not stop what is already running inside Revit. Typed operations (plan/commit) remain available.",
                     Icons.Mode(false, 32), Icons.Mode(false, 16))) as PushButton;
 
-                var help = app.CreateRibbonPanel(TabName, "Ayuda");
-                help.AddItem(Btn("BimbridgeSettings", "Ajustes", typeof(SettingsCommand),
-                    "Pausa, modo de los cambios y C# dinámico en un solo lugar, con lo que implica cada uno.",
-                    "Cada cambio se aplica al momento y se ve en esta cinta. Permitir C# dinámico pide confirmación. " +
-                    "Los niveles de permiso (leer, plan, aplicar) se muestran aquí, pero sólo se cambian con el instalador.",
+                var help = app.CreateRibbonPanel(TabName, "Help");
+                help.AddItem(Btn("BimbridgeSettings", "Settings", typeof(SettingsCommand),
+                    "Pause, change mode and dynamic C# in one place, with what each one means.",
+                    "Each change applies immediately and shows on this ribbon. Allowing dynamic C# asks for confirmation. " +
+                    "Permission levels (read, plan, apply) are shown here, but can only be changed with the installer.",
                     SettingsWindow.Icon(32), SettingsWindow.Icon(16)));
-                help.AddItem(Btn("BimbridgeHelp", "Cómo\nfunciona", typeof(HelpCommand),
-                    "Guía rápida de los botones.", "Qué hace cada botón y qué puede y no puede hacer la IA.",
+                help.AddItem(Btn("BimbridgeHelp", "How it\nworks", typeof(HelpCommand),
+                    "Quick guide to the buttons.", "What each button does and what the AI can and cannot do.",
                     Icons.Help(32), Icons.Help(16)));
-                UpdateService.Button = help.AddItem(Btn("BimbridgeUpdate", "Versión\n" + Bimbridge.Setup.Updates.Format(UpdateService.Running), typeof(UpdateCommand),
-                    "Buscar e instalar versiones nuevas sin cerrar Revit.",
-                    "Deje el instalador nuevo (.zip o .exe) en Descargas o en el Escritorio: este botón se pone verde y lo instala con un clic, " +
-                    "con las mismas opciones. La versión nueva entra al reiniciar Revit. También permite volver a la versión anterior.",
+                UpdateService.Button = help.AddItem(Btn("BimbridgeUpdate", "Version\n" + Bimbridge.Setup.Updates.Format(UpdateService.Running), typeof(UpdateCommand),
+                    "Find and install new versions without closing Revit.",
+                    "Drop the new installer (.zip or .exe) in Downloads or on the Desktop: this button turns green and installs it with one click, " +
+                    "with the same options. The new version takes effect when Revit restarts. You can also go back to the previous version.",
                     Icons.Update(0, 32), Icons.Update(0, 16))) as PushButton;
 
-                // 0.8.0: herramientas de desarrollo. Sólo las pulsa una persona.
+                // 0.8.0: developer tools. Only a person presses them.
                 var dev = app.CreateRibbonPanel(TabName, "Developer Tools");
-                dev.AddItem(Btn("BimbridgeZipUpdate", "Actualizar\ndesde ZIP", typeof(ZipUpdateCommand),
-                    "Instalar un paquete de BIMBRIDGE (.zip) verificado. Se aplica al cerrar Revit.",
-                    "Abre un paquete .zip, comprueba su manifiesto, firma de procedencia, hashes y compatibilidad, muestra la versión instalada y la nueva " +
-                    "y pide confirmación. La instalación la hace un proceso aparte cuando usted cierra Revit; BIMBRIDGE nunca cierra ni reinicia Revit. " +
-                    "Si la instalación no queda verificada, vuelve a la versión anterior.",
+                dev.AddItem(Btn("BimbridgeZipUpdate", "Update\nfrom ZIP", typeof(ZipUpdateCommand),
+                    "Install a verified BIMBRIDGE package (.zip). It is applied when Revit closes.",
+                    "Opens a .zip package, checks its manifest, provenance signature, hashes and compatibility, shows the installed and the new version " +
+                    "and asks for confirmation. A separate process installs it when you close Revit; BIMBRIDGE never closes or restarts Revit. " +
+                    "If the installation cannot be verified, it goes back to the previous version.",
                     Icons.Update(1, 32), Icons.Update(1, 16)));
                 Runtime.MarkDirty();
             }
             catch (Exception ex)
             {
-                Log("No se pudo crear el ribbon (el MCP sigue funcionando): " + ex.Message);
+                Log("Could not create the ribbon (the MCP keeps working): " + ex.Message);
             }
         }
 
-        /// <summary>Cuál documento está activo, para fijar el destino de cada petición sin entrar al hilo de Revit.</summary>
+        /// <summary>Which document is active, to set the target of each request without entering the Revit thread.</summary>
         private static void OnViewActivated(object sender, Autodesk.Revit.UI.Events.ViewActivatedEventArgs e)
         {
             try { DocRegistry.Instance.SetActive(e.Document); } catch (Exception) { }
@@ -248,7 +248,7 @@ namespace Bimbridge.Addin
             catch (Exception) { }
         }
 
-        /// <summary>Pipe sólo accesible por el usuario de Windows actual. Sin red.</summary>
+        /// <summary>Pipe accessible only to the current Windows user. No network.</summary>
         private static NamedPipeServerStream CreateSecurePipe(string name)
         {
 #if REVIT2025_OR_GREATER
@@ -265,7 +265,7 @@ namespace Bimbridge.Addin
 
         private static string Sanitize(string s)
         {
-            var chars = (s ?? "usuario").ToCharArray();
+            var chars = (s ?? "user").ToCharArray();
             for (var i = 0; i < chars.Length; i++)
                 if (!char.IsLetterOrDigit(chars[i])) chars[i] = '_';
             return new string(chars);
@@ -276,7 +276,7 @@ namespace Bimbridge.Addin
             try
             {
                 if (_logPath == null) return;
-                // Varias conexiones registran a la vez: sin candado, una escritura chocaba y se perdía la línea.
+                // Several connections log at once: without a lock, one write collided and the line was lost.
                 lock (_logLock) File.AppendAllText(_logPath, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + message + Environment.NewLine);
             }
             catch (Exception) { }

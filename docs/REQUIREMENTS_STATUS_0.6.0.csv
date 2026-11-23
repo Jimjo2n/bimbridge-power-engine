@@ -1,0 +1,22 @@
+section;requirement;status;evidence;pending
+3.1;uniform document identity (handle/path/key/title; ambiguous does not choose);implemented;IdentityJournalTests.Resolver_*, NormalizePath_*, UnsavedDocs_*, ReplacedDocument_*;native: two open models (PROCEDURE_0.6.0 §3)
+3.2;state machine and persistence; Codex regressions;implemented;TransportRegressionTests (5 cases) + PartialOrUnknown_*, RevertedConfirmed_*;—
+3.3;persistent working memory (decisions, exceptions, artifacts);implemented;TaskEngineTests + Bench_CompactSummary_*;native §2.4
+4;long task engine: units, batches, checkpoints, barriers, resume without duplicating;implemented (engine tested; Revit backend compiled);TaskEngineTests (14) with fault injection;native §2 and §3 on 2024 and 2026
+4;Revit / bridge / chat crash / cancellation / pause;implemented;CrashBetweenCommitAndJournal_*, RevitRestart*_*, Cancel_*, PauseAndClosedDocument_*;native §2.3–2.6
+5;general runner + recipes by file/name with copy and SHA;implemented;ScriptingTests.BuiltInRecipesAndBimHelpers_Compile (5 years), RecipeRegistry;native §2, §5, §6
+5;file/recovery/barrier arguments reach the handler;implemented;EndToEndTests (transport, both profiles);—
+6;low-cost interface;implemented;bench tokens: compact 5 tools 5,685 characters (0.5.0: 5,810); 1,000-unit summary 996 characters;real client tokens (not measured)
+7.1;groups: inspection, signature, composition, type change with verification;implemented (API);compiles 5 years;native §5.6
+7.2;mounting with real support (rays, links), classification, transforms;implemented;Xform tests + compiles;native §5.7
+7.3;view range, template, why it is not visible, category filters;implemented;VisibilityQc tests + compiles;native §5.8; plan regions: range not readable by the public API
+7.4;one-to-one QC against a manifest;implemented;QcFixtureTests (fixture D with known deviations);native §5.1–5.5
+8;save/sync/pdf with evidence, approximate pages;implemented;compiles; barrier engine tested;native §2.6, §6
+8;installer verifiable by hash, diagnostics, preserve config, rollback;implemented;SetupTests.Manifest_*, Diagnose_*, CacheSetup_KeepsCurrentAndPrevious;native §0
+9.1;unit + transport;done;193 tests green;—
+9.2;fault injection;done in the engine;TaskEngineTests;serialization and worker end only in the Revit backend (compiled)
+9.3;compiled/simulated/native matrix;done;docs/CAPABILITY_MATRIX.md generated from the code;—
+9.4;native acceptance 2024/2026;NOT RUN;tools/acceptance/PROCEDURE_0.6.0.md;requires the test machine
+9.5;equivalent MCP/pyRevit benchmark (3 workloads, 1 cold + 10 warm);harness ready, NOT RUN;tools/bench_060;requires the test machine
+9.6;soak test;NOT RUN;PROCEDURE_0.6.0 §8;requires the test machine
+9.7;per-task diagnostic package;done;collect_evidence.ps1;—

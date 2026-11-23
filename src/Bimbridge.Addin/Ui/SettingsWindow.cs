@@ -11,15 +11,15 @@ using Bimbridge.Engine;
 namespace Bimbridge.Addin.Ui
 {
     /// <summary>
-    /// Ajustes: sólo los interruptores que ya existen y ya se guardan (Pausa y Retener como archivos de estado, bloqueo de C# en
-    /// config.json). Cada cambio usa el mismo camino que su botón de la cinta y se ve al momento en la cinta y en Estado.
-    /// Más una preferencia de interfaz propia del complemento (Movimiento), guardada aparte en interfaz.json.
-    /// Los niveles se muestran, pero sólo los cambia el instalador (se leen al arrancar Revit).
+    /// Settings: only the switches that already exist and are already saved (Pause and Hold as state files, C# block in
+    /// config.json). Each change takes the same path as its ribbon button and shows immediately on the ribbon and in Status.
+    /// Plus a UI preference of the add-in itself (Motion), saved separately in ui.json.
+    /// Levels are shown, but only the installer changes them (they are read when Revit starts).
     /// </summary>
     internal sealed class SettingsWindow
     {
-        private const string Live = "En vivo", Hold = "Retener", Active = "Activa", Paused = "En pausa", Allowed = "Permitido", Blocked = "Bloqueado";
-        private const string MotionAuto = "Automático (sigue a Windows)", MotionReduced = "Reducido";
+        private const string Live = "Live", Hold = "Hold", Active = "Active", Paused = "Paused", Allowed = "Allowed", Blocked = "Blocked";
+        private const string MotionAuto = "Automatic (follows Windows)", MotionReduced = "Reduced";
 
         private readonly Autodesk.Revit.UI.UIApplication _app;
         private readonly Window _win;
@@ -34,19 +34,19 @@ namespace Bimbridge.Addin.Ui
         private SettingsWindow(Autodesk.Revit.UI.UIApplication app)
         {
             _app = app;
-            _win = Theme.NewWindow("BIMBRIDGE · Ajustes", 620, 700);
+            _win = Theme.NewWindow("BIMBRIDGE · Settings", 620, 700);
             try { new WindowInteropHelper(_win) { Owner = app.MainWindowHandle }; } catch (Exception) { }
             var cfg = Runtime.Config;
             var root = new DockPanel();
-            var header = Theme.Header(Theme.ProductEyebrow, "Ajustes", "Los cambios se aplican al momento y se guardan.", out _, out _pill, out _pillText);
+            var header = Theme.Header(Theme.ProductEyebrow, "Settings", "Changes apply immediately and are saved.", out _, out _pill, out _pillText);
             DockPanel.SetDock(header, Dock.Top);
             root.Children.Add(header);
 
-            var close = Theme.Button("Listo", Theme.Kind.Primary);
+            var close = Theme.Button("Done", Theme.Kind.Primary);
             close.IsDefault = true;
             close.IsCancel = true;
             close.Click += (s, e) => _win.Close();
-            var footer = Theme.Footer(Theme.FooterNote("Los mismos interruptores están en la cinta BIMBRIDGE."), close);
+            var footer = Theme.Footer(Theme.FooterNote("The same switches are on the BIMBRIDGE ribbon."), close);
             DockPanel.SetDock(footer, Dock.Bottom);
             root.Children.Add(footer);
 
@@ -55,25 +55,25 @@ namespace Bimbridge.Addin.Ui
             _warn.Visibility = Visibility.Collapsed;
             body.Children.Add(_warn);
 
-            // ---- 1. Control de la IA ----
+            // ---- 1. AI control ----
             var control = new StackPanel();
-            control.Children.Add(Theme.Section("Control de la IA", "Qué ocurre con las peticiones que llegan ahora."));
-            control.Children.Add(Row("IA", Theme.Segmented(new[] { Active, Paused }, Runtime.Pause.On ? Paused : Active, v => SetPause(v == Paused)), _pauseLine));
+            control.Children.Add(Theme.Section("AI control", "What happens to requests arriving now."));
+            control.Children.Add(Row("AI", Theme.Segmented(new[] { Active, Paused }, Runtime.Pause.On ? Paused : Active, v => SetPause(v == Paused)), _pauseLine));
             control.Children.Add(Theme.Divider());
             var writes = cfg.Allows('P') && cfg.Allows('W');
             var modeSeg = Theme.Segmented(new[] { Live, Hold }, Runtime.Hold.On || !cfg.Allows('W') ? Hold : Live, v => SetHold(v == Hold));
             modeSeg.IsEnabled = writes;
-            control.Children.Add(Row("Cambios aprobados", modeSeg, _modeLine));
-            if (!writes) control.Children.Add(Muted("Sus permisos no incluyen aplicar cambios (W): todo espera en Cola. Se cambia con el instalador."));
+            control.Children.Add(Row("Approved changes", modeSeg, _modeLine));
+            if (!writes) control.Children.Add(Muted("Your permissions do not include applying changes (W): everything waits in Queue. Change it with the installer."));
             body.Children.Add(Theme.Card(control));
 
-            // ---- 2. Qué puede hacer la IA ----
+            // ---- 2. What the AI can do ----
             var perms = new StackPanel();
-            perms.Children.Add(Theme.Section("Qué puede hacer la IA", "Permisos elegidos al instalar."));
+            perms.Children.Add(Theme.Section("What the AI can do", "Permissions chosen at install time."));
             var levels = new Grid { Margin = new Thickness(0, 10, 0, 0) };
             levels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             levels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            var items = new[] { ("Leer el modelo", 'R'), ("Preparar cambios (plan)", 'P'), ("Aplicar cambios", 'W'), ("Guardar, sincronizar, PDF", 'D') };
+            var items = new[] { ("Read the model", 'R'), ("Prepare changes (plan)", 'P'), ("Apply changes", 'W'), ("Save, sync, PDF", 'D') };
             for (var i = 0; i < items.Length; i++)
             {
                 var on = items[i].Item2 == 'D' ? cfg.AllowsDocOps : cfg.Allows(items[i].Item2);
@@ -88,24 +88,24 @@ namespace Bimbridge.Addin.Ui
                 levels.Children.Add(cell);
             }
             perms.Children.Add(levels);
-            perms.Children.Add(Muted("Para cambiarlos, abra el instalador y elija Modificar instalación. Se aplican al reiniciar Revit."));
+            perms.Children.Add(Muted("To change them, open the installer and choose Modify installation. They take effect when Revit restarts."));
             perms.Children.Add(Theme.Divider());
             _codeSeg = Theme.Segmented(new[] { Allowed, Blocked }, Runtime.BlockDynamicCode ? Blocked : Allowed, v => SetBlocked(v == Blocked));
-            perms.Children.Add(Row("Código C# dinámico (exec)", _codeSeg, _codeLine));
-            if (cfg.Runner == "apagado") perms.Children.Add(Muted("config.json tiene runner = apagado: exec no se ejecuta en ningún caso."));
+            perms.Children.Add(Row("Dynamic C# code (exec)", _codeSeg, _codeLine));
+            if (cfg.Runner == "off") perms.Children.Add(Muted("config.json has runner = off (off): exec never runs."));
             var why = new StackPanel();
-            why.Children.Add(Muted("Por defecto la IA local autorizada puede ejecutar C# dinámico, auditado. Bloqueado: toda petición nueva de exec se rechaza; las operaciones tipadas (plan/commit) siguen disponibles."));
-            why.Children.Add(Muted("No es un sandbox: el código corre en el proceso de Revit con los permisos de su usuario y sus efectos fuera del documento no se revierten."));
-            why.Children.Add(Muted("El cambio queda guardado en config.json y vale para las peticiones nuevas; no detiene lo que ya está dentro de Revit."));
-            var disc = Theme.Disclosure("Qué implica", why);
+            why.Children.Add(Muted("By default the authorized local AI can run dynamic C#, audited. Blocked: every new exec request is rejected; typed operations (plan/commit) remain available."));
+            why.Children.Add(Muted("It is not a sandbox: the code runs in the Revit process with your user's permissions and its effects outside the document are not rolled back."));
+            why.Children.Add(Muted("The change is saved in config.json and applies to new requests; it does not stop what is already running inside Revit."));
+            var disc = Theme.Disclosure("What it means", why);
             disc.Margin = new Thickness(0, 8, 0, 0);
             perms.Children.Add(disc);
             body.Children.Add(Theme.Card(perms));
 
-            // ---- 3. Interfaz ----
+            // ---- 3. Interface ----
             var ui = new StackPanel();
-            ui.Children.Add(Theme.Section("Interfaz", "Sólo para este usuario de Windows. No cambia nada de la IA."));
-            ui.Children.Add(Row("Movimiento", Theme.Segmented(new[] { MotionAuto, MotionReduced }, Theme.ReduceMotionOverride ? MotionReduced : MotionAuto, v => SetMotion(v == MotionReduced)), _motionLine));
+            ui.Children.Add(Theme.Section("Interface", "For this Windows user only. Changes nothing about the AI."));
+            ui.Children.Add(Row("Motion", Theme.Segmented(new[] { MotionAuto, MotionReduced }, Theme.ReduceMotionOverride ? MotionReduced : MotionAuto, v => SetMotion(v == MotionReduced)), _motionLine));
             body.Children.Add(Theme.Card(ui));
 
             root.Children.Add(Theme.Scroll(body));
@@ -113,54 +113,54 @@ namespace Bimbridge.Addin.Ui
             Describe(false);
         }
 
-        // ---- cambios: el mismo camino que los botones de la cinta ----
+        // ---- changes: the same path as the ribbon buttons ----
 
         private void SetPause(bool on)
         {
             if (_syncing || Runtime.Pause.On == on) return;
             Runtime.TogglePause();
-            Saved(Runtime.Pause.Unsaved, "la pausa");
+            Saved(Runtime.Pause.Unsaved, "the pause");
         }
 
         private void SetHold(bool on)
         {
             if (_syncing || Runtime.Hold.On == on) return;
             Runtime.ToggleHold();
-            Saved(Runtime.Hold.Unsaved, "el modo");
+            Saved(Runtime.Hold.Unsaved, "the mode");
         }
 
         private void SetBlocked(bool on)
         {
             if (_syncing || Runtime.BlockDynamicCode == on) return;
-            // Permitir amplía lo que la IA puede hacer: la misma confirmación que la cinta, "No" por defecto.
+            // Allowing widens what the AI can do: the same confirmation as the ribbon, "No" by default.
             if (!on && !Runtime.ConfirmAllowDynamicCode()) { Select(_codeSeg, Blocked); return; }
             if (!Runtime.ToggleBlockDynamicCode(out var error))
             {
                 Select(_codeSeg, Runtime.BlockDynamicCode ? Blocked : Allowed);
-                ShowWarn("No se pudo guardar en config.json, así que no se aplicó. " + error);
+                ShowWarn("Could not save to config.json, so it was not applied. " + error);
                 return;
             }
             Changed();
         }
 
-        /// <summary>Preferencia propia del complemento (no config.json). Se aplica al momento, sin reiniciar.</summary>
+        /// <summary>The add-in's own preference (not config.json). Applies immediately, without restarting.</summary>
         private void SetMotion(bool reduced)
         {
             if (_syncing || Theme.ReduceMotionOverride == reduced) return;
-            if (!Runtime.SetReducedMotion(reduced, out var error)) ShowWarn("No se pudo guardar la preferencia de movimiento: vale hasta cerrar Revit. " + error);
+            if (!Runtime.SetReducedMotion(reduced, out var error)) ShowWarn("Could not save the motion preference: it holds until Revit closes. " + error);
             Describe(true);
         }
 
         private void Saved(bool unsaved, string what)
         {
-            if (unsaved) ShowWarn("No se pudo guardar " + what + " en disco: vale hasta cerrar Revit.");
+            if (unsaved) ShowWarn("Could not save " + what + " to disk: it holds until Revit closes.");
             Changed();
         }
 
         private void Changed()
         {
             Runtime.MarkDirty();
-            try { Runtime.OnIdling(_app); } catch (Exception ex) { Runtime.Log("Ajustes: " + ex.Message); }
+            try { Runtime.OnIdling(_app); } catch (Exception ex) { Runtime.Log("Settings: " + ex.Message); }
             Describe(true);
         }
 
@@ -171,27 +171,27 @@ namespace Bimbridge.Addin.Ui
             Theme.Enter(_warn, 4, 200);
         }
 
-        /// <summary>Consecuencia de cada ajuste en una línea y píldora con el estado efectivo. Al cambiar, sólo entra la línea que cambió.</summary>
+        /// <summary>Consequence of each setting in one line, and a pill with the effective state. On change, only the line that changed animates in.</summary>
         private void Describe(bool animate)
         {
             var cfg = Runtime.Config;
             var paused = Runtime.Pause.On;
             var hold = Runtime.Hold.On || !cfg.Allows('W');
-            Set(_pauseLine, paused ? "Revit rechaza toda petición de la IA, también las lecturas." : "La IA puede leer el modelo y pedir cambios.", animate);
-            Set(_modeLine, hold ? "Los cambios esperan en Cola; el modelo no se toca hasta que usted los aplique." : "Lo que usted apruebe en la conversación se aplica al momento.", animate);
-            Set(_codeLine, Runtime.BlockDynamicCode ? "La IA no podrá ejecutar C#; plan/commit siguen disponibles." : "La IA podrá ejecutar C# sobre la API de Revit, auditado.", animate);
-            Set(_motionLine, Theme.ReduceMotionOverride ? "Sin animaciones en las ventanas ni en la cinta; todo responde igual de rápido."
-                : Theme.WindowsReducedMotion ? "Windows tiene las animaciones desactivadas: sin animaciones." : "Animaciones breves sólo en cambios de estado ocasionales.", animate);
-            if (paused) Theme.SetPill(_pill, _pillText, Theme.Red, "IA en pausa", true);
-            else if (hold) Theme.SetPill(_pill, _pillText, Theme.Amber, "Retener", true);
-            else Theme.SetPill(_pill, _pillText, Theme.Green, "En vivo", true);
+            Set(_pauseLine, paused ? "Revit rejects every AI request, reads included." : "The AI can read the model and request changes.", animate);
+            Set(_modeLine, hold ? "Changes wait in Queue; the model is not touched until you apply them." : "What you approve in the conversation is applied immediately.", animate);
+            Set(_codeLine, Runtime.BlockDynamicCode ? "The AI will not be able to run C#; plan/commit remain available." : "The AI will be able to run C# on the Revit API, audited.", animate);
+            Set(_motionLine, Theme.ReduceMotionOverride ? "No animations in the windows or on the ribbon; everything responds just as fast."
+                : Theme.WindowsReducedMotion ? "Windows has animations turned off: no animations." : "Brief animations only on occasional state changes.", animate);
+            if (paused) Theme.SetPill(_pill, _pillText, Theme.Red, "AI paused", true);
+            else if (hold) Theme.SetPill(_pill, _pillText, Theme.Amber, "Hold", true);
+            else Theme.SetPill(_pill, _pillText, Theme.Green, "Live", true);
         }
 
         private static void Set(TextBlock t, string text, bool animate)
         {
             if (t.Text == text) return;
             t.Text = text;
-            if (animate && !Theme.FromKeyboard) Theme.Enter(t, 4, 180); // flechas en los segmentos: al instante
+            if (animate && !Theme.FromKeyboard) Theme.Enter(t, 4, 180); // arrow keys on the segments: instant
         }
 
         private void Select(StackPanel seg, string value)
@@ -201,7 +201,7 @@ namespace Bimbridge.Addin.Ui
             finally { _syncing = false; }
         }
 
-        // ---- piezas ----
+        // ---- parts ----
 
         private static TextBlock Line() => new TextBlock { FontSize = 12.5, Foreground = Theme.B(Theme.Muted), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) };
 
@@ -212,7 +212,7 @@ namespace Bimbridge.Addin.Ui
             return t;
         }
 
-        /// <summary>Etiqueta a la izquierda, segmentos a la derecha y la consecuencia debajo.</summary>
+        /// <summary>Label on the left, segments on the right and the consequence below.</summary>
         private static UIElement Row(string label, StackPanel seg, TextBlock line)
         {
             var s = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
@@ -231,7 +231,7 @@ namespace Bimbridge.Addin.Ui
             return s;
         }
 
-        /// <summary>Icono de la cinta: engranaje marino con centro blanco, en el lienzo de 32×32 de <see cref="Icons"/>.</summary>
+        /// <summary>Ribbon icon: navy gear with a white center, on the 32×32 canvas of <see cref="Icons"/>.</summary>
         public static ImageSource Icon(int size)
         {
             var visual = new DrawingVisual();

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-//! Núcleos geométricos. Determinismo: mismos resultados que la referencia C# (desempates por índice).
+//! Geometry kernels. Determinism: same results as the C# reference (ties broken by index).
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -11,11 +11,11 @@ pub enum PeError {
 
 pub type PeResult<T> = Result<T, PeError>;
 
-/// La cancelación se consulta por TRABAJO hecho (puntos visitados), no por índice: un grupo patológico en una sola
-/// celda (n² comparaciones) también se cancela en milisegundos. Mismo criterio en C# (GeometryKernels.WorkCheck).
+/// Cancellation is checked by WORK done (points visited), not by index: a pathological cluster in a single
+/// cell (n² comparisons) is also cancelled within milliseconds. Same rule in C# (GeometryKernels.WorkCheck).
 pub const WORK_CHECK: usize = 1 << 16;
 
-/// Bandera de cancelación compartida (el núcleo C# la activa; los bucles la consultan cada bloque).
+/// Shared cancellation flag (the C# core sets it; loops check it every block).
 pub struct Cancel<'a>(pub Option<&'a AtomicBool>);
 
 impl<'a> Cancel<'a> {
@@ -31,28 +31,28 @@ impl<'a> Cancel<'a> {
 fn check_finite(v: &[f64], what: &str) -> PeResult<()> {
     for (i, x) in v.iter().enumerate() {
         if !x.is_finite() {
-            return Err(PeError::Invalid(format!("{what}: valor no finito en la posición {i}")));
+            return Err(PeError::Invalid(format!("{what}: non-finite value at position {i}")));
         }
     }
     Ok(())
 }
 
-/// Umbral a partir del cual se reparte el trabajo entre hilos.
+/// Threshold above which work is split across threads.
 pub const PAR_MIN: usize = 50_000;
 
 fn threads() -> usize {
     std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1).min(16)
 }
 
-// ---------------- transformaciones ----------------
+// ---------------- transforms ----------------
 
 pub fn transform3(xyz: &[f64], m: &[f64], out: &mut [f64], c: &Cancel) -> PeResult<()> {
     if m.len() != 12 {
-        return Err(PeError::Invalid("matriz 3x4 (12 valores)".into()));
+        return Err(PeError::Invalid("3x4 matrix (12 values)".into()));
     }
-    check_finite(m, "matriz")?;
+    check_finite(m, "matrix")?;
     if xyz.len() % 3 != 0 || out.len() != xyz.len() {
-        return Err(PeError::Invalid("búferes xyz inválidos".into()));
+        return Err(PeError::Invalid("invalid xyz buffers".into()));
     }
     let n = xyz.len() / 3;
     let work = |src: &[f64], dst: &mut [f64]| {
@@ -78,7 +78,7 @@ pub fn transform3(xyz: &[f64], m: &[f64], out: &mut [f64], c: &Cancel) -> PeResu
     c.check()
 }
 
-// ---------------- rejilla ----------------
+// ---------------- grid ----------------
 
 pub struct Grid<'a> {
     dim: usize,
@@ -97,10 +97,10 @@ fn pack(cx: i64, cy: i64, cz: i64) -> i64 {
 impl<'a> Grid<'a> {
     pub fn new(p: &'a [f64], dim: usize, cell: f64) -> PeResult<Self> {
         if dim != 2 && dim != 3 {
-            return Err(PeError::Invalid("dim 2 o 3".into()));
+            return Err(PeError::Invalid("dim 2 or 3".into()));
         }
         if !(cell > 0.0) || !cell.is_finite() {
-            return Err(PeError::Invalid("tamaño de celda > 0".into()));
+            return Err(PeError::Invalid("cell size > 0".into()));
         }
         let n = p.len() / dim;
         let mut o = [f64::MAX; 3];
@@ -140,7 +140,7 @@ impl<'a> Grid<'a> {
     }
 
     #[inline]
-    /// Visita los puntos de las celdas vecinas; devuelve cuántos visitó (trabajo, para consultar la cancelación por trabajo hecho).
+    /// Visits the points in neighbouring cells; returns how many it visited (work, so cancellation can be checked by work done).
     pub fn near<F: FnMut(usize)>(&self, x: f64, y: f64, z: f64, mut visit: F) -> usize {
         let mut visited = 0usize;
         let cx = self.cell_of(x, self.o[0]);
@@ -174,15 +174,15 @@ impl<'a> Grid<'a> {
     }
 }
 
-// ---------------- vecino más cercano ----------------
+// ---------------- nearest neighbour ----------------
 
 pub fn nearest(q: &[f64], r: &[f64], dim: usize, max_dist: f64, out_idx: &mut [i32], out_dist: &mut [f64], c: &Cancel) -> PeResult<()> {
-    check_finite(q, "consulta")?;
-    check_finite(r, "referencia")?;
+    check_finite(q, "query")?;
+    check_finite(r, "reference")?;
     let g = Grid::new(r, dim, max_dist)?;
     let n = q.len() / dim;
     if out_idx.len() != n || out_dist.len() != n {
-        return Err(PeError::Invalid("búferes de salida".into()));
+        return Err(PeError::Invalid("output buffers".into()));
     }
     let max2 = max_dist * max_dist;
     let one = |i: usize| -> (i32, f64, usize) {
@@ -239,16 +239,16 @@ pub fn nearest(q: &[f64], r: &[f64], dim: usize, max_dist: f64, out_idx: &mut [i
     c.check()
 }
 
-// ---------------- emparejamiento ----------------
+// ---------------- matching ----------------
 
 pub fn match_points(e: &[f64], o: &[f64], dim: usize, tol: f64, out: &mut [i32], c: &Cancel) -> PeResult<()> {
-    check_finite(e, "esperados")?;
-    check_finite(o, "observados")?;
+    check_finite(e, "expected")?;
+    check_finite(o, "observed")?;
     let g = Grid::new(o, dim, tol)?;
     let ne = e.len() / dim;
     let no = o.len() / dim;
     if out.len() != ne {
-        return Err(PeError::Invalid("búfer de salida".into()));
+        return Err(PeError::Invalid("output buffer".into()));
     }
     let t2 = tol * tol;
     let mut cand: Vec<(f64, u32, u32)> = Vec::new();
@@ -281,7 +281,7 @@ pub fn match_points(e: &[f64], o: &[f64], dim: usize, tol: f64, out: &mut [i32],
     Ok(())
 }
 
-// ---------------- duplicados y union-find ----------------
+// ---------------- duplicates and union-find ----------------
 
 pub struct UnionFind(Vec<u32>);
 
@@ -297,7 +297,7 @@ impl UnionFind {
         }
         x
     }
-    /// La raíz es siempre el menor índice (igual que C#).
+    /// The root is always the lowest index (same as C#).
     pub fn union(&mut self, a: usize, b: usize) {
         let a = self.find(a);
         let b = self.find(b);
@@ -313,10 +313,10 @@ impl UnionFind {
 }
 
 pub fn duplicates(p: &[f64], dim: usize, tol: f64, out: &mut [i32], c: &Cancel) -> PeResult<()> {
-    check_finite(p, "puntos")?;
+    check_finite(p, "points")?;
     let n = p.len() / dim;
     if out.len() != n {
-        return Err(PeError::Invalid("búfer de salida".into()));
+        return Err(PeError::Invalid("output buffer".into()));
     }
     let g = Grid::new(p, dim, tol)?;
     let mut uf = UnionFind::new(n);
@@ -342,7 +342,7 @@ pub fn duplicates(p: &[f64], dim: usize, tol: f64, out: &mut [i32], c: &Cancel) 
     Ok(())
 }
 
-// ---------------- segmentos ----------------
+// ---------------- segments ----------------
 
 pub const CROSS: i32 = 1;
 pub const TOUCH: i32 = 2;
@@ -397,7 +397,7 @@ pub fn classify(s: &[f64], i: usize, j: usize, eps: f64) -> i32 {
 }
 
 pub fn segment_contacts(s: &[f64], eps: f64, c: &Cancel) -> PeResult<Vec<(i32, i32, i32)>> {
-    check_finite(s, "segmentos")?;
+    check_finite(s, "segments")?;
     let n = s.len() / 4;
     let mut res = Vec::new();
     if n < 2 {
@@ -413,7 +413,7 @@ pub fn segment_contacts(s: &[f64], eps: f64, c: &Cancel) -> PeResult<Vec<(i32, i
         ox = ox.min(s[4 * i].min(s[4 * i + 2]));
         oy = oy.min(s[4 * i + 1].min(s[4 * i + 3]));
     }
-    // (celda, segmento) ordenado → cubetas contiguas
+    // sorted (cell, segment) → contiguous buckets
     let mut entries: Vec<(i64, u32)> = Vec::with_capacity(n * 2);
     for i in 0..n {
         let x0 = ((s[4 * i].min(s[4 * i + 2]) - ox) / cell - 1e-9).floor() as i64;
@@ -459,18 +459,18 @@ pub fn segment_contacts(s: &[f64], eps: f64, c: &Cancel) -> PeResult<Vec<(i32, i
     Ok(res)
 }
 
-// ---------------- grafos ----------------
+// ---------------- graphs ----------------
 
 pub fn components(nodes: usize, edges: &[i32], comp: &mut [i32], deg: &mut [i32]) -> PeResult<()> {
     if comp.len() != nodes || deg.len() != nodes {
-        return Err(PeError::Invalid("búferes de salida".into()));
+        return Err(PeError::Invalid("output buffers".into()));
     }
     let mut uf = UnionFind::new(nodes);
     deg.iter_mut().for_each(|d| *d = 0);
     for (e, ab) in edges.chunks_exact(2).enumerate() {
         let (a, b) = (ab[0], ab[1]);
         if a < 0 || b < 0 || a as usize >= nodes || b as usize >= nodes {
-            return Err(PeError::Invalid(format!("arista {e} con nodo fuera de rango")));
+            return Err(PeError::Invalid(format!("edge {e} has a node out of range")));
         }
         let (a, b) = (a as usize, b as usize);
         uf.union(a, b);
@@ -508,7 +508,7 @@ mod tests {
         let mut i = [0; 3];
         let mut d = [0.0; 3];
         nearest(&q, &r, 2, 1.0, &mut i, &mut d, &NC).unwrap();
-        assert_eq!(i, [0, 2, -1]); // empate 0.5/0.5 → menor índice
+        assert_eq!(i, [0, 2, -1]); // tie 0.5/0.5 → lowest index
         let mut m = [0; 3];
         match_points(&q, &r, 2, 1.0, &mut m, &NC).unwrap();
         assert_eq!(m, [0, 2, -1]);

@@ -11,10 +11,10 @@ using Bimbridge.Engine.Qc;
 namespace Bimbridge.Addin.Scripting
 {
     /// <summary>
-    /// Ayudas BIM para scripts y recetas (0.6.0, hito D). Son funciones de la API pública de Revit ya resueltas: no limitan lo que el
-    /// script puede hacer (sigue teniendo doc, la API completa y ctx), sólo ahorran código repetido y devuelven resultados compactos en mm.
-    /// Nada aquí abre transacciones: las que escriben (Grupos.Componer/CambiarTipo, Vistas.AplicarRango/FiltroPorCategoria) se llaman
-    /// dentro de la transacción del motor (exec con escritura o receta PorUnidad).
+    /// BIM helpers for scripts and recipes (0.6.0, milestone D). They are ready-made functions over the public Revit API: they do not limit what the
+    /// script can do (it still has doc, the full API and ctx), they only save repeated code and return compact results in mm.
+    /// Nothing here opens transactions: the ones that write (Groups.Compose/ChangeType, Views.ApplyRange/FilterByCategory) are called
+    /// inside the engine's transaction (exec with writes or a PerUnit recipe).
     /// </summary>
     public static class Bim
     {
@@ -38,16 +38,16 @@ namespace Bimbridge.Addin.Scripting
         }
 
         // =====================================================================================================
-        // GRUPOS
+        // GROUPS
         // =====================================================================================================
-        public static class Grupos
+        public static class Groups
         {
             /// <summary>
-            /// Lo que hay dentro de un grupo, con posiciones relativas a su origen (mm, sin rotación del grupo): permite comparar
-            /// instancias del mismo tipo aunque estén giradas. "miembros_espejados" cuenta los FamilyInstance con Mirrored=true
-            /// (la API no expone si el grupo entero está en espejo).
+            /// What is inside a group, with positions relative to its origin (mm, without the group rotation): lets you compare
+            /// instances of the same type even when rotated. "mirrored_members" counts the FamilyInstances with Mirrored=true
+            /// (the API does not expose whether the whole group is mirrored).
             /// </summary>
-            public static Dictionary<string, object> Inspeccionar(Group g)
+            public static Dictionary<string, object> Inspect(Group g)
             {
                 var doc = g.Document;
                 var o = (g.Location as LocationPoint)?.Point ?? XYZ.Zero;
@@ -60,26 +60,26 @@ namespace Bimbridge.Addin.Scripting
                 {
                     var m = doc.GetElement(id);
                     if (m == null) continue;
-                    if (m is Group sub) { nested.Add(new Dictionary<string, object> { ["id"] = L(id), ["tipo"] = sub.GroupType?.Name }); continue; }
+                    if (m is Group sub) { nested.Add(new Dictionary<string, object> { ["id"] = L(id), ["type"] = sub.GroupType?.Name }); continue; }
                     if (m is FamilyInstance fi && fi.Mirrored) mirrored++;
                     var p = PointOf(m);
                     var rel = p == null ? null : inv.OfPoint(p) - o;
                     members.Add(new Dictionary<string, object>
                     {
-                        ["id"] = L(id), ["uid"] = m.UniqueId, ["cat"] = m.Category?.Name, ["tipo"] = TypeName(doc, m),
+                        ["id"] = L(id), ["uid"] = m.UniqueId, ["cat"] = m.Category?.Name, ["type"] = TypeName(doc, m),
                         ["rel_mm"] = rel == null ? null : new[] { R(rel.X), R(rel.Y), R(rel.Z) },
                     });
                 }
                 return new Dictionary<string, object>
                 {
-                    ["id"] = L(g.Id), ["tipo"] = g.GroupType?.Name, ["origen_mm"] = new[] { R(o.X), R(o.Y), R(o.Z) },
-                    ["giro"] = Math.Round(rot * 180 / Math.PI, 3), ["miembros"] = members.Count, ["anidados"] = nested,
-                    ["miembros_espejados"] = mirrored, ["detalle"] = members,
+                    ["id"] = L(g.Id), ["type"] = g.GroupType?.Name, ["origin_mm"] = new[] { R(o.X), R(o.Y), R(o.Z) },
+                    ["rotation"] = Math.Round(rot * 180 / Math.PI, 3), ["members"] = members.Count, ["nested"] = nested,
+                    ["mirrored_members"] = mirrored, ["detail"] = members,
                 };
             }
 
-            /// <summary>Firma estable de un miembro: categoría|tipo|posición relativa redondeada a 10 mm. Sirve para emparejar miembros entre tipos.</summary>
-            public static string Firma(Group g, Element m)
+            /// <summary>Stable signature of a member: category|type|relative position rounded to 10 mm. Used to match members across types.</summary>
+            public static string Signature(Group g, Element m)
             {
                 var o = (g.Location as LocationPoint)?.Point ?? XYZ.Zero;
                 var rot = (g.Location as LocationPoint)?.Rotation ?? 0;
@@ -89,110 +89,110 @@ namespace Bimbridge.Addin.Scripting
                 return (m.Category?.Name ?? "?") + "|" + TypeName(m.Document, m) + "|" + r10(rel.X) + "," + r10(rel.Y) + "," + r10(rel.Z);
             }
 
-            /// <summary>Instancias de un tipo de grupo (por nombre o id).</summary>
-            public static IList<Group> Instancias(Document doc, string nombreTipo) =>
-                new FilteredElementCollector(doc).OfClass(typeof(Group)).Cast<Group>().Where(x => x.GroupType?.Name == nombreTipo).ToList();
+            /// <summary>Instances of a group type (by name or id).</summary>
+            public static IList<Group> Instances(Document doc, string typeName) =>
+                new FilteredElementCollector(doc).OfClass(typeof(Group)).Cast<Group>().Where(x => x.GroupType?.Name == typeName).ToList();
 
-            /// <summary>Crea un grupo con esos elementos y, si se da nombre, renombra su tipo (falla si ya existe un tipo con ese nombre).</summary>
-            public static Group Componer(Document doc, IEnumerable<ElementId> ids, string nombreTipo = null)
+            /// <summary>Creates a group with those elements and, if a name is given, renames its type (fails if a type with that name already exists).</summary>
+            public static Group Compose(Document doc, IEnumerable<ElementId> ids, string typeName = null)
             {
                 var list = ids.ToList();
-                if (list.Count == 0) throw new ArgumentException("no hay elementos para agrupar");
+                if (list.Count == 0) throw new ArgumentException("there are no elements to group");
                 var g = doc.Create.NewGroup(list);
-                if (!string.IsNullOrEmpty(nombreTipo))
+                if (!string.IsNullOrEmpty(typeName))
                 {
-                    if (new FilteredElementCollector(doc).OfClass(typeof(GroupType)).Any(t => t.Name == nombreTipo && t.Id != g.GroupType.Id))
-                        throw new ArgumentException("ya existe un tipo de grupo '" + nombreTipo + "'");
-                    g.GroupType.Name = nombreTipo;
+                    if (new FilteredElementCollector(doc).OfClass(typeof(GroupType)).Any(t => t.Name == typeName && t.Id != g.GroupType.Id))
+                        throw new ArgumentException("a group type already exists: '" + typeName + "'");
+                    g.GroupType.Name = typeName;
                 }
                 return g;
             }
 
             /// <summary>
-            /// Cambia el tipo de un grupo y comprueba que no se movió ni giró. Devuelve el emparejamiento de miembros por firma
-            /// (antes→después) y los que no tienen pareja, para que la receta decida (no se inventa correspondencia).
+            /// Changes the type of a group and checks that it did not move or rotate. Returns the member matching by signature
+            /// (before→after) and the unmatched ones, so the recipe decides (no correspondence is invented).
             /// </summary>
-            public static Dictionary<string, object> CambiarTipo(Group g, GroupType nuevo)
+            public static Dictionary<string, object> ChangeType(Group g, GroupType newType)
             {
-                if (nuevo == null) throw new ArgumentNullException(nameof(nuevo));
+                if (newType == null) throw new ArgumentNullException(nameof(newType));
                 var doc = g.Document;
                 var lp0 = g.Location as LocationPoint;
                 var o0 = lp0?.Point; var r0 = lp0?.Rotation ?? 0;
                 var before = g.GetMemberIds().Select(doc.GetElement).Where(m => m != null && !(m is Group))
-                    .GroupBy(m => Firma(g, m)).ToDictionary(x => x.Key, x => x.Select(m => L(m.Id)).ToList());
-                var anterior = g.GroupType?.Name;
-                g.GroupType = nuevo;
+                    .GroupBy(m => Signature(g, m)).ToDictionary(x => x.Key, x => x.Select(m => L(m.Id)).ToList());
+                var previous = g.GroupType?.Name;
+                g.GroupType = newType;
                 doc.Regenerate();
                 var lp1 = g.Location as LocationPoint;
                 var moved = o0 != null && lp1 != null ? lp1.Point.DistanceTo(o0) * Ft : 0;
                 var turned = lp1 != null ? Math.Abs(lp1.Rotation - r0) * 180 / Math.PI : 0;
                 var after = g.GetMemberIds().Select(doc.GetElement).Where(m => m != null && !(m is Group))
-                    .GroupBy(m => Firma(g, m)).ToDictionary(x => x.Key, x => x.Select(m => L(m.Id)).ToList());
-                var pares = before.Keys.Intersect(after.Keys).Select(k => new object[] { k, before[k], after[k] }).ToList();
+                    .GroupBy(m => Signature(g, m)).ToDictionary(x => x.Key, x => x.Select(m => L(m.Id)).ToList());
+                var pairs = before.Keys.Intersect(after.Keys).Select(k => new object[] { k, before[k], after[k] }).ToList();
                 return new Dictionary<string, object>
                 {
-                    ["grupo"] = L(g.Id), ["anterior"] = anterior, ["nuevo"] = g.GroupType?.Name, ["ok"] = g.GroupType?.Id == nuevo.Id,
-                    ["desplazado_mm"] = Math.Round(moved, 1), ["girado_grados"] = Math.Round(turned, 3),
-                    ["emparejados"] = pares.Count, ["solo_antes"] = before.Keys.Except(after.Keys).ToList(), ["solo_despues"] = after.Keys.Except(before.Keys).ToList(),
+                    ["group"] = L(g.Id), ["previous"] = previous, ["new"] = g.GroupType?.Name, ["ok"] = g.GroupType?.Id == newType.Id,
+                    ["displaced_mm"] = Math.Round(moved, 1), ["rotated_degrees"] = Math.Round(turned, 3),
+                    ["paired"] = pairs.Count, ["only_before"] = before.Keys.Except(after.Keys).ToList(), ["only_after"] = after.Keys.Except(before.Keys).ToList(),
                 };
             }
 
-            /// <summary>¿Todas las instancias del tipo tienen la misma composición (firmas)? Lista las que difieren (miembros excluidos, etc.).</summary>
-            public static Dictionary<string, object> VerificarComposicion(Document doc, string nombreTipo)
+            /// <summary>Do all instances of the type have the same composition (signatures)? Lists the ones that differ (excluded members, etc.).</summary>
+            public static Dictionary<string, object> VerifyComposition(Document doc, string typeName)
             {
-                var inst = Instancias(doc, nombreTipo);
-                var sigs = inst.ToDictionary(x => L(x.Id), x => string.Join(";", x.GetMemberIds().Select(doc.GetElement).Where(m => m != null).Select(m => Firma(x, m)).OrderBy(s => s, StringComparer.Ordinal)));
+                var inst = Instances(doc, typeName);
+                var sigs = inst.ToDictionary(x => L(x.Id), x => string.Join(";", x.GetMemberIds().Select(doc.GetElement).Where(m => m != null).Select(m => Signature(x, m)).OrderBy(s => s, StringComparer.Ordinal)));
                 var mode = sigs.Values.GroupBy(s => s).OrderByDescending(x => x.Count()).FirstOrDefault()?.Key;
                 var diff = sigs.Where(kv => kv.Value != mode).Select(kv => kv.Key).ToList();
-                return new Dictionary<string, object> { ["tipo"] = nombreTipo, ["instancias"] = inst.Count, ["distintas"] = diff, ["coherente"] = diff.Count == 0 };
+                return new Dictionary<string, object> { ["type"] = typeName, ["instances"] = inst.Count, ["different"] = diff, ["coherent"] = diff.Count == 0 };
             }
         }
 
         // =====================================================================================================
-        // MONTAJE
+        // MOUNTING
         // =====================================================================================================
-        public static class Montaje
+        public static class Mounting
         {
-            /// <summary>Cotas del cuerpo real (mm, sin "Light Source"): [zmin, zmax, fuente]. Si no hay sólidos usa la caja y lo dice.</summary>
-            public static Dictionary<string, object> Cuerpo(Element e)
+            /// <summary>Extents of the real body (mm, without "Light Source"): [zmin, zmax, fuente]. If there are no solids it uses the bounding box and says so.</summary>
+            public static Dictionary<string, object> Body(Element e)
             {
                 var solids = new List<Solid>();
                 Bodies.CollectSolids(e.get_Geometry(Bodies.NewOptions()), solids, e.Document, new[] { "Light Source" });
                 if (Bodies.TryBox(solids, out var box))
-                    return new Dictionary<string, object> { ["zmin"] = R(box.Min.Z), ["zmax"] = R(box.Max.Z), ["min"] = new[] { R(box.Min.X), R(box.Min.Y) }, ["max"] = new[] { R(box.Max.X), R(box.Max.Y) }, ["fuente"] = "solidos" };
+                    return new Dictionary<string, object> { ["zmin"] = R(box.Min.Z), ["zmax"] = R(box.Max.Z), ["min"] = new[] { R(box.Min.X), R(box.Min.Y) }, ["max"] = new[] { R(box.Max.X), R(box.Max.Y) }, ["source"] = "solids" };
                 var bb = e.get_BoundingBox(null);
                 if (bb == null) return null;
-                return new Dictionary<string, object> { ["zmin"] = R(bb.Min.Z), ["zmax"] = R(bb.Max.Z), ["min"] = new[] { R(bb.Min.X), R(bb.Min.Y) }, ["max"] = new[] { R(bb.Max.X), R(bb.Max.Y) }, ["fuente"] = "caja (sin sólidos: dato aproximado)" };
+                return new Dictionary<string, object> { ["zmin"] = R(bb.Min.Z), ["zmax"] = R(bb.Max.Z), ["min"] = new[] { R(bb.Min.X), R(bb.Min.Y) }, ["max"] = new[] { R(bb.Max.X), R(bb.Max.Y) }, ["source"] = "box (no solids: approximate value)" };
             }
 
-            /// <summary>Primera vista 3D no plantilla y sin caja de sección (ReferenceIntersector la necesita).</summary>
-            public static View3D Vista3D(Document doc) =>
+            /// <summary>First 3D view that is not a template and has no section box (ReferenceIntersector needs it).</summary>
+            public static View3D View3D(Document doc) =>
                 new FilteredElementCollector(doc).OfClass(typeof(View3D)).Cast<View3D>().Where(v => !v.IsTemplate)
                     .OrderBy(v => v.IsSectionBoxActive ? 1 : 0).FirstOrDefault();
 
             /// <summary>
-            /// Busca el soporte del cuerpo con un rayo desde la base del cuerpo en <paramref name="direccion"/> ("arriba" | "abajo"),
-            /// también dentro de vínculos. Clasifica: al_ras (|holgura| ≤ tol), empotrado (el soporte corta el cuerpo), separado (holgura
-            /// positiva: puede ser correcto si es colgante; lo decide quien revisa), sin_referencia (nada en maxMm). No mueve nada.
+            /// Finds the body's support with a ray from the body base in <paramref name="direction"/> ("up" | "down"),
+            /// also inside links. Classifies: al_ras (|clearance| ≤ tol), empotrado (the support cuts the body), separado (positive
+            /// clearance: may be correct if pendant-mounted; the reviewer decides), sin_referencia (nothing within maxMm). Moves nothing.
             /// </summary>
-            public static Dictionary<string, object> Soporte(Element e, View3D vista, string direccion = "arriba", double maxMm = 3000, double tolMm = 3,
-                IEnumerable<BuiltInCategory> categorias = null)
+            public static Dictionary<string, object> Support(Element e, View3D view, string direction = "up", double maxMm = 3000, double tolMm = 3,
+                IEnumerable<BuiltInCategory> categories = null)
             {
                 var doc = e.Document;
-                vista = vista ?? Vista3D(doc) ?? throw new InvalidOperationException("no hay una vista 3D no plantilla para lanzar rayos");
-                var body = Cuerpo(e);
-                if (body == null) return new Dictionary<string, object> { ["id"] = L(e.Id), ["clase"] = "sin_cuerpo" };
-                var up = direccion != "abajo";
-                var cats = (categorias ?? new[] { BuiltInCategory.OST_Floors, BuiltInCategory.OST_Ceilings, BuiltInCategory.OST_Roofs, BuiltInCategory.OST_StructuralFraming,
+                view = view ?? View3D(doc) ?? throw new InvalidOperationException("there is no non-template 3D view to cast rays");
+                var body = Body(e);
+                if (body == null) return new Dictionary<string, object> { ["id"] = L(e.Id), ["class"] = "no_body" };
+                var up = direction != "down";
+                var cats = (categories ?? new[] { BuiltInCategory.OST_Floors, BuiltInCategory.OST_Ceilings, BuiltInCategory.OST_Roofs, BuiltInCategory.OST_StructuralFraming,
                     BuiltInCategory.OST_Stairs, BuiltInCategory.OST_Ramps, BuiltInCategory.OST_GenericModel }).ToList();
-                // El filtro debe aceptar también la instancia de vínculo; la categoría de lo encontrado dentro del vínculo se comprueba después.
+                // The filter must also accept the link instance; the category of what is found inside the link is checked afterwards.
                 ElementFilter f = new LogicalOrFilter(new ElementMulticategoryFilter(cats), new ElementClassFilter(typeof(RevitLinkInstance)));
                 f = new LogicalAndFilter(f, new ExclusionFilter(new List<ElementId> { e.Id }));
-                var ri = new ReferenceIntersector(f, FindReferenceTarget.Face, vista) { FindReferencesInRevitLinks = true };
+                var ri = new ReferenceIntersector(f, FindReferenceTarget.Face, view) { FindReferencesInRevitLinks = true };
                 var min = (double[])body["min"]; var max = (double[])body["max"];
                 var cx = (min[0] + max[0]) / 2 / Ft; var cy = (min[1] + max[1]) / 2 / Ft;
                 var zmin = (double)body["zmin"] / Ft; var zmax = (double)body["zmax"] / Ft;
-                // Origen 1 mm por fuera del cuerpo por el lado opuesto: así un soporte que corta el cuerpo aparece a menos de su altura.
+                // Origin 1 mm outside the body on the opposite side: this way a support that cuts the body shows up closer than its height.
                 var start = up ? zmin - 1 / Ft : zmax + 1 / Ft;
                 var height = (zmax - zmin) + 1 / Ft;
                 var hits = ri.Find(new XYZ(cx, cy, start), up ? XYZ.BasisZ : -XYZ.BasisZ) ?? new List<ReferenceWithContext>();
@@ -212,19 +212,19 @@ namespace Bimbridge.Addin.Scripting
                     else hit = host;
                     if (hit == null) continue;
                     var gap = (h.Proximity - height) * Ft;
-                    var clase = Math.Abs(gap) <= tolMm ? "al_ras" : gap < 0 ? "empotrado" : "separado";
+                    var cls = Math.Abs(gap) <= tolMm ? "flush" : gap < 0 ? "embedded" : "separated";
                     return new Dictionary<string, object>
                     {
-                        ["id"] = L(e.Id), ["clase"] = clase, ["holgura_mm"] = Math.Round(gap, 1), ["soporte"] = L(hit.Id), ["soporte_uid"] = hit.UniqueId,
-                        ["soporte_cat"] = hit.Category?.Name, ["vinculo"] = link, ["cuerpo"] = body["fuente"], ["direccion"] = up ? "arriba" : "abajo",
-                        ["regla"] = "rayo vertical desde el centro de la huella del cuerpo; tolerancia " + tolMm + " mm",
+                        ["id"] = L(e.Id), ["class"] = cls, ["clearance_mm"] = Math.Round(gap, 1), ["support"] = L(hit.Id), ["support_uid"] = hit.UniqueId,
+                        ["support_cat"] = hit.Category?.Name, ["link"] = link, ["body"] = body["source"], ["direction"] = up ? "up" : "down",
+                        ["rule"] = "vertical ray from the center of the body footprint; tolerance " + tolMm + " mm",
                     };
                 }
-                return new Dictionary<string, object> { ["id"] = L(e.Id), ["clase"] = "sin_referencia", ["direccion"] = up ? "arriba" : "abajo", ["max_mm"] = maxMm };
+                return new Dictionary<string, object> { ["id"] = L(e.Id), ["class"] = "no_reference", ["direction"] = up ? "up" : "down", ["max_mm"] = maxMm };
             }
 
-            /// <summary>Transform de Revit (pies) → Xform del motor (mm) para usar ManifestQc/transformaciones sin Revit.</summary>
-            public static Xform Transformacion(Transform t) => new Xform
+            /// <summary>Revit Transform (feet) → engine Xform (mm) to use ManifestQc/transformations without Revit.</summary>
+            public static Xform Transformation(Transform t) => new Xform
             {
                 X = new[] { t.BasisX.X, t.BasisX.Y, t.BasisX.Z }, Y = new[] { t.BasisY.X, t.BasisY.Y, t.BasisY.Z },
                 Z = new[] { t.BasisZ.X, t.BasisZ.Y, t.BasisZ.Z }, O = new[] { t.Origin.X * Ft, t.Origin.Y * Ft, t.Origin.Z * Ft },
@@ -232,59 +232,59 @@ namespace Bimbridge.Addin.Scripting
         }
 
         // =====================================================================================================
-        // VISTAS
+        // VIEWS
         // =====================================================================================================
-        public static class Vistas
+        public static class Views
         {
             private static readonly PlanViewPlane[] Planes = { PlanViewPlane.TopClipPlane, PlanViewPlane.CutPlane, PlanViewPlane.BottomClipPlane, PlanViewPlane.ViewDepthPlane };
-            private static string PlaneName(PlanViewPlane p) => p == PlanViewPlane.TopClipPlane ? "superior" : p == PlanViewPlane.CutPlane ? "corte" : p == PlanViewPlane.BottomClipPlane ? "inferior" : "profundidad";
+            private static string PlaneName(PlanViewPlane p) => p == PlanViewPlane.TopClipPlane ? "top" : p == PlanViewPlane.CutPlane ? "cut" : p == PlanViewPlane.BottomClipPlane ? "bottom" : "depth";
 
-            /// <summary>Rango de vista: por plano, nivel + desfase y cota absoluta (mm, elevación de proyecto). "ilimitado" cuando aplica.</summary>
-            public static Dictionary<string, object> Rango(ViewPlan v)
+            /// <summary>View range: per plane, level + offset and absolute elevation (mm, project elevation). "unlimited" when applicable.</summary>
+            public static Dictionary<string, object> Range(ViewPlan v)
             {
                 var doc = v.Document;
                 var r = v.GetViewRange();
-                var o = new Dictionary<string, object> { ["vista"] = L(v.Id), ["nombre"] = v.Name, ["tipo"] = v.ViewType.ToString() };
+                var o = new Dictionary<string, object> { ["view"] = L(v.Id), ["name"] = v.Name, ["type"] = v.ViewType.ToString() };
                 foreach (var p in Planes)
                 {
                     var lid = r.GetLevelId(p);
                     var off = r.GetOffset(p);
-                    if (lid == PlanViewRange.Unlimited) { o[PlaneName(p)] = new Dictionary<string, object> { ["nivel"] = "ilimitado" }; continue; }
+                    if (lid == PlanViewRange.Unlimited) { o[PlaneName(p)] = new Dictionary<string, object> { ["level"] = "unlimited" }; continue; }
                     var lvl = lid == PlanViewRange.LevelAbove ? null : lid == PlanViewRange.Current ? v.GenLevel : doc.GetElement(lid) as Level;
                     o[PlaneName(p)] = new Dictionary<string, object>
                     {
-                        ["nivel"] = lid == PlanViewRange.LevelAbove ? "nivel superior" : lvl?.Name, ["desfase_mm"] = R(off),
-                        ["cota_mm"] = lvl == null ? (object)null : R(lvl.Elevation + off),
+                        ["level"] = lid == PlanViewRange.LevelAbove ? "level above" : lvl?.Name, ["offset_mm"] = R(off),
+                        ["dimension_mm"] = lvl == null ? (object)null : R(lvl.Elevation + off),
                     };
                 }
                 var tid = v.ViewTemplateId;
-                if (tid != ElementId.InvalidElementId) o["plantilla"] = doc.GetElement(tid)?.Name;
+                if (tid != ElementId.InvalidElementId) o["template"] = doc.GetElement(tid)?.Name;
                 return o;
             }
 
             /// <summary>
-            /// Cambia un plano del rango ("superior"|"corte"|"inferior"|"profundidad") a nivel + desfase (mm). Falla con mensaje claro si una
-            /// plantilla controla el rango. Requiere transacción.
+            /// Changes a range plane ("top"|"cut"|"bottom"|"depth") to level + offset (mm). Fails with a clear message if a
+            /// template controls the range. Requires a transaction.
             /// </summary>
-            public static void AplicarRango(ViewPlan v, string plano, Level nivel, double desfaseMm)
+            public static void ApplyRange(ViewPlan v, string plane, Level level, double offsetMm)
             {
-                var p = Planes.FirstOrDefault(x => PlaneName(x) == plano);
-                if (PlaneName(p) != plano) throw new ArgumentException("plano debe ser superior, corte, inferior o profundidad");
+                var p = Planes.FirstOrDefault(x => PlaneName(x) == plane);
+                if (PlaneName(p) != plane) throw new ArgumentException("plane must be top, cut, bottom or depth");
                 var tid = v.ViewTemplateId;
                 if (tid != ElementId.InvalidElementId && v.Document.GetElement(tid) is View t
                     && !t.GetNonControlledTemplateParameterIds().Contains(new ElementId(BuiltInParameter.PLAN_VIEW_RANGE)))
-                    throw new InvalidOperationException("la plantilla '" + t.Name + "' controla el rango de vista de '" + v.Name + "'");
+                    throw new InvalidOperationException("the template '" + t.Name + "' controls the view range of '" + v.Name + "'");
                 var r = v.GetViewRange();
-                r.SetLevelId(p, nivel.Id);
-                r.SetOffset(p, desfaseMm / Ft);
+                r.SetLevelId(p, level.Id);
+                r.SetOffset(p, offsetMm / Ft);
                 v.SetViewRange(r);
             }
 
-            /// <summary>Qué parámetros controla la plantilla de la vista y cuáles no (nombres), para saber qué se puede cambiar en la vista.</summary>
-            public static Dictionary<string, object> CompararPlantilla(View v)
+            /// <summary>Which parameters the view template controls and which it does not (names), to know what can be changed in the view.</summary>
+            public static Dictionary<string, object> CompareTemplate(View v)
             {
                 var doc = v.Document;
-                if (!(doc.GetElement(v.ViewTemplateId) is View t)) return new Dictionary<string, object> { ["vista"] = v.Name, ["plantilla"] = null };
+                if (!(doc.GetElement(v.ViewTemplateId) is View t)) return new Dictionary<string, object> { ["view"] = v.Name, ["template"] = null };
                 var all = t.GetTemplateParameterIds();
                 var free = new HashSet<ElementId>(t.GetNonControlledTemplateParameterIds());
                 string name(ElementId id)
@@ -295,18 +295,18 @@ namespace Bimbridge.Addin.Scripting
                 }
                 return new Dictionary<string, object>
                 {
-                    ["vista"] = v.Name, ["plantilla"] = t.Name,
-                    ["controla"] = all.Where(i => !free.Contains(i)).Select(name).OrderBy(s => s).ToList(),
-                    ["libres"] = all.Where(free.Contains).Select(name).OrderBy(s => s).ToList(),
+                    ["view"] = v.Name, ["template"] = t.Name,
+                    ["controls"] = all.Where(i => !free.Contains(i)).Select(name).OrderBy(s => s).ToList(),
+                    ["free_items"] = all.Where(free.Contains).Select(name).OrderBy(s => s).ToList(),
                 };
             }
 
             /// <summary>
-            /// ¿Por qué no se ve <paramref name="e"/> en <paramref name="v"/>? Junta los hechos con la API y deja que VisibilityQc decida.
-            /// Las regiones de plano de la vista se listan, pero su rango no es legible por la API pública: si el elemento cae dentro de una,
-            /// el veredicto de rango se marca como no comprobable.
+            /// Why is <paramref name="e"/> not visible in <paramref name="v"/>? Gathers the facts with the API and lets VisibilityQc decide.
+            /// The view's plan regions are listed, but their range is not readable through the public API: if the element falls inside one,
+            /// the range verdict is marked as not checkable.
             /// </summary>
-            public static Dictionary<string, object> PorQueNoSeVe(View v, Element e)
+            public static Dictionary<string, object> WhyNotVisible(View v, Element e)
             {
                 var doc = v.Document;
                 var f = new VisibilityQc.Facts();
@@ -321,7 +321,7 @@ namespace Bimbridge.Addin.Scripting
                         var fe = doc.GetElement(fid);
                         if (MatchesFilter(fe, e)) f.HidingFilters.Add(fe.Name);
                     }
-                    catch (Exception ex) { notes.Add("filtro " + L(fid) + ": " + ex.Message); }
+                    catch (Exception ex) { notes.Add("filter " + L(fid) + ": " + ex.Message); }
                 }
                 if (doc.IsWorkshared && e.WorksetId != WorksetId.InvalidWorksetId)
                 {
@@ -343,7 +343,7 @@ namespace Bimbridge.Addin.Scripting
                 }
                 catch (Exception) { f.PhaseHidden = null; }
                 f.DesignOptionHidden = e.DesignOption == null ? false : (bool?)null;
-                if (e.DesignOption != null) notes.Add("pertenece a la opción de diseño '" + e.DesignOption.Name + "': la API no dice qué opción muestra la vista");
+                if (e.DesignOption != null) notes.Add("belongs to design option '" + e.DesignOption.Name + "': the API does not say which option the view shows");
                 f.Template = doc.GetElement(v.ViewTemplateId)?.Name;
                 f.CropActive = v.CropBoxActive;
                 var ebb = e.get_BoundingBox(null);
@@ -358,15 +358,15 @@ namespace Bimbridge.Addin.Scripting
                     }
                     catch (Exception) { f.InsideCrop = null; }
                 }
-                var regiones = new List<long>();
+                var regions = new List<long>();
                 if (v is ViewPlan vp)
                 {
-                    f.PlanKind = vp.ViewType == ViewType.CeilingPlan ? "rcp" : vp.ViewType == ViewType.FloorPlan || vp.ViewType == ViewType.EngineeringPlan ? "planta" : null;
-                    var rg = Rango(vp);
-                    double? cota(string k) => rg.TryGetValue(k, out var x) && x is Dictionary<string, object> d && d.TryGetValue("cota_mm", out var c) && c is double cd ? cd : (double?)null;
-                    f.Top = cota("superior"); f.Cut = cota("corte"); f.Bottom = cota("inferior"); f.Depth = cota("profundidad");
-                    f.RangeSource = "rango de la vista";
-                    var body = Montaje.Cuerpo(e);
+                    f.PlanKind = vp.ViewType == ViewType.CeilingPlan ? "rcp" : vp.ViewType == ViewType.FloorPlan || vp.ViewType == ViewType.EngineeringPlan ? "floorplan" : null;
+                    var rg = Range(vp);
+                    double? elevation(string k) => rg.TryGetValue(k, out var x) && x is Dictionary<string, object> d && d.TryGetValue("dimension_mm", out var c) && c is double cd ? cd : (double?)null;
+                    f.Top = elevation("top"); f.Cut = elevation("cut"); f.Bottom = elevation("bottom"); f.Depth = elevation("depth");
+                    f.RangeSource = "view range";
+                    var body = Mounting.Body(e);
                     if (body != null) { f.ZMin = (double)body["zmin"]; f.ZMax = (double)body["zmax"]; }
                     try
                     {
@@ -374,23 +374,23 @@ namespace Bimbridge.Addin.Scripting
                         foreach (var pr in new FilteredElementCollector(doc, v.Id).OfCategory(BuiltInCategory.OST_PlanRegion).WhereElementIsNotElementType())
                         {
                             var bb = pr.get_BoundingBox(v);
-                            if (ept != null && bb != null && ept.X >= bb.Min.X && ept.X <= bb.Max.X && ept.Y >= bb.Min.Y && ept.Y <= bb.Max.Y) regiones.Add(L(pr.Id));
+                            if (ept != null && bb != null && ept.X >= bb.Min.X && ept.X <= bb.Max.X && ept.Y >= bb.Min.Y && ept.Y <= bb.Max.Y) regions.Add(L(pr.Id));
                         }
                     }
                     catch (Exception) { }
-                    if (regiones.Count > 0)
+                    if (regions.Count > 0)
                     {
-                        notes.Add("cae en la caja de región(es) de plano " + string.Join(", ", regiones) + ": su rango no es legible por la API pública; el veredicto de rango de la vista puede no aplicar");
-                        f.RangeSource = "rango de la vista (hay región de plano encima: comprobar a mano)";
+                        notes.Add("falls inside the box of plan region(s) " + string.Join(", ", regions) + ": their range is not readable through the public API; the view range verdict may not apply");
+                        f.RangeSource = "view range (a plan region overlaps: check by hand)";
                     }
                 }
                 var reasons = VisibilityQc.Explain(f, out var notCheckable);
-                if (regiones.Count > 0) foreach (var r in reasons.Where(x => x.Code == "rango_de_vista")) r.Certain = false;
+                if (regions.Count > 0) foreach (var r in reasons.Where(x => x.Code == "view_range_of")) r.Certain = false;
                 return new Dictionary<string, object>
                 {
-                    ["vista"] = v.Name, ["id"] = L(e.Id), ["visible_segun_api"] = reasons.Count == 0,
-                    ["causas"] = reasons.Select(x => x.ToString()).ToList(), ["no_comprobable"] = notCheckable.Concat(notes).ToList(),
-                    ["cuerpo_mm"] = f.ZMin.HasValue ? new[] { f.ZMin.Value, f.ZMax.Value } : null, ["regiones_de_plano"] = regiones,
+                    ["view"] = v.Name, ["id"] = L(e.Id), ["visible_per_api"] = reasons.Count == 0,
+                    ["causes"] = reasons.Select(x => x.ToString()).ToList(), ["not_checkable"] = notCheckable.Concat(notes).ToList(),
+                    ["body_mm"] = f.ZMin.HasValue ? new[] { f.ZMin.Value, f.ZMax.Value } : null, ["plan_regions"] = regions,
                 };
             }
 
@@ -403,35 +403,35 @@ namespace Bimbridge.Addin.Scripting
             }
 
             /// <summary>
-            /// Filtro de vista "parámetro de texto = valor" para unas categorías. Si ya existe uno con ese nombre se devuelve sin tocarlo.
-            /// Requiere transacción.
+            /// View filter "text parameter = value" for some categories. If one with that name already exists it is returned untouched.
+            /// Requires a transaction.
             /// </summary>
-            public static ParameterFilterElement FiltroPorCategoria(Document doc, string nombre, IEnumerable<BuiltInCategory> categorias, BuiltInParameter parametro, string valor)
+            public static ParameterFilterElement FilterByCategory(Document doc, string name, IEnumerable<BuiltInCategory> categories, BuiltInParameter parameter, string value)
             {
-                var existing = new FilteredElementCollector(doc).OfClass(typeof(ParameterFilterElement)).Cast<ParameterFilterElement>().FirstOrDefault(x => x.Name == nombre);
+                var existing = new FilteredElementCollector(doc).OfClass(typeof(ParameterFilterElement)).Cast<ParameterFilterElement>().FirstOrDefault(x => x.Name == name);
                 if (existing != null) return existing;
-                var cats = categorias.Select(c => new ElementId(c)).ToList();
-                var pid = new ElementId(parametro);
+                var cats = categories.Select(c => new ElementId(c)).ToList();
+                var pid = new ElementId(parameter);
 #if REVIT2023_OR_GREATER
-                var rule = ParameterFilterRuleFactory.CreateEqualsRule(pid, valor);
+                var rule = ParameterFilterRuleFactory.CreateEqualsRule(pid, value);
 #else
-                var rule = ParameterFilterRuleFactory.CreateEqualsRule(pid, valor, false);
+                var rule = ParameterFilterRuleFactory.CreateEqualsRule(pid, value, false);
 #endif
-                return ParameterFilterElement.Create(doc, nombre, cats, new ElementParameterFilter(rule));
+                return ParameterFilterElement.Create(doc, name, cats, new ElementParameterFilter(rule));
             }
         }
 
         // =====================================================================================================
-        // MANIFIESTO (QC uno a uno contra una lista esperada)
+        // MANIFEST (one-to-one QC against an expected list)
         // =====================================================================================================
-        public static class Manifiesto
+        public static class Manifest
         {
-            /// <summary>Convierte elementos del modelo a lo que compara ManifestQc (mm, giro por BasisX, nivel, etiquetas, grupo).</summary>
-            public static List<ManifestQc.Actual> Juntar(Document doc, IEnumerable<Element> elems, View vistaEtiquetas = null)
+            /// <summary>Converts model elements to what ManifestQc compares (mm, rotation from BasisX, level, tags, group).</summary>
+            public static List<ManifestQc.Actual> Collect(Document doc, IEnumerable<Element> elems, View tagView = null)
             {
                 var list = elems.Where(x => x != null).ToList();
                 var tagCount = new Dictionary<ElementId, int>();
-                var tags = vistaEtiquetas != null ? new FilteredElementCollector(doc, vistaEtiquetas.Id).OfClass(typeof(IndependentTag)) : new FilteredElementCollector(doc).OfClass(typeof(IndependentTag));
+                var tags = tagView != null ? new FilteredElementCollector(doc, tagView.Id).OfClass(typeof(IndependentTag)) : new FilteredElementCollector(doc).OfClass(typeof(IndependentTag));
                 foreach (IndependentTag t in tags)
                 {
                     ICollection<ElementId> ids;
@@ -467,12 +467,12 @@ namespace Bimbridge.Addin.Scripting
                 };
             }
 
-            /// <summary>QC completo: lee el manifiesto (JSON de ManifestQc.Parse), compara y devuelve el resultado.</summary>
-            public static ManifestQc.Result Qc(Document doc, string manifestJson, IEnumerable<Element> elems, View vistaEtiquetas = null)
+            /// <summary>Full QC: reads the manifest (ManifestQc.Parse JSON), compares and returns the result.</summary>
+            public static ManifestQc.Result Qc(Document doc, string manifestJson, IEnumerable<Element> elems, View tagView = null)
             {
                 var json = Bimbridge.Protocol.Json.ParseObject(manifestJson);
                 var expected = ManifestQc.Parse(json, out var opt);
-                return ManifestQc.Run(expected, Juntar(doc, elems, vistaEtiquetas), opt);
+                return ManifestQc.Run(expected, Collect(doc, elems, tagView), opt);
             }
         }
     }

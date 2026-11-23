@@ -9,17 +9,17 @@ using System.Text;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// Formato de texto compacto para la IA (perfil compacto). Mismo contenido que el JSON, menos tokens:
-    /// - sin comillas, llaves ni nombres de campo repetidos;
-    /// - tablas como "col|col" + una fila por línea;
-    /// - columnas con un solo valor salen una vez ("fijo:");
-    /// - columnas de texto muy repetido se codifican con un diccionario ("col#: 1=…, 2=…");
-    /// - listas de ids consecutivos se acortan a rangos (17858356-17858370).
-    /// Es reversible para una persona o una IA; no se pierde información.
+    /// Compact text format for the AI (compact profile). Same content as the JSON, fewer tokens:
+    /// - no quotes, braces or repeated field names;
+    /// - tables as "col|col" + one row per line;
+    /// - columns with a single value are printed once ("fixed:");
+    /// - columns of highly repeated text are encoded with a dictionary ("col#: 1=…, 2=…");
+    /// - lists of consecutive ids are shortened to ranges (17858356-17858370).
+    /// It is reversible for a person or an AI; no information is lost.
     /// </summary>
     public static class CompactText
     {
-        private static readonly string[] First = { "estado", "aviso" };
+        private static readonly string[] First = { "status", "warning" };
 
         public static string Write(object value)
         {
@@ -89,7 +89,7 @@ namespace Bimbridge.Engine
                 sb.Append(pad).Append(label).Append(Ranges(items)).Append('\n');
                 return;
             }
-            // Lista de objetos con las mismas claves → tabla
+            // List of objects with the same keys → table
             if (items.All(i => i is IDictionary<string, object> x && x.Values.All(IsScalar)))
             {
                 var cols = new List<string>();
@@ -113,20 +113,20 @@ namespace Bimbridge.Engine
         private static void WriteTable(StringBuilder sb, List<string> cols, List<object[]> rows, int indent)
         {
             var pad = new string(' ', indent);
-            if (rows.Count == 0) { sb.Append(pad).Append("filas: 0 (").Append(string.Join("|", cols)).Append(")\n"); return; }
+            if (rows.Count == 0) { sb.Append(pad).Append("rows: 0 (").Append(string.Join("|", cols)).Append(")\n"); return; }
             var keep = new List<int>();
             var fixedParts = new List<string>();
             for (var c = 0; c < cols.Count; c++)
             {
                 var first = Cell(rows[0], c);
                 if (rows.Count > 2 && rows.All(r => Cell(r, c) == first))
-                    fixedParts.Add(cols[c] + "=" + (first.Length == 0 ? "(vacío)" : first));
+                    fixedParts.Add(cols[c] + "=" + (first.Length == 0 ? "(empty)" : first));
                 else keep.Add(c);
             }
-            if (fixedParts.Count > 0) sb.Append(pad).Append("fijo: ").Append(string.Join("; ", fixedParts)).Append('\n');
-            if (keep.Count == 0) { sb.Append(pad).Append("filas: ").Append(rows.Count).Append('\n'); return; }
+            if (fixedParts.Count > 0) sb.Append(pad).Append("fixed: ").Append(string.Join("; ", fixedParts)).Append('\n');
+            if (keep.Count == 0) { sb.Append(pad).Append("rows: ").Append(rows.Count).Append('\n'); return; }
 
-            // Diccionario por columna cuando ahorra al menos un 30 % de esa columna
+            // Per-column dictionary when it saves at least 30 % of that column
             var dict = new Dictionary<int, Dictionary<string, int>>();
             foreach (var c in keep)
             {
@@ -173,7 +173,7 @@ namespace Bimbridge.Engine
             {
                 case null: return "";
                 case string s: return s.Replace("\r", "").Replace("\n", "⏎");
-                case bool b: return b ? "sí" : "no";
+                case bool b: return b ? "yes" : "no";
                 case double d: return double.IsNaN(d) ? "" : d.ToString("0.######", CultureInfo.InvariantCulture);
                 case float f: return ((double)f).ToString("0.######", CultureInfo.InvariantCulture);
                 case IDictionary<string, object> nd: return "{" + string.Join(", ", nd.Select(kv => kv.Key + "=" + Scalar(kv.Value))) + "}";
@@ -182,7 +182,7 @@ namespace Bimbridge.Engine
             }
         }
 
-        /// <summary>Enteros consecutivos → a-b (sólo con 3 o más seguidos). El resto, separado por comas.</summary>
+        /// <summary>Consecutive integers → a-b (only with 3 or more in a row). The rest, comma-separated.</summary>
         public static string Ranges(IList<object> items)
         {
             if (items.Count < 3 || !items.All(i => i is long || i is int))

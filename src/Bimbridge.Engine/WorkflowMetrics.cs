@@ -5,14 +5,14 @@ using System.Linq;
 namespace Bimbridge.Engine
 {
     /// <summary>
-    /// 0.9.1 (instrumentación para el benchmark frente a pyRevit): métricas de un workflow con su procedencia declarada.
-    /// Cada métrica es OBSERVADA (medida en este proceso: cronómetro, contador incrementado en el punto exacto), ESTIMADA
-    /// (calculada, p. ej. tokens = bytes/4) o NO INSTRUMENTADA (no se mide en esta ruta). Nunca se informa como observado algo que
-    /// sólo está parcialmente contado: los contadores de llamadas a la API de Revit no existen todavía y se declaran así.
+    /// 0.9.1 (instrumentation for the benchmark against pyRevit): workflow metrics with their declared provenance.
+    /// Each metric is OBSERVED (measured in this process: stopwatch, counter incremented at the exact point), ESTIMATED
+    /// (computed, e.g. tokens = bytes/4) or NOT INSTRUMENTED (not measured on this path). Something only partially counted
+    /// is never reported as observed: Revit API call counters do not exist yet and are declared as such.
     /// </summary>
     public sealed class WorkflowMetrics
     {
-        /// <summary>Nombres oficiales de la directiva, en orden.</summary>
+        /// <summary>Official names from the directive, in order.</summary>
         public static readonly string[] Names =
         {
             "total_ms", "queue_ms", "revit_main_thread_ms", "revit_slices", "revit_max_slice_ms", "api_calls", "elements_read", "elements_written",
@@ -31,15 +31,15 @@ namespace Bimbridge.Engine
 
         private static void Check(string name)
         {
-            if (System.Array.IndexOf(Names, name) < 0) throw new System.ArgumentException("métrica desconocida: " + name);
+            if (System.Array.IndexOf(Names, name) < 0) throw new System.ArgumentException("unknown metric: " + name);
         }
 
-        /// <summary>Métricas del hilo de Revit tal como las mide MainThread (observadas).</summary>
+        /// <summary>Revit thread metrics as measured by MainThread (observed).</summary>
         public static WorkflowMetrics FromMainThread(long totalMs, long waitMs, long busyMs, int slices, long maxSliceMs) =>
             new WorkflowMetrics().Observe("total_ms", totalMs).Observe("queue_ms", waitMs).Observe("revit_main_thread_ms", busyMs)
                                  .Observe("revit_slices", slices).Observe("revit_max_slice_ms", maxSliceMs);
 
-        /// <summary>Tamaño de la respuesta serializada (observado) y su coste en tokens (estimado: bytes/4, no lo informa el cliente MCP).</summary>
+        /// <summary>Size of the serialized response (observed) and its token cost (estimated: bytes/4, not reported by the MCP client).</summary>
         public WorkflowMetrics Payload(long bytes, long serializationMs)
         {
             Observe("payload_bytes", bytes);
@@ -51,12 +51,12 @@ namespace Bimbridge.Engine
         {
             var d = new Dictionary<string, object>
             {
-                ["observadas"] = Names.Where(_observed.ContainsKey).ToDictionary(n => n, n => (object)_observed[n]),
+                ["observed"] = Names.Where(_observed.ContainsKey).ToDictionary(n => n, n => (object)_observed[n]),
             };
-            if (_estimated.Count > 0) d["estimadas"] = Names.Where(_estimated.ContainsKey).ToDictionary(n => n, n => (object)_estimated[n]);
+            if (_estimated.Count > 0) d["estimated"] = Names.Where(_estimated.ContainsKey).ToDictionary(n => n, n => (object)_estimated[n]);
             var missing = Names.Where(n => !_observed.ContainsKey(n) && !_estimated.ContainsKey(n)).ToList();
-            if (missing.Count > 0) d["no_instrumentadas"] = missing.Cast<object>().ToList();
-            if (_observed.TryGetValue("payload_bytes", out var b)) d["tokens_estimados"] = b / 4;
+            if (missing.Count > 0) d["not_instrumented"] = missing.Cast<object>().ToList();
+            if (_observed.TryGetValue("payload_bytes", out var b)) d["estimated_tokens"] = b / 4;
             return d;
         }
     }

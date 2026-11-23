@@ -10,16 +10,16 @@ using Bimbridge.Protocol;
 
 namespace Bimbridge.Setup
 {
-    /// <summary>Carpetas del usuario. En pruebas se apuntan a temporales.</summary>
+    /// <summary>User folders. Tests point them at temporary folders.</summary>
     public sealed class SetupPaths
     {
         public string AppData;        // %APPDATA%
         public string LocalAppData;   // %LOCALAPPDATA%
         public string UserProfile;    // %USERPROFILE%
         public string ProgramFiles;   // C:\Program Files
-        public string Desktop;        // Escritorio (puede estar en OneDrive)
+        public string Desktop;        // Desktop (may be in OneDrive)
 
-        /// <summary>Pruebas offline: con BIMBRIDGE_SETUP_SANDBOX=carpeta todas las rutas caen dentro de ella; ni registro de Windows ni Claude.</summary>
+        /// <summary>Offline tests: with BIMBRIDGE_SETUP_SANDBOX=folder all paths fall inside it; no Windows registry and no Claude.</summary>
         public static string Sandbox => Environment.GetEnvironmentVariable("BIMBRIDGE_SETUP_SANDBOX");
         public static bool IsSandbox => !string.IsNullOrEmpty(Sandbox);
 
@@ -45,11 +45,11 @@ namespace Bimbridge.Setup
         public string AddinsDir(string version) => Path.Combine(AppData, "Autodesk", "Revit", "Addins", version);
         public string CodexConfig => Path.Combine(UserProfile, ".codex", "config.toml");
         public string Downloads => Path.Combine(UserProfile, "Downloads");
-        /// <summary>Copias de los instaladores (actual y anterior) para "Volver a la versión anterior", y la carpeta temporal.</summary>
-        public string UpdatesDir => Path.Combine(Home, "actualizaciones");
+        /// <summary>Copies of the installers (current and previous) for "Go back to the previous version", and the temp folder.</summary>
+        public string UpdatesDir => Path.Combine(Home, "updates");
         public string UpdatesTemp => Path.Combine(UpdatesDir, "tmp");
         public string CachedSetup(string version) => Path.Combine(UpdatesDir, "Bimbridge.Setup-" + version + ".exe");
-        /// <summary>Carpetas donde puede haber archivos renombrados *.viejo-* al reemplazar algo en uso.</summary>
+        /// <summary>Folders that may contain files renamed *.viejo-* when something in use was replaced.</summary>
         public IEnumerable<string> LeftoverDirs(IEnumerable<string> versions)
         {
             yield return BinDir;
@@ -60,22 +60,22 @@ namespace Bimbridge.Setup
     public sealed class RevitInstall
     {
         public string Version;
-        public bool Installed;   // Revit.exe encontrado
+        public bool Installed;   // Revit.exe found
         public string Path;
     }
 
     public sealed class InstallOptions
     {
         public List<string> Versions = new List<string>();
-        /// <summary>R, RP o RPW.</summary>
+        /// <summary>R, RP or RPW.</summary>
         public string Levels = "RPW";
         public bool Codex;
         /// <summary>
-        /// true (modo /actualizar): si un archivo está en uso por Revit o por una conversación de la IA, se renombra a *.viejo-*
-        /// y se pone el nuevo al lado. Windows permite renombrar un .dll/.exe cargado aunque no borrarlo. Lo nuevo entra al reiniciar.
+        /// true (/actualizar mode): if a file is in use by Revit or by an AI conversation, it is renamed to *.viejo-*
+        /// and the new one is placed next to it. Windows allows renaming a loaded .dll/.exe but not deleting it. The new version takes effect on restart.
         /// </summary>
         public bool AllowInUse;
-        /// <summary>true: sin manifiesto no se instala nada.</summary>
+        /// <summary>true: without a manifest nothing is installed.</summary>
         public bool RequireManifest;
     }
 
@@ -86,17 +86,17 @@ namespace Bimbridge.Setup
         public string Levels;
         public DateTime InstalledUtc;
         public bool Codex;
-        /// <summary>Versión que había antes de la última actualización (para volver atrás).</summary>
+        /// <summary>Version that was installed before the last update (to go back).</summary>
         public string Previous;
     }
 
     /// <summary>
-    /// Instala, actualiza y desinstala BIMBRIDGE - Power Engine para el usuario actual, sin permisos de administrador:
-    ///   add-in  → %APPDATA%\Autodesk\Revit\Addins\&lt;versión&gt;\Bimbridge.addin + Bimbridge\
-    ///   puente  → %LOCALAPPDATA%\Bimbridge\bin\Bimbridge.Bridge.exe
-    ///   config  → %APPDATA%\Bimbridge\config.json (sólo cambia "levels"; el resto se conserva)
-    ///   Codex   → sección [mcp_servers.bimbridge] en ~\.codex\config.toml (opcional)
-    /// Claude Code y el registro de Windows los maneja el .exe (necesitan procesos y registro).
+    /// Installs, updates and uninstalls BIMBRIDGE - Power Engine for the current user, without administrator permissions:
+    ///   add-in  → %APPDATA%\Autodesk\Revit\Addins\&lt;version&gt;\Bimbridge.addin + Bimbridge\
+    ///   bridge  → %LOCALAPPDATA%\Bimbridge\bin\Bimbridge.Bridge.exe
+    ///   config  → %APPDATA%\Bimbridge\config.json (only "levels" changes; the rest is kept)
+    ///   Codex   → section [mcp_servers.bimbridge] in ~\.codex\config.toml (optional)
+    /// Claude Code and the Windows registry are handled by the .exe (they need processes and the registry).
     /// </summary>
     public sealed class SetupCore
     {
@@ -114,7 +114,7 @@ namespace Bimbridge.Setup
 
         public SetupPaths Paths => _p;
 
-        // ---------------- detección ----------------
+        // ---------------- detection ----------------
 
         public List<RevitInstall> DetectRevit()
         {
@@ -137,7 +137,7 @@ namespace Bimbridge.Setup
             try
             {
                 if (!File.Exists(file)) return null;
-                var o = Json.ParseObject(File.ReadAllText(file));
+                var o = LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(file)));
                 var info = new InstalledInfo
                 {
                     ProductVersion = Arg.GetString(o, "version"),
@@ -152,43 +152,43 @@ namespace Bimbridge.Setup
             catch (Exception) { return null; }
         }
 
-        // ---------------- instalar ----------------
+        // ---------------- install ----------------
 
-        /// <summary>Copia lo necesario desde el paquete (zip). Lanza IOException con un mensaje claro si un archivo está en uso.</summary>
-        /// <summary>Respaldo creado por la última instalación (null si no había nada instalado).</summary>
+        /// <summary>Copies what is needed from the package (zip). Throws IOException with a clear message if a file is in use.</summary>
+        /// <summary>Backup created by the last install (null if nothing was installed).</summary>
         public string LastBackup { get; private set; }
 
         public void Install(ZipArchive payload, InstallOptions o, string productVersion)
         {
-            if (o.Versions.Count == 0) throw new ArgumentException("elija al menos una versión de Revit");
+            if (o.Versions.Count == 0) throw new ArgumentException("choose at least one Revit version");
             var levels = (o.Levels ?? "R").ToUpperInvariant();
-            if (levels != "R" && levels != "RP" && levels != "RPW") throw new ArgumentException("niveles no válidos: " + levels);
+            if (levels != "R" && levels != "RP" && levels != "RPW") throw new ArgumentException("invalid levels: " + levels);
 
             var previous = ReadInstalled();
-            // 0.6.0: el paquete trae manifest.json con el SHA-256 de cada archivo; si no coincide, no se instala nada.
+            // 0.6.0: the package carries manifest.json with each file's SHA-256; if it does not match, nothing is installed.
             var manifest = ReadPayloadManifest(payload);
-            if (manifest == null && o.RequireManifest) throw new InvalidOperationException("el paquete no trae manifest.json: no se puede verificar su integridad y no se instaló nada");
+            if (manifest == null && o.RequireManifest) throw new InvalidOperationException("the package has no manifest.json: its integrity cannot be verified and nothing was installed");
             if (manifest != null) VerifyPayload(payload, manifest, o.Versions);
-            // Native Validation: antes de tocar nada se respalda lo instalado, para poder volver (Setup.exe /restaurar).
+            // Native Validation: before touching anything the installed files are backed up, so we can go back (Setup.exe /restaurar).
             LastBackup = previous == null && !Directory.Exists(_p.BinDir) ? null
-                : InstallBackup.Create(_p, o.Versions.Concat(previous?.Versions ?? new List<string>()).Distinct(), "antes de instalar " + productVersion, DateTime.UtcNow);
-            // Antes de tocar nada: si el puente está en uso y no se permite renombrar, se detiene aquí sin cambios.
+                : InstallBackup.Create(_p, o.Versions.Concat(previous?.Versions ?? new List<string>()).Distinct(), "before installing " + productVersion, DateTime.UtcNow);
+            // Before touching anything: if the bridge is in use and renaming is not allowed, stop here with no changes.
             if (!o.AllowInUse && File.Exists(_p.BridgeExe))
             {
                 try { using (new FileStream(_p.BridgeExe, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { } }
                 catch (IOException)
                 {
-                    throw new IOException("No se cambió nada: " + _p.BridgeExe + " está en uso por una conversación de Claude o Codex. Ciérrela y repita.");
+                    throw new IOException("Nothing was changed: " + _p.BridgeExe + " is in use by a Claude or Codex conversation. Close it and try again.");
                 }
             }
             InstallBackup.Prune(_p);
             try { InstallSteps(payload, o, productVersion, levels, previous, manifest); }
             catch (Exception ex) when (LastBackup != null && (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidOperationException || ex is InvalidDataException))
             {
-                // Atómica desde fuera: un fallo a mitad vuelve al respaldo previo en vez de dejar archivos mezclados.
+                // Atomic from the outside: a failure halfway goes back to the previous backup instead of leaving mixed files.
                 try { InstallBackup.Restore(_p, LastBackup, DateTime.UtcNow); }
-                catch (Exception undo) { throw new IOException("La instalación falló (" + ex.Message + ") y no se pudo volver al respaldo (" + undo.Message + "). Use /restaurar=\"" + LastBackup + "\".", ex); }
-                throw new IOException("La instalación falló y se volvió al estado anterior: " + ex.Message, ex);
+                catch (Exception undo) { throw new IOException("The install failed (" + ex.Message + ") and could not go back to the backup (" + undo.Message + "). Use /restore=\"" + LastBackup + "\".", ex); }
+                throw new IOException("The install failed and the previous state was restored: " + ex.Message, ex);
             }
         }
 
@@ -199,13 +199,13 @@ namespace Bimbridge.Setup
             _allowInUse = o.AllowInUse;
             _replacedInUse = 0;
 
-            // 1) Add-in por versión
+            // 1) Add-in per version
             foreach (var v in o.Versions)
             {
                 var prefix = "addin/" + v + "/";
-                // Compress-Archive de PowerShell 5 guarda rutas con "\": se normalizan.
+                // PowerShell 5 Compress-Archive stores paths with "\": they are normalized.
                 var entries = payload.Entries.Where(e => Norm(e).StartsWith(prefix, StringComparison.Ordinal) && e.Name.Length > 0).ToList();
-                if (entries.Count == 0) throw new InvalidOperationException("el paquete no trae el add-in para Revit " + v);
+                if (entries.Count == 0) throw new InvalidOperationException("the package does not contain the add-in for Revit " + v);
                 var dest = _p.AddinsDir(v);
                 foreach (var e in entries)
                 {
@@ -213,44 +213,44 @@ namespace Bimbridge.Setup
                     Extract(e, target, "Revit " + v);
                     Record(Norm(e), target, manifest);
                 }
-                _log("Add-in instalado para Revit " + v);
+                _log("Add-in installed for Revit " + v);
             }
-            // Versiones que estaban y ya no se eligieron: se quitan.
+            // Versions that were installed and are no longer chosen: removed.
             if (previous != null)
                 foreach (var v in previous.Versions.Where(x => !o.Versions.Contains(x)))
                 {
                     RemoveAddin(v);
-                    _log("Add-in quitado de Revit " + v);
+                    _log("Add-in removed from Revit " + v);
                 }
 
-            // 2) Puente
-            var bridge = payload.Entries.FirstOrDefault(e => Norm(e) == "bridge/Bimbridge.Bridge.exe") ?? throw new InvalidOperationException("el paquete no trae el puente");
-            Extract(bridge, _p.BridgeExe, "el puente (¿hay una conversación de Claude o Codex abierta?)");
+            // 2) Bridge
+            var bridge = payload.Entries.FirstOrDefault(e => Norm(e) == "bridge/Bimbridge.Bridge.exe") ?? throw new InvalidOperationException("the package does not contain the bridge");
+            Extract(bridge, _p.BridgeExe, "the bridge (is a Claude or Codex conversation open?)");
             Record(Norm(bridge), _p.BridgeExe, manifest);
-            // 0.9.0: AgentHost y Power Engine junto al puente.
+            // 0.9.0: AgentHost and Power Engine next to the bridge.
             var peFiles = 0;
             foreach (var e in payload.Entries)
             {
                 var n = Norm(e);
                 if (!n.StartsWith("bridge/", StringComparison.Ordinal) || n == "bridge/Bimbridge.Bridge.exe" || n.EndsWith("/", StringComparison.Ordinal)) continue;
                 var rel = n.Substring("bridge/".Length);
-                if (rel.Split('/').Any(x => x == ".." || x.Length == 0)) throw new InvalidOperationException("ruta inválida en el paquete: " + n);
+                if (rel.Split('/').Any(x => x == ".." || x.Length == 0)) throw new InvalidOperationException("invalid path in the package: " + n);
                 var target = Path.Combine(_p.BinDir, rel.Replace('/', Path.DirectorySeparatorChar));
-                Extract(e, target, "el Power Engine");
+                Extract(e, target, "the Power Engine");
                 Record(n, target, manifest);
                 peFiles++;
             }
-            _log("Puente instalado en " + _p.BinDir + (peFiles > 0 ? " (Power Engine: " + peFiles + " archivos)" : ""));
+            _log("Bridge installed in " + _p.BinDir + (peFiles > 0 ? " (Power Engine: " + peFiles + " files)" : ""));
 
-            // 3) Configuración: sólo "levels" y "enabled"; lo demás se conserva.
+            // 3) Configuration: only "levels" and "enabled"; the rest is kept.
             WriteConfig(levels);
-            _log("Permisos de la IA: " + LevelsText(levels));
+            _log("AI permissions: " + LevelsText(levels));
 
             // 4) Codex
-            if (o.Codex) { RegisterCodex(); _log("Conectado con Codex"); }
+            if (o.Codex) { RegisterCodex(); _log("Connected to Codex"); }
             else if (previous != null && previous.Codex) { UnregisterCodex(); }
 
-            // 5) Registro de la instalación
+            // 5) Install record
             var record = new Dictionary<string, object>
             {
                 ["version"] = productVersion,
@@ -260,17 +260,17 @@ namespace Bimbridge.Setup
                 ["previous"] = previous == null ? null
                     : previous.ProductVersion != productVersion ? previous.ProductVersion : previous.Previous,
                 ["installed_utc"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
-                // 0.6.0: hash de cada archivo instalado (relativo a su carpeta raíz) para el diagnóstico posterior.
-                ["archivos"] = _installed.ToDictionary(kv => kv.Key, kv => (object)kv.Value),
-                ["manifiesto_paquete"] = manifest != null,
-                ["reemplazados_en_uso"] = _replacedInUse,
+                // 0.6.0: hash of each installed file (relative to its root folder) for later diagnostics.
+                ["files"] = _installed.ToDictionary(kv => kv.Key, kv => (object)kv.Value),
+                ["package_manifest"] = manifest != null,
+                ["replaced_in_use"] = _replacedInUse,
             };
             Directory.CreateDirectory(_p.Home);
             File.WriteAllText(_p.InstallRecord, Json.Write(record));
         }
 
 
-        // ---------------- verificación por hash y diagnóstico (0.6.0) ----------------
+        // ---------------- hash verification and diagnostics (0.6.0) ----------------
 
         public const string PayloadManifest = "manifest.json";
         private readonly Dictionary<string, string> _installed = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -281,7 +281,7 @@ namespace Bimbridge.Setup
                 return BitConverter.ToString(h.ComputeHash(s)).Replace("-", "").ToLowerInvariant();
         }
 
-        /// <summary>Copia sobrescribiendo aunque el destino viejo esté marcado como sólo lectura (causa del "Acceso denegado" de alpha3).</summary>
+        /// <summary>Copies overwriting even if the old target is marked read-only (the cause of the alpha3 "Access denied").</summary>
         public static void CopyOver(string from, string to)
         {
             if (File.Exists(to))
@@ -304,19 +304,19 @@ namespace Bimbridge.Setup
             using (var r = new StreamReader(m.Open(), Encoding.UTF8))
             {
                 var o = Json.ParseObject(r.ReadToEnd());
-                if (!(o.TryGetValue("archivos", out var a) && a is Dictionary<string, object> files)) throw new InvalidDataException("manifest.json sin 'archivos'");
-                if (o.ContainsKey("requeridos"))
+                if (!(o.TryGetValue("files", out var a) && a is Dictionary<string, object> files)) throw new InvalidDataException("manifest.json without 'files'");
+                if (o.ContainsKey("required"))
                 {
-                    var required = Arg.GetStringList(o, "requeridos");
+                    var required = Arg.GetStringList(o, "required");
                     var present = new HashSet<string>(payload.Entries.Where(e => e.Name.Length > 0 && e.Length > 0).Select(Norm), StringComparer.Ordinal);
                     if (required.Count == 0 || required.Any(n => !present.Contains(n) || !files.ContainsKey(n)))
-                        throw new InvalidDataException("faltan componentes obligatorios del payload");
+                        throw new InvalidDataException("required payload components are missing");
                 }
                 return files.ToDictionary(kv => kv.Key, kv => Convert.ToString(kv.Value, CultureInfo.InvariantCulture), StringComparer.Ordinal);
             }
         }
 
-        /// <summary>Cada archivo que se va a instalar debe estar en el manifiesto y coincidir su SHA-256; si no, InvalidDataException (no se toca nada).</summary>
+        /// <summary>Every file to be installed must be in the manifest with a matching SHA-256; otherwise InvalidDataException (nothing is touched).</summary>
         public static void VerifyPayload(ZipArchive payload, Dictionary<string, string> manifest, IEnumerable<string> versions)
         {
             var bad = new List<string>();
@@ -329,47 +329,47 @@ namespace Bimbridge.Setup
                 if (!Selected(n)) continue;
                 if (!seen.Add(n) || n.Split('/').Any(part => part.Length == 0 || part == "." || part == ".." || part.Contains(":")))
                 {
-                    bad.Add(n + " (ruta inválida o duplicada)");
+                    bad.Add(n + " (invalid or duplicate path)");
                     continue;
                 }
                 string sha;
                 using (var s = e.Open()) sha = Sha256(s);
-                if (!manifest.TryGetValue(n, out var exp)) bad.Add(n + " (no está en el manifiesto)");
-                else if (!string.Equals(exp, sha, StringComparison.OrdinalIgnoreCase)) bad.Add(n + " (hash distinto)");
+                if (!manifest.TryGetValue(n, out var exp)) bad.Add(n + " (not in the manifest)");
+                else if (!string.Equals(exp, sha, StringComparison.OrdinalIgnoreCase)) bad.Add(n + " (hash mismatch)");
             }
             foreach (var expected in manifest.Keys.Where(Selected))
-                if (!seen.Contains(expected)) bad.Add(expected + " (ausente en el payload)");
-            if (bad.Count > 0) throw new InvalidDataException("el paquete no coincide con su manifiesto; no se instaló nada: " + string.Join("; ", bad.Take(5)) + (bad.Count > 5 ? " …" : ""));
+                if (!seen.Contains(expected)) bad.Add(expected + " (missing from the payload)");
+            if (bad.Count > 0) throw new InvalidDataException("the package does not match its manifest; nothing was installed: " + string.Join("; ", bad.Take(5)) + (bad.Count > 5 ? " …" : ""));
         }
 
         private void Record(string entry, string target, Dictionary<string, string> manifest)
         {
             var sha = FileSha(target);
             if (manifest != null && manifest.TryGetValue(entry, out var exp) && !string.Equals(exp, sha, StringComparison.OrdinalIgnoreCase))
-                throw new IOException("tras copiar, " + entry + " no coincide con el manifiesto (disco o antivirus); vuelva a instalar");
+                throw new IOException("after copying, " + entry + " does not match the manifest (disk or antivirus); install again");
             _installed[entry] = sha;
         }
 
         /// <summary>
-        /// Diagnóstico compacto: versión instalada, por año si los archivos coinciden con lo instalado, si hay un reinicio pendiente
-        /// (archivos apartados *.viejo-*), versión cargada en cada Revit abierto (por su descriptor) y el puente. Sólo lee.
+        /// Compact diagnostics: installed version, per year whether the files match what was installed, whether a restart is pending
+        /// (files set aside as *.viejo-*), version loaded in each open Revit (from its descriptor) and the bridge. Read-only.
         /// </summary>
         public Dictionary<string, object> Diagnose()
         {
             var info = ReadInstalled();
             Dictionary<string, object> files = null;
-            try { if (File.Exists(_p.InstallRecord)) files = Json.ParseObject(File.ReadAllText(_p.InstallRecord)).TryGetValue("archivos", out var a) ? a as Dictionary<string, object> : null; }
+            try { if (File.Exists(_p.InstallRecord)) files = LegacyAliases.NormalizeRecord(Json.ParseObject(File.ReadAllText(_p.InstallRecord))).TryGetValue("files", out var a) ? a as Dictionary<string, object> : null; }
             catch (Exception) { }
             var res = new Dictionary<string, object>
             {
-                ["instalada"] = info?.ProductVersion, ["anterior"] = info?.Previous, ["revit_elegidos"] = info?.Versions?.Cast<object>().ToList(),
+                ["installed"] = info?.ProductVersion, ["previous"] = info?.Previous, ["revit_selected"] = info?.Versions?.Cast<object>().ToList(),
             };
             var years = new Dictionary<string, object>();
             foreach (var v in SupportedVersions)
             {
                 var dir = _p.AddinsDir(v);
                 var manifestFile = Path.Combine(dir, "Bimbridge.addin");
-                if (!File.Exists(manifestFile)) { years[v] = "no instalado"; continue; }
+                if (!File.Exists(manifestFile)) { years[v] = "not installed"; continue; }
                 var diff = new List<object>();
                 var n = 0;
                 if (files != null)
@@ -377,15 +377,15 @@ namespace Bimbridge.Setup
                     {
                         n++;
                         var path = Path.Combine(dir, kv.Key.Substring(("addin/" + v + "/").Length).Replace('/', Path.DirectorySeparatorChar));
-                        if (!File.Exists(path)) diff.Add(kv.Key + " falta");
-                        else if (!string.Equals(FileSha(path), Convert.ToString(kv.Value), StringComparison.OrdinalIgnoreCase)) diff.Add(kv.Key + " cambió");
+                        if (!File.Exists(path)) diff.Add(kv.Key + " missing");
+                        else if (!string.Equals(FileSha(path), Convert.ToString(kv.Value), StringComparison.OrdinalIgnoreCase)) diff.Add(kv.Key + " changed");
                     }
                 var pending = Directory.Exists(Path.Combine(dir, "Bimbridge"))
-                    && Directory.GetFiles(Path.Combine(dir, "Bimbridge"), "*" + Updates.LeftoverMark + "*", SearchOption.AllDirectories).Length > 0;
+                    && Updates.Leftovers(Path.Combine(dir, "Bimbridge"), SearchOption.AllDirectories).Length > 0;
                 years[v] = new Dictionary<string, object>
                 {
-                    ["archivos"] = n, ["coinciden"] = files == null ? (object)"sin registro de hashes (instalación anterior a 0.6.0)" : diff.Count == 0,
-                    ["diferencias"] = diff, ["reinicio_pendiente"] = pending,
+                    ["files"] = n, ["match"] = files == null ? (object)"no hash record (install older than 0.6.0)" : diff.Count == 0,
+                    ["differences"] = diff, ["restart_pending"] = pending,
                 };
             }
             res["addin"] = years;
@@ -393,10 +393,10 @@ namespace Bimbridge.Setup
             object bridgeMatch = null;
             if (bridgeOk && files != null && files.TryGetValue("bridge/Bimbridge.Bridge.exe", out var bs))
                 bridgeMatch = string.Equals(FileSha(_p.BridgeExe), Convert.ToString(bs), StringComparison.OrdinalIgnoreCase);
-            res["puente"] = new Dictionary<string, object>
+            res["bridge"] = new Dictionary<string, object>
             {
-                ["existe"] = bridgeOk, ["coincide"] = bridgeMatch,
-                ["reinicio_pendiente"] = Directory.Exists(_p.BinDir) && Directory.GetFiles(_p.BinDir, "*" + Updates.LeftoverMark + "*").Length > 0,
+                ["exists"] = bridgeOk, ["matches"] = bridgeMatch,
+                ["restart_pending"] = Directory.Exists(_p.BinDir) && Updates.Leftovers(_p.BinDir, SearchOption.TopDirectoryOnly).Length > 0,
             };
             var loaded = new List<object>();
             var inst = Path.Combine(_p.Home, "instances");
@@ -411,22 +411,22 @@ namespace Bimbridge.Setup
                         if (!alive) continue;
                         loaded.Add(new Dictionary<string, object>
                         {
-                            ["revit"] = d.RevitVersion, ["pid"] = d.Pid, ["addin_cargado"] = d.AddinVersion, ["desde"] = d.StartedUtc,
-                            ["coincide_con_instalada"] = info?.ProductVersion != null && d.AddinVersion != null && d.AddinVersion.StartsWith(info.ProductVersion, StringComparison.Ordinal),
+                            ["revit"] = d.RevitVersion, ["pid"] = d.Pid, ["addin_loaded"] = d.AddinVersion, ["from"] = d.StartedUtc,
+                            ["matches_installed"] = info?.ProductVersion != null && d.AddinVersion != null && d.AddinVersion.StartsWith(info.ProductVersion, StringComparison.Ordinal),
                         });
                     }
                     catch (Exception) { }
                 }
-            res["revit_abiertos"] = loaded;
+            res["open_revits"] = loaded;
             try
             {
                 if (File.Exists(_p.ConfigFile))
                 {
-                    var c = Json.ParseObject(File.ReadAllText(_p.ConfigFile));
+                    var c = LegacyAliases.NormalizeConfig(Json.ParseObject(File.ReadAllText(_p.ConfigFile)));
                     res["config"] = new Dictionary<string, object> { ["enabled"] = Arg.GetBool(c, "enabled"), ["levels"] = Arg.GetString(c, "levels"), ["runner"] = Arg.GetString(c, "runner") ?? "auto" };
                 }
             }
-            catch (Exception ex) { res["config"] = "ilegible: " + ex.Message; }
+            catch (Exception ex) { res["config"] = "unreadable: " + ex.Message; }
             return res;
         }
 
@@ -436,16 +436,16 @@ namespace Bimbridge.Setup
         {
             switch (levels)
             {
-                case "R": return "sólo leer el modelo";
-                case "RP": return "leer y proponer cambios; todo cambio espera en la cola";
-                default: return "leer y cambiar, con su aprobación (En vivo o Retener)";
+                case "R": return "read the model only";
+                case "RP": return "read and propose changes; every change waits in the queue";
+                default: return "read and change, with your approval (Live or Hold)";
             }
         }
 
         private bool _allowInUse;
         private int _replacedInUse;
 
-        /// <summary>Cuántos archivos estaban en uso y se reemplazaron por renombre en la última instalación (entran al reiniciar).</summary>
+        /// <summary>How many files were in use and were replaced by renaming in the last install (they take effect on restart).</summary>
         public int ReplacedInUse => _replacedInUse;
 
         private void Extract(ZipArchiveEntry e, string dest, string owner)
@@ -465,7 +465,7 @@ namespace Bimbridge.Setup
                 {
                     try
                     {
-                        // En uso: se aparta con otro nombre (permitido para archivos cargados) y el nuevo ocupa su lugar.
+                        // In use: set aside under another name (allowed for loaded files) and the new one takes its place.
                         var aside = dest + Updates.LeftoverMark + DateTime.UtcNow.Ticks;
                         File.Move(dest, aside);
                         File.Move(tmp, dest);
@@ -475,13 +475,13 @@ namespace Bimbridge.Setup
                     catch (Exception) { }
                 }
                 try { File.Delete(tmp); } catch (Exception) { }
-                throw new IOException("No se pudo reemplazar " + Path.GetFileName(dest) + ": está en uso por " + owner + ". Ciérrelo y vuelva a intentar.", ex);
+                throw new IOException("Could not replace " + Path.GetFileName(dest) + ": it is in use by " + owner + ". Close it and try again.", ex);
             }
         }
 
         /// <summary>
-        /// Guarda una copia del instalador en la carpeta de actualizaciones y deja sólo la actual y la anterior
-        /// (la anterior sirve para "Volver a la versión anterior"). Devuelve las copias borradas.
+        /// Saves a copy of the installer in the updates folder and keeps only the current and the previous one
+        /// (the previous one is used for "Go back to the previous version"). Returns the deleted copies.
         /// </summary>
         public List<string> CacheSetup(string selfExe, string productVersion, string previousVersion)
         {
@@ -494,7 +494,7 @@ namespace Bimbridge.Setup
             if (!string.IsNullOrEmpty(previousVersion)) keep.Add(_p.CachedSetup(previousVersion));
             foreach (var f in Directory.GetFiles(_p.UpdatesDir, "Bimbridge.Setup-*.exe"))
                 if (!keep.Contains(f) && Updates.TryDelete(f)) removed.Add(f);
-            // Temporales de .zip ya revisados
+            // Temp files of already checked .zip packages
             if (Directory.Exists(_p.UpdatesTemp))
                 foreach (var f in Directory.GetFiles(_p.UpdatesTemp)) Updates.TryDelete(f);
             return removed;
@@ -506,9 +506,9 @@ namespace Bimbridge.Setup
             if (File.Exists(_p.ConfigFile))
             {
                 try { o = Json.ParseObject(File.ReadAllText(_p.ConfigFile)); }
-                catch (Exception) { File.Copy(_p.ConfigFile, _p.ConfigFile + ".danado", true); }
+                catch (Exception) { File.Copy(_p.ConfigFile, _p.ConfigFile + ".damaged", true); }
             }
-            // F19: una actualización no vuelve a encender un MCP que el usuario apagó; sólo una instalación nueva lo deja encendido.
+            // F19: an update does not turn back on an MCP the user turned off; only a fresh install leaves it on.
             if (o == null) o = new Dictionary<string, object> { ["enabled"] = true };
             else if (!o.ContainsKey("enabled")) o["enabled"] = true;
             o["levels"] = levels;
@@ -518,13 +518,13 @@ namespace Bimbridge.Setup
 
         // ---------------- Codex ----------------
 
-        /// <summary>Añade o actualiza [mcp_servers.bimbridge] en config.toml sin tocar el resto del archivo.</summary>
+        /// <summary>Adds or updates [mcp_servers.bimbridge] in config.toml without touching the rest of the file.</summary>
         public void RegisterCodex()
         {
             var path = _p.CodexConfig;
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             var text = File.Exists(path) ? File.ReadAllText(path) : "";
-            // F19/A31: se conservan las demás claves de la sección (args, env, startup_timeout_sec…) y sus subtablas; sólo cambia command.
+            // F19/A31: the section's other keys (args, env, startup_timeout_sec…) and its subtables are kept; only command changes.
             var kept = TomlSectionBody(text, CodexSection, out var subtables);
             var block = CodexSection + "\ncommand = \"" + _p.BridgeExe.Replace("\\", "\\\\") + "\"\n" + kept + subtables;
             var original = File.Exists(path) ? text : null;
@@ -533,7 +533,7 @@ namespace Bimbridge.Setup
             if (text.Length > 0) text += "\n";
             var updated = text + block;
             if (original == updated) return;
-            // Copia junto al archivo antes de cambiarlo; el reemplazo es atómico para no dejarlo a medias.
+            // Copy next to the file before changing it; the replace is atomic so it is never left half-written.
             if (original != null) File.Copy(path, path + ".bimbridge-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture) + ".bak", true);
             var tmp = path + ".tmp-" + Guid.NewGuid().ToString("N").Substring(0, 8);
             File.WriteAllText(tmp, updated);
@@ -541,7 +541,7 @@ namespace Bimbridge.Setup
             else File.Move(tmp, path);
         }
 
-        /// <summary>Devuelve current con la sección header (y sus subtablas) tal como está en source, o sin ella si source no la tiene.</summary>
+        /// <summary>Returns current with the header section (and its subtables) as it is in source, or without it if source does not have it.</summary>
         public static string ReplaceTomlSection(string current, string source, string header)
         {
             var lines = source.Replace("\r\n", "\n").Split('\n');
@@ -556,16 +556,16 @@ namespace Bimbridge.Setup
             return rest + header + "\n" + (command != null ? command + "\n" : "") + kept + subtables;
         }
 
-        /// <summary>Conflictos con lo que ya hay en este perfil. Vacío = no hay nada instalado.</summary>
+        /// <summary>Conflicts with what is already in this profile. Empty = nothing is installed.</summary>
         public List<string> DetectConflicts(string productVersion)
         {
             var list = new List<string>();
             var installed = ReadInstalled();
-            if (installed != null) list.Add("ya hay una instalación " + installed.ProductVersion + " para Revit " + string.Join(", ", installed.Versions));
-            else if (File.Exists(_p.InstallRecord)) list.Add("el registro de instalación existe y no se puede leer: " + _p.InstallRecord);
-            else if (Directory.Exists(_p.BinDir)) list.Add("hay archivos en " + _p.BinDir + " sin registro de instalación");
+            if (installed != null) list.Add("there is already an install " + installed.ProductVersion + " for Revit " + string.Join(", ", installed.Versions));
+            else if (File.Exists(_p.InstallRecord)) list.Add("the install record exists and cannot be read: " + _p.InstallRecord);
+            else if (Directory.Exists(_p.BinDir)) list.Add("there are files in " + _p.BinDir + " without an install record");
             foreach (var v in SupportedVersions)
-                if (installed == null && File.Exists(Path.Combine(_p.AddinsDir(v), "Bimbridge.addin"))) list.Add("hay un add-in sin registro en Revit " + v);
+                if (installed == null && File.Exists(Path.Combine(_p.AddinsDir(v), "Bimbridge.addin"))) list.Add("there is an add-in without a record in Revit " + v);
             return list;
         }
 
@@ -578,13 +578,13 @@ namespace Bimbridge.Setup
             if (cleaned != text) File.WriteAllText(path, cleaned);
         }
 
-        /// <summary>Líneas de la sección [x] salvo su encabezado y "command =" (texto con \n final), y aparte sus subtablas [x.algo] completas.</summary>
+        /// <summary>Lines of section [x] except its header and "command =" (text with a trailing \n), and separately its complete subtables [x.something].</summary>
         public static string TomlSectionBody(string text, string header, out string subtables)
         {
             var name = header.Trim('[', ']');
             var body = new StringBuilder();
             var subs = new StringBuilder();
-            var where = 0; // 0 fuera, 1 en la sección, 2 en una subtabla
+            var where = 0; // 0 outside, 1 in the section, 2 in a subtable
             foreach (var line in text.Replace("\r\n", "\n").Split('\n'))
             {
                 var t = line.Trim();
@@ -606,7 +606,7 @@ namespace Bimbridge.Setup
             return body.ToString();
         }
 
-        /// <summary>Quita una sección [x] y sus líneas hasta la siguiente sección (incluidas subtablas [x.algo]).</summary>
+        /// <summary>Removes a section [x] and its lines up to the next section (including subtables [x.something]).</summary>
         public static string RemoveTomlSection(string text, string header)
         {
             var name = header.Trim('[', ']');
@@ -628,27 +628,28 @@ namespace Bimbridge.Setup
             return result == "\n" ? "" : result;
         }
 
-        // ---------------- desinstalar ----------------
+        // ---------------- uninstall ----------------
 
         public void Uninstall(bool removeData)
         {
             var info = ReadInstalled();
             foreach (var v in SupportedVersions) RemoveAddin(v);
-            _log("Add-in quitado de Revit");
+            _log("Add-in removed from Revit");
             try { if (Directory.Exists(_p.BinDir)) Directory.Delete(_p.BinDir, true); }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-            { throw new IOException("No se pudo quitar el puente: está en uso. Cierre las conversaciones de Claude o Codex y vuelva a intentar.", ex); }
+            { throw new IOException("Could not remove the bridge: it is in use. Close the Claude or Codex conversations and try again.", ex); }
             UnregisterCodex();
             try { File.Delete(_p.InstallRecord); } catch (Exception) { }
             if (removeData)
             {
-                foreach (var d in new[] { Path.Combine(_p.Home, "journal"), Path.Combine(_p.Home, "cola"), Path.Combine(_p.Home, "instances"),
-                                       Path.Combine(_p.Home, "operaciones"), Path.Combine(_p.Home, "resultados"), Path.Combine(_p.Home, "scripts") })
+                // Data never migrated by an install keeps its 0.9.3 name: both spellings are removed.
+                string[] AndLegacy(params string[] names) => names.Concat(names.Where(LegacyAliases.HomeNames.ContainsKey).Select(n => LegacyAliases.HomeNames[n])).ToArray();
+                foreach (var d in AndLegacy("journal", "queue", "instances", "operations", "results", "scripts").Select(n => Path.Combine(_p.Home, n)))
                     try { if (Directory.Exists(d)) Directory.Delete(d, true); } catch (Exception) { }
-                foreach (var f in new[] { "addin.log", "retener.on", "pausado.on" })
+                foreach (var f in AndLegacy("addin.log", "hold.on", "paused.on"))
                     try { File.Delete(Path.Combine(_p.Home, f)); } catch (Exception) { }
                 try { var cfg = Path.GetDirectoryName(_p.ConfigFile); if (Directory.Exists(cfg)) Directory.Delete(cfg, true); } catch (Exception) { }
-                _log("Registros, cola y configuración borrados");
+                _log("Logs, queue and configuration deleted");
             }
         }
 
@@ -664,7 +665,7 @@ namespace Bimbridge.Setup
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
-                throw new IOException("No se pudo quitar el add-in de Revit " + v + ": Revit está abierto. Ciérrelo y vuelva a intentar.", ex);
+                throw new IOException("Could not remove the add-in from Revit " + v + ": Revit is open. Close it and try again.", ex);
             }
         }
     }

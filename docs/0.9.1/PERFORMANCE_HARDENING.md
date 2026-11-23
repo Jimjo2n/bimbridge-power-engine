@@ -1,67 +1,67 @@
-# 0.9.1 — endurecimiento de rendimiento (ronda final)
+# 0.9.1 — performance hardening (final round)
 
-Todo lo medido aquí es **offline** (fuera del hilo de Revit, `tools/bench/WorkflowBench`). Lo que se espera en Revit se marca **hipótesis**: no se ha ejecutado Revit.
-Cifras de este equipo (4 CPU, otra carga en paralelo): son orientativas, no resultados de rendimiento frente a pyRevit.
+Everything measured here is **offline** (outside the Revit thread, `tools/bench/WorkflowBench`). What is expected in Revit is marked **hypothesis**: Revit has not been run.
+Figures from this machine (4 CPUs, other load in parallel): they are indicative, not performance results against pyRevit.
 
-## A. Consumidores de `RunMain()` (perfil estático)
+## A. `RunMain()` consumers (static profile)
 
-| Ruta | Visitas al hilo | Coste dominante en Revit | Frecuencia | ¿Optimizable? | Riesgo | Estado |
+| Path | Thread visits | Dominant cost in Revit | Frequency | Optimizable? | Risk | Status |
 |---|---|---|---|---|---|---|
-| `query` (QueryRunner) | 1 + tramos | `doc.GetElement` por candidato; lecturas de parámetros; tipo y nivel por instancia | muy alta | sí: caché por id de tipo/nivel/destino y clase de dato | bajo (vive una consulta) | **hecho** |
-| `check lighting_audit` | 1 + tramos | nivel y workset por luminaria; nombre/nivel de vista por etiqueta | media | sí: caché por id | bajo | **hecho** |
-| `check model_health` | 1 por fase | `GetWarnings`, tipo por instancia, un colector por lámina | media | sí: tipo/nivel por id, tablas por lámina en una pasada, fases troceadas | bajo | **hecho** (AUD-17 + esta ronda) |
-| `check copy_monitor` | 1 | colectores de origen y anfitrión | baja (por intento) | sí en parte: ya una sola visita | bajo | sin cambio (ya 1 visita) |
-| `geo` (GeoRunner) | 1–2 + tramos | geometría y mallas | media | ya tiene caché por revisión y mallas reutilizadas | — | sin cambio |
-| `plan` sin geometría | 1 | resolución de tipos/niveles (`ModelIndex` cacheado por planificación) | alta | ya en una visita | — | sin cambio |
-| `commit` | 1 grupo + lotes | transacciones por lote; `Regenerate` | alta | ver D | alto (integridad) | sin cambio (ver D) |
-| `doc pdf/ifc/csv/guardar/sync` | 1 + espera | E/S y exportación | baja | no: trabajo de Revit | — | ahora pasan por el planificador |
-| `exec` | 1 | compilación y ejecución | media | caché de compilación ya existente | — | sin cambio |
+| `query` (QueryRunner) | 1 + slices | `doc.GetElement` per candidate; parameter reads; type and level per instance | very high | yes: cache by type/level/target id and data class | low (lives for one query) | **done** |
+| `check lighting_audit` | 1 + slices | level and workset per fixture; view name/level per tag | medium | yes: cache by id | low | **done** |
+| `check model_health` | 1 per phase | `GetWarnings`, type per instance, one collector per sheet | medium | yes: type/level by id, schedules per sheet in one pass, chunked phases | low | **done** (AUD-17 + this round) |
+| `check copy_monitor` | 1 | source and host collectors | low (per attempt) | partly: already a single visit | low | unchanged (already 1 visit) |
+| `geo` (GeoRunner) | 1–2 + slices | geometry and meshes | medium | already has a per-revision cache and reused meshes | — | unchanged |
+| `plan` without geometry | 1 | type/level resolution (`ModelIndex` cached per planning) | high | already in one visit | — | unchanged |
+| `commit` | 1 group + batches | transactions per batch; `Regenerate` | high | see D | high (integrity) | unchanged (see D) |
+| `doc pdf/ifc/csv/guardar/sync` | 1 + wait | I/O and export | low | no: Revit work | — | now go through the scheduler |
+| `exec` | 1 | compilation and execution | medium | existing compilation cache | — | unchanged |
 
-Lo que NO se tocó, y por qué: `commit`/`exec` siguen en la cola propia del hilo de Revit (no se ha demostrado que el planificador preserve el orden de escrituras y los locks existentes; ver §G).
+What was NOT touched, and why: `commit`/`exec` stay on the Revit thread's own queue (it has not been shown that the scheduler preserves write ordering and the existing locks; see §G).
 
-## B. Cambios por ruta (cuello → cambio → riesgo → medición → impacto esperado)
+## B. Changes per path (bottleneck → change → risk → measurement → expected impact)
 
-| Archivo / método | Cuello | Cambio | Riesgo | Medición offline | Impacto en Revit |
+| File / method | Bottleneck | Change | Risk | Offline measurement | Impact in Revit |
 |---|---|---|---|---|---|
-| `ElementFields.ParamValue/ReadOne` | `GetDataType()` por valor; `doc.GetElement` del tipo por instancia en parámetros de tipo; nombre de destino repetido | caché por invocación: clase de dato por `Definition`, elemento de tipo por id, destino por id; contadores de aciertos/fallos | bajo: vida de una consulta, dentro del hilo de Revit, no cruza documentos ni revisiones | no medible fuera de Revit (necesita la API) | **hipótesis**: menos llamadas `GetElement`/`GetDataType` proporcionales a instancias/tipos; medir en BM-01/BM-02 |
-| `ModelHealthProbe` (fase 1) | hasta 3 `GetElement(typeId)` por instancia + 1 por parámetro requerido no de instancia + nivel por instancia | `TypeMeta` y `LevelName` por id; valores de parámetros de tipo resueltos una vez por tipo | bajo | no medible fuera de Revit | **hipótesis**: de O(instancias) a O(tipos) en accesos de tipo |
-| `LightingAuditRunner` | nivel y workset por luminaria; vista por etiqueta | caché de nivel (NameCache), workset por id, vista por id | bajo | no medible fuera de Revit | **hipótesis**: igual |
-| `ModelHealth.Duplicates` | `List.Contains` cuadrático en grupos muy densos; coordenadas no finitas/enormes desbordaban la cuantización | `HashSet` de pertenencia; exclusión de no finitos y \|x\|≥1e9 | bajo (pruebas) | grupo de 20.000 coincidentes: **42,6 ms → 4,7 ms (9,0×)**; modelos dispersos de 10k–50k: sin cambio (0,9–1,0×, dentro del ruido) | ninguno en Revit (corre fuera del hilo) |
-| `JobStore.Complete` / `DocOp` | — (AUD-18, corrección, no optimización) | estado final decidido antes de notificar | bajo | `OperationHistoryTests` | — |
-| `OperationScheduler` en `DocOp` | operaciones de documento sin orden entre agentes | exclusión por documento y reparto justo (ver BM-09) | medio: no toca commit/exec | BM-09 | **hipótesis** |
+| `ElementFields.ParamValue/ReadOne` | `GetDataType()` per value; `doc.GetElement` of the type per instance for type parameters; repeated target name | per-invocation cache: data class per `Definition`, type element by id, target by id; hit/miss counters | low: lifetime of one query, inside the Revit thread, never crosses documents or revisions | not measurable outside Revit (needs the API) | **hypothesis**: fewer `GetElement`/`GetDataType` calls, proportional to instances/types; measure in BM-01/BM-02 |
+| `ModelHealthProbe` (phase 1) | up to 3 `GetElement(typeId)` per instance + 1 per required non-instance parameter + level per instance | `TypeMeta` and `LevelName` by id; type parameter values resolved once per type | low | not measurable outside Revit | **hypothesis**: from O(instances) to O(types) in type accesses |
+| `LightingAuditRunner` | level and workset per fixture; view per tag | level cache (NameCache), workset by id, view by id | low | not measurable outside Revit | **hypothesis**: same |
+| `ModelHealth.Duplicates` | quadratic `List.Contains` in very dense groups; non-finite/huge coordinates overflowed the quantization | membership `HashSet`; exclusion of non-finite values and \|x\|≥1e9 | low (tests) | group of 20,000 coincident: **42.6 ms → 4.7 ms (9.0×)**; sparse models of 10k–50k: unchanged (0.9–1.0×, within noise) | none in Revit (runs outside the thread) |
+| `JobStore.Complete` / `DocOp` | — (AUD-18, a fix, not an optimization) | final status decided before notifying | low | `OperationHistoryTests` | — |
+| `OperationScheduler` in `DocOp` | document operations without ordering between agents | per-document exclusion and fair sharing (see BM-09) | medium: does not touch commit/exec | BM-09 | **hypothesis** |
 
-Verificado y **sin cambio** a propósito:
-- `Document.Regenerate()` (3 llamadas en `PlanApplier`): sólo tras `FamilySymbol.Activate()`, condicionadas a `!IsActive`; Revit exige la regeneración antes de colocar. No son redundantes; no se suprimen.
-- Transacciones de `PlanApplier`: una por operación (o por sub-lote de N cambios) dentro de UN `TransactionGroup` asimilado; ya están por lote. Fusionar más rompería la recuperación por lote (checkpoint de ids antes de cada lote). No se toca.
-- `fsync` de la auditoría y checkpoints: no se reducen (garantías de durabilidad).
+Verified and **unchanged** on purpose:
+- `Document.Regenerate()` (3 calls in `PlanApplier`): only after `FamilySymbol.Activate()`, conditioned on `!IsActive`; Revit requires regeneration before placing. They are not redundant; they are not removed.
+- `PlanApplier` transactions: one per operation (or per sub-batch of N changes) inside ONE assimilated `TransactionGroup`; they are already per batch. Merging further would break per-batch recovery (checkpoint of ids before each batch). Not touched.
+- `fsync` of the audit and checkpoints: not reduced (durability guarantees).
 
-## C. Caché y presupuesto
+## C. Cache and budget
 
-| Caché | Clave | Alcance | Invalidación | Presupuesto | Métricas |
+| Cache | Key | Scope | Invalidation | Budget | Metrics |
 |---|---|---|---|---|---|
-| `ElementFields.NameCache` (nuevo: tipo, destino, clase de dato) | id de tipo / id de destino / `Definition` | una consulta, hilo de Revit | muere con la consulta (revisión y documento fijos durante ella) | acotado por nº de tipos/definiciones distintos | `Hits`/`Misses` observados → `metricas` |
-| `ModelHealthProbe` tipos y niveles (nuevo) | id de tipo / nivel | una revisión | muere con el probe | nº de tipos y niveles | `CacheHits`/`CacheMisses` |
-| `QuerySnapshotStore` | sesión + documento + revisión | sesión | revisión, TTL 5 min, cierre | 64 MB global / 32 MB documento / 4 por sesión | evicciones con motivo |
-| `ResultCache` (geo) | doc + revisión + firma | proceso | revisión | 48 entradas | aciertos/fallos |
-| `CompileCache` | hash de código + referencias | proceso | no se descargan ensamblados | 1024 entradas, por agente | por agente |
-| `CapabilityIndex` | id/dominio/… | proceso, inmutable | huella de contenido | catálogo | — |
+| `ElementFields.NameCache` (new: type, target, data class) | type id / target id / `Definition` | one query, Revit thread | dies with the query (revision and document fixed during it) | bounded by the number of distinct types/definitions | observed `Hits`/`Misses` → `metricas` |
+| `ModelHealthProbe` types and levels (new) | type id / level | one revision | dies with the probe | number of types and levels | `CacheHits`/`CacheMisses` |
+| `QuerySnapshotStore` | session + document + revision | session | revision, 5 min TTL, close | 64 MB global / 32 MB per document / 4 per session | evictions with reason |
+| `ResultCache` (geo) | doc + revision + signature | process | revision | 48 entries | hits/misses |
+| `CompileCache` | code hash + references | process | assemblies are not unloaded | 1024 entries, per agent | per agent |
+| `CapabilityIndex` | id/domain/… | process, immutable | content fingerprint | catalog | — |
 
-Ninguna caché nueva es global ni conserva objetos de Revit entre consultas.
+No new cache is global or keeps Revit objects between queries.
 
-## D. Verificación y escrituras
-`Verify()` ya relee sólo lo planificado (entradas del plan) y los creados por id; `VerifyModelCreations` relee cada creado una vez. No se reduce a «existe». Sin cambio.
+## D. Verification and writes
+`Verify()` already rereads only what was planned (plan entries) and the created elements by id; `VerifyModelCreations` rereads each created element once. It is not reduced to "exists". Unchanged.
 
-## E. Instrumentación (`WorkflowMetrics`)
-Nombres oficiales: `total_ms, queue_ms, revit_main_thread_ms, revit_slices, revit_max_slice_ms, api_calls, elements_read, elements_written, transactions, regenerations, serialization_ms, payload_bytes, worker_ms, cache_hits, cache_misses, verification_ms, audit_ms, allocations_bytes`.
-Hoy **observadas**: `total_ms, queue_ms, revit_main_thread_ms, revit_slices, revit_max_slice_ms` (de `MainThread`), `elements_read`, `elements_written`, `transactions` (0 en lecturas), `cache_hits/misses` (de las cachés nuevas). Se devuelven en `metricas` con `check name=model_health metricas=true`, `query metricas=true` (o `timing=true`) y `lighting_audit`.
-**No instrumentadas** (se listan como tales en la respuesta): `api_calls` (sin contador completo: no se declara parcial), `regenerations`, `serialization_ms`, `payload_bytes` en el add-in, `worker_ms`, `verification_ms`, `audit_ms`, `allocations_bytes`. `payload_bytes` y `serialization_ms` sí se miden en el harness offline.
+## E. Instrumentation (`WorkflowMetrics`)
+Official names: `total_ms, queue_ms, revit_main_thread_ms, revit_slices, revit_max_slice_ms, api_calls, elements_read, elements_written, transactions, regenerations, serialization_ms, payload_bytes, worker_ms, cache_hits, cache_misses, verification_ms, audit_ms, allocations_bytes`.
+**Observed** today: `total_ms, queue_ms, revit_main_thread_ms, revit_slices, revit_max_slice_ms` (from `MainThread`), `elements_read`, `elements_written`, `transactions` (0 for reads), `cache_hits/misses` (from the new caches). They are returned in `metricas` with `check name=model_health metricas=true`, `query metricas=true` (or `timing=true`) and `lighting_audit`.
+**Not instrumented** (listed as such in the response): `api_calls` (no complete counter: it is not declared partial), `regenerations`, `serialization_ms`, `payload_bytes` in the add-in, `worker_ms`, `verification_ms`, `audit_ms`, `allocations_bytes`. `payload_bytes` and `serialization_ms` are measured in the offline harness.
 
 ## F. Benchmark readiness
-- Harness offline: `dotnet tools/bench/WorkflowBench/bin/Release/net8.0/WorkflowBench.dll docs/0.9.1/benchmarks/workflow-bench.md docs/0.9.1/benchmarks/workflow-bench.json 7`. Resultados en esos archivos (mediana, p95, throughput, asignación; antes/después).
-- Escenarios medidos offline: BM-03 (informe y duplicados), BM-06 (validación de N operaciones frente a una compuesta: **sin ganancia offline**; la ganancia esperada es en visitas al hilo y transacciones, no medible aquí), BM-07 (verificación del fixture de 88 aparatos y de 10.000), BM-09 (reparto del planificador con 1/2/4/8 agentes).
-- Escenarios que requieren Revit (BM-01, 02, 04, 05, 08, 10 y la parte nativa de 03, 06, 07, 09): especificados en `workloads_nativos` del JSON con tamaños, entrada común y criterio de corrección.
-- Procedimiento de comparación con pyRevit (campaña nativa): mismo Revit, modelo, versión y máquina; mismo número de operaciones y verificación funcional (relectura idéntica); separar (1) tiempo del workflow dentro de Revit, (2) tiempo total con la comunicación MCP, (3) trabajo directo por API, (4) interacción humana y (5) instrumentación propia; no atribuir latencia de LLM a pyRevit; baseline de pyRevit escrito de forma razonable (lectura por lote, una transacción por lote). Informar mediana, p95, memoria pico, throughput, speedup, corrección, regresiones y diferencias de funcionalidad. Los objetivos 2–5× son **hipótesis**.
+- Offline harness: `dotnet tools/bench/WorkflowBench/bin/Release/net8.0/WorkflowBench.dll docs/0.9.1/benchmarks/workflow-bench.md docs/0.9.1/benchmarks/workflow-bench.json 7`. Results in those files (median, p95, throughput, allocation; before/after).
+- Scenarios measured offline: BM-03 (report and duplicates), BM-06 (validation of N operations versus one composite: **no offline gain**; the expected gain is in thread visits and transactions, not measurable here), BM-07 (verification of the 88-device fixture and of 10,000), BM-09 (scheduler sharing with 1/2/4/8 agents).
+- Scenarios that require Revit (BM-01, 02, 04, 05, 08, 10 and the native part of 03, 06, 07, 09): specified in `workloads_nativos` of the JSON with sizes, common input and correctness criterion.
+- Comparison procedure against pyRevit (native campaign): same Revit, model, version and machine; same number of operations and functional verification (identical reread); separate (1) workflow time inside Revit, (2) total time with MCP communication, (3) direct API work, (4) human interaction and (5) our own instrumentation; do not attribute LLM latency to pyRevit; a reasonably written pyRevit baseline (batch reads, one transaction per batch). Report median, p95, peak memory, throughput, speedup, correctness, regressions and functional differences. The 2–5× targets are **hypotheses**.
 
 ## G. Scheduler
-El planificador sólo gobierna operaciones de documento. Para ampliarlo a `commit`/`exec` habría que demostrar que respeta el orden de escrituras, las políticas de transacción y los locks (`GuardDocLock`, `BeginWrite` del `PlanStore`, cola de `MainThread`); sin esa demostración no se amplía. Orden de locks actual: scheduler (clave exclusiva `doc:<id>`) → hilo de Revit → bloqueo del documento; ninguna ruta los toma en orden inverso. Tiempos: BM-09 muestra que 2–8 agentes con 5 ms sintéticos terminan en ≈341 ms frente a ≈499 ms con 1 (límite por agente 2; global 4).
-Pendiente: tiempos separados de espera del scheduler, espera del hilo, ejecución, verificación y persistencia (hoy `queue_ms` es la espera del hilo; la del scheduler no se registra aún).
+The scheduler only governs document operations. Extending it to `commit`/`exec` would require showing that it respects write ordering, transaction policies and locks (`GuardDocLock`, `PlanStore`'s `BeginWrite`, the `MainThread` queue); without that proof it is not extended. Current lock order: scheduler (exclusive key `doc:<id>`) → Revit thread → document lock; no path takes them in reverse order. Timings: BM-09 shows that 2–8 agents with 5 ms of synthetic work finish in ≈341 ms versus ≈499 ms with 1 (per-agent limit 2; global 4).
+Pending: separate timings for scheduler wait, thread wait, execution, verification and persistence (today `queue_ms` is the thread wait; the scheduler wait is not recorded yet).

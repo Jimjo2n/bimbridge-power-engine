@@ -10,9 +10,9 @@ using Xunit;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// Runner general (exec): el código del usuario se envuelve y se COMPILA con Roslyn contra la API real de cada año
-    /// (ensamblados de referencia de RevitAPI/RevitAPIUI) y contra el add-in compilado de ese año. No ejecuta nada en Revit:
-    /// prueba que el script es válido para esa API, no que funcione en un modelo.
+    /// General runner (exec): the user's code is wrapped and COMPILED with Roslyn against the real API of each year
+    /// (RevitAPI/RevitAPIUI reference assemblies) and against that year's compiled add-in. It runs nothing in Revit:
+    /// it proves the script is valid for that API, not that it works on a model.
     /// </summary>
     public class ScriptingTests
     {
@@ -58,7 +58,7 @@ namespace Bimbridge.Tests
                 refs.AddRange(Directory.GetFiles(Path.Combine(Nuget, pkg, RefVersion[year], "ref"), "*.dll", SearchOption.AllDirectories));
             var addin = Path.Combine(Root, "src", "Bimbridge.Addin", "bin", "Release", "R" + year);
             Assert.True(File.Exists(Path.Combine(addin, "Bimbridge.Addin.dll")),
-                "falta el add-in compilado de " + year + " (" + addin + "): build.sh compila los add-ins antes de las pruebas");
+                "missing compiled add-in for " + year + " (" + addin + "): build.sh builds the add-ins before the tests");
             refs.AddRange(Directory.GetFiles(addin, "Bimbridge.*.dll"));
             return refs.ToArray();
         }
@@ -66,7 +66,7 @@ namespace Bimbridge.Tests
         private static (byte[] dll, string[] diags) Compile(string code, int year)
         {
             var w = ScriptSource.Wrap(code, "S" + Guid.NewGuid().ToString("N"));
-            var dll = Compiler.Compile(w.Source, References(year), "prueba_" + year, out var diags, out _, out _);
+            var dll = Compiler.Compile(w.Source, References(year), "test_" + year, out var diags, out _, out _);
             return (dll, diags);
         }
 
@@ -83,7 +83,7 @@ namespace Bimbridge.Tests
         [Theory, InlineData(2024), InlineData(2026)]
         public void BuiltInRecipes_PassRestrictedAutonomousPolicy(int year)
         {
-            foreach (var f in Directory.GetFiles(Path.Combine(Root, "src", "Bimbridge.Addin", "recetas"), "*.cs"))
+            foreach (var f in Directory.GetFiles(Path.Combine(Root, "src", "Bimbridge.Addin", "recipes"), "*.cs"))
             {
                 var caps = Caps(File.ReadAllText(f), year);
                 var denied = Bimbridge.Engine.CapabilityPolicy.Denied(Bimbridge.Engine.ExecutionProfile.RestrictedAutonomous, caps);
@@ -96,13 +96,13 @@ namespace Bimbridge.Tests
         {
             var cases = new Dictionary<string, string>
             {
-                ["proceso"] = "System.Diagnostics.Process.Start(\"cmd.exe\"); return 1;",
-                ["red"] = "var c = new System.Net.Http.HttpClient(); return c;",
-                ["reflexion"] = "var t = System.Type.GetType(\"X\"); return System.Activator.CreateInstance(t);",
-                ["archivo_escritura"] = "System.IO.File.WriteAllText(\"c:/x.txt\", \"a\"); return 1;",
+                ["process"] = "System.Diagnostics.Process.Start(\"cmd.exe\"); return 1;",
+                ["network"] = "var c = new System.Net.Http.HttpClient(); return c;",
+                ["reflection"] = "var t = System.Type.GetType(\"X\"); return System.Activator.CreateInstance(t);",
+                ["write_file"] = "System.IO.File.WriteAllText(\"c:/x.txt\", \"a\"); return 1;",
                 ["revit_sync"] = "doc.SynchronizeWithCentral(new TransactWithCentralOptions(), new SynchronizeWithCentralOptions()); return 1;",
-                ["revit_cerrar"] = "doc.Close(false); return 1;",
-                ["salida_proceso"] = "System.Environment.Exit(0); return 1;",
+                ["revit_close"] = "doc.Close(false); return 1;",
+                ["process_output"] = "System.Environment.Exit(0); return 1;",
             };
             foreach (var kv in cases)
             {
@@ -112,42 +112,42 @@ namespace Bimbridge.Tests
                 Assert.Empty(Bimbridge.Engine.CapabilityPolicy.Denied(Bimbridge.Engine.ExecutionProfile.TrustedInteractive, caps));
             }
             var w = Caps("System.IO.File.WriteAllText(\"c:/x.txt\", \"a\"); return 1;", year);
-            Assert.Empty(Bimbridge.Engine.CapabilityPolicy.Denied(Bimbridge.Engine.ExecutionProfile.RestrictedAutonomous, w, new[] { "archivo_escritura" }));
-            Assert.NotEmpty(Bimbridge.Engine.CapabilityPolicy.Denied(Bimbridge.Engine.ExecutionProfile.RestrictedAutonomous, Caps("System.Diagnostics.Process.Start(\"x\"); return 1;", year), new[] { "proceso" }));
+            Assert.Empty(Bimbridge.Engine.CapabilityPolicy.Denied(Bimbridge.Engine.ExecutionProfile.RestrictedAutonomous, w, new[] { "write_file" }));
+            Assert.NotEmpty(Bimbridge.Engine.CapabilityPolicy.Denied(Bimbridge.Engine.ExecutionProfile.RestrictedAutonomous, Caps("System.Diagnostics.Process.Start(\"x\"); return 1;", year), new[] { "process" }));
             Assert.Empty(Caps("return new FilteredElementCollector(doc).GetElementCount();", year));
         }
 
         public static IEnumerable<object[]> Years() => RefVersion.Keys.OrderBy(y => y).Select(y => new object[] { y });
 
         [Theory, MemberData(nameof(Years))]
-        public void Lavamanos_CompilesAgainstEachYearsApi(int year)
+        public void Washbasin_CompilesAgainstEachYearsApi(int year)
         {
-            var code = File.ReadAllText(Path.Combine(Root, "tools", "aceptacion", "lavamanos_exec.cs"));
+            var code = File.ReadAllText(Path.Combine(Root, "tools", "acceptance", "washbasin_exec.cs"));
             var (dll, diags) = Compile(code, year);
             Assert.True(dll != null, year + ": " + string.Join("\n", diags));
         }
 
-        /// <summary>Las recetas que trae el instalador (src/Bimbridge.Addin/recetas) y un script que usa Bim.* compilan en los 5 años.</summary>
+        /// <summary>The recipes shipped by the installer (src/Bimbridge.Addin/recipes) and a script that uses Bim.* compile for all 5 years.</summary>
         [Theory, MemberData(nameof(Years))]
         public void BuiltInRecipesAndBimHelpers_Compile(int year)
         {
-            var dir = Path.Combine(Root, "src", "Bimbridge.Addin", "recetas");
+            var dir = Path.Combine(Root, "src", "Bimbridge.Addin", "recipes");
             var files = Directory.GetFiles(dir, "*.cs");
             Assert.True(files.Length >= 4);
             foreach (var f in files)
             {
                 var code = File.ReadAllText(f);
-                Assert.True(ScriptSource.IsRecipe(code), Path.GetFileName(f) + " no se reconoce como receta");
+                Assert.True(ScriptSource.IsRecipe(code), Path.GetFileName(f) + " is not recognized as a recipe");
                 var (dll, diags) = Compile(code, year);
                 Assert.True(dll != null, year + " " + Path.GetFileName(f) + ": " + string.Join("\n", diags));
             }
-            foreach (var f in Directory.GetFiles(Path.Combine(Root, "tools", "bench_060"), "mcp_*.cs").Concat(Directory.GetFiles(Path.Combine(Root, "tools", "aceptacion"), "*_060.cs")).Concat(Directory.GetFiles(Path.Combine(Root, "tools", "aceptacion", "0.9.0"), "*_090.cs")))
+            foreach (var f in Directory.GetFiles(Path.Combine(Root, "tools", "bench_060"), "mcp_*.cs").Concat(Directory.GetFiles(Path.Combine(Root, "tools", "acceptance"), "*_060.cs")).Concat(Directory.GetFiles(Path.Combine(Root, "tools", "acceptance", "0.9.0"), "*_090.cs")))
             {
                 var (db, gb) = Compile(File.ReadAllText(f), year);
                 Assert.True(db != null, year + " " + Path.GetFileName(f) + ": " + string.Join("\n", gb));
             }
-            var body = "var v = Bim.Montaje.Vista3D(doc);\nvar g = new FilteredElementCollector(doc).OfClass(typeof(Group)).Cast<Group>().FirstOrDefault();\n" +
-                       "var vp = doc.ActiveView as ViewPlan;\nreturn new { g = g == null ? null : Bim.Grupos.Inspeccionar(g), r = vp == null ? null : Bim.Vistas.Rango(vp), x = Bim.Montaje.Transformacion(Transform.Identity).Mirrored };";
+            var body = "var v = Bim.Mounting.View3D(doc);\nvar g = new FilteredElementCollector(doc).OfClass(typeof(Group)).Cast<Group>().FirstOrDefault();\n" +
+                       "var vp = doc.ActiveView as ViewPlan;\nreturn new { g = g == null ? null : Bim.Groups.Inspect(g), r = vp == null ? null : Bim.Views.Range(vp), x = Bim.Mounting.Transformation(Transform.Identity).Mirrored };";
             var (d2, g2) = Compile(body, year);
             Assert.True(d2 != null, string.Join("\n", g2));
         }
@@ -162,13 +162,13 @@ namespace Bimbridge.Tests
             Assert.True(dll != null, string.Join("\n", diags));
         }
 
-        /// <summary>Medición (no prueba): BIMBRIDGE_BENCH_OUT=archivo dotnet test --filter Bench_. Compilación en frío y en caliente por año.</summary>
+        /// <summary>Measurement (not a test): BIMBRIDGE_BENCH_OUT=file dotnet test --filter Bench_. Cold and warm compilation per year.</summary>
         [Fact]
         public void Bench_CompileTimes()
         {
             var outPath = Environment.GetEnvironmentVariable("BIMBRIDGE_BENCH_OUT");
             if (string.IsNullOrEmpty(outPath)) return;
-            var code = File.ReadAllText(Path.Combine(Root, "tools", "aceptacion", "lavamanos_exec.cs"));
+            var code = File.ReadAllText(Path.Combine(Root, "tools", "acceptance", "washbasin_exec.cs"));
             var lines = new List<string> { "año;primera_ms;siguientes_mediana_ms;referencias" };
             foreach (var y in RefVersion.Keys.OrderBy(year => year))
             {
@@ -195,10 +195,10 @@ namespace Bimbridge.Tests
         public void Wrap_HoistsUsingsAfterComments_AndDetectsForms()
         {
             var w = ScriptSource.Wrap("// nota\nusing System.Text.RegularExpressions;\nreturn Regex.IsMatch(\"a\", \"a\");", "X");
-            Assert.Equal("cuerpo", w.Kind);
+            Assert.Equal("body", w.Kind);
             Assert.Contains("using System.Text.RegularExpressions;", w.HoistedUsings);
-            Assert.Equal("expresión", ScriptSource.Wrap("doc.Title", "X").Kind);
-            Assert.Equal("clase", ScriptSource.Wrap("public static class A { public static object Run(Bimbridge.Addin.Scripting.ScriptContext ctx) => 1; }", "X").Kind);
+            Assert.Equal("expression", ScriptSource.Wrap("doc.Title", "X").Kind);
+            Assert.Equal("class", ScriptSource.Wrap("public static class A { public static object Run(Bimbridge.Addin.Scripting.ScriptContext ctx) => 1; }", "X").Kind);
         }
     }
 }

@@ -1,29 +1,29 @@
-# Informe de pruebas beta1
+# beta1 test report
 
-## Automatizadas (sin Revit; NO son validación nativa)
-- **Suite:** 367/367. En alpha3 eran 359; se suman 8:
-  - NRT-05 aprobada contra el add-in falso;
-  - un guardado que no cambia el archivo produce FALLIDA;
-  - 4 bloqueos previos a cualquier escritura: sin autorización, ruta distinta, workshared, documento modificado;
-  - mapeo de estados;
-  - `CopyOver` sobre un destino sólo lectura.
-- **Repeticiones contra flakes:** 3 corridas completas adicionales, 367/367 en cada una (1 m 9 s – 1 m 31 s), sin fallos intermitentes.
-- **Idempotencia y fallos de conexión** (pruebas existentes, siguen pasando):
-  - timeout tras aplicar: se observa y no se repite, con 1 commit;
-  - NRT-03 con caída del AgentHost en 5 puntos: reanuda sin commit duplicado;
-  - la reanudación del mismo diario en NRT-05 hace 0 commits nuevos.
-- **Compilación del add-in:** 2022, 2023, 2024, 2025 y 2026 (en `build.sh`). `verificar_disco` usa ElementId de 64 bits en 2024+ y `int` en 2022–2023.
+## Automated (without Revit; NOT native validation)
+- **Suite:** 367/367. In alpha3 there were 359; 8 are added:
+  - NRT-05 passed against the fake add-in;
+  - a save that does not change the file produces FAILED;
+  - 4 blocks before any write: no authorization, different path, workshared, modified document;
+  - state mapping;
+  - `CopyOver` onto a read-only target.
+- **Repeats against flakes:** 3 additional full runs, 367/367 in each (1 m 9 s – 1 m 31 s), no intermittent failures.
+- **Idempotency and connection failures** (existing tests, still passing):
+  - timeout after applying: observed and not repeated, with 1 commit;
+  - NRT-03 with AgentHost crash at 5 points: resumes without a duplicate commit;
+  - resuming the same journal in NRT-05 makes 0 new commits.
+- **Add-in build:** 2022, 2023, 2024, 2025 and 2026 (in `build.sh`). `verificar_disco` uses 64-bit ElementId in 2024+ and `int` in 2022–2023.
 
-## Nativo
-| Prueba | Estado |
+## Native
+| Test | Status |
 |---|---|
-| NRT-05 (persistente, guardar, SHA, disco, duplicado) | **PENDIENTE**: requiere autorización del operador e instancia de prueba |
+| NRT-05 (persistent, save, SHA, disk, duplicate) | **PENDING**: requires operator authorization and a test instance |
 
-Criterio de APROBADA, todo verdadero en `nrt05_informe.json → comprobaciones`:
+PASSED criterion, all true in `nrt05_informe.json → comprobaciones`:
 - `autorizacion_operador_requerida`, `estado_op_verificada`, `un_solo_commit`;
 - `valores_tras_commit`, `mismo_documento`, `modificado_tras_commit`;
 - `guardado_ok`, `sha256_cambio`, `sin_cambios_pendientes_tras_guardar`;
 - `disco_valores_esperados`, `disco_sha_es_el_guardado`;
 - `sin_commit_duplicado`, `reanudar_no_modifica`.
 
-Un SHA igual antes y después del guardado nunca cuenta como éxito.
+An identical SHA before and after the save never counts as success.

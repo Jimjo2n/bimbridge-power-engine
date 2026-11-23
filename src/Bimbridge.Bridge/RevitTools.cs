@@ -15,9 +15,9 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Bridge
 {
     /// <summary>
-    /// Herramientas que ve la IA (sección 7). Lectura + escritura tipada (plan → commit → job).
-    /// Las descripciones son cortas a propósito: se cargan en el contexto de la IA en cada sesión.
-    /// Ninguna menciona puertos, sesiones ni colas.
+    /// Tools the AI sees (section 7). Reads + typed writes (plan → commit → job).
+    /// Descriptions are short on purpose: they are loaded into the AI context in every session.
+    /// None mentions ports, sessions or queues.
     /// </summary>
     [McpServerToolType]
     public sealed class RevitTools
@@ -29,147 +29,147 @@ namespace Bimbridge.Bridge
         public RevitTools(RevitConnection revit) { _revit = revit; }
 
         [McpServerTool(Name = "revit_context", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-        [Description("Estado de Revit: versión, documento activo, usuario, si está modificado, worksharing y rev. Úsela primero. " +
-                     "rev cuenta los cambios vistos desde que Revit abrió el modelo (0 = ninguno todavía); sirve para since. " +
-                     "Con varios Revit abiertos lista 'instancias'; instancia=<pid o versión, p. ej. 2024> cambia a otro. Detalle de uso: guide.")]
+        [Description("Revit state: version, active document, user, whether it is modified, worksharing and rev. Use it first. " +
+                     "rev counts the changes seen since Revit opened the model (0 = none yet); use it for since. " +
+                     "With several Revit open it lists 'instances'; instance=<pid or version, e.g. 2024> switches to another. Usage details: guide.")]
         public async Task<string> RevitContext(
             McpServer server,
-            [Description("pid o versión del Revit a usar cuando hay varios abiertos (opcional)")] string instancia = null,
-            [Description("Nombre de este agente para el panel de BIMBRIDGE, p. ej. el título del chat (opcional; regístrelo una vez)")] string agente = null,
-            [Description("true: incluye la tabla de capacidades")] bool? detalle = null,
+            [Description("pid or version of the Revit to use when several are open (optional)")] string instance = null,
+            [Description("Name of this agent for the BIMBRIDGE panel, e.g. the chat title (optional; register it once)")] string agent = null,
+            [Description("true: includes the capability table")] bool? detail = null,
             CancellationToken ct = default)
         {
-            if (!string.IsNullOrWhiteSpace(instancia))
+            if (!string.IsNullOrWhiteSpace(instance))
             {
-                var why = await _revit.SwitchToAsync(instancia.Trim(), ct).ConfigureAwait(false);
-                if (why != null) return Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = why });
+                var why = await _revit.SwitchToAsync(instance.Trim(), ct).ConfigureAwait(false);
+                if (why != null) return Json.Write(new Dictionary<string, object> { ["status"] = Status.Invalid, ["warning"] = why });
             }
             if (server?.ClientInfo?.Name is string name && name.Length > 0) _revit.ClientName = name; if (server?.ClientInfo?.Version is string clientVer && clientVer.Length > 0) _revit.ClientVersion = clientVer;
             var ctxArgs = new Dictionary<string, object>();
-            if (!string.IsNullOrWhiteSpace(agente)) { ctxArgs["agente"] = agente; _revit.AgentName = agente; _revit.AgentSource = "registro"; }
-            if (detalle == true) ctxArgs["detalle"] = true;
+            if (!string.IsNullOrWhiteSpace(agent)) { ctxArgs["agent"] = agent; _revit.AgentName = agent; _revit.AgentSource = AgentIdentity.SourceRegister; }
+            if (detail == true) ctxArgs["detail"] = true;
             var resp = await _revit.CallAsync(Wire.OpContext, ctxArgs, ReadTimeout, ct).ConfigureAwait(false);
             var o = RenderDict(resp);
             var all = RevitConnection.Instances();
             if (all.Count > 1)
             {
-                o["instancias"] = all.Select(d => (object)new Dictionary<string, object>
+                o["instances"] = all.Select(d => (object)new Dictionary<string, object>
                 {
                     ["pid"] = (long)d.Pid, ["revit"] = d.RevitVersion, ["addin"] = d.AddinVersion,
-                    ["en_uso"] = _revit.Instance != null && _revit.Instance.Pid == d.Pid,
+                    ["in_use"] = _revit.Instance != null && _revit.Instance.Pid == d.Pid,
                 }).ToList();
             }
-            o["puente"] = Program.Version;
+            o["bridge"] = Program.Version;
             return Json.Write(o);
         }
 
         [McpServerTool(Name = "guide", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-        [Description("Guía de uso bajo demanda (no toca Revit). tema: flujo, consulta, catalogo, geo, escritura, captura, lote. " +
-                     "Para escritura, op=tag,place… devuelve sólo esas operaciones.")]
+        [Description("On-demand usage guide (does not touch Revit). topic: workflow, query, catalog, geo, write, capture, batch. " +
+                     "For write, op=tag,place… returns only those operations.")]
         public string Guide(
-            [Description("flujo (por defecto), consulta, catalogo, geo, escritura, captura o lote")] string tema = null,
-            [Description("Sólo con tema=escritura: operaciones separadas por coma")] string op = null)
-            => Guides.Get(tema, op);
+            [Description("workflow (default), query, catalog, geo, write, capture or batch")] string topic = null,
+            [Description("Only with topic=write: comma-separated operations")] string op = null)
+            => Guides.Get(topic, op);
 
         [McpServerTool(Name = "catalog", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-        [Description("Catálogo del modelo en una llamada, tabla {total, cols, rows}. Detalle: guide tema=catalogo.")]
+        [Description("Model catalog in one call, table {total, cols, rows}. Details: guide topic=catalog.")]
         public Task<string> Catalog(
             McpServer server,
-            [Description("resumen, categorias, tipos, familias, niveles, vistas, plantillas, laminas, worksets, vinculos o filtros")] string que = null,
-            [Description("Categorías (tipos y familias), p. ej. LightingFixtures")] string cat = null,
-            [Description("Niveles (vistas)")] string lvl = null,
-            [Description("Tipo de vista: plano, rcp, seccion, alzado, 3d, leyenda, tabla…")] string tipo = null,
-            [Description("Texto a buscar en cualquier columna")] string buscar = null,
-            [Description("Parámetros extra (vistas, láminas), p. ej. Sub-Discipline,Set Group")] string f = null,
+            [Description("summary, categories, types, families, levels, views, templates, sheets, worksets, links or filters")] string kind = null,
+            [Description("Categories (types and families), e.g. LightingFixtures")] string cat = null,
+            [Description("Levels (views)")] string lvl = null,
+            [Description("View type: plan, rcp, section, elevation, 3d, legend, schedule…")] string type = null,
+            [Description("Text to search for in any column")] string search = null,
+            [Description("Extra parameters (views, sheets), e.g. Sub-Discipline,Set Group")] string f = null,
             int? page = null,
-            [Description("máx. 200")] int? page_size = null,
-            [Description("ft o mm")] string units = null,
+            [Description("max 200")] int? page_size = null,
+            [Description("ft or mm")] string units = null,
             CancellationToken ct = default)
         {
             var a = new Dictionary<string, object>();
             void Put(string k, object v) { if (v != null) a[k] = v; }
-            Put("que", que); Put("cat", cat); Put("lvl", lvl); Put("tipo", tipo); Put("buscar", buscar); Put("f", f); Put("units", units);
+            Put("kind", kind); Put("cat", cat); Put("lvl", lvl); Put("type", type); Put("search", search); Put("f", f); Put("units", units);
             Put("page", page.HasValue ? (long?)page.Value : null);
             Put("page_size", page_size.HasValue ? (long?)page_size.Value : null);
             return Call(server, Wire.OpCatalog, a, ct);
         }
 
         [McpServerTool(Name = "show", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-        [Description("Muestra elementos al usuario en Revit: los selecciona y encuadra en la vista activa (vista=id cambia antes de vista). No modifica el modelo. " +
-                     "Si no se ven en la vista activa, sugiere vistas donde buscarlos.")]
+        [Description("Shows elements to the user in Revit: selects them and frames them in the active view (view=id switches view first). Does not modify the model. " +
+                     "If they are not visible in the active view, suggests views where to find them.")]
         public Task<string> Show(
             McpServer server,
-            [Description("Ids separados por coma o $conjunto")] string ids = null,
-            [Description("Vista a abrir antes (id, opcional)")] long? vista = null,
-            [Description("false = no cambiar la selección")] bool? seleccionar = null,
-            [Description("false = no mover el zoom")] bool? zoom = null,
+            [Description("Comma-separated ids or $set")] string ids = null,
+            [Description("View to open first (id, optional)")] long? view = null,
+            [Description("false = do not change the selection")] bool? select = null,
+            [Description("false = do not move the zoom")] bool? zoom = null,
             CancellationToken ct = default)
         {
             var a = new Dictionary<string, object>();
             if (ids != null) a["ids"] = ids;
-            if (vista != null) a["vista"] = vista;
-            if (seleccionar != null) a["seleccionar"] = seleccionar;
+            if (view != null) a["view"] = view;
+            if (select != null) a["select"] = select;
             if (zoom != null) a["zoom"] = zoom;
             return Call(server, Wire.OpShow, a, ct);
         }
 
         [McpServerTool(Name = "capture", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-        [Description("Imagen de una vista de Revit para VERLA (no modifica el modelo). colorear=categorias distingue luminarias (naranja), interruptores (verde), tomas (azul), tableros (magenta)… " +
-                     "resaltar=$conjunto (o \"$a=rojo;$b=azul\") marca elementos; encuadre=ids|$conjunto|resaltado recorta a ellos. Devuelve la imagen y una leyenda con lo visible por categoría.")]
+        [Description("Image of a Revit view so you can SEE it (does not modify the model). color_by=categories tells apart fixtures (orange), switches (green), receptacles (blue), panels (magenta)… " +
+                     "highlight=$set (or \"$a=red;$b=blue\") marks elements; framing=ids|$set|highlighted crops to them. Returns the image and a legend of what is visible per category.")]
         public async Task<CallToolResult> Capture(
             McpServer server,
-            [Description("Id de la vista (por defecto la activa)")] long? vista = null,
-            [Description("categorias = un color por categoría")] string colorear = null,
-            [Description("Ids/$conjunto a resaltar; varios grupos con ; y color con =, p. ej. $sin_tag=rojo;$ok=verde")] string resaltar = null,
-            [Description("Recortar a estos ids/$conjunto, o resaltado")] string encuadre = null,
-            [Description("Lado mayor en píxeles, 400–2400 (por defecto 1400)")] int? px = null,
+            [Description("View id (default: the active one)")] long? view = null,
+            [Description("categories = one color per category")] string color_by = null,
+            [Description("Ids/$set to highlight; several groups with ; and color with =, e.g. $untagged=red;$ok=green")] string highlight = null,
+            [Description("Crop to these ids/$set, or highlighted")] string framing = null,
+            [Description("Longest side in pixels, 400–2400 (default 1400)")] int? px = null,
             CancellationToken ct = default)
         {
             if (server?.ClientInfo?.Name is string name && name.Length > 0) _revit.ClientName = name; if (server?.ClientInfo?.Version is string clientVer && clientVer.Length > 0) _revit.ClientVersion = clientVer;
             var a = new Dictionary<string, object>();
-            if (vista != null) a["vista"] = vista;
-            if (colorear != null) a["colorear"] = colorear;
-            if (resaltar != null) a["resaltar"] = resaltar;
-            if (encuadre != null) a["encuadre"] = encuadre;
+            if (view != null) a["view"] = view;
+            if (color_by != null) a["color_by"] = color_by;
+            if (highlight != null) a["highlight"] = highlight;
+            if (framing != null) a["framing"] = framing;
             if (px != null) a["px"] = (long)px.Value;
             var resp = await _revit.CallAsync(Wire.OpCapture, a, CaptureTimeout, ct).ConfigureAwait(false);
             var o = RenderDict(resp);
             var result = new CallToolResult { Content = new List<ContentBlock>() };
             byte[] bytes = null;
             var mime = o.TryGetValue("mime", out var m) ? m as string ?? "image/png" : "image/png";
-            if (resp.Estado == Status.Ok && o.TryGetValue("archivo", out var f) && f is string path)
+            if (resp.State == Status.Ok && o.TryGetValue("file", out var f) && f is string path)
             {
                 try { bytes = File.ReadAllBytes(path); }
-                catch (Exception ex) { o["aviso"] = "la imagen se generó pero no se pudo leer: " + ex.Message; }
+                catch (Exception ex) { o["warning"] = "the image was generated but could not be read: " + ex.Message; }
             }
             o.Remove("mime");
             result.Content.Add(new TextContentBlock { Text = Json.Write(o) });
             if (bytes != null) result.Content.Add(ImageContentBlock.FromBytes(bytes, mime));
-            result.IsError = resp.Estado != Status.Ok;
+            result.IsError = resp.State != Status.Ok;
             return result;
         }
 
-        [McpServerTool(Name = "lote", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-        [Description("Varias lecturas en UNA llamada (se ejecutan a la vez): llamadas=[{\"tool\":\"query\",\"cat\":\"LightingFixtures\",\"count\":true},{\"tool\":\"catalog\",\"que\":\"niveles\"}]. " +
-                     "Admite revit_context, query, get, catalog, check, geo y sets; máx. 8. Devuelve resultados en el mismo orden.")]
-        public async Task<string> Lote(
+        [McpServerTool(Name = "batch", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+        [Description("Several reads in ONE call (they run concurrently): calls=[{\"tool\":\"query\",\"cat\":\"LightingFixtures\",\"count\":true},{\"tool\":\"catalog\",\"kind\":\"levels\"}]. " +
+                     "Accepts revit_context, query, get, catalog, check, geo and sets; max 8. Returns results in the same order.")]
+        public async Task<string> Batch(
             McpServer server,
-            [Description("Lista de llamadas: cada una con tool y sus argumentos")] JsonElement llamadas,
+            [Description("List of calls: each with tool and its arguments")] JsonElement calls,
             CancellationToken ct = default)
         {
             if (server?.ClientInfo?.Name is string name && name.Length > 0) _revit.ClientName = name; if (server?.ClientInfo?.Version is string clientVer && clientVer.Length > 0) _revit.ClientVersion = clientVer;
             object parsed;
-            try { parsed = Json.Parse(llamadas.ValueKind == JsonValueKind.String ? llamadas.GetString() : llamadas.GetRawText()); }
-            catch (Exception ex) { return Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "llamadas no es JSON válido: " + ex.Message }); }
+            try { parsed = Json.Parse(calls.ValueKind == JsonValueKind.String ? calls.GetString() : calls.GetRawText()); }
+            catch (Exception ex) { return Json.Write(new Dictionary<string, object> { ["status"] = Status.Invalid, ["warning"] = "calls is not valid JSON: " + ex.Message }); }
             if (parsed is Dictionary<string, object> one) parsed = new List<object> { one };
             if (!(parsed is List<object> list) || list.Count == 0)
-                return Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "llamadas: lista de {tool, …}" });
+                return Json.Write(new Dictionary<string, object> { ["status"] = Status.Invalid, ["warning"] = "calls: list of {tool, …}" });
             if (list.Count > MaxBatch)
-                return Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "lote admite hasta " + MaxBatch + " llamadas" });
+                return Json.Write(new Dictionary<string, object> { ["status"] = Status.Invalid, ["warning"] = "batch accepts up to " + MaxBatch + " calls" });
 
             var tasks = list.Select(item => RunBatchItem(item, ct)).ToList();
             var results = await Task.WhenAll(tasks).ConfigureAwait(false);
-            return Json.Write(new Dictionary<string, object> { ["resultados"] = results.Cast<object>().ToList() });
+            return Json.Write(new Dictionary<string, object> { ["results"] = results.Cast<object>().ToList() });
         }
 
         private const int MaxBatch = 8;
@@ -178,7 +178,7 @@ namespace Bimbridge.Bridge
         private async Task<Dictionary<string, object>> RunBatchItem(object item, CancellationToken ct)
         {
             if (!(item is Dictionary<string, object> d))
-                return new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "cada llamada es un objeto {tool, …}" };
+                return new Dictionary<string, object> { ["status"] = Status.Invalid, ["warning"] = "each call is an object {tool, …}" };
             var tool = (Arg.GetString(d, "tool") ?? "").Trim().ToLowerInvariant();
             var args = new Dictionary<string, object>(d, StringComparer.Ordinal);
             args.Remove("tool");
@@ -199,10 +199,10 @@ namespace Bimbridge.Bridge
                 case "sets":
                     op = Wire.OpSets;
                     if (!string.Equals(Arg.GetString(args, "op") ?? "list", "list", StringComparison.OrdinalIgnoreCase))
-                        return new Dictionary<string, object> { ["tool"] = tool, ["estado"] = Status.Invalido, ["aviso"] = "en lote, sets sólo admite op=list" };
+                        return new Dictionary<string, object> { ["tool"] = tool, ["status"] = Status.Invalid, ["warning"] = "in batch, sets only accepts op=list" };
                     break;
                 default:
-                    return new Dictionary<string, object> { ["tool"] = tool, ["estado"] = Status.Invalido, ["aviso"] = "lote admite revit_context, query, get, catalog, check, geo y sets (no escritura)" };
+                    return new Dictionary<string, object> { ["tool"] = tool, ["status"] = Status.Invalid, ["warning"] = "batch accepts revit_context, query, get, catalog, check, geo and sets (no writes)" };
             }
             var resp = await _revit.CallAsync(op, args, ReadTimeout, ct).ConfigureAwait(false);
             var o = new Dictionary<string, object> { ["tool"] = tool };
@@ -213,26 +213,26 @@ namespace Bimbridge.Bridge
         private const string DefaultGetFields = "id,cat,fam,type,lvl,ws,elev,mark,host,x,y,z";
 
         [McpServerTool(Name = "query", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-        [Description("Consulta elementos sin modificar nada: tabla {total, cols, rows} o {cols, groups} con group_by. Longitudes en pies (units=mm). Indique cat, ids o view. Detalle: guide tema=consulta.")]
+        [Description("Queries elements without modifying anything: table {total, cols, rows} or {cols, groups} with group_by. Lengths in feet (units=mm). Give cat, ids or view. Details: guide topic=query.")]
         public Task<string> Query(
             McpServer server,
-            [Description("Categorías, p. ej. LightingFixtures,LightingDevices")] string cat = null,
-            [Description("Niveles por nombre, p. ej. LEVEL05")] string lvl = null,
-            [Description("Filtro por familia o tipo (contiene)")] string type = null,
-            [Description("Worksets por nombre")] string ws = null,
-            [Description("Ids \"1,2\" o $conjunto")] string ids = null,
-            [Description("Sólo elementos visibles en esta vista (id)")] long? view = null,
-            [Description("Condiciones: campo=valor, !=, >, <, >=, <=, ~ (contiene), campo? (no vacío), !campo (vacío)")] string[] where = null,
-            [Description("Campos (por defecto id,fam,type,lvl): cat,ws,elev,mark,comments,host,x,y,z o un parámetro")] string f = null,
-            [Description("Agrupar y contar por estos campos (máx. 3)")] string group_by = null,
-            [Description("true = sólo el total")] bool? count = null,
+            [Description("Categories, e.g. LightingFixtures,LightingDevices")] string cat = null,
+            [Description("Levels by name, e.g. LEVEL05")] string lvl = null,
+            [Description("Filter by family or type (contains)")] string type = null,
+            [Description("Worksets by name")] string ws = null,
+            [Description("Ids \"1,2\" or $set")] string ids = null,
+            [Description("Only elements visible in this view (id)")] long? view = null,
+            [Description("Conditions: field=value, !=, >, <, >=, <=, ~ (contains), field? (not empty), !field (empty)")] string[] where = null,
+            [Description("Fields (default id,fam,type,lvl): cat,ws,elev,mark,comments,host,x,y,z or a parameter")] string f = null,
+            [Description("Group and count by these fields (max 3)")] string group_by = null,
+            [Description("true = total only")] bool? count = null,
             int? page = null,
-            [Description("máx. 200")] int? page_size = null,
-            [Description("Guardar ids como $nombre")] string save_as = null,
-            [Description("Sólo elementos cambiados después de esta rev")] long? since = null,
-            [Description("ft o mm (elev, x, y, z, where)")] string units = null,
-            [Description("textos sin recortar")] bool? full = null,
-            [Description("Cursor devuelto por la primera página: con page=N sirve las siguientes sin releer el modelo (se rechaza si el documento cambió)")] string cursor = null,
+            [Description("max 200")] int? page_size = null,
+            [Description("Save ids as $name")] string save_as = null,
+            [Description("Only elements changed after this rev")] long? since = null,
+            [Description("ft or mm (elev, x, y, z, where)")] string units = null,
+            [Description("untruncated text")] bool? full = null,
+            [Description("Cursor returned by the first page: with page=N it serves the next ones without rereading the model (rejected if the document changed)")] string cursor = null,
             CancellationToken ct = default)
         {
             var a = new Dictionary<string, object>();
@@ -250,16 +250,16 @@ namespace Bimbridge.Bridge
         }
 
         [McpServerTool(Name = "get", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-        [Description("Detalle de elementos concretos: ids o $conjunto. Por defecto id,cat,fam,type,lvl,ws,elev,mark,host,x,y,z; f para pedir otros parámetros por nombre. " +
-                     "f=* = TODOS los parámetros de instancia y de tipo (hasta 10 elementos; lo común una sola vez; buscar filtra nombres).")]
+        [Description("Details of specific elements: ids or $set. Default id,cat,fam,type,lvl,ws,elev,mark,host,x,y,z; f to request other parameters by name. " +
+                     "f=* = ALL instance and type parameters (up to 10 elements; shared values once; search filters names).")]
         public Task<string> Get(
             McpServer server,
-            [Description("Ids separados por coma o $conjunto")] string ids,
-            [Description("Campos o nombres de parámetro, separados por coma; * = todos")] string f = null,
-            [Description("Página (desde 1)")] int? page = null,
-            [Description("ft (por defecto) o mm")] string units = null,
-            [Description("textos sin recortar")] bool? full = null,
-            [Description("Con f=*: sólo parámetros cuyo nombre contenga este texto")] string buscar = null,
+            [Description("Comma-separated ids or $set")] string ids,
+            [Description("Fields or parameter names, comma-separated; * = all")] string f = null,
+            [Description("Page (from 1)")] int? page = null,
+            [Description("ft (default) or mm")] string units = null,
+            [Description("untruncated text")] bool? full = null,
+            [Description("With f=*: only parameters whose name contains this text")] string search = null,
             CancellationToken ct = default)
         {
             if (f != null && f.Trim() == "*")
@@ -267,7 +267,7 @@ namespace Bimbridge.Bridge
                 var p = new Dictionary<string, object> { ["ids"] = ids, [Wire.ToolArg] = "get" };
                 if (units != null) p["units"] = units;
                 if (full != null) p["full"] = full;
-                if (buscar != null) p["buscar"] = buscar;
+                if (search != null) p["search"] = search;
                 return Call(server, Wire.OpParams, p, ct);
             }
             var a = new Dictionary<string, object>
@@ -283,78 +283,78 @@ namespace Bimbridge.Bridge
         }
 
         [McpServerTool(Name = "check", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-        [Description("Revisiones completas en una llamada. name=lighting_audit: luminarias por nivel, workset y tipo; sin tag, tags huérfanos y duplicados por vista " +
-                     "(guarda $sin_tag, $tags_huerfanos, $tags_sobrantes). views=rcp añade por cada plano de techo de iluminación (los que ya tienen tags) " +
-                     "luminarias, tags y sin_tag_en_vista, estimado por nivel y sin regenerar. exacto=true cuenta lo realmente visible pero regenera cada vista: sólo con pocas vistas (máx. 12).")]
+        [Description("Complete checks in one call. name=lighting_audit: fixtures by level, workset and type; untagged, orphan tags and duplicates per view " +
+                     "(saves $untagged, $orphan_tags, $leftover_tags). views=rcp adds, for each lighting ceiling plan (those that already have tags), " +
+                     "fixtures, tags and untagged_in_view, estimated by level and without regenerating. exact=true counts what is really visible but regenerates each view: only with few views (max 12).")]
         public Task<string> Check(
             McpServer server,
-            [Description("lighting_audit, cobertura, tabla_audit o vista_audit")] string name,
-            [Description("Niveles por nombre, separados por coma (opcional)")] string lvl = null,
-            [Description("rcp (planos de techo con tags de luminarias), rcp_todos, o ids de vista separados por coma (opcional)")] string views = null,
-            [Description("true = luminarias realmente visibles por vista (lento: máx. 12 vistas)")] bool? exacto = null,
-            [Description("Argumentos JSON. lighting_audit: manifiesto de inventario en mm; cobertura: q, modo, id y filtros; tabla_audit: tabla, ids_esperados, cantidad_esperada, filtros_esperados, celdas_esperadas; vista_audit: vistas, ids y expectativas opcionales por par vista-elemento.")] string args = null,
+            [Description("lighting_audit, coverage, schedule_audit or view_audit")] string name,
+            [Description("Levels by name, comma-separated (optional)")] string lvl = null,
+            [Description("rcp (ceiling plans with fixture tags), rcp_all, or comma-separated view ids (optional)")] string views = null,
+            [Description("true = fixtures really visible per view (slow: max 12 views)")] bool? exact = null,
+            [Description("JSON arguments. lighting_audit: inventory manifest in mm; coverage: q, mode, id and filters; schedule_audit: schedule, expected_ids, expected_count, expected_filters, expected_cells; view_audit: views, ids and optional expectations per view-element pair.")] string args = null,
             CancellationToken ct = default)
         {
             Dictionary<string, object> a;
             try { a = args == null ? new Dictionary<string, object>() : Json.ParseObject(args); }
-            catch (FormatException ex) { return Task.FromResult(Json.Write(Response.Fail(0, Status.Invalido, ex.Message))); }
+            catch (FormatException ex) { return Task.FromResult(Json.Write(Response.Fail(0, Status.Invalid, ex.Message))); }
             a["name"] = name;
-            if (exacto != null) a["exacto"] = exacto;
+            if (exact != null) a["exact"] = exact;
             if (lvl != null) a["lvl"] = lvl;
             if (views != null) a["views"] = views;
             return Call(server, Wire.OpCheck, a, ct);
         }
 
         [McpServerTool(Name = "geo", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-        [Description("Geometría real (mallas del modelo y de los vínculos), sin modificar nada. name: montaje (9 puntos contra la cara inferior de lo de arriba: ok, empotrada, flotando, sin_superficie), " +
-                     "holgura, choques, cerca, muro, nivel_real, duplicados, cuarto, rango_vista, indice. Devuelve conteos, problemas primero (holguras en pulgadas) y $conjuntos por clase para plan. " +
-                     "Si tarda: job_id → job. Repetir sin cambios es instantáneo. Detalle: guide tema=geo.")]
+        [Description("Real geometry (meshes of the model and its links), without modifying anything. name: mounting (9 points against the bottom face of what is above: ok, embedded, floating, no_surface), " +
+                     "clearance, clashes, near, wall, actual_level, duplicates, room, view_range, index. Returns counts, problems first (clearances in inches) and $sets per class for plan. " +
+                     "If slow: job_id → job. Repeating without changes is instant. Details: guide topic=geo.")]
         public Task<string> Geo(
             McpServer server,
-            [Description("Receta")] string name,
-            [Description("Categorías (LightingFixtures)")] string cat = null,
+            [Description("Recipe")] string name,
+            [Description("Categories (LightingFixtures)")] string cat = null,
             string lvl = null,
-            [Description("Ids o $conjunto")] string ids = null,
+            [Description("Ids or $set")] string ids = null,
             string ws = null,
-            [Description("Familia o tipo (contiene)")] string type = null,
-            [Description("losas, vigas, columnas, rampas, escaleras, muros, cielos, techos o categorías")] string contra = null,
-            [Description("Vínculos (contiene), todos o ninguno")] string vinculos = null,
-            bool? anfitrion = null,
-            [Description("arriba o abajo")] string lado = null,
-            [Description("1, 5 o 9")] int? puntos = null,
-            [Description("1/16\" por defecto")] string tol = null,
-            [Description("30' por defecto")] string max = null,
-            [Description("cerca/muro, p. ej. 2'")] string radio = null,
-            [Description("rango_vista: rcp, rcp_todos, plantas o ids")] string views = null,
-            [Description("cuarto: ambos, cuartos o espacios")] string fuente = null,
-            [Description("Subcategorías a ignorar, p. ej. JBox")] string sub_excluir = null,
-            [Description("Clase a listar o todos")] string solo = null,
+            [Description("Family or type (contains)")] string type = null,
+            [Description("slabs, beams, columns, ramps, stairs, walls, ceilings, roofs or categories")] string against = null,
+            [Description("Links (contains), all or none")] string links = null,
+            bool? host = null,
+            [Description("up or down")] string side = null,
+            [Description("1, 5 or 9")] int? points = null,
+            [Description("1/16\" default")] string tol = null,
+            [Description("30' default")] string max = null,
+            [Description("near/wall, e.g. 2'")] string radius = null,
+            [Description("view_range: rcp, rcp_all, floor_plans or ids")] string views = null,
+            [Description("room: both, rooms or spaces")] string source = null,
+            [Description("Subcategories to ignore, e.g. JBox")] string sub_exclude = null,
+            [Description("Class to list, or all")] string only = null,
             int? page = null,
             int? page_size = null,
-            [Description("ft o mm")] string units = null,
+            [Description("ft or mm")] string units = null,
             bool? reconstruir = null,
             CancellationToken ct = default,
-            [Description("montaje/holgura: IDs de origen y punto de la cara en el anfitrión")] bool? referencias = null)
+            [Description("mounting/clearance: source IDs and face point on the host")] bool? references = null)
         {
             var a = new Dictionary<string, object> { ["name"] = name };
             void Put(string k, object v) { if (v != null) a[k] = v; }
-            Put("cat", cat); Put("lvl", lvl); Put("ids", ids); Put("ws", ws); Put("type", type); Put("contra", contra);
-            Put("vinculos", vinculos); Put("anfitrion", anfitrion); Put("lado", lado);
-            Put("puntos", puntos.HasValue ? (long?)puntos.Value : null);
-            Put("tol", tol); Put("max", max); Put("radio", radio); Put("views", views); Put("fuente", fuente);
-            Put("sub_excluir", sub_excluir); Put("solo", solo);
+            Put("cat", cat); Put("lvl", lvl); Put("ids", ids); Put("ws", ws); Put("type", type); Put("against", against);
+            Put("links", links); Put("host", host); Put("side", side);
+            Put("points", points.HasValue ? (long?)points.Value : null);
+            Put("tol", tol); Put("max", max); Put("radius", radius); Put("views", views); Put("source", source);
+            Put("sub_exclude", sub_exclude); Put("only", only);
             Put("page", page.HasValue ? (long?)page.Value : null);
             Put("page_size", page_size.HasValue ? (long?)page_size.Value : null);
-            Put("units", units); Put("reconstruir", reconstruir); Put("referencias", referencias);
+            Put("units", units); Put("rebuild", reconstruir); Put("references", references);
             return Call(server, Wire.OpGeo, a, ct);
         }
 
         [McpServerTool(Name = "sets", ReadOnly = true, OpenWorld = false)]
-        [Description("Conjuntos guardados con save_as. op=list (por defecto) o op=drop con name.")]
+        [Description("Sets saved with save_as. op=list (default) or op=drop with name.")]
         public Task<string> Sets(
             McpServer server,
-            [Description("list o drop")] string op = "list",
-            [Description("Nombre del conjunto, p. ej. $l5_perimetro")] string name = null,
+            [Description("list or drop")] string op = "list",
+            [Description("Set name, e.g. $l5_perimeter")] string name = null,
             CancellationToken ct = default)
         {
             var a = new Dictionary<string, object> { ["op"] = op ?? "list" };
@@ -363,206 +363,206 @@ namespace Bimbridge.Bridge
         }
 
         [McpServerTool(Name = "plan", ReadOnly = true, OpenWorld = false)]
-        [Description("Prepara cambios SIN aplicarlos y devuelve el diff (antes → después) con plan_id. Operaciones tipadas, máx. 200, " +
-                     "un plan = un Deshacer. ops: set_param, set_values, set_type_param, change_type, set_elevation, set_workset, set_level, " +
+        [Description("Prepares changes WITHOUT applying them and returns the diff (before → after) with plan_id. Typed operations, max 200, " +
+                     "one plan = one Undo. ops: set_param, set_values, set_type_param, change_type, set_elevation, set_workset, set_level, " +
                      "snap_to_surface, move, rotate, mirror, copy, delete, place, " +
                      "tag, tag_move, group_create, ungroup, group_place, view_create, " +
                      "view_set, view_hide, view_override, sheet_create, sheet_place, text_note, filled_region. " +
-                     "ids: \"1,2\", $conjunto o @n (lo creado por la op n). Argumentos: guide tema=escritura op=<op>. job_id → job.")]
+                     "ids: \"1,2\", $set or @n (what op n created). Arguments: guide topic=write op=<op>. job_id → job.")]
         public Task<string> Plan(
             McpServer server,
-            [Description("[{\"op\":\"set_param\",\"ids\":\"$x\",\"name\":\"Comments\",\"value\":\"REVISAR\"}]")] JsonElement ops,
-            [Description("Resumen corto para el usuario (aparece en la cola de Revit)")] string summary = null,
-            [Description("Documento dN (por defecto el activo)")] string doc = null,
-            [Description("Tarea autorizada (permite commit tras reconectar)")] string tarea = null,
+            [Description("[{\"op\":\"set_param\",\"ids\":\"$x\",\"name\":\"Comments\",\"value\":\"REVIEW\"}]")] JsonElement ops,
+            [Description("Short summary for the user (shown in the Revit queue)")] string summary = null,
+            [Description("Document dN (default: the active one)")] string doc = null,
+            [Description("Authorized task (allows commit after reconnecting)")] string task = null,
             CancellationToken ct = default)
         {
             object parsed;
             try { parsed = Json.Parse(ops.ValueKind == JsonValueKind.String ? ops.GetString() : ops.GetRawText()); }
-            catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "ops no es JSON válido: " + ex.Message })); }
+            catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["status"] = Status.Invalid, ["warning"] = "ops is not valid JSON: " + ex.Message })); }
             if (parsed is Dictionary<string, object> single) parsed = new List<object> { single };
             var a = new Dictionary<string, object> { ["ops"] = parsed };
             if (summary != null) a["summary"] = summary;
             if (doc != null) a[Wire.DocArg] = doc;
-            if (tarea != null) a[Wire.TaskArg] = tarea;
+            if (task != null) a[Wire.TaskArg] = task;
             return Call(server, Wire.OpPlan, a, ct);
         }
 
         [McpServerTool(Name = "commit", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
-        [Description("Aplica un plan ya revisado por el usuario. Si el usuario tiene la cola activa, responde estado=retenido: " +
-                     "el cambio espera a que el usuario lo aplique desde Revit; no lo repita. Si algo cambió desde el plan: estado=conflicto y no se aplica nada. " +
-                     "Lo creado queda en $creados (y $creados_n por operación); 'verificacion' relee lo tocado.")]
+        [Description("Applies a plan already reviewed by the user. If the user has the queue on, it answers status=held: " +
+                     "the change waits for the user to apply it from Revit; do not repeat it. If something changed since the plan: status=conflict and nothing is applied. " +
+                     "What was created is in $created (and $created_n per operation); 'verification' rereads what was touched.")]
         public Task<string> Commit(
             McpServer server,
-            [Description("plan_id devuelto por plan")] string plan_id,
-            [Description("Clave de idempotencia: con la misma clave no se aplica dos veces")] string clave = null,
-            [Description("Tarea autorizada")] string tarea = null,
-            [Description("Tras interrumpido con clave=: no_aplicado | aplicado")] string reconciliar = null,
-            [Description("aplicar (por defecto) | ensayo: aplica, verifica y REVIERTE; no es un commit")] string modo = null,
+            [Description("plan_id returned by plan")] string plan_id,
+            [Description("Idempotency key: the same key is never applied twice")] string key = null,
+            [Description("Authorized task")] string task = null,
+            [Description("After interrupted with key=: not_applied | applied")] string reconcile = null,
+            [Description("apply (default) | trial: applies, verifies and ROLLS BACK; it is not a commit")] string mode = null,
             CancellationToken ct = default)
         {
             var a = new Dictionary<string, object> { ["plan_id"] = plan_id };
-            if (modo != null) a["modo"] = modo;
-            if (reconciliar != null) a["reconciliar"] = reconciliar;
-            if (clave != null) a[Wire.KeyArg] = clave;
-            if (tarea != null) a[Wire.TaskArg] = tarea;
+            if (mode != null) a["mode"] = mode;
+            if (reconcile != null) a["reconcile"] = reconcile;
+            if (key != null) a[Wire.KeyArg] = key;
+            if (task != null) a[Wire.TaskArg] = task;
             return Call(server, Wire.OpCommit, a, ct, WriteTimeout);
         }
 
         [McpServerTool(Name = "docs", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-        [Description("Documentos abiertos en este Revit (proyectos y familias) con su handle dN, tipo, ruta, si está modificado y último guardado/sync.")]
+        [Description("Documents open in this Revit (projects and families) with their dN handle, type, path, whether modified, and last save/sync.")]
         public Task<string> Docs(McpServer server, CancellationToken ct = default)
             => Call(server, Wire.OpDocs, new Dictionary<string, object>(), ct);
 
         [McpServerTool(Name = "res", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-        [Description("Lee un resultado largo guardado (id r… o b…) por tramos de líneas.")]
+        [Description("Reads a saved long result (id r… or b…) in line ranges.")]
         public Task<string> Res(
-            [Description("Id del resultado")] string id,
-            [Description("Línea inicial")] int desde = 0,
-            [Description("Número de líneas")] int lineas = 300)
+            [Description("Result id")] string id,
+            [Description("Start line")] int from = 0,
+            [Description("Number of lines")] int lines = 300)
         {
-            var txt = ResultStore.Read(id, desde, lineas, out var total);
-            if (txt == null) return Task.FromResult(Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "no existe el resultado " + id }));
-            return Task.FromResult(Json.Write(new Dictionary<string, object> { ["texto"] = txt, ["total_lineas"] = (long)total, ["desde"] = (long)desde }));
+            var txt = ResultStore.Read(id, from, lines, out var total);
+            if (txt == null) return Task.FromResult(Json.Write(new Dictionary<string, object> { ["status"] = Status.Invalid, ["warning"] = "result does not exist: " + id }));
+            return Task.FromResult(Json.Write(new Dictionary<string, object> { ["text"] = txt, ["total_lines"] = (long)total, ["from"] = (long)from }));
         }
 
         [McpServerTool(Name = "exec", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
-        [Description("C# sobre la API pública de Revit. Código: expresión, cuerpo con return, o clase con static object Run(ScriptContext ctx). " +
-                     "Ya existen doc, uidoc, app, uiapp, args, ctx. modo=consulta (solo lectura, sin transacción) | ensayo (cambia y revierte; nivel W) | ejecutar (tx=auto|grupo|ninguna; ninguna para EditFamily/LoadFamily). " +
-                     "Devuelve el valor en JSON, avisos de Revit y qué cambió.")]
+        [Description("C# against the public Revit API. Code: expression, body with return, or class with static object Run(ScriptContext ctx). " +
+                     "doc, uidoc, app, uiapp, args, ctx already exist. mode=query (read-only, no transaction) | trial (changes and rolls back; level W) | run (tx=auto|group|none; none for EditFamily/LoadFamily). " +
+                     "Returns the value as JSON, Revit warnings and what changed.")]
         public Task<string> Exec(
             McpServer server,
-            [Description("Código C#")] string codigo = null,
-            [Description("consulta | ensayo | ejecutar")] string modo = "consulta",
-            [Description("auto | grupo | ninguna")] string tx = null,
-            [Description("Documento dN")] string doc = null,
-            [Description("Argumentos (objeto JSON) → args")] JsonElement? args = null,
-            [Description("Script guardado a repetir, o 'lista'")] string nombre = null,
-            [Description("Guardar el código con ese nombre")] string guardar = null,
-            [Description("Clave de idempotencia")] string clave = null,
-            [Description("Tarea autorizada")] string tarea = null,
-            [Description("Archivo .cs con el código")] string archivo = null,
-            [Description("DLL extra separadas por coma")] string refs = null,
-            [Description("Otros documentos que toca: d2,d3")] string docs = null,
-            [Description("Tras interrumpido con clave=: no_aplicado | aplicado")] string reconciliar = null,
+            [Description("C# code")] string code = null,
+            [Description("query | trial | run")] string mode = "query",
+            [Description("auto | group | none")] string tx = null,
+            [Description("Document dN")] string doc = null,
+            [Description("Arguments (JSON object) → args")] JsonElement? args = null,
+            [Description("Saved script to repeat, or 'list'")] string name = null,
+            [Description("Save the code under that name")] string save_as = null,
+            [Description("Idempotency key")] string key = null,
+            [Description("Authorized task")] string task = null,
+            [Description(".cs file with the code")] string file = null,
+            [Description("Extra DLLs, comma-separated")] string refs = null,
+            [Description("Other documents it touches: d2,d3")] string docs = null,
+            [Description("After interrupted with key=: not_applied | applied")] string reconcile = null,
             CancellationToken ct = default)
         {
             var a = new Dictionary<string, object>();
-            if (archivo != null) a["archivo"] = archivo;
+            if (file != null) a["file"] = file;
             if (refs != null) a["refs"] = refs.Split(',').Select(x => (object)x.Trim()).Where(x => ((string)x).Length > 0).ToList();
             if (docs != null) a["docs"] = docs.Split(',').Select(x => (object)x.Trim()).Where(x => ((string)x).Length > 0).ToList();
-            if (reconciliar != null) a["reconciliar"] = reconciliar;
-            if (string.Equals(nombre, "lista", StringComparison.OrdinalIgnoreCase) && codigo == null) a["accion"] = "lista";
-            else if (nombre != null) a["nombre"] = nombre;
-            if (codigo != null) a["codigo"] = codigo;
-            if (modo != null) a["modo"] = modo;
+            if (reconcile != null) a["reconcile"] = reconcile;
+            if (string.Equals(name, "list", StringComparison.OrdinalIgnoreCase) && code == null) a["action"] = "list";
+            else if (name != null) a["name"] = name;
+            if (code != null) a["code"] = code;
+            if (mode != null) a["mode"] = mode;
             if (tx != null) a["tx"] = tx;
             if (doc != null) a[Wire.DocArg] = doc;
-            if (guardar != null) a["guardar"] = guardar;
-            if (clave != null) a[Wire.KeyArg] = clave;
-            if (tarea != null) a[Wire.TaskArg] = tarea;
+            if (save_as != null) a["save"] = save_as;
+            if (key != null) a[Wire.KeyArg] = key;
+            if (task != null) a[Wire.TaskArg] = task;
             if (args.HasValue && args.Value.ValueKind == JsonValueKind.Object) a["args"] = Json.Parse(args.Value.GetRawText());
             else if (args.HasValue && args.Value.ValueKind == JsonValueKind.String)
             {
                 try { a["args"] = Json.Parse(args.Value.GetString()); }
-                catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "args no es JSON: " + ex.Message })); }
+                catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["status"] = Status.Invalid, ["warning"] = "args is not JSON: " + ex.Message })); }
             }
             return Call(server, Wire.OpExec, a, ct, WriteTimeout);
         }
 
         [McpServerTool(Name = "fam", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
-        [Description("Familias y conectores. accion=info|caras (leen) | abrir (EditFamily → dN) | conector (crea o reconcilia por nombre: sistema, cara, radio/diametro con unidad, flujo) | " +
-                     "param (valor/formula, crear, asociar) | cargar (en=dN, sobrescribir=no|valores). Argumentos en 'args' como objeto JSON.")]
+        [Description("Families and connectors. action=info|faces|search (read) | open (EditFamily → dN) | connector (creates or reconciles by name: system, face, radius/diameter with unit, flow) | " +
+                     "param (value/formula, create, associate) | load (into=dN, overwrite=no|values). Arguments in 'args' as a JSON object.")]
         public Task<string> Fam(
             McpServer server,
-            [Description("info | caras | abrir | conector | param | cargar")] string accion,
-            [Description("Argumentos, p. ej. {\"nombre\":\"fria\",\"sistema\":\"fria\",\"cara\":\"812:3\",\"radio\":\"6.5mm\"}")] JsonElement? args = null,
-            [Description("Documento dN")] string doc = null,
-            [Description("Clave de idempotencia")] string clave = null,
+            [Description("info | faces | search | open | connector | param | load")] string action,
+            [Description("Arguments, e.g. {\"name\":\"cold\",\"system\":\"cold\",\"face\":\"812:3\",\"radius\":\"6.5mm\"}")] JsonElement? args = null,
+            [Description("Document dN")] string doc = null,
+            [Description("Idempotency key")] string key = null,
             CancellationToken ct = default)
-            => CallWithArgs(server, Wire.OpFam, accion, args, doc, clave, ct, WriteTimeout);
+            => CallWithArgs(server, Wire.OpFam, action, args, doc, key, ct, WriteTimeout);
 
         [McpServerTool(Name = "doc_op", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
-        [Description("Operaciones de documento: guardar | guardar_como (como=ruta) | sync (comentario=) | pdf (conjunto= u hojas=, carpeta=, nombre=) | cerrar (guardar=si|descartar=si). " +
-                     "Verifica el resultado (archivo, hash, páginas). Argumentos en 'args' como objeto JSON.")]
+        [Description("Document operations: save | save_as (as=path) | sync (comment=) | pdf (sheet_set= or sheets=, folder=, name=) | close (save=yes|discard=yes). " +
+                     "Verifies the result (file, hash, pages). Arguments in 'args' as a JSON object.")]
         public Task<string> DocOp(
             McpServer server,
-            [Description("guardar | guardar_como | sync | pdf | cerrar")] string accion,
-            [Description("Argumentos (objeto JSON)")] JsonElement? args = null,
-            [Description("Documento dN")] string doc = null,
-            [Description("Clave de idempotencia")] string clave = null,
+            [Description("save | save_as | sync | pdf | close")] string action,
+            [Description("Arguments (JSON object)")] JsonElement? args = null,
+            [Description("Document dN")] string doc = null,
+            [Description("Idempotency key")] string key = null,
             CancellationToken ct = default)
-            => CallWithArgs(server, Wire.OpDoc, accion, args, doc, clave, ct, WriteTimeout);
+            => CallWithArgs(server, Wire.OpDoc, action, args, doc, key, ct, WriteTimeout);
 
-        private Task<string> CallWithArgs(McpServer server, string op, string accion, JsonElement? args, string doc, string clave, CancellationToken ct, TimeSpan timeout)
+        private Task<string> CallWithArgs(McpServer server, string op, string action, JsonElement? args, string doc, string key, CancellationToken ct, TimeSpan timeout)
         {
             var a = new Dictionary<string, object>();
             if (args.HasValue && args.Value.ValueKind != JsonValueKind.Null && args.Value.ValueKind != JsonValueKind.Undefined)
             {
                 object parsed;
                 try { parsed = Json.Parse(args.Value.ValueKind == JsonValueKind.String ? args.Value.GetString() : args.Value.GetRawText()); }
-                catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "args no es JSON: " + ex.Message })); }
+                catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["status"] = Status.Invalid, ["warning"] = "args is not JSON: " + ex.Message })); }
                 if (parsed is Dictionary<string, object> d) foreach (var kv in d) a[kv.Key] = kv.Value is string || kv.Value is bool ? kv.Value : Convert.ToString(kv.Value, System.Globalization.CultureInfo.InvariantCulture);
             }
-            a["accion"] = accion;
+            a["action"] = action;
             if (doc != null) a[Wire.DocArg] = doc;
-            if (clave != null) a[Wire.KeyArg] = clave;
+            if (key != null) a[Wire.KeyArg] = key;
             return Call(server, op, a, ct, timeout);
         }
 
-        [McpServerTool(Name = "tarea", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
-        [Description("Tareas largas reanudables: una receta (clase que hereda de Receta, por nombre registrado, archivo .cs o código) recorre unidades por lotes, " +
-                     "con checkpoints, barreras guardar/sync/pdf verificadas y QC final. Cualquier cliente la continúa por id. " +
-                     "accion=iniciar | estado | resumen | esperar (desde=rev, max=s) | unidades | lista | recetas | reanudar | cancelar | reconciliar (decision=aplicada|no_aplicada, claves) | anotar (texto) | olvidar.")]
-        public Task<string> Tarea(
+        [McpServerTool(Name = "task", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
+        [Description("Long resumable tasks: a recipe (class inheriting from Recipe, by registered name, .cs file or code) walks units in batches, " +
+                     "with checkpoints, verified save/sync/pdf barriers and final QC. Any client can continue it by id. " +
+                     "action=start | status | summary | wait (from=rev, max=s) | units | list | recipes | resume | cancel | reconcile (decision=applied|not_applied, keys) | note (text) | forget.")]
+        public Task<string> TaskTool(
             McpServer server,
-            [Description("iniciar | estado | resumen | esperar | unidades | lista | recetas | reanudar | cancelar | reconciliar | anotar | olvidar")] string accion = "estado",
-            [Description("Id de la tarea (al iniciar: opcional, para poder repetir sin duplicar)")] string id = null,
-            [Description("Receta registrada por nombre")] string receta = null,
-            [Description("Archivo .cs con la receta")] string archivo = null,
-            [Description("Código de la receta")] string codigo = null,
-            [Description("Argumentos de la receta (objeto JSON)")] JsonElement? args = null,
-            [Description("Objetivo en una frase (memoria de la tarea)")] string objetivo = null,
-            [Description("Opciones: \"guardar_cada=200 al_final=guardar,pdf en_error=continuar lote_max=200 espera_s=10 desde=N max=30 decision=aplicada claves=a,b texto=...\"")] string opciones = null,
-            [Description("Documento dN")] string doc = null,
+            [Description("start | status | summary | wait | units | list | recipes | resume | cancel | reconcile | note | forget")] string action = "status",
+            [Description("Task id (on start: optional, so it can be repeated without duplicating)")] string id = null,
+            [Description("Registered recipe by name")] string recipe = null,
+            [Description(".cs file with the recipe")] string file = null,
+            [Description("Recipe code")] string code = null,
+            [Description("Recipe arguments (JSON object)")] JsonElement? args = null,
+            [Description("Goal in one sentence (task memory)")] string target = null,
+            [Description("Options: \"save_every=200 at_end=save,pdf on_error=continue batch_max=200 wait_s=10 from=N max=30 decision=applied keys=a,b text=...\"")] string options = null,
+            [Description("Document dN")] string doc = null,
             CancellationToken ct = default)
         {
-            var a = new Dictionary<string, object> { ["accion"] = accion ?? "estado" };
+            var a = new Dictionary<string, object> { ["action"] = action ?? "status" };
             if (id != null) a["id"] = id;
-            if (receta != null) a["receta"] = receta;
-            if (archivo != null) a["archivo"] = archivo;
-            if (codigo != null) a["codigo"] = codigo;
-            if (objetivo != null) a["objetivo"] = objetivo;
+            if (recipe != null) a["recipe"] = recipe;
+            if (file != null) a["file"] = file;
+            if (code != null) a["code"] = code;
+            if (target != null) a["target"] = target;
             if (doc != null) a[Wire.DocArg] = doc;
-            if (!string.IsNullOrWhiteSpace(opciones))
+            if (!string.IsNullOrWhiteSpace(options))
             {
-                var o = Command.Parse("x " + opciones);
+                var o = Command.Parse("x " + options);
                 if (o != null) foreach (var kv in o.Args) a[kv.Key == "count" ? "n" : kv.Key] = kv.Value;
             }
             if (args.HasValue && args.Value.ValueKind != JsonValueKind.Null && args.Value.ValueKind != JsonValueKind.Undefined)
             {
                 try { a["args"] = Json.Parse(args.Value.ValueKind == JsonValueKind.String ? args.Value.GetString() : args.Value.GetRawText()); }
-                catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["estado"] = Status.Invalido, ["aviso"] = "args no es JSON: " + ex.Message })); }
+                catch (Exception ex) { return Task.FromResult(Json.Write(new Dictionary<string, object> { ["status"] = Status.Invalid, ["warning"] = "args is not JSON: " + ex.Message })); }
             }
             return Call(server, Wire.OpTask, a, ct, TimeSpan.FromSeconds(180));
         }
 
         [McpServerTool(Name = "job", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-        [Description("Seguimiento. job_id: espera el resultado de una revisión larga (hasta ~40 s por llamada) u op=cancel. " +
-                     "plan_id: estado del plan (listo, retenido, aplicado, conflicto, revertido, vencido, descartado, desconocido, reconciliado) u op=drop. " +
-                     "op=pendientes: bloqueo del documento. op=reconciliar plan_id: compara con el modelo y libera sólo si queda demostrado. Sin ids: lista de esta conversación.")]
+        [Description("Tracking. job_id: waits for the result of a long check (up to ~40 s per call) or op=cancel. " +
+                     "plan_id: plan status (ready, held, applied, conflict, reverted, expired, discarded, unknown, reconciled) or op=drop. " +
+                     "op=pending_items: document lock. op=reconcile plan_id: compares with the model and releases only if proven. Without ids: list for this conversation.")]
         public Task<string> Job(
             McpServer server,
-            [Description("job_id devuelto por geo o plan (opcional)")] string job_id = null,
-            [Description("plan_id (opcional)")] string plan_id = null,
-            [Description("status (por defecto), cancel (job), drop (plan), pendientes o reconciliar")] string op = null,
-            [Description("ID de intento de escritura para consulta de sólo lectura")] string intento_id = null,
+            [Description("job_id returned by geo or plan (optional)")] string job_id = null,
+            [Description("plan_id (optional)")] string plan_id = null,
+            [Description("status (default), cancel (job), drop (plan), pending or reconcile")] string op = null,
+            [Description("Write attempt ID for a read-only query")] string attempt_id = null,
             CancellationToken ct = default)
         {
             var a = new Dictionary<string, object>();
             if (job_id != null) a["job_id"] = job_id;
             if (plan_id != null) a["plan_id"] = plan_id;
-            if (intento_id != null) a["intento_id"] = intento_id;
+            if (attempt_id != null) a["attempt_id"] = attempt_id;
             if (op != null) a["op"] = op;
             return Call(server, Wire.OpJob, a, ct);
         }
@@ -573,23 +573,23 @@ namespace Bimbridge.Bridge
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var resp = await _revit.CallAsync(op, args, timeout ?? ReadTimeout, ct).ConfigureAwait(false);
             var text = Render(resp);
-            UsageMetrics.Record(_revit.ClientName, op, op, Json.Write(args ?? new Dictionary<string, object>()).Length, text.Length, sw.ElapsedMilliseconds, resp.Estado);
+            UsageMetrics.Record(_revit.ClientName, op, op, Json.Write(args ?? new Dictionary<string, object>()).Length, text.Length, sw.ElapsedMilliseconds, resp.State);
             return text;
         }
 
         /// <summary>
-        /// Respuesta para la IA: si todo fue bien, los datos con la rev; si no, el estado y un aviso accionable.
+        /// Response for the AI: if all went well, the data with the rev; otherwise the status and an actionable warning.
         /// </summary>
         internal static string Render(Response resp) => Json.Write(RenderDict(resp));
 
         internal static Dictionary<string, object> RenderDict(Response resp)
         {
             var o = new Dictionary<string, object>();
-            if (resp.Estado != Status.Ok) o["estado"] = resp.Estado;
+            if (resp.State != Status.Ok) o["status"] = resp.State;
             if (resp.Rev.HasValue) o["rev"] = resp.Rev.Value;
-            if (resp.Datos is Dictionary<string, object> d) foreach (var kv in d) o[kv.Key] = kv.Value;
-            else if (resp.Datos != null) o["datos"] = resp.Datos;
-            if (!string.IsNullOrEmpty(resp.Aviso)) o["aviso"] = resp.Aviso;
+            if (resp.Data is Dictionary<string, object> d) foreach (var kv in d) o[kv.Key] = kv.Value;
+            else if (resp.Data != null) o["data"] = resp.Data;
+            if (!string.IsNullOrEmpty(resp.Warning)) o["warning"] = resp.Warning;
             return o;
         }
     }

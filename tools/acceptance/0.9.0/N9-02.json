@@ -1,0 +1,23 @@
+{
+ "schema": "bimbridge.campaign080/1",
+ "item": "N9-02",
+ "title": "Model grids for drawing–model registration (read only)",
+ "initial_status": "Disposable LOCAL copy, not workshared, of an authorized public or synthetic model (e.g. an Autodesk sample) with named straight grids and a OneLevelBased lighting fixture family loaded. Revit 2024 with BIMBRIDGE 0.9.0 installed; config.json levels RPW, lab profile with the copy's folder in laboratorio.carpetas and carpetas_documentos with the test PDF folder. NEVER the user's working model.",
+ "status": "BLOCKED — REVIT_IN_USE — AWAITING_USER_AUTHORIZATION",
+ "variables": {
+  "grids_code": "@tools/acceptance/0.9.0/model_grids_090.cs"
+ },
+ "steps": [
+  {
+   "name": "read grids (query, no transaction)",
+   "op": "exec",
+   "args": {
+    "mode": "query",
+    "code": "${grids_code}"
+   },
+   "contains": [
+    "model_grids_090.json"
+   ]
+  }
+ ]
+}

@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Sin dependencias externas: lo carga Revit (net48 y net8) y el puente. -->
+  <!-- No external dependencies: loaded by Revit (net48 and net8) and by the bridge. -->
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>

@@ -16,11 +16,11 @@ namespace Bimbridge.Addin.Revit
     {
         private async Task<Response> ScheduleCheck(Request request, CancellationToken ct)
         {
-            var selector = Arg.GetString(request.Args, "tabla")?.Trim();
-            if (string.IsNullOrEmpty(selector)) return Response.Fail(request.Id, Status.Invalido, "indique tabla= con el ID o nombre exacto");
+            var selector = Arg.GetString(request.Args, "schedule")?.Trim();
+            if (string.IsNullOrEmpty(selector)) return Response.Fail(request.Id, Status.Invalid, "give schedule= with the ID or exact name");
             ScheduleAudit audit;
             try { audit = new ScheduleAudit(request.Args); }
-            catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalido, ex.Message); }
+            catch (QueryException ex) { return Response.Fail(request.Id, Status.Invalid, ex.Message); }
 
             Dictionary<string, object> data = null;
             string error = null;
@@ -37,10 +37,10 @@ namespace Bimbridge.Addin.Revit
                     using var collector = new FilteredElementCollector(doc);
                     var matches = collector.OfClass(typeof(ViewSchedule)).Cast<ViewSchedule>()
                         .Where(v => !v.IsTemplate && string.Equals(v.Name, selector, StringComparison.OrdinalIgnoreCase)).Take(2).ToList();
-                    if (matches.Count > 1) { error = "hay varias tablas con ese nombre; indique su ID"; return true; }
+                    if (matches.Count > 1) { error = "there are several schedules with that name; give its ID"; return true; }
                     schedule = matches.SingleOrDefault();
                 }
-                if (schedule == null || schedule.IsTemplate) { error = "no existe esa tabla en el documento destino"; return true; }
+                if (schedule == null || schedule.IsTemplate) { error = "that schedule does not exist in the target document"; return true; }
                 var definition = schedule.Definition;
                 var filters = new List<object>();
                 foreach (var filter in definition.GetFilters())
@@ -53,8 +53,8 @@ namespace Bimbridge.Addin.Revit
                     else if (filter.IsElementIdValue) value = Ids.ToLong(filter.GetElementIdValue());
                     filters.Add(new Dictionary<string, object>
                     {
-                        ["campo"] = field.GetName(), ["parametro_id"] = Ids.ToLong(field.ParameterId),
-                        ["operador"] = filter.FilterType.ToString(), ["valor"] = value,
+                        ["field"] = field.GetName(), ["parameter_id"] = Ids.ToLong(field.ParameterId),
+                        ["operator"] = filter.FilterType.ToString(), ["value"] = value,
                     });
                 }
 
@@ -63,9 +63,9 @@ namespace Bimbridge.Addin.Revit
                 if (audit.NeedsPopulation)
                 {
                     if (definition.IncludeLinkedFiles || definition.HasEmbeddedSchedule)
-                        limitation = "La población incluye vínculos o una tabla incrustada. El recuento de elementos del anfitrión no la representa.";
+                        limitation = "The population includes links or an embedded schedule. The host element count does not represent it.";
                     else if (!FilteredElementCollector.IsViewValidForElementIteration(doc, schedule.Id))
-                        limitation = "Revit no permite enumerar la población de esta tabla.";
+                        limitation = "Revit does not allow enumerating the population of this schedule.";
                     else
                     {
                         using var collector = new FilteredElementCollector(doc, schedule.Id);
@@ -77,22 +77,22 @@ namespace Bimbridge.Addin.Revit
                 data = audit.Compare(population, filters, cell =>
                     cell.Row >= body.NumberOfRows || cell.Column >= body.NumberOfColumns ? null :
                         schedule.GetCellText(SectionType.Body, body.FirstRowNumber + cell.Row, body.FirstColumnNumber + cell.Column));
-                data["tabla"] = schedule.Name;
-                data["tabla_id"] = Ids.ToLong(schedule.Id);
+                data["schedule"] = schedule.Name;
+                data["schedule_id"] = Ids.ToLong(schedule.Id);
                 data["doc"] = DocRegistry.Instance.IdOf(doc);
-                data["filas_cuerpo"] = (long)body.NumberOfRows;
-                data["columnas_cuerpo"] = (long)body.NumberOfColumns;
-                if (limitation != null) data["motivo_poblacion"] = limitation;
+                data["body_rows"] = (long)body.NumberOfRows;
+                data["body_columns"] = (long)body.NumberOfColumns;
+                if (limitation != null) data["population_reason"] = limitation;
                 revision = _tracker.For(doc)?.Rev ?? 0;
                 return true;
             }, highPriority: false, busyAfter: TimeSpan.FromMilliseconds(_config.BusyAfterMs), ct: ct).ConfigureAwait(false);
             if (!work.Ok) return FromWork(request.Id, work);
-            if (error != null) return Response.Fail(request.Id, Status.Invalido, error);
-            var outcome = Arg.GetString(data, "resultado");
+            if (error != null) return Response.Fail(request.Id, Status.Invalid, error);
+            var outcome = Arg.GetString(data, "result");
             return new Response
             {
-                Id = request.Id, Rev = revision, Datos = data,
-                Estado = outcome == "con_diferencias" || outcome == "no_evaluable" ? Status.ConDiferencias : Status.Ok,
+                Id = request.Id, Rev = revision, Data = data,
+                State = outcome == "with_differences" || outcome == "not_evaluable" ? Status.CompletedWithDifferences : Status.Ok,
             };
         }
     }

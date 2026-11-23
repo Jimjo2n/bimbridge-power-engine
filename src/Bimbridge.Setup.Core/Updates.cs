@@ -7,36 +7,37 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using Bimbridge.Protocol;
 
 namespace Bimbridge.Setup
 {
-    /// <summary>Un instalador encontrado en una carpeta: el .exe suelto o dentro de un .zip descargado.</summary>
+    /// <summary>An installer found in a folder: the bare .exe or inside a downloaded .zip.</summary>
     public sealed class UpdateCandidate
     {
         public Version Version;
-        /// <summary>Archivo que vio el usuario (el .zip o el .exe en Descargas, Escritorio…).</summary>
+        /// <summary>File the user saw (the .zip or the .exe in Downloads, Desktop…).</summary>
         public string Source;
-        /// <summary>El Bimbridge.Setup.exe listo para ejecutar (si venía en .zip, ya extraído en la carpeta temporal).</summary>
+        /// <summary>The Bimbridge.Setup.exe ready to run (if it came in a .zip, already extracted to the temp folder).</summary>
         public string Exe;
         public string VersionText => Updates.Format(Version);
     }
 
     /// <summary>
-    /// Actualización sin reinstalar a mano (flujo de actualización): el add-in busca instaladores nuevos en
-    /// Descargas, Escritorio, la carpeta de actualizaciones y las que configure IT, y el instalador en modo
-    /// /actualizar los aplica con las mismas opciones, al cerrar todas las instancias de Revit.
-    /// Sólo se aceptan ensamblados llamados Bimbridge.Setup; nunca se descarga nada de internet.
+    /// Update without reinstalling by hand (update workflow): the add-in looks for new installers in
+    /// Downloads, Desktop, the updates folder and any folders IT configures, and the installer in
+    /// /actualizar mode applies them with the same options once all Revit instances are closed.
+    /// Only assemblies named Bimbridge.Setup are accepted; nothing is ever downloaded from the internet.
     /// </summary>
     public static class Updates
     {
         public const string Prefix = "Bimbridge.Setup";
-        public const string LeftoverMark = ".viejo-";
+        public const string LeftoverMark = ".old-";
 
         private static readonly object CacheLock = new object();
         private static readonly Dictionary<string, (long size, DateTime mtime, UpdateCandidate c)> Cache =
             new Dictionary<string, (long, DateTime, UpdateCandidate)>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Cómo se lee la versión de un .exe (las pruebas lo sustituyen; en Windows es <see cref="ReadVersion"/>).</summary>
+        /// <summary>How the version of an .exe is read (tests replace it; on Windows it is <see cref="ReadVersion"/>).</summary>
         public static Func<string, Version> VersionReader = ReadVersion;
 
         public static string Format(Version v) => v == null ? "?" : v.Major + "." + v.Minor + "." + Math.Max(0, v.Build);
@@ -47,10 +48,10 @@ namespace Bimbridge.Setup
             return Version.TryParse(s.Trim(), out var v) ? Normalize(v) : null;
         }
 
-        /// <summary>0.2.1 y 0.2.1.0 son la misma versión.</summary>
+        /// <summary>0.2.1 and 0.2.1.0 are the same version.</summary>
         public static Version Normalize(Version v) => v == null ? null : new Version(v.Major, v.Minor, Math.Max(0, v.Build));
 
-        /// <summary>Carpetas donde se buscan instaladores: Descargas, Escritorio, la de actualizaciones y las extra (red, OneDrive de IT).</summary>
+        /// <summary>Folders searched for installers: Downloads, Desktop, the updates folder and extra ones (network, IT OneDrive).</summary>
         public static List<string> Folders(SetupPaths p, IEnumerable<string> extra = null)
         {
             var list = new List<string> { p.Downloads, p.Desktop, p.UpdatesDir };
@@ -59,8 +60,8 @@ namespace Bimbridge.Setup
         }
 
         /// <summary>
-        /// Todos los instaladores válidos en esas carpetas (y en subcarpetas de primer nivel llamadas Bimbridge.Setup*,
-        /// que es lo que deja "Extraer todo"). Los .zip se abren y su .exe se copia a <paramref name="tempDir"/>.
+        /// All valid installers in those folders (and in first-level subfolders named Bimbridge.Setup*,
+        /// which is what "Extract all" leaves). .zip files are opened and their .exe is copied to <paramref name="tempDir"/>.
         /// </summary>
         public static List<UpdateCandidate> Scan(IEnumerable<string> folders, string tempDir)
         {
@@ -83,14 +84,14 @@ namespace Bimbridge.Setup
             return found;
         }
 
-        /// <summary>El más nuevo que sea mayor que <paramref name="than"/>, o null.</summary>
+        /// <summary>The newest one greater than <paramref name="than"/>, or null.</summary>
         public static UpdateCandidate Newest(IEnumerable<UpdateCandidate> found, Version than)
         {
             than = Normalize(than) ?? new Version(0, 0, 0);
             return found.Where(c => c.Version > than).OrderByDescending(c => c.Version).FirstOrDefault();
         }
 
-        /// <summary>Versión de un Bimbridge.Setup.exe leyendo sólo sus metadatos (no lo ejecuta ni lo carga). Null si no es nuestro.</summary>
+        /// <summary>Version of a Bimbridge.Setup.exe read from its metadata only (it is neither run nor loaded). Null if it is not ours.</summary>
         public static Version ReadVersion(string exe)
         {
             try
@@ -108,7 +109,7 @@ namespace Bimbridge.Setup
             if (!name.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase)) return null;
             var ext = Path.GetExtension(file).ToLowerInvariant();
             if (ext != ".exe" && ext != ".zip") return null;
-            if (name.IndexOf(LeftoverMark, StringComparison.OrdinalIgnoreCase) >= 0) return null;
+            if (IsLeftover(name)) return null;
 
             FileInfo info;
             try { info = new FileInfo(file); } catch (Exception) { return null; }
@@ -160,8 +161,8 @@ namespace Bimbridge.Setup
         }
 
         /// <summary>
-        /// Instaladores ya superados por <paramref name="installed"/> en las carpetas del usuario (no en la caché propia),
-        /// para mandarlos a la papelera después de actualizar. Así no se acumulan copias en Descargas.
+        /// Installers already superseded by <paramref name="installed"/> in the user's folders (not in our own cache),
+        /// to send them to the Recycle Bin after updating. This way copies do not pile up in Downloads.
         /// </summary>
         public static List<string> Superseded(IEnumerable<UpdateCandidate> found, Version installed, string cacheDir)
         {
@@ -172,7 +173,16 @@ namespace Bimbridge.Setup
                         .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        /// <summary>Borra lo que quedó renombrado como *.viejo-* al reemplazar archivos en uso (ya no lo están tras reiniciar).</summary>
+        /// <summary>The leftover mark and the one 0.9.3/0.9.4 used (files they set aside are still cleaned up and recognized).</summary>
+        public static readonly string[] LeftoverMarks = { LeftoverMark, LegacyAliases.LeftoverMark };
+
+        public static bool IsLeftover(string name) => LeftoverMarks.Any(m => name.IndexOf(m, StringComparison.OrdinalIgnoreCase) >= 0);
+
+        /// <summary>Files under <paramref name="dir"/> set aside with any leftover mark.</summary>
+        public static string[] Leftovers(string dir, SearchOption option) =>
+            LeftoverMarks.SelectMany(m => Directory.GetFiles(dir, "*" + m + "*", option)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+        /// <summary>Deletes what was left renamed as *.old-* when replacing files in use (they are no longer in use after a restart).</summary>
         public static int DeleteLeftovers(IEnumerable<string> dirs)
         {
             var n = 0;
@@ -180,7 +190,7 @@ namespace Bimbridge.Setup
             {
                 if (!Directory.Exists(d)) continue;
                 string[] files;
-                try { files = Directory.GetFiles(d, "*" + LeftoverMark + "*", SearchOption.AllDirectories); }
+                try { files = Leftovers(d, SearchOption.AllDirectories); }
                 catch (Exception) { continue; }
                 foreach (var f in files) if (TryDelete(f)) n++;
             }

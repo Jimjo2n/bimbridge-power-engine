@@ -7,29 +7,29 @@ using System.Linq;
 namespace Bimbridge.Protocol
 {
     /// <summary>
-    /// 0.9.0: dos perfiles de funcionamiento con políticas distintas, comprobadas por pruebas (no una bandera cosmética).
+    /// 0.9.0: two operating profiles with different policies, enforced by tests (not a cosmetic flag).
     ///
-    /// PRODUCCION (por defecto): documentos reales. Código dinámico sólo si su SHA-256 está autorizado por el usuario para ese
-    /// documento (o para todos) en config.json; operaciones EXPERIMENTAL rechazadas; actualizaciones sólo firmadas por una clave
-    /// de confianza.
+    /// PRODUCTION (default): real documents. Dynamic code only if its SHA-256 is authorized by the user for that
+    /// document (or for all) in config.json; EXPERIMENTAL operations rejected; updates only when signed by a trusted
+    /// key.
     ///
-    /// LABORATORIO: investigación con recursos sintéticos, desechables o autorizados. Permite código dinámico sin autorización por
-    /// hash y operaciones experimentales, pero SÓLO sobre documentos cuya ruta local esté dentro de las carpetas de laboratorio
-    /// configuradas (nunca nube, central ni rutas fuera); un paquete de actualización sin firma sólo si el usuario lo habilitó
-    /// explícitamente para el laboratorio. El perfil no levanta ninguna otra protección (permisos, niveles, auditoría, diario).
+    /// LAB: research with synthetic, disposable or authorized resources. Allows dynamic code without hash authorization
+    /// and experimental operations, but ONLY on documents whose local path is inside the configured lab folders
+    /// (never cloud, central or outside paths); an unsigned update package only if the user explicitly enabled it
+    /// for the lab. The profile lifts no other protection (permissions, levels, audit, journal).
     ///
-    /// La ejecución nativa en Revit sigue prohibida por una restricción independiente del perfil (NativeGate).
+    /// Native execution in Revit stays forbidden by a restriction independent of the profile (NativeGate).
     /// </summary>
     public sealed class ProfilePolicy
     {
-        public const string Production = "produccion", Lab = "laboratorio";
+        public const string Production = "production", Lab = "lab";
 
         public string Name = Production;
-        /// <summary>Carpetas locales de laboratorio (perfil LAB). Vacío = ningún documento es de laboratorio.</summary>
+        /// <summary>Local lab folders (LAB profile). Empty = no document is a lab document.</summary>
         public List<string> LabFolders = new List<string>();
-        /// <summary>LAB: el usuario aceptó instalar paquetes de actualización sin firma en este equipo de laboratorio.</summary>
+        /// <summary>LAB: the user agreed to install unsigned update packages on this lab machine.</summary>
         public bool LabUnsignedUpdates;
-        /// <summary>PRODUCCION: código dinámico autorizado: "sha256" (cualquier documento) o "sha256@clave_documento".</summary>
+        /// <summary>PRODUCTION: authorized dynamic code: "sha256" (any document) or "sha256@document_key".</summary>
         public List<string> AuthorizedCode = new List<string>();
 
         public bool IsLab => Name == Lab;
@@ -38,7 +38,7 @@ namespace Bimbridge.Protocol
         {
             var n = (name ?? Production).Trim().ToLowerInvariant();
             if (n == "lab" || n == "experimental") n = Lab;
-            if (n != Lab) n = Production;   // un valor desconocido NUNCA abre el laboratorio
+            if (n != Lab) n = Production;   // an unknown value NEVER opens the lab
             return new ProfilePolicy
             {
                 Name = n,
@@ -55,8 +55,8 @@ namespace Bimbridge.Protocol
         }
 
         /// <summary>
-        /// Ruta local de una clave de documento ("archivo:c:\x\y.rvt"); null si es de nube, central o desconocida.
-        /// Las claves que no son de archivo local nunca cuentan como laboratorio.
+        /// Local path of a document key ("archivo:c:\x\y.rvt"); null if cloud, central or unknown.
+        /// Keys that are not local files never count as lab.
         /// </summary>
         public static string LocalPathOf(string docKey)
         {
@@ -64,8 +64,8 @@ namespace Bimbridge.Protocol
             const string pfx = "archivo:";
             if (!docKey.StartsWith(pfx, StringComparison.OrdinalIgnoreCase)) return null;
             var p = docKey.Substring(pfx.Length).Trim().Replace('/', '\\');
-            if (p.StartsWith("\\\\", StringComparison.Ordinal)) return null;   // UNC: carpeta de red, no laboratorio local
-            if (p.Contains("..")) return null;                                   // sin atajos de ruta
+            if (p.StartsWith("\\\\", StringComparison.Ordinal)) return null;   // UNC: network folder, not a local lab
+            if (p.Contains("..")) return null;                                   // no path shortcuts
             return p.ToLowerInvariant();
         }
 
@@ -76,57 +76,57 @@ namespace Bimbridge.Protocol
         }
 
         /// <summary>
-        /// Política del perfil para una petición ya clasificada. null = permitida por el perfil (los permisos y niveles se comprueban
-        /// aparte). <paramref name="capabilityState"/>: estado del registro de capacidades para la operación (EXPERIMENTAL, AVAILABLE…).
+        /// Profile policy for an already classified request. null = allowed by the profile (permissions and levels are checked
+        /// separately). <paramref name="capabilityState"/>: capability registry state for the operation (EXPERIMENTAL, AVAILABLE…).
         /// </summary>
         public string DenyRequest(string op, string permission, string docKey, string capabilityState)
         {
             var experimental = string.Equals(capabilityState, CapabilityStates.Experimental, StringComparison.Ordinal);
             if (!IsLab)
             {
-                if (experimental) return "perfil_produccion: la operación " + op + " es EXPERIMENTAL y sólo existe en el perfil de laboratorio";
+                if (experimental) return "perfil_produccion: operation " + op + " is EXPERIMENTAL and only exists in the lab profile";
                 return null;
             }
-            // LAB: nada fuera del laboratorio, ni siquiera lectura de documentos (las listas de contexto no tocan ningún modelo).
+            // LAB: nothing outside the lab, not even document reads (context listings touch no model).
             if (op == Wire.OpContext || op == Wire.OpDocs || op == Wire.OpCatalog) return null;
             if (permission == Permissions.Ui) return null;
-            if (string.IsNullOrEmpty(docKey)) return null;   // sin documento (catálogo, ayuda): nada que proteger
+            if (string.IsNullOrEmpty(docKey)) return null;   // no document (catalog, help): nothing to protect
             if (!IsLabDocument(docKey))
-                return "perfil_laboratorio: el documento no está en una carpeta de laboratorio (" + (LabFolders.Count == 0 ? "no hay ninguna configurada" : string.Join("; ", LabFolders)) +
-                       "). El laboratorio sólo trabaja con copias locales desechables o autorizadas; nunca nube, central ni modelos de trabajo.";
+                return "perfil_laboratorio: the document is not in a lab folder (" + (LabFolders.Count == 0 ? "none configured" : string.Join("; ", LabFolders)) +
+                       "). The lab only works with disposable or authorized local copies; never cloud, central or working models.";
             return null;
         }
 
-        /// <summary>Código dinámico: en producción exige autorización por SHA-256 (y alcance de documento). null = permitido.</summary>
+        /// <summary>Dynamic code: in production it requires SHA-256 authorization (and document scope). null = allowed.</summary>
         public string DenyDynamicCode(string codeSha256, string docKey)
         {
-            if (IsLab) return IsLabDocument(docKey) || string.IsNullOrEmpty(docKey) ? null : "perfil_laboratorio: código dinámico fuera de una carpeta de laboratorio";
+            if (IsLab) return IsLabDocument(docKey) || string.IsNullOrEmpty(docKey) ? null : "perfil_laboratorio: dynamic code outside a lab folder";
             var sha = (codeSha256 ?? "").ToLowerInvariant();
-            if (sha.Length == 0) return "codigo_no_autorizado: falta el SHA-256 del código";
+            if (sha.Length == 0) return "codigo_no_autorizado: the code SHA-256 is missing";
             var key = (docKey ?? "").ToLowerInvariant();
             foreach (var a in AuthorizedCode)
             {
                 var at = a.IndexOf('@');
                 if (at < 0 ? a == sha : a.Substring(0, at) == sha && a.Substring(at + 1) == key) return null;
             }
-            return "codigo_no_autorizado: en el perfil de producción el código dinámico sólo corre si el usuario autorizó su SHA-256 (" + sha.Substring(0, Math.Min(16, sha.Length)) +
-                   "…) para este documento en config.json (codigo_autorizado). Use una operación tipada o pídale la autorización; no lo intente por otra vía.";
+            return "codigo_no_autorizado: in the production profile dynamic code only runs if the user authorized its SHA-256 (" + sha.Substring(0, Math.Min(16, sha.Length)) +
+                   "…) for this document in config.json (authorized_code). Use a typed operation or ask the user for the authorization; do not try another way.";
         }
 
-        /// <summary>Paquetes de actualización sin firma: sólo en laboratorio y sólo si el usuario lo habilitó. null = admitido (con confirmación).</summary>
+        /// <summary>Unsigned update packages: lab only, and only if the user enabled it. null = accepted (with confirmation).</summary>
         public string DenyUnsignedUpdate() =>
             IsLab && LabUnsignedUpdates ? null
-            : IsLab ? "perfil_laboratorio: los paquetes sin firma están deshabilitados (laboratorio.actualizacion_sin_firma=false)"
-            : "perfil_produccion: sólo se instalan paquetes firmados por una clave de confianza (procedencia criptográfica obligatoria)";
+            : IsLab ? "lab_profile: unsigned packages are disabled (lab.unsigned_updates=false)"
+            : "perfil_produccion: only packages signed by a trusted key are installed (cryptographic provenance required)";
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["perfil"] = Name, ["carpetas_laboratorio"] = LabFolders.Cast<object>().ToList(), ["actualizacion_sin_firma"] = LabUnsignedUpdates,
-            ["codigo_autorizado"] = (long)AuthorizedCode.Count,
+            ["profile"] = Name, ["lab_folders"] = LabFolders.Cast<object>().ToList(), ["unsigned_update"] = LabUnsignedUpdates,
+            ["authorized_code"] = (long)AuthorizedCode.Count,
         };
     }
 
-    /// <summary>0.9.0: estados del registro de capacidades (descubrimiento bajo demanda). No confundir con los de la matriz de pruebas.</summary>
+    /// <summary>0.9.0: capability registry states (on-demand discovery). Not to be confused with the test matrix states.</summary>
     public static class CapabilityStates
     {
         public const string Available = "AVAILABLE", Experimental = "EXPERIMENTAL", RequiresAuthorization = "REQUIRES_AUTHORIZATION",

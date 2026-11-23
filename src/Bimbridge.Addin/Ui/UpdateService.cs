@@ -13,11 +13,11 @@ using Bimbridge.Setup;
 namespace Bimbridge.Addin.Ui
 {
     /// <summary>
-    /// Botón "Actualizar": busca instaladores nuevos (Descargas, Escritorio, carpeta de actualizaciones y las que configure IT)
-    /// cada 10 minutos en un hilo de fondo, sin tocar Revit. Al pulsar Instalar ejecuta el instalador en modo /actualizar,
-    /// que espera el cierre de Revit antes de reemplazar los archivos.
-    /// 0.9.1: además, cuando una persona pulsa «Buscar en GitHub», consulta la última Release pública del repositorio y descarga su
-    /// instalador verificando SHA-256, tamaño y versión. Nunca se conecta por su cuenta ni instala sin que el usuario pulse el botón.
+    /// "Update" button: looks for new installers (Downloads, Desktop, the updates folder and any folders IT configures)
+    /// every 10 minutes on a background thread, without touching Revit. Pressing Install runs the installer in /actualizar mode,
+    /// which waits for Revit to close before replacing the files.
+    /// 0.9.1: also, when a person presses "Check GitHub", it queries the repository's latest public Release and downloads its
+    /// installer, verifying SHA-256, size and version. It never connects on its own or installs without the user pressing the button.
     /// </summary>
     internal static class UpdateService
     {
@@ -41,27 +41,27 @@ namespace Bimbridge.Addin.Ui
             OnlineEnabled = (config?.OnlineUpdate ?? "manual") != "no";
             AllowPrerelease = config?.UpdatePrerelease ?? false;
             try { Repo = OnlineUpdate.ValidRepo(config?.UpdateRepo); }
-            catch (OnlineUpdateException ex) { Repo = OnlineUpdate.DefaultRepo; Runtime.Log("Actualización en línea: " + ex.Message + "; se usa " + Repo); }
-            // Lo que quedó apartado al actualizar con Revit abierto ya no está en uso: se borra.
+            catch (OnlineUpdateException ex) { Repo = OnlineUpdate.DefaultRepo; Runtime.Log("Online update: " + ex.Message + "; using " + Repo); }
+            // What was set aside when updating with Revit open is no longer in use: delete it.
             try
             {
                 var n = Updates.DeleteLeftovers(Paths.LeftoverDirs(SetupCore.SupportedVersions));
-                if (n > 0) Runtime.Log("Actualización: " + n + " archivos de la versión anterior borrados.");
+                if (n > 0) Runtime.Log("Update: " + n + " files from the previous version deleted.");
             }
             catch (Exception) { }
             _timer = new Timer(_ => Check(), null, TimeSpan.FromSeconds(20), TimeSpan.FromMinutes(10));
         }
 
-        // ------------------------------------------------------------------ 0.9.1: actualización en línea (Releases públicas de GitHub)
+        // ------------------------------------------------------------------ 0.9.1: online update (public GitHub Releases)
 
         public static volatile OnlineRelease Online;
-        /// <summary>null (sin consultar), nueva, mismo_version_otro_commit, al_dia, anterior, sin_releases o error.</summary>
+        /// <summary>null (not queried), nueva, mismo_version_otro_commit, al_dia, anterior, sin_releases or error.</summary>
         public static volatile string OnlineState;
         public static volatile string OnlineError;
         public static string Repo = OnlineUpdate.DefaultRepo;
         public static bool OnlineEnabled = true, AllowPrerelease;
 
-        /// <summary>Commit con que se compiló este add-in (de su versión informativa), o null.</summary>
+        /// <summary>Commit this add-in was built from (from its informational version), or null.</summary>
         public static string RunningCommit
         {
             get
@@ -75,40 +75,40 @@ namespace Bimbridge.Addin.Ui
             }
         }
 
-        /// <summary>Consulta la última release publicada. Sólo se llama cuando una persona pulsa el botón; en un hilo de fondo.</summary>
+        /// <summary>Queries the latest published release. Only called when a person presses the button; on a background thread.</summary>
         public static void CheckOnline()
         {
             Online = null; OnlineError = null;
             try
             {
-                if (!OnlineEnabled) { OnlineState = "error"; OnlineError = "la actualización en línea está deshabilitada en la configuración (actualizacion_online=no)"; return; }
+                if (!OnlineEnabled) { OnlineState = "error"; OnlineError = "online update is disabled in the configuration (online_update=no)"; return; }
                 var json = OnlineHttp.GetText(OnlineUpdate.ApiUrl(Repo), OnlineUpdate.MaxTextBytes);
                 var r = OnlineUpdate.Pick(json, Repo, AllowPrerelease, out var skipped);
-                if (r == null) { OnlineState = "sin_releases"; OnlineError = skipped.Count > 0 ? "descartadas: " + string.Join("; ", skipped.Take(5)) : null; return; }
+                if (r == null) { OnlineState = "no_releases"; OnlineError = skipped.Count > 0 ? "discarded: " + string.Join("; ", skipped.Take(5)) : null; return; }
                 Online = r;
                 OnlineState = OnlineUpdate.Compare(Running, RunningCommit, r);
-                Runtime.Journal?.Log("usuario", "actualizar_buscar_online", OnlineState, 0, new Dictionary<string, object> { ["release"] = r.Tag, ["repo"] = Repo });
+                Runtime.Journal?.Log("user", "update_check_online", OnlineState, 0, new Dictionary<string, object> { ["release"] = r.Tag, ["repo"] = Repo });
             }
             catch (Exception ex) when (ex is OnlineUpdateException || ex is IOException)
             {
                 OnlineState = "error";
                 OnlineError = ex.Message;
-                Runtime.Log("Actualización en línea: " + OnlineError);
+                Runtime.Log("Online update: " + OnlineError);
             }
         }
 
-        /// <summary>Descarga y verifica el instalador de la release (SHA-256 publicado, tamaño y versión). Devuelve (candidato, error).</summary>
+        /// <summary>Downloads and verifies the release installer (published SHA-256, size and version). Returns (candidate, error).</summary>
         public static (UpdateCandidate c, string error) DownloadOnline(OnlineRelease r)
         {
             try
             {
                 var c = OnlineUpdate.Download(r, Paths.CachedSetup(r.VersionText), OnlineHttp.GetText, OnlineHttp.GetFile);
-                Runtime.Journal?.Log("usuario", "actualizar_descargar_online", "ok", 0, new Dictionary<string, object> { ["release"] = r.Tag, ["repo"] = Repo, ["sha256"] = OnlineUpdate.Sha256File(c.Exe) });
+                Runtime.Journal?.Log("user", "update_download_online", "ok", 0, new Dictionary<string, object> { ["release"] = r.Tag, ["repo"] = Repo, ["sha256"] = OnlineUpdate.Sha256File(c.Exe) });
                 return (c, null);
             }
             catch (Exception ex) when (ex is OnlineUpdateException || ex is IOException || ex is UnauthorizedAccessException)
             {
-                Runtime.Journal?.Log("usuario", "actualizar_descargar_online", "error", 0, new Dictionary<string, object> { ["release"] = r.Tag, ["detalle"] = ex.Message });
+                Runtime.Journal?.Log("user", "update_download_online", "error", 0, new Dictionary<string, object> { ["release"] = r.Tag, ["detail"] = ex.Message });
                 return (null, ex.Message);
             }
         }
@@ -130,7 +130,7 @@ namespace Bimbridge.Addin.Ui
 
         public static List<string> Folders => Updates.Folders(Paths, _extraFolders);
 
-        /// <summary>Copia de la versión anterior guardada por el instalador, para volver atrás.</summary>
+        /// <summary>Copy of the previous version saved by the installer, to roll back.</summary>
         public static string PreviousSetup
         {
             get
@@ -142,7 +142,7 @@ namespace Bimbridge.Addin.Ui
             }
         }
 
-        /// <summary>Busca de nuevo. Rápido salvo la primera vez que ve un .zip nuevo (lo abre para leer la versión).</summary>
+        /// <summary>Searches again. Fast except the first time it sees a new .zip (it opens it to read the version).</summary>
         public static void Check()
         {
             if (!Monitor.TryEnter(CheckLock)) return;
@@ -158,7 +158,7 @@ namespace Bimbridge.Addin.Ui
             }
             catch (Exception ex)
             {
-                Runtime.Log("Actualización: no se pudo buscar: " + ex.Message);
+                Runtime.Log("Update: could not search: " + ex.Message);
             }
             finally
             {
@@ -168,8 +168,8 @@ namespace Bimbridge.Addin.Ui
         }
 
         /// <summary>
-        /// Ejecuta el instalador en modo /actualizar y espera. Se copia antes a la carpeta de actualizaciones
-        /// (así sirve para volver atrás y no depende del archivo en Descargas). Devuelve (éxito, mensaje).
+        /// Runs the installer in /actualizar mode and waits. It is first copied to the updates folder
+        /// (so it can be used to roll back and does not depend on the file in Downloads). Returns (success, message).
         /// </summary>
         public static (bool ok, string text) Install(UpdateCandidate c, bool allowOlder)
         {
@@ -181,10 +181,10 @@ namespace Bimbridge.Addin.Ui
                 var exe = Paths.CachedSetup(c.VersionText);
                 if (!string.Equals(Path.GetFullPath(c.Exe), Path.GetFullPath(exe), StringComparison.OrdinalIgnoreCase))
                     File.Copy(c.Exe, exe, true);
-                var report = Path.Combine(Paths.UpdatesDir, "ultima.txt");
+                var report = Bimbridge.Protocol.LegacyAliases.ResolveExisting(Paths.UpdatesDir, Path.Combine(Paths.UpdatesDir, "last.txt"));
                 try { File.Delete(report); } catch (Exception) { }
 
-                var psi = new ProcessStartInfo(exe, "/actualizar" + (allowOlder ? " /permitir-anterior" : ""))
+                var psi = new ProcessStartInfo(exe, "/update" + (allowOlder ? " /permitir-anterior" : ""))
                 {
                     UseShellExecute = false,
                     CreateNoWindow = true,
@@ -198,13 +198,13 @@ namespace Bimbridge.Addin.Ui
                         var waiting = PendingInstallation();
                         if (waiting != null) return (true, waiting);
                         if (deadline.Elapsed >= TimeSpan.FromMinutes(3))
-                            return (false, "El instalador no terminó en 3 minutos. Revise " + report + ".");
+                            return (false, "The installer did not finish within 3 minutes. Check " + report + ".");
                     }
                     var text = File.Exists(report) ? File.ReadAllLines(report).Skip(2).FirstOrDefault() : null;
-                    Runtime.Journal?.Log("usuario", "actualizar", p.ExitCode == 0 ? "ok" : "error", 0,
-                        new Dictionary<string, object> { ["version"] = c.VersionText, ["codigo"] = (long)p.ExitCode, ["detalle"] = text });
-                    Runtime.Log("Actualización a " + c.VersionText + ": código " + p.ExitCode + " " + text);
-                    return (p.ExitCode == 0, text ?? "El instalador terminó con el código " + p.ExitCode + ".");
+                    Runtime.Journal?.Log("user", "update", p.ExitCode == 0 ? "ok" : "error", 0,
+                        new Dictionary<string, object> { ["version"] = c.VersionText, ["code"] = (long)p.ExitCode, ["detail"] = text });
+                    Runtime.Log("Update to " + c.VersionText + ": exit code " + p.ExitCode + " " + text);
+                    return (p.ExitCode == 0, text ?? "The installer finished with exit code " + p.ExitCode + ".");
                 }
             }
             catch (Exception ex)
@@ -221,7 +221,7 @@ namespace Bimbridge.Addin.Ui
         {
             try
             {
-                using (File.Open(Path.Combine(Paths.Home, "instalador.lock"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) { }
+                using (File.Open(Path.Combine(Paths.Home, "installer.lock"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) { }
                 return null;
             }
             catch (FileNotFoundException) { return null; }
@@ -230,14 +230,14 @@ namespace Bimbridge.Addin.Ui
             {
                 try
                 {
-                    var lines = File.ReadAllLines(Path.Combine(Paths.UpdatesDir, "ultima.txt"));
+                    var lines = File.ReadAllLines(Bimbridge.Protocol.LegacyAliases.ResolveExisting(Paths.UpdatesDir, Path.Combine(Paths.UpdatesDir, "last.txt")));
                     return lines.Length >= 3 && lines[0] == "6" ? lines[2] : null;
                 }
                 catch (IOException) { return null; }
             }
         }
 
-        /// <summary>Se llama en Idling: cambia icono y texto del botón sólo si cambió el estado.</summary>
+        /// <summary>Called on Idling: changes the button icon and text only if the state changed.</summary>
         public static void RefreshButton()
         {
             if (Button == null) return;
@@ -248,16 +248,16 @@ namespace Bimbridge.Addin.Ui
             _lastVisual = visual;
             if (state != _lastState)
             {
-                // Sólo anima cuando aparece o cambia el globo (no en la primera pintura ni al quitarlo); con movimiento reducido, Play pone el final.
+                // Only animates when the badge appears or changes (not on first paint nor when removed); with reduced motion, Play sets the final frame.
                 RibbonMotion.Play(Button, "update|" + state, _lastState != null && state > 0, (t, s) => Icons.Update(state, t, s), s => Icons.Update(state, s));
                 _lastState = state;
             }
-            Button.ItemText = state == 2 ? "Reiniciar\nRevit" : state == 1 ? "Actualizar\na " + a.VersionText : "Versión\n" + Updates.Format(Running);
+            Button.ItemText = state == 2 ? "Restart\nRevit" : state == 1 ? "Update\nto " + a.VersionText : "Version\n" + Updates.Format(Running);
             Button.ToolTip = state == 2
-                ? "La versión " + InstalledVersion + " ya está instalada: cierre y abra Revit para usarla."
+                ? "Version " + InstalledVersion + " is already installed: close and reopen Revit to use it."
                 : state == 1
-                    ? "Hay una versión nueva (" + a.VersionText + "). Pulse para preparar la instalación al cerrar Revit."
-                    : "Está al día. Pulse para buscar de nuevo o volver a la versión anterior.";
+                    ? "A new version is available (" + a.VersionText + "). Press to prepare the installation for when Revit closes."
+                    : "Up to date. Press to search again or go back to the previous version.";
         }
     }
 }

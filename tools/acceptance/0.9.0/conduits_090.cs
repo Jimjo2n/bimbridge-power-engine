@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Acceptance 0.9.0 (N9-05): conduit runs of a level with their connectors, for the three-layer network analysis
+// (geometric continuity, physical connection, proximity). READ ONLY (exec modo consulta). args={"nivel":"Level 1"}
+// Returns [{"id","a":[x,y,z],"b":[x,y,z],"diam","sistema","con_a","con_b"}] in feet; con_* = id of the connected element or null.
+var level = args.ContainsKey("nivel") ? Convert.ToString(args["nivel"]) : null;
+var runs = new List<object>();
+foreach (var c in new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Conduit).WhereElementIsNotElementType().OfType<MEPCurve>())
+{
+    if (level != null && (doc.GetElement(c.ReferenceLevel?.Id ?? ElementId.InvalidElementId) as Level)?.Name != level) continue;
+    var l = (c.Location as LocationCurve)?.Curve as Line;
+    if (l == null) continue;
+    var a = l.GetEndPoint(0); var b = l.GetEndPoint(1);
+    string Other(XYZ end)
+    {
+        foreach (Connector k in c.ConnectorManager.Connectors)
+        {
+            if (k.ConnectorType != ConnectorType.End || k.Origin.DistanceTo(end) > 1e-3) continue;
+            foreach (Connector r in k.AllRefs)
+                if (r.Owner != null && r.Owner.Id != c.Id && r.ConnectorType != ConnectorType.Logical) return ctx.Long(r.Owner.Id).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+        return null;
+    }
+    var d = c.get_Parameter(BuiltInParameter.RBS_CONDUIT_DIAMETER_PARAM)?.AsDouble() ?? 0;
+    runs.Add(new Dictionary<string, object>
+    {
+        ["id"] = ctx.Long(c.Id).ToString(System.Globalization.CultureInfo.InvariantCulture), ["a"] = new List<object> { a.X, a.Y, a.Z }, ["b"] = new List<object> { b.X, b.Y, b.Z },
+        ["diam"] = d, ["sistema"] = c.LookupParameter("Service Type")?.AsString(), ["con_a"] = Other(a), ["con_b"] = Other(b),
+    });
+}
+var path = ctx.Artifact("conduits_090.json", Bimbridge.Protocol.Json.Write(runs));
+return new { tramos = runs.Count, ruta = path };

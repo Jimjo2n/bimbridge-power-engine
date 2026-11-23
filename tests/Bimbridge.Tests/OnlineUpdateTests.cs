@@ -10,8 +10,8 @@ using Xunit;
 namespace Bimbridge.Tests
 {
     /// <summary>
-    /// 0.9.1: actualización en línea desde Releases públicas. Sin red: las respuestas de GitHub y las descargas se simulan.
-    /// Lo que se comprueba es que NUNCA queda disponible un instalador que no cuadre con lo publicado.
+    /// 0.9.1: online update from public Releases. No network: GitHub responses and downloads are simulated.
+    /// What is checked is that an installer that does not match what was published is NEVER made available.
     /// </summary>
     [Collection("updates")]
     public class OnlineUpdateTests : IDisposable
@@ -44,10 +44,10 @@ namespace Bimbridge.Tests
             Assert.Equal(new Version(0, 9, 1), r.Version);
             Assert.Equal("https://github.com/" + Repo + "/releases/download/v0.9.1/Bimbridge.Setup.exe", r.SetupUrl);
             Assert.Equal(6, skipped.Count);
-            Assert.Contains(skipped, s => s.StartsWith("v0.9.5") && s.Contains("URL inesperada"));
-            Assert.Equal("v0.9.3", OnlineUpdate.Pick(json, Repo, true, out _).Tag);      // prerelease sólo si se pide
+            Assert.Contains(skipped, s => s.StartsWith("v0.9.5") && s.Contains("unexpected URL"));
+            Assert.Equal("v0.9.3", OnlineUpdate.Pick(json, Repo, true, out _).Tag);      // prerelease only if requested
             Assert.Null(OnlineUpdate.Pick("[]", Repo, false, out _));
-            // Una release de OTRO repositorio servida en la respuesta no se acepta.
+            // A release from ANOTHER repository served in the response is not accepted.
             Assert.Null(OnlineUpdate.Pick("[" + Release("v1.0.0", repo: "otro/repo") + "]", Repo, false, out var sk2));
             Assert.Single(sk2);
         }
@@ -80,15 +80,15 @@ namespace Bimbridge.Tests
         public void Compare_DistinguishesNewVersion_SameVersionOtherCommit_UpToDate_AndOlder()
         {
             var r = OnlineUpdate.Pick("[" + Release("v0.9.1") + "]", Repo, false, out _);
-            Assert.Equal("nueva", OnlineUpdate.Compare(new Version(0, 9, 0), "abc1234", r));
-            Assert.Equal("anterior", OnlineUpdate.Compare(new Version(0, 9, 2), "abc1234", r));
-            Assert.Equal("mismo_version_otro_commit", OnlineUpdate.Compare(new Version(0, 9, 1, 0), "abc1234", r));
-            Assert.Equal("al_dia", OnlineUpdate.Compare(new Version(0, 9, 1), "0123456", r));
-            Assert.Equal("al_dia", OnlineUpdate.Compare(new Version(0, 9, 1), null, r));            // sin commit conocido no se afirma que sea otro
+            Assert.Equal("new", OnlineUpdate.Compare(new Version(0, 9, 0), "abc1234", r));
+            Assert.Equal("previous", OnlineUpdate.Compare(new Version(0, 9, 2), "abc1234", r));
+            Assert.Equal("same_version_other_commit", OnlineUpdate.Compare(new Version(0, 9, 1, 0), "abc1234", r));
+            Assert.Equal("up_to_date", OnlineUpdate.Compare(new Version(0, 9, 1), "0123456", r));
+            Assert.Equal("up_to_date", OnlineUpdate.Compare(new Version(0, 9, 1), null, r));            // without a known commit it is not claimed to be different
             Assert.Equal("abc1234", OnlineUpdate.CommitOf("0.9.1+ABC1234"));
             Assert.Null(OnlineUpdate.CommitOf("0.9.1"));
             Assert.Null(OnlineUpdate.CommitOf("0.9.1+no-es-hex"));
-            // target_commitish que es un nombre de rama no se toma por commit.
+            // a target_commitish that is a branch name is not taken as a commit.
             Assert.Null(OnlineUpdate.Pick("[" + Release("v0.9.1", commit: "main") + "]", Repo, false, out _).Commit);
         }
 
@@ -105,13 +105,13 @@ namespace Bimbridge.Tests
             Assert.Throws<OnlineUpdateException>(() => OnlineHttp.GetFile("file:///c:/x", Path.Combine(_dir, "x"), 10));
         }
 
-        /// <summary>Comprobación manual con red (no corre en CI): BIMBRIDGE_TEST_ONLINE=1.</summary>
+        /// <summary>Manual check with network (does not run in CI): BIMBRIDGE_TEST_ONLINE=1.</summary>
         [Fact]
         public void Live_PublicApiAnswersWithoutAnAccount_WhenOptedIn()
         {
             if (Environment.GetEnvironmentVariable("BIMBRIDGE_TEST_ONLINE") != "1") return;
             var json = OnlineHttp.GetText(OnlineUpdate.ApiUrl(null), OnlineUpdate.MaxTextBytes);
-            OnlineUpdate.Pick(json, null, true, out _);   // no lanza: la respuesta es una lista (vacía si aún no hay releases)
+            OnlineUpdate.Pick(json, null, true, out _);   // does not throw: the response is a list (empty if there are no releases yet)
         }
 
         private UpdateCandidate Run(byte[] served, string sumsHashFor, Version internalVersion, out List<string> urls, long declaredSize = -1, string tag = "v0.9.1")
@@ -136,7 +136,7 @@ namespace Bimbridge.Tests
             Assert.Equal("https://github.com/" + Repo + "/releases/tag/v0.9.1", c.Source);
             Assert.All(urls, u => Assert.StartsWith("https://github.com/" + Repo + "/releases/download/v0.9.1/", u));
             Assert.Single(Leftovers());
-            // Segunda vez: ya está y coincide el hash → sólo se pide la lista de hashes.
+            // Second time: already present and the hash matches -> only the hash list is requested.
             Run(bytes, Sha(bytes), new Version(0, 9, 1), out var urls2);
             Assert.Single(urls2);
         }
@@ -144,25 +144,25 @@ namespace Bimbridge.Tests
         [Fact]
         public void Download_AnyMismatch_LeavesNothingInstallable()
         {
-            var bytes = Encoding.ASCII.GetBytes("instalador");
-            // Hash distinto del publicado (manipulado o corrupto).
+            var bytes = Encoding.ASCII.GetBytes("installer");
+            // Hash differs from the published one (tampered or corrupt).
             var ex = Assert.Throws<OnlineUpdateException>(() => Run(Encoding.ASCII.GetBytes("instalad0r"), Sha(bytes), new Version(0, 9, 1), out _));
-            Assert.Contains("no coincide", ex.Message);
+            Assert.Contains("does not match", ex.Message);
             Assert.Empty(Leftovers());
-            // Tamaño distinto del declarado (descarga truncada).
+            // Size differs from the declared one (truncated download).
             Assert.Throws<OnlineUpdateException>(() => Run(bytes, Sha(bytes), new Version(0, 9, 1), out _, declaredSize: bytes.Length + 1));
             Assert.Empty(Leftovers());
-            // El archivo no es un instalador nuestro, o dice ser otra versión que la etiqueta.
+            // The file is not one of our installers, or claims a different version than the tag.
             Assert.Throws<OnlineUpdateException>(() => Run(bytes, Sha(bytes), null, out _));
             Assert.Throws<OnlineUpdateException>(() => Run(bytes, Sha(bytes), new Version(0, 8, 0), out _));
             Assert.Empty(Leftovers());
-            // La release no publica hash para el instalador.
+            // The release publishes no hash for the installer.
             var r = OnlineUpdate.Pick("[" + Release("v0.9.1") + "]", Repo, false, out _);
-            Assert.Throws<OnlineUpdateException>(() => OnlineUpdate.Download(r, Path.Combine(_dir, "cache", "x.exe"), (u, m) => "nada", (u, d, m) => File.WriteAllBytes(d, bytes)));
-            // Fallo de red a mitad: no queda temporal.
+            Assert.Throws<OnlineUpdateException>(() => OnlineUpdate.Download(r, Path.Combine(_dir, "cache", "x.exe"), (u, m) => "nothing", (u, d, m) => File.WriteAllBytes(d, bytes)));
+            // Network failure midway: no temp file is left.
             Updates.VersionReader = _ => new Version(0, 9, 1);
             Assert.Throws<IOException>(() => OnlineUpdate.Download(r, Path.Combine(_dir, "cache", "x.exe"), (u, m) => Sha(bytes) + "  Bimbridge.Setup.exe",
-                (u, d, m) => { File.WriteAllBytes(d, new byte[3]); throw new IOException("conexión cortada"); }));
+                (u, d, m) => { File.WriteAllBytes(d, new byte[3]); throw new IOException("connection dropped"); }));
             Assert.Empty(Leftovers());
         }
     }

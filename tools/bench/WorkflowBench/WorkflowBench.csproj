@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- SPDX-License-Identifier: GPL-3.0-only -->
-  <!-- Harness offline de benchmarks de workflows (0.9.1). Mide la parte de BIMBRIDGE que corre fuera de Revit; NO mide Revit ni pyRevit. -->
+  <!-- Offline workflow benchmark harness (0.9.1). Measures the part of BIMBRIDGE that runs outside Revit; it does NOT measure Revit or pyRevit. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>

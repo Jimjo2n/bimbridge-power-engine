@@ -24,22 +24,22 @@ namespace Bimbridge.Addin.Revit.Writes
                 var element = doc.GetElement(Ids.ToId(id));
                 if (!(element is Conduit) && !(element is FamilyInstance fitting &&
                     Ids.ToLong(fitting.Category?.Id ?? ElementId.InvalidElementId) == (long)BuiltInCategory.OST_ConduitFitting))
-                    throw new QueryException("el ID " + id + " no es tramo ni accesorio de conduit");
+                    throw new QueryException("ID " + id + " is not a conduit segment or fitting");
                 var ports = Manager(element)?.Connectors.Cast<Connector>().Where(c => c.ConnectorType == ConnectorType.End)
                     .OrderBy(c => c.Id).ToList();
-                if (ports == null || ports.Count != 2) throw new QueryException("el ID " + id + " debe tener exactamente dos extremos físicos");
+                if (ports == null || ports.Count != 2) throw new QueryException("ID " + id + " must have exactly two physical ends");
                 var portDetails = new List<object>();
                 foreach (var port in ports)
                 {
                     var refs = PhysicalReferences(port);
                     if (refs.Count > 1 || (port.IsConnected && refs.Count != 1))
-                        throw new QueryException("no se pudo identificar una conexión física única en " + id);
+                        throw new QueryException("could not identify a single physical connection on " + id);
                     var reference = refs.SingleOrDefault();
                     if (reference != null && scope.Contains(Ids.ToLong(reference.Owner.Id)))
                         adjacency[id].Add(Ids.ToLong(reference.Owner.Id));
                     else
                         boundaries.Add((port.Origin, reference == null ? null : FingerprintPort(reference)));
-                    portDetails.Add(new object[] { FingerprintPort(port), reference == null ? null : FingerprintPort(reference) });
+                    portDetails.Add(new object[] { Frozen(FingerprintPort(port)), reference == null ? null : Frozen(FingerprintPort(reference)) });
                 }
                 snapshot.Add(new object[]
                 {
@@ -57,24 +57,24 @@ namespace Bimbridge.Addin.Revit.Writes
                 foreach (var next in adjacency[current]) pending.Push(next);
             }
             if (seen.Count != ids.Count || boundaries.Count != 2)
-                throw new QueryException("los IDs deben formar un recorrido conectado sin ramales y con exactamente dos extremos");
+                throw new QueryException("the IDs must form a connected run with no branches and exactly two ends");
             var first = boundaries.FindIndex(b => Close(b.Point, start));
             if (first < 0 || !Close(boundaries[1 - first].Point, end) || Close(start, end))
-                throw new QueryException("los extremos del trazado deben coincidir con los dos extremos originales dentro de 1 mm");
+                throw new QueryException("the route ends must match the two original ends within 1 mm");
             return new Dictionary<string, object>
             {
-                ["huella"] = Home.Sha256Hex(OpSemantics.Canonical(snapshot)),
-                ["extremos"] = new List<object> { boundaries[first].External, boundaries[1 - first].External },
+                ["fingerprint"] = Home.Sha256Hex(OpSemantics.Canonical(snapshot)),
+                ["ends"] = new List<object> { boundaries[first].External, boundaries[1 - first].External },
             };
         }
 
         internal static Dictionary<string, object> Terminal(Document doc, Dictionary<string, object> input, XYZ target, bool mustBeFree)
         {
             var owner = doc.GetElement(Ids.ToId(Arg.GetLong(input, "id").Value));
-            var port = Manager(owner)?.Lookup((int)Arg.GetLong(input, "conector").Value);
+            var port = Manager(owner)?.Lookup((int)Arg.GetLong(input, "connector").Value);
             if (port == null || port.ConnectorType != ConnectorType.End || !Close(port.Origin, target))
-                throw new QueryException("el conector especificado no es un extremo en la posición esperada");
-            if (mustBeFree && port.IsConnected) throw new QueryException("el conector terminal ya está ocupado");
+                throw new QueryException("the specified connector is not an end at the expected position");
+            if (mustBeFree && port.IsConnected) throw new QueryException("the terminal connector is already taken");
             return FingerprintPort(port);
         }
 
@@ -82,9 +82,9 @@ namespace Bimbridge.Addin.Revit.Writes
         {
             var current = Terminal(doc, saved, target, mustBeFree);
             if (OpSemantics.Canonical(current) != OpSemantics.Canonical(saved))
-                throw new QueryException("cambió el conector terminal");
+                throw new QueryException("the terminal connector changed");
             var owner = doc.GetElement(Ids.ToId(Arg.GetLong(saved, "id").Value));
-            return Manager(owner).Lookup((int)Arg.GetLong(saved, "conector").Value);
+            return Manager(owner).Lookup((int)Arg.GetLong(saved, "connector").Value);
         }
 
         internal static List<Connector> PhysicalReferences(Connector port) => port.AllRefs.Cast<Connector>()
@@ -93,15 +93,23 @@ namespace Bimbridge.Addin.Revit.Writes
         private static ConnectorManager Manager(Element e) => e is MEPCurve curve ? curve.ConnectorManager :
             (e as FamilyInstance)?.MEPModel?.ConnectorManager;
 
+        /// <summary>FROZEN hash literals: the 0.9.4 port keys the run fingerprint of held plans was computed with. Never change these strings.</summary>
+        private static readonly IReadOnlyDictionary<string, string> FrozenKeys = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["connector"] = "conector", ["domain"] = "dominio", ["shape"] = "forma", ["radius"] = "radio",
+        };
+
+        private static Dictionary<string, object> Frozen(Dictionary<string, object> port) => LegacyAliases.Frozen(port, FrozenKeys);
+
         private static Dictionary<string, object> FingerprintPort(Connector c)
         {
             var point = c.Origin;
             var direction = c.CoordinateSystem.BasisZ;
             return new Dictionary<string, object>
             {
-                ["id"] = Ids.ToLong(c.Owner.Id), ["uid"] = c.Owner.UniqueId, ["conector"] = (long)c.Id,
+                ["id"] = Ids.ToLong(c.Owner.Id), ["uid"] = c.Owner.UniqueId, ["connector"] = (long)c.Id,
                 ["pos"] = WriteKit.List(point.X, point.Y, point.Z), ["dir"] = WriteKit.List(direction.X, direction.Y, direction.Z),
-                ["dominio"] = c.Domain.ToString(), ["forma"] = c.Shape.ToString(), ["radio"] = c.Shape == ConnectorProfileType.Round ? (object)c.Radius : null,
+                ["domain"] = c.Domain.ToString(), ["shape"] = c.Shape.ToString(), ["radius"] = c.Shape == ConnectorProfileType.Round ? (object)c.Radius : null,
             };
         }
 

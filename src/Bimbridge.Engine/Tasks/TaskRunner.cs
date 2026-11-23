@@ -9,15 +9,15 @@ using Bimbridge.Protocol;
 namespace Bimbridge.Engine.Tasks
 {
     /// <summary>
-    /// Motor de una tarea reanudable (§4). Una sola petición la inicia y el motor:
-    /// 1. reconcilia lo dudoso (unidades sin final, o confirmadas después del último guardado si el documento se reabrió);
-    /// 2. enumera las unidades de la receta (claves estables) y salta las ya confirmadas: reanudar nunca duplica;
-    /// 3. ejecuta lotes de unidades, uno por visita al hilo de Revit, con tamaño adaptado a lo medido (cede la interfaz entre visitas);
-    /// 4. escribe "inicio" ANTES y "fin" DESPUÉS de cada lote (durable): la ventana commit→diario queda "en_curso" y se verifica al reanudar;
-    /// 5. respeta barreras (guardar, sync, PDF…): sólo corren cuando todo lo anterior está confirmado; registran la evidencia de persistencia;
-    /// 6. cancelación cooperativa entre lotes; pausa del usuario, Revit ocupado o documento cerrado = espera con reintento acotado;
-    /// 7. QC final (postcondición) y resumen de continuación determinista.
-    /// No promete "exactamente una vez" por decreto: lo que no se puede probar queda "desconocida" y pide reconciliación explícita.
+    /// Engine of a resumable task (§4). A single request starts it and the engine:
+    /// 1. reconciles what is doubtful (units with no end, or committed after the last save if the document was reopened);
+    /// 2. enumerates the recipe units (stable keys) and skips those already committed: resume never duplicates;
+    /// 3. runs batches of units, one per visit to the Revit thread, sized to what was measured (yields the UI between visits);
+    /// 4. writes "start" BEFORE and "end" AFTER each batch (durable): the commit→journal window stays "running" and is verified on resume;
+    /// 5. respects barriers (save, sync, PDF…): they only run when everything before is committed; they record the persistence evidence;
+    /// 6. cooperative cancellation between batches; user pause, Revit busy or document closed = wait with bounded retry;
+    /// 7. final QC (postcondition) and deterministic continuation summary.
+    /// It does not promise "exactly once" by decree: what cannot be proven stays "unknown" and asks for explicit reconciliation.
     /// </summary>
     public sealed class TaskRunner
     {
@@ -30,17 +30,17 @@ namespace Bimbridge.Engine.Tasks
         private readonly Action<TaskRecord> _changed;
 
         public volatile bool CancelRequested;
-        /// <summary>Tiempo máximo esperando contexto (pausa, diálogo…) antes de dejar la tarea aparcada en esperando_contexto.</summary>
+        /// <summary>Maximum time waiting for context (pause, dialog…) before leaving the task parked in esperando_contexto.</summary>
         public TimeSpan MaxWait = TimeSpan.FromHours(2);
         public Func<TimeSpan, CancellationToken, Task> Delay = (d, ct) => Task.Delay(d, ct);
         public Func<DateTime> Now = () => DateTime.UtcNow;
         public int BudgetMs = 200;
         public TimeSpan LeaseTtl = TimeSpan.FromSeconds(60);
-        /// <summary>Autoridad de capacidades (R03). Por defecto niega todo lo que escribe: el add-in pone la real (GrantAuthority).</summary>
+        /// <summary>Capability authority (R03). By default denies everything that writes: the add-in sets the real one (GrantAuthority).</summary>
         public ITaskAuthority Authority = DenyWritesAuthority.Instance;
-        /// <summary>Auditoría en dos fases (R01). null = sin auditoría (sólo pruebas del motor); el add-in siempre la pone.</summary>
+        /// <summary>Two-phase audit (R01). null = no audit (engine tests only); the add-in always sets it.</summary>
         public AuditLog Audit;
-        /// <summary>Exclusión por documento entre procesos (R06): leases en una carpeta hermana de las tareas.</summary>
+        /// <summary>Per-document exclusion across processes (R06): leases in a sibling folder of the tasks.</summary>
         public TaskStore DocLeases;
 
         public TaskRunner(TaskStore store, ITaskBackend backend, TaskRecord task, string owner, string instance, Action<TaskRecord> changed)
@@ -57,9 +57,9 @@ namespace Bimbridge.Engine.Tasks
         public TaskRecord Task_ => _t;
         public UnitLog Units => _units;
 
-        private bool StopOnError => !string.Equals(_t.PolicyString("en_error"), "continuar", StringComparison.OrdinalIgnoreCase);
-        private int MaxBatch => (int)Math.Max(1, Math.Min(500, _t.PolicyLong("lote_max", 200)));
-        private long SaveEvery => _t.PolicyLong("guardar_cada", 0);
+        private bool StopOnError => !string.Equals(_t.PolicyString("on_error"), "continue", StringComparison.OrdinalIgnoreCase);
+        private int MaxBatch => (int)Math.Max(1, Math.Min(500, _t.PolicyLong("batch_max", 200)));
+        private long SaveEvery => _t.PolicyLong("save_every", 0);
 
         private DateTime _lastLease;
 
@@ -70,31 +70,31 @@ namespace Bimbridge.Engine.Tasks
             try { got = _store.TryLease(_t.Id, _owner, _instance, LeaseTtl, Now(), out holder); }
             catch (TaskStore.LeaseStoreException ex)
             {
-                _t.Reason = "no se pudo tomar la ejecución de la tarea (almacén de leases no fiable: " + ex.Message + "); no se ejecutó nada";
+                _t.Reason = "could not take over the task execution (unreliable lease store: " + ex.Message + "); nothing was run";
                 _changed(_t);
                 return;
             }
             if (!got)
             {
-                _t.Reason = "la tarea se está ejecutando en otra instancia (" + holder.Instance + ") hasta " + holder.Expires;
+                _t.Reason = "the task is running in another instance (" + holder.Instance + ") until " + holder.Expires;
                 _changed(_t);
                 return;
             }
             _lastLease = Now();
             _fencing = holder.Fencing;
-            // Exclusión por documento: dos tareas (aunque sean de procesos distintos) no escriben a la vez en el mismo documento.
+            // Per-document exclusion: two tasks (even from different processes) do not write to the same document at the same time.
             if (DocLeases != null && _t.MainDoc?.Key != null)
             {
                 _docLeaseId = "doc-" + Home.Sha256Hex(_t.MainDoc.Key, 24);
                 TaskStore.Lease dh = null;
                 bool dok;
                 try { dok = DocLeases.TryLease(_docLeaseId, _owner + "|" + _t.Id, _t.Id, LeaseTtl, Now(), out dh); }
-                catch (TaskStore.LeaseStoreException ex) { dok = false; dh = new TaskStore.Lease { Instance = "?", Expires = "almacén no fiable: " + ex.Message }; }
+                catch (TaskStore.LeaseStoreException ex) { dok = false; dh = new TaskStore.Lease { Instance = "?", Expires = "unreliable store: " + ex.Message }; }
                 if (!dok)
                 {
-                    // Se persiste mientras aún se tiene el lease de la TAREA (nadie más escribe tarea.json), y después se suelta.
+                    // Persisted while the TASK lease is still held (nobody else writes tarea.json), then released.
                     _docLeaseId = null;
-                    SetState(TaskState.EsperandoContexto, "el documento lo está modificando la tarea " + dh.Instance + " (hasta " + dh.Expires + "); no se ejecutó nada, reanude cuando termine");
+                    SetState(TaskState.WaitingContext, "the document is being modified by task " + dh.Instance + " (until " + dh.Expires + "); nothing was run, resume when it finishes");
                     _store.ReleaseLease(_t.Id, _owner);
                     return;
                 }
@@ -102,11 +102,11 @@ namespace Bimbridge.Engine.Tasks
             }
             _t.Preflight = Preflight;
             _t.Owner = _instance;
-            SetState(TaskState.Ejecutando, null);
+            SetState(TaskState.Running, null);
             try
             {
-                // rc3: autorizar ANTES de cualquier código de la receta (constructor, Preparar, enumeración, Verificar de la reconciliación).
-                // El backend repite la comprobación en el hilo de Revit a través de Preflight/RecipeGate en cada fase.
+                // rc3: authorize BEFORE any recipe code (constructor, Prepare, enumeration, Verify during reconciliation).
+                // The backend repeats the check on the Revit thread through Preflight/RecipeGate in each phase.
                 Authorize(null);
                 if (!await ReconcileAsync(ct).ConfigureAwait(false)) return;
                 var list = await EnumerateAsync(ct).ConfigureAwait(false);
@@ -116,42 +116,42 @@ namespace Bimbridge.Engine.Tasks
             }
             catch (JournalUnavailableException ex)
             {
-                SetState(TaskState.Parcial, "el registro de unidades no se pudo escribir (" + ex.Message + "): la tarea se detuvo para no perder la cuenta. " +
-                                             "Lo confirmado hasta el último checkpoint está listado; corrija la carpeta de datos y reanude (se verificará lo dudoso).");
+                SetState(TaskState.Partial, "the unit log could not be written (" + ex.Message + "): the task stopped so as not to lose count. " +
+                                             "What was committed up to the last checkpoint is listed; fix the data folder and resume (what is doubtful will be verified).");
             }
             catch (CheckpointException ex)
             {
-                SetState(TaskState.Parcial, "checkpoint no durable (" + ex.Message + "): la tarea se detuvo; el estado en disco puede ir por detrás del real. " +
-                                             "Corrija la carpeta de datos y reanude: se verificará lo dudoso desde unidades.jsonl.");
+                SetState(TaskState.Partial, "checkpoint not durable (" + ex.Message + "): the task stopped; the state on disk may lag behind the real one. " +
+                                             "Fix the data folder and resume: what is doubtful will be verified from unidades.jsonl.");
             }
             catch (NotAuthorizedException ex)
             {
-                SetState(TaskState.Interrumpida, "autorizacion_requerida: " + ex.Message + ". Nada más se ejecutó; una persona debe autorizarlo en Revit y luego reanudar.");
+                SetState(TaskState.Interrupted, "authorization_required: " + ex.Message + ". Nothing more was run; a person must authorize it in Revit and then resume.");
             }
             catch (AuditUnavailableException ex)
             {
-                SetState(TaskState.Parcial, "auditoria_no_disponible: " + ex.Message);
+                SetState(TaskState.Partial, "audit_unavailable: " + ex.Message);
             }
             catch (LeaseLostException ex)
             {
-                // Sólo en memoria: si otro Revit ya tomó la tarea, su tarea.json es el bueno (lo decide el checkpoint del finally).
-                _t.State = TaskState.Interrumpida;
-                _t.Reason = "lease perdido (" + ex.Message + "): esta instancia dejó de ejecutar para no escribir sin autoridad; lo confirmado sigue en el registro";
+                // In memory only: if another Revit already took the task, its tarea.json is the valid one (the checkpoint in finally decides).
+                _t.State = TaskState.Interrupted;
+                _t.Reason = "lease lost (" + ex.Message + "): this instance stopped running so as not to write without authority; what was committed stays in the log";
                 _changed(_t);
             }
             catch (OperationCanceledException)
             {
-                SetState(TaskState.Cancelada, "cancelada; lo confirmado antes de cancelar sigue aplicado (" + Count(UnitState.Confirmada) + " unidades)");
+                SetState(TaskState.Cancelled, "cancelled; what was committed before cancelling stays applied (" + Count(UnitState.Committed) + " units)");
             }
             catch (Exception ex)
             {
-                SetState(TaskState.Interrumpida, "error interno del motor (" + ex.GetType().Name + ": " + ex.Message + "); reanude: se verificará lo dudoso antes de seguir");
+                SetState(TaskState.Interrupted, "internal engine error (" + ex.GetType().Name + ": " + ex.Message + "); resume: what is doubtful will be verified before continuing");
             }
             finally
             {
                 _t.Preflight = null;
-                // Guardar ANTES de soltar el lease y sólo si nadie más lo tomó: un motor que perdió la tarea no pisa el tarea.json del nuevo dueño.
-                // shortcut: lectura y guardado sin el bloqueo del lease (otro Revit podría tomarlo entre ambos si el lease ya venció); pasar a un SaveIfOwner bajo WithLeaseLock si se observa.
+                // Save BEFORE releasing the lease and only if nobody else took it: an engine that lost the task does not overwrite the new owner's tarea.json.
+                // shortcut: read and save without the lease lock (another Revit could take it in between if the lease already expired); move to a SaveIfOwner under WithLeaseLock if observed.
                 var cur = _store.ReadLease(_t.Id);
                 if (cur == null || (cur.Owner == _owner && cur.Fencing == _fencing))
                     try { Checkpoint(); } catch (CheckpointException) { }
@@ -160,7 +160,7 @@ namespace Bimbridge.Engine.Tasks
             }
         }
 
-        // ---------------- 1) reconciliación ----------------
+        // ---------------- 1) reconciliation ----------------
 
         private async Task<bool> ReconcileAsync(CancellationToken ct)
         {
@@ -169,47 +169,47 @@ namespace Bimbridge.Engine.Tasks
             var reopened = gen != null && main?.Generation != null && gen != main.Generation;
             var persistSeq = _t.LastPersist?.Seq ?? 0;
             var doubtful = _units.Units.Values.Where(u => UnitState.NeedsReconcile(u.State) ||
-                                                          (reopened && u.State == UnitState.Confirmada && u.Seq > persistSeq)).ToList();
+                                                          (reopened && u.State == UnitState.Committed && u.Seq > persistSeq)).ToList();
             if (doubtful.Count > 0)
             {
-                _t.Reason = "verificando " + doubtful.Count + " unidades dudosas" + (reopened ? " (el documento se reabrió: lo confirmado después del último guardado pudo perderse)" : "");
+                _t.Reason = "verifying " + doubtful.Count + " doubtful units" + (reopened ? " (the document was reopened: what was committed after the last save may have been lost)" : "");
                 _changed(_t);
                 var r = await WithWaitAsync(() => _b.VerifyAsync(_t, doubtful, reopened, ct), ct).ConfigureAwait(false);
                 if (r == null) return false;
                 var unknown = new List<string>();
                 foreach (var o in r.Value)
                 {
-                    var state = o.State == UnitState.Confirmada ? UnitState.Confirmada : o.State == UnitState.Pendiente || o.State == UnitState.Revertida ? UnitState.Pendiente : UnitState.Desconocida;
+                    var state = o.State == UnitState.Committed ? UnitState.Committed : o.State == UnitState.Pending || o.State == UnitState.RolledBack ? UnitState.Pending : UnitState.Unknown;
                     _store.AppendUnitEvent(_t.Id, new Dictionary<string, object>
                     {
-                        ["ev"] = "verificada", ["clave"] = o.Key, ["estado"] = state, ["error"] = o.Error, ["generacion"] = gen,
-                        ["creados"] = o.Created.Count > 0 ? (object)o.Created : null,
+                        ["ev"] = "verified", ["key"] = o.Key, ["status"] = state, ["error"] = o.Error, ["generation"] = gen,
+                        ["created"] = o.Created.Count > 0 ? (object)o.Created : null,
                     });
-                    _units.Apply(new Dictionary<string, object> { ["ev"] = "verificada", ["clave"] = o.Key, ["estado"] = state, ["error"] = o.Error });
-                    if (state == UnitState.Desconocida) unknown.Add(o.Key);
+                    _units.Apply(new Dictionary<string, object> { ["ev"] = "verified", ["key"] = o.Key, ["status"] = state, ["error"] = o.Error });
+                    if (state == UnitState.Unknown) unknown.Add(o.Key);
                 }
-                _t.AddMetric("verificadas", r.Value.Count);
+                _t.AddMetric("verified", r.Value.Count);
                 if (unknown.Count > 0)
                 {
-                    SetState(TaskState.Interrumpida, unknown.Count + " unidades no se pudieron verificar en el modelo (" + string.Join(", ", unknown.Take(5)) +
-                                                     (unknown.Count > 5 ? "…" : "") + "). Revíselas y use tarea reconciliar con decision=aplicada o no_aplicada; después, reanudar.");
+                    SetState(TaskState.Interrupted, unknown.Count + " units could not be verified in the model (" + string.Join(", ", unknown.Take(5)) +
+                                                     (unknown.Count > 5 ? "…" : "") + "). Review them and use task reconcile with decision=applied or not_applied; then resume.");
                     return false;
                 }
             }
             if (reopened && main != null)
             {
                 main.Generation = gen;
-                _t.AddMetric("reaperturas", 1);
+                _t.AddMetric("reopenings", 1);
             }
             else if (main != null && main.Generation == null) main.Generation = gen;
             return true;
         }
 
-        // ---------------- 2) enumeración ----------------
+        // ---------------- 2) enumeration ----------------
 
         private async Task<List<UnitRef>> EnumerateAsync(CancellationToken ct)
         {
-            _t.Reason = "enumerando unidades";
+            _t.Reason = "enumerating units";
             _changed(_t);
             var r = await WithWaitAsync(() => _b.EnumerateAsync(_t, ct), ct).ConfigureAwait(false);
             if (r == null) return null;
@@ -217,10 +217,10 @@ namespace Bimbridge.Engine.Tasks
             var dup = list.GroupBy(u => u.Key).FirstOrDefault(g => g.Count() > 1);
             if (dup != null)
             {
-                SetState(TaskState.Parcial, "la receta devolvió dos unidades con la misma clave '" + dup.Key + "': las claves deben ser únicas y estables");
+                SetState(TaskState.Partial, "the recipe returned two units with the same key '" + dup.Key + "': keys must be unique and stable");
                 return null;
             }
-            // Barreras finales pedidas en la tarea (al_final=guardar,pdf …)
+            // Final barriers requested in the task (al_final=guardar,pdf …)
             var i = 0;
             foreach (var spec in FinalBarriers())
             {
@@ -236,18 +236,18 @@ namespace Bimbridge.Engine.Tasks
             }
             for (var k = 0; k < list.Count; k++) list[k].Ordinal = k;
             _t.UnitsTotal = list.Count(u => !u.IsBarrier);
-            _t.SetMetric("barreras", list.Count(u => u.IsBarrier));
+            _t.SetMetric("barriers", list.Count(u => u.IsBarrier));
             return list;
         }
 
         private IEnumerable<string> FinalBarriers()
         {
-            if (!_t.Policy.TryGetValue("al_final", out var v) || v == null) return Enumerable.Empty<string>();
+            if (!_t.Policy.TryGetValue("at_end", out var v) || v == null) return Enumerable.Empty<string>();
             if (v is List<object> l) return l.Select(x => Convert.ToString(x, System.Globalization.CultureInfo.InvariantCulture)).Where(x => !string.IsNullOrWhiteSpace(x));
             return Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture).Split(';', ',').Select(x => x.Trim()).Where(x => x.Length > 0);
         }
 
-        // ---------------- 3) bucle principal ----------------
+        // ---------------- 3) main loop ----------------
 
         private bool Done(UnitRef u)
         {
@@ -257,10 +257,10 @@ namespace Bimbridge.Engine.Tasks
 
         private async Task<bool> MainLoopAsync(List<UnitRef> list, CancellationToken ct)
         {
-            // Al reanudar se reintentan las revertidas y las de conflicto (se replanifican sobre el modelo actual).
+            // On resume, rolled-back and conflicting units are retried (replanned on the current model).
             var pending = list.Where(u => !Done(u)).ToList();
             _t.Reason = null;
-            SetState(TaskState.Ejecutando, null);
+            SetState(TaskState.Running, null);
             var k = 1;
             double avg = -1;
             var emptyVisits = 0;
@@ -268,7 +268,7 @@ namespace Bimbridge.Engine.Tasks
             var i = 0;
             while (i < pending.Count)
             {
-                if (CancelRequested) { SetState(TaskState.Cancelada, "cancelada a petición; lo confirmado antes (" + Count(UnitState.Confirmada) + " unidades) sigue aplicado"); return false; }
+                if (CancelRequested) { SetState(TaskState.Cancelled, "cancelled on request; what was committed before (" + Count(UnitState.Committed) + " units) stays applied"); return false; }
                 if (!await EnsureContextAsync(ct).ConfigureAwait(false)) return false;
                 RenewLease();
                 var u = pending[i];
@@ -282,43 +282,43 @@ namespace Bimbridge.Engine.Tasks
                     continue;
                 }
                 var batch = new List<UnitRef>();
-                // Con guardar_cada=N el lote no pasa del punto de guardado: se guarda exactamente cada N confirmadas.
+                // With guardar_cada=N the batch does not go past the save point: it saves exactly every N committed units.
                 var cap = SaveEvery > 0 ? (int)Math.Max(1, Math.Min(k, SaveEvery - sinceSave)) : k;
                 for (var j = i; j < pending.Count && batch.Count < cap && !pending[j].IsBarrier; j++) batch.Add(pending[j]);
                 var gen = _b.CurrentGeneration(_t);
-                var startEv = new Dictionary<string, object> { ["ev"] = "inicio", ["claves"] = batch.Select(x => (object)x.Key).ToList(), ["generacion"] = gen };
+                var startEv = new Dictionary<string, object> { ["ev"] = "start", ["keys"] = batch.Select(x => (object)x.Key).ToList(), ["generation"] = gen };
                 _store.AppendUnitEvent(_t.Id, startEv);
                 _units.Apply(startEv);
-                var intent = AuditIntent("tarea_lote", new Dictionary<string, object> { ["claves"] = startEv["claves"], ["generacion"] = gen });
+                var intent = AuditIntent("task_batch", new Dictionary<string, object> { ["keys"] = startEv["keys"], ["generation"] = gen });
                 var r = await _b.RunBatchAsync(_t, batch, BudgetMs, ct).ConfigureAwait(false);
                 var outcomes = r.Value ?? new List<UnitOutcome>();
-                // Lo que el backend sí ejecutó se registra SIEMPRE, también cuando además pide esperar o falla.
+                // What the backend did run is ALWAYS recorded, also when it additionally asks to wait or fails.
                 long batchMs = 0;
                 var stop = (string)null;
                 foreach (var o in outcomes)
                 {
                     batchMs += o.Ms;
                     Record(o, gen);
-                    if (o.State == UnitState.Confirmada) sinceSave++;
-                    if (o.State == UnitState.Parcial || o.State == UnitState.Desconocida)
-                        stop = "la unidad " + o.Key + " quedó " + o.State + " (" + o.Error + "): reconcíliela antes de seguir";
-                    else if (o.State == UnitState.Revertida && StopOnError)
-                        stop = "la unidad " + o.Key + " falló y se revirtió: " + o.Error + ". Corrija la causa y reanude (se reintenta), o reanude con en_error=continuar";
+                    if (o.State == UnitState.Committed) sinceSave++;
+                    if (o.State == UnitState.Partial || o.State == UnitState.Unknown)
+                        stop = "unit " + o.Key + " ended up " + o.State + " (" + o.Error + "): reconcile it before continuing";
+                    else if (o.State == UnitState.RolledBack && StopOnError)
+                        stop = "unit " + o.Key + " failed and was rolled back: " + o.Error + ". Fix the cause and resume (it is retried), or resume with on_error=continue";
                 }
                 var notRun = batch.Skip(outcomes.Count).Select(x => (object)x.Key).ToList();
                 if (notRun.Count > 0)
                 {
-                    _store.AppendUnitEvent(_t.Id, new Dictionary<string, object> { ["ev"] = "sin_ejecutar", ["claves"] = notRun });
-                    _units.Apply(new Dictionary<string, object> { ["ev"] = "sin_ejecutar", ["claves"] = notRun });
+                    _store.AppendUnitEvent(_t.Id, new Dictionary<string, object> { ["ev"] = "not_run", ["keys"] = notRun });
+                    _units.Apply(new Dictionary<string, object> { ["ev"] = "not_run", ["keys"] = notRun });
                 }
-                AuditOutcome("tarea_lote", intent, outcomes);
-                _t.AddMetric("lotes", 1);
-                _t.AddMetric("ms_revit", batchMs);
-                if (outcomes.Count > (int)_t.Metric("lote_max_real")) _t.SetMetric("lote_max_real", outcomes.Count);
+                AuditOutcome("task_batch", intent, outcomes);
+                _t.AddMetric("batches", 1);
+                _t.AddMetric("revit_ms_total", batchMs);
+                if (outcomes.Count > (int)_t.Metric("actual_batch_max")) _t.SetMetric("actual_batch_max", outcomes.Count);
                 i += outcomes.Count;
                 Checkpoint();
-                if (stop != null) { SetState(TaskState.Parcial, stop); return false; }
-                if (r.Fatal != null) { SetState(TaskState.Parcial, r.Fatal); return false; }
+                if (stop != null) { SetState(TaskState.Partial, stop); return false; }
+                if (r.Fatal != null) { SetState(TaskState.Partial, r.Fatal); return false; }
                 if (r.Wait != null)
                 {
                     if (!await WaitContextAsync(r.Wait, r.Action, ct).ConfigureAwait(false)) return false;
@@ -326,18 +326,18 @@ namespace Bimbridge.Engine.Tasks
                 }
                 if (outcomes.Count == 0)
                 {
-                    if (++emptyVisits >= 3) { SetState(TaskState.Parcial, "Revit no ejecutó ninguna unidad en 3 visitas seguidas; reanude más tarde"); return false; }
+                    if (++emptyVisits >= 3) { SetState(TaskState.Partial, "Revit did not run any unit in 3 consecutive visits; resume later"); return false; }
                     k = 1;
                     continue;
                 }
                 emptyVisits = 0;
-                // Tamaño de lote adaptativo: lo que cabe en el presupuesto según el tiempo medido por unidad.
+                // Adaptive batch size: what fits in the budget according to the measured time per unit.
                 var per = (double)batchMs / outcomes.Count;
                 avg = avg < 0 ? per : avg * 0.7 + per * 0.3;
                 k = outcomes.Count < batch.Count ? Math.Max(1, outcomes.Count) : (int)Math.Max(1, Math.Min(MaxBatch, Math.Floor(BudgetMs * 0.8 / Math.Max(0.5, avg))));
                 if (SaveEvery > 0 && sinceSave >= SaveEvery && i < pending.Count)
                 {
-                    var auto = new UnitRef { Key = "auto-guardar:" + _t.ConfirmSeq, Barrier = "guardar", BarrierArgs = new Dictionary<string, object>() };
+                    var auto = new UnitRef { Key = "auto-guardar:" + _t.ConfirmSeq, Barrier = "save", BarrierArgs = new Dictionary<string, object>() };
                     if (!await RunBarrierAsync(auto, list, ct).ConfigureAwait(false)) return false;
                     sinceSave = 0;
                     Checkpoint();
@@ -349,19 +349,19 @@ namespace Bimbridge.Engine.Tasks
         private void Record(UnitOutcome o, string gen)
         {
             long? seq = null;
-            if (o.State == UnitState.Confirmada) seq = ++_t.ConfirmSeq;
+            if (o.State == UnitState.Committed) seq = ++_t.ConfirmSeq;
             var ev = new Dictionary<string, object>
             {
-                ["ev"] = "fin", ["clave"] = o.Key, ["estado"] = o.State, ["ms"] = o.Ms, ["seq"] = seq, ["generacion"] = gen,
-                ["cambiados"] = o.Changed, ["borrados"] = o.Deleted, ["error"] = o.Error,
-                ["creados"] = o.Created.Count > 0 ? (object)o.Created : null,
-                ["resultado"] = TrimResult(o.Result),
+                ["ev"] = "end", ["key"] = o.Key, ["status"] = o.State, ["ms"] = o.Ms, ["seq"] = seq, ["generation"] = gen,
+                ["changed"] = o.Changed, ["deleted_items"] = o.Deleted, ["error"] = o.Error,
+                ["created"] = o.Created.Count > 0 ? (object)o.Created : null,
+                ["result"] = TrimResult(o.Result),
             };
             _store.AppendUnitEvent(_t.Id, ev);
             _units.Apply(ev);
-            lock (_t) foreach (var d in o.Decisions) _t.Decisions.Add(new Dictionary<string, object> { ["t"] = TaskTime.Now(), ["unidad"] = o.Key, ["texto"] = d });
-            foreach (var x in o.Exceptions) { x["unidad"] = o.Key; _t.Exceptions.Add(x); }
-            foreach (var a in o.Artifacts) { a["unidad"] = o.Key; _t.Artifacts.Add(a); }
+            lock (_t) foreach (var d in o.Decisions) _t.Decisions.Add(new Dictionary<string, object> { ["t"] = TaskTime.Now(), ["unit"] = o.Key, ["text"] = d });
+            foreach (var x in o.Exceptions) { x["unit"] = o.Key; _t.Exceptions.Add(x); }
+            foreach (var a in o.Artifacts) { a["unit"] = o.Key; _t.Artifacts.Add(a); }
             if (_t.Decisions.Count > 200) _t.Decisions.RemoveRange(0, _t.Decisions.Count - 200);
         }
 
@@ -378,39 +378,39 @@ namespace Bimbridge.Engine.Tasks
             if (u.Ordinal == 0 && u.Key.StartsWith("auto-", StringComparison.Ordinal)) before.Clear();
             if (before.Count > 0)
             {
-                SetState(TaskState.Parcial, "la barrera " + u.Barrier + " no se ejecuta porque " + before.Count + " unidades anteriores no están confirmadas (" +
-                                            string.Join(", ", before.Take(5)) + (before.Count > 5 ? "…" : "") + "): guardar/exportar ahora dejaría un resultado inconsistente");
+                SetState(TaskState.Partial, "barrier " + u.Barrier + " does not run because " + before.Count + " previous units are not committed (" +
+                                            string.Join(", ", before.Take(5)) + (before.Count > 5 ? "…" : "") + "): saving/exporting now would leave an inconsistent result");
                 return false;
             }
             var gen = _b.CurrentGeneration(_t);
-            var startEv = new Dictionary<string, object> { ["ev"] = "inicio", ["claves"] = new List<object> { u.Key }, ["generacion"] = gen };
+            var startEv = new Dictionary<string, object> { ["ev"] = "start", ["keys"] = new List<object> { u.Key }, ["generation"] = gen };
             _store.AppendUnitEvent(_t.Id, startEv);
             _units.Apply(startEv);
-            _t.Reason = "barrera " + u.Barrier;
+            _t.Reason = "barrier " + u.Barrier;
             _changed(_t);
-            var bIntent = AuditIntent("tarea_barrera_" + u.Barrier, new Dictionary<string, object> { ["clave"] = u.Key, ["generacion"] = gen });
+            var bIntent = AuditIntent("task_barrier_" + u.Barrier, new Dictionary<string, object> { ["key"] = u.Key, ["generation"] = gen });
             var r = await WithWaitAsync(() => _b.RunBarrierAsync(_t, u, ct), ct).ConfigureAwait(false);
             if (r == null)
             {
-                _store.AppendUnitEvent(_t.Id, new Dictionary<string, object> { ["ev"] = "sin_ejecutar", ["claves"] = new List<object> { u.Key } });
-                _units.Apply(new Dictionary<string, object> { ["ev"] = "sin_ejecutar", ["claves"] = new List<object> { u.Key } });
+                _store.AppendUnitEvent(_t.Id, new Dictionary<string, object> { ["ev"] = "not_run", ["keys"] = new List<object> { u.Key } });
+                _units.Apply(new Dictionary<string, object> { ["ev"] = "not_run", ["keys"] = new List<object> { u.Key } });
                 return false;
             }
             var o = r.Value;
-            AuditOutcome("tarea_barrera_" + u.Barrier, bIntent, new List<UnitOutcome> { o });
-            // Una barrera no confirma unidades: no consume secuencia de confirmación.
+            AuditOutcome("task_barrier_" + u.Barrier, bIntent, new List<UnitOutcome> { o });
+            // A barrier does not commit units: it does not consume a commit sequence number.
             var ev = new Dictionary<string, object>
             {
-                ["ev"] = "fin", ["clave"] = u.Key, ["estado"] = o.State, ["ms"] = o.Ms, ["error"] = o.Error, ["generacion"] = gen, ["resultado"] = TrimResult(o.Result),
+                ["ev"] = "end", ["key"] = u.Key, ["status"] = o.State, ["ms"] = o.Ms, ["error"] = o.Error, ["generation"] = gen, ["result"] = TrimResult(o.Result),
             };
             _store.AppendUnitEvent(_t.Id, ev);
             _units.Apply(ev);
-            foreach (var a in o.Artifacts) { a["unidad"] = u.Key; _t.Artifacts.Add(a); }
-            foreach (var x in o.Exceptions) { x["unidad"] = u.Key; _t.Exceptions.Add(x); }
-            _t.AddMetric("barreras_ok", o.State == UnitState.Confirmada ? 1 : 0);
-            if (o.State != UnitState.Confirmada)
+            foreach (var a in o.Artifacts) { a["unit"] = u.Key; _t.Artifacts.Add(a); }
+            foreach (var x in o.Exceptions) { x["unit"] = u.Key; _t.Exceptions.Add(x); }
+            _t.AddMetric("barriers_ok", o.State == UnitState.Committed ? 1 : 0);
+            if (o.State != UnitState.Committed)
             {
-                SetState(TaskState.Parcial, "la barrera " + u.Barrier + " falló: " + o.Error);
+                SetState(TaskState.Partial, "barrier " + u.Barrier + " failed: " + o.Error);
                 return false;
             }
             if (o.Persist != null)
@@ -426,50 +426,50 @@ namespace Bimbridge.Engine.Tasks
 
         private async Task FinishAsync(CancellationToken ct)
         {
-            _t.Reason = "QC final";
+            _t.Reason = "final QC";
             _changed(_t);
             var r = await WithWaitAsync(() => _b.PostconditionAsync(_t, ct), ct).ConfigureAwait(false);
             if (r == null) return;
             _t.Postcondition = r.Value;
-            var deviations = r.Value != null && r.Value.TryGetValue("desviaciones", out var dv) && dv is List<object> dl ? dl.Count : 0;
-            var conflicts = Count(UnitState.Conflicto);
-            var reverted = Count(UnitState.Revertida);
+            var deviations = r.Value != null && r.Value.TryGetValue("deviations", out var dv) && dv is List<object> dl ? dl.Count : 0;
+            var conflicts = Count(UnitState.Conflict);
+            var reverted = Count(UnitState.RolledBack);
             var diff = deviations > 0 || conflicts > 0 || reverted > 0 || _t.Exceptions.Count > 0;
-            SetState(diff ? TaskState.AplicadaConDiferencias : TaskState.Aplicada,
-                diff ? "terminó con " + conflicts + " conflictos, " + reverted + " revertidas, " + _t.Exceptions.Count + " excepciones y " + deviations + " desviaciones del QC" : null);
+            SetState(diff ? TaskState.AppliedWithDifferences : TaskState.Applied,
+                diff ? "finished with " + conflicts + " conflicts, " + reverted + " rolled back, " + _t.Exceptions.Count + " exceptions and " + deviations + " QC deviations" : null);
         }
 
-        // ---------------- esperas, contexto, estado ----------------
+        // ---------------- waits, context, state ----------------
 
         private async Task<bool> EnsureContextAsync(CancellationToken ct)
         {
             var c = _b.CheckContext(_t);
-            if (c.Fatal != null) { SetState(TaskState.Parcial, c.Fatal); return false; }
+            if (c.Fatal != null) { SetState(TaskState.Partial, c.Fatal); return false; }
             if (c.Wait == null) return true;
             return await WaitContextAsync(c.Wait, c.Action, ct).ConfigureAwait(false);
         }
 
-        /// <summary>Espera con reintentos espaciados (1, 2, 4… hasta 15 s): no bombardea el ExternalEvent ni gasta llamadas del agente.</summary>
+        /// <summary>Waits with spaced retries (1, 2, 4… up to 15 s): does not flood the ExternalEvent or spend agent calls.</summary>
         private async Task<bool> WaitContextAsync(string why, string action, CancellationToken ct)
         {
             var start = Now();
             var delay = TimeSpan.FromSeconds(1);
-            SetState(TaskState.EsperandoContexto, why + (action != null ? ". Acción: " + action : ""));
-            _t.AddMetric("esperas", 1);
+            SetState(TaskState.WaitingContext, why + (action != null ? ". Action: " + action : ""));
+            _t.AddMetric("waits", 1);
             while (true)
             {
-                if (CancelRequested) { SetState(TaskState.Cancelada, "cancelada mientras esperaba; lo confirmado antes sigue aplicado (" + Count(UnitState.Confirmada) + " unidades)"); return false; }
+                if (CancelRequested) { SetState(TaskState.Cancelled, "cancelled while waiting; what was committed before stays applied (" + Count(UnitState.Committed) + " units)"); return false; }
                 if (Now() - start > MaxWait)
                 {
-                    SetState(TaskState.EsperandoContexto, why + ". Se dejó de esperar tras " + (int)MaxWait.TotalMinutes + " min; cuando se resuelva, use tarea reanudar");
+                    SetState(TaskState.WaitingContext, why + ". Stopped waiting after " + (int)MaxWait.TotalMinutes + " min; once resolved, use task resume");
                     return false;
                 }
                 await Delay(delay, ct).ConfigureAwait(false);
                 RenewLease();
                 var c = _b.CheckContext(_t);
-                if (c.Fatal != null) { SetState(TaskState.Parcial, c.Fatal); return false; }
-                if (c.Wait == null) { SetState(TaskState.Ejecutando, null); return true; }
-                if (c.Wait != why) { why = c.Wait; SetState(TaskState.EsperandoContexto, why + (c.Action != null ? ". Acción: " + c.Action : "")); }
+                if (c.Fatal != null) { SetState(TaskState.Partial, c.Fatal); return false; }
+                if (c.Wait == null) { SetState(TaskState.Running, null); return true; }
+                if (c.Wait != why) { why = c.Wait; SetState(TaskState.WaitingContext, why + (c.Action != null ? ". Action: " + c.Action : "")); }
                 delay = TimeSpan.FromSeconds(Math.Min(15, delay.TotalSeconds * 2));
             }
         }
@@ -479,7 +479,7 @@ namespace Bimbridge.Engine.Tasks
             for (var attempt = 0; ; attempt++)
             {
                 var r = await step().ConfigureAwait(false);
-                if (r.Fatal != null) { SetState(TaskState.Parcial, r.Fatal); return null; }
+                if (r.Fatal != null) { SetState(TaskState.Partial, r.Fatal); return null; }
                 if (r.Wait == null) return r;
                 if (!await WaitContextAsync(r.Wait, r.Action, ct).ConfigureAwait(false)) return null;
             }
@@ -498,40 +498,40 @@ namespace Bimbridge.Engine.Tasks
         public sealed class NotAuthorizedException : Exception { public NotAuthorizedException(string m) : base(m) { } }
         public sealed class AuditUnavailableException : Exception { public AuditUnavailableException(string m) : base(m) { } }
 
-        /// <summary>Capacidades que la tarea necesita para sus unidades (no barreras). Sin la lista (tareas de 0.6.0): se asume que escribe.</summary>
+        /// <summary>Capabilities the task needs for its units (not barriers). Without the list (0.6.0 tasks): it is assumed to write.</summary>
         private IEnumerable<string> UnitCapabilities()
         {
-            if (_t.Policy.TryGetValue("requiere", out var v) && v is List<object> l) return l.Select(x => Convert.ToString(x, System.Globalization.CultureInfo.InvariantCulture));
-            return new[] { Capability.Modificar };
+            if (_t.Policy.TryGetValue("requires", out var v) && v is List<object> l) return l.Select(x => Convert.ToString(x, System.Globalization.CultureInfo.InvariantCulture));
+            return new[] { Capability.Modify };
         }
 
-        /// <summary>R03: comprueba concesiones en el punto de ejecución. barrierCap = null → capacidades de las unidades.</summary>
+        /// <summary>R03: checks grants at the point of execution. barrierCap = null → the units' capabilities.</summary>
         private void Authorize(string barrierCap)
         {
             var now = Now();
             foreach (var cap in barrierCap != null ? new[] { barrierCap } : UnitCapabilities())
             {
-                var why = (Authority == null ? "sin autoridad configurada" : Authority.Check(_t, cap, now));
+                var why = (Authority == null ? "no authority configured" : Authority.Check(_t, cap, now));
                 if (why != null) throw new NotAuthorizedException(cap + ": " + why);
             }
         }
 
         /// <summary>
-        /// Último punto seguro (R06): el backend lo llama en el hilo de Revit JUSTO antes de abrir la transacción de cada unidad.
-        /// null = adelante; si no, la unidad no se ejecuta (queda sin_ejecutar) y el ejecutor se detiene en el siguiente punto.
-        /// Barato: validar lease ~0,07 ms; la autoridad se cachea 2 s (una revocación tarda como mucho 2 s en cortar).
+        /// Last safe point (R06): the backend calls it on the Revit thread RIGHT before opening each unit's transaction.
+        /// null = go ahead; otherwise the unit is not run (stays sin_ejecutar) and the runner stops at the next point.
+        /// Cheap: validating the lease ~0.07 ms; the authority is cached for 2 s (a revocation takes at most 2 s to take effect).
         /// </summary>
         private string Preflight()
         {
             var now = Now();
-            if (!_store.ValidateOwnership(_t.Id, _owner, _fencing, now)) return "lease_perdido";
-            if (_docLeaseId != null && !DocLeases.ValidateOwnership(_docLeaseId, _owner + "|" + _t.Id, _docFencing, now)) return "documento_sin_exclusion";
+            if (!_store.ValidateOwnership(_t.Id, _owner, _fencing, now)) return "lease_lost";
+            if (_docLeaseId != null && !DocLeases.ValidateOwnership(_docLeaseId, _owner + "|" + _t.Id, _docFencing, now)) return "document_without_exclusion";
             foreach (var cap in UnitCapabilities())
             {
                 string why;
                 if (_authCacheCap == cap && now - _authCacheAt < TimeSpan.FromSeconds(2)) why = _authCacheResult;
-                else { why = (Authority == null ? "sin autoridad configurada" : Authority.Check(_t, cap, now)); _authCacheCap = cap; _authCacheAt = now; _authCacheResult = why; }
-                if (why != null) return "autorizacion_requerida: " + cap + ": " + why;
+                else { why = (Authority == null ? "no authority configured" : Authority.Check(_t, cap, now)); _authCacheCap = cap; _authCacheAt = now; _authCacheResult = why; }
+                if (why != null) return "authorization_required: " + cap + ": " + why;
             }
             return null;
         }
@@ -539,11 +539,11 @@ namespace Bimbridge.Engine.Tasks
         private string AuditIntent(string op, Dictionary<string, object> extra)
         {
             if (Audit == null) return null;
-            extra["tarea"] = _t.Id;
+            extra["task"] = _t.Id;
             extra["fencing"] = _fencing;
             extra["doc"] = _t.MainDoc?.Key;
             try { return Audit.Intent(_owner, op, _t.Id, extra); }
-            catch (JournalUnavailableException ex) { throw new AuditUnavailableException("no se pudo registrar la intención antes de " + op + " (" + ex.Message + "): no se modificó nada"); }
+            catch (JournalUnavailableException ex) { throw new AuditUnavailableException("could not record the intent before " + op + " (" + ex.Message + "): nothing was modified"); }
         }
 
         private void AuditOutcome(string op, string intent, List<UnitOutcome> outs)
@@ -551,21 +551,21 @@ namespace Bimbridge.Engine.Tasks
             if (Audit == null || intent == null) return;
             var extra = new Dictionary<string, object>
             {
-                ["tarea"] = _t.Id,
-                ["resultado"] = outs.Where(o => o != null).GroupBy(o => o.State).ToDictionary(g => g.Key, g => (object)(long)g.Count()),
+                ["task"] = _t.Id,
+                ["result"] = outs.Where(o => o != null).GroupBy(o => o.State).ToDictionary(g => g.Key, g => (object)(long)g.Count()),
             };
-            try { Audit.Outcome(_owner, op, intent, "resultado", extra); }
+            try { Audit.Outcome(_owner, op, intent, "result", extra); }
             catch (JournalUnavailableException ex)
             {
-                // Lo ejecutado ya está en unidades.jsonl; la intención sin resultado aparece en AuditLog.PendingIntents para reconciliar.
-                throw new AuditUnavailableException("la operación terminó y está en el registro de unidades, pero su resultado no quedó en la auditoría (" + ex.Message +
-                                                    "); intención " + intent + " pendiente de reconciliar. La tarea se detuvo.");
+                // What ran is already in unidades.jsonl; the intent without an outcome appears in AuditLog.PendingIntents for reconciliation.
+                throw new AuditUnavailableException("the operation finished and is in the unit log, but its outcome did not reach the audit (" + ex.Message +
+                                                    "); intent " + intent + " pending reconciliation. The task stopped.");
             }
         }
 
         public sealed class LeaseLostException : Exception { public LeaseLostException(string m) : base(m) { } }
 
-        /// <summary>Punto de autoridad antes de cada lote/barrera: valida dueño+fencing y renueva si toca. Falla → LeaseLostException (no se escribe).</summary>
+        /// <summary>Authority point before each batch/barrier: validates owner+fencing and renews when due. Failure → LeaseLostException (nothing is written).</summary>
         private void RenewLease()
         {
             if (_checkpointError != null) throw new CheckpointException(_checkpointError);
@@ -574,22 +574,22 @@ namespace Bimbridge.Engine.Tasks
             {
                 bool ok;
                 try { ok = _store.RenewLease(_t.Id, _owner, _fencing, LeaseTtl, now); }
-                catch (TaskStore.LeaseStoreException ex) { throw new LeaseLostException("renovación imposible: " + ex.Message); }
-                if (!ok) throw new LeaseLostException("otra instancia tomó la tarea o el lease venció (fencing " + _fencing + ")");
+                catch (TaskStore.LeaseStoreException ex) { throw new LeaseLostException("renewal impossible: " + ex.Message); }
+                if (!ok) throw new LeaseLostException("another instance took the task or the lease expired (fencing " + _fencing + ")");
                 if (_docLeaseId != null)
                 {
                     bool dok;
                     try { dok = DocLeases.RenewLease(_docLeaseId, _owner + "|" + _t.Id, _docFencing, LeaseTtl, now); }
-                    catch (TaskStore.LeaseStoreException ex) { throw new LeaseLostException("exclusión del documento: " + ex.Message); }
-                    if (!dok) throw new LeaseLostException("se perdió la exclusión del documento (fencing " + _docFencing + ")");
+                    catch (TaskStore.LeaseStoreException ex) { throw new LeaseLostException("document exclusion: " + ex.Message); }
+                    if (!dok) throw new LeaseLostException("document exclusion was lost (fencing " + _docFencing + ")");
                 }
                 _lastLease = now;
                 return;
             }
             if (!_store.ValidateOwnership(_t.Id, _owner, _fencing, now))
-                throw new LeaseLostException("validación de propiedad fallida (fencing " + _fencing + ")");
+                throw new LeaseLostException("ownership validation failed (fencing " + _fencing + ")");
             if (_docLeaseId != null && !DocLeases.ValidateOwnership(_docLeaseId, _owner + "|" + _t.Id, _docFencing, now))
-                throw new LeaseLostException("se perdió la exclusión del documento (fencing " + _docFencing + ")");
+                throw new LeaseLostException("document exclusion was lost (fencing " + _docFencing + ")");
         }
 
         private long Count(string state) => _units.Units.Values.LongCount(u => u.State == state);
@@ -598,7 +598,7 @@ namespace Bimbridge.Engine.Tasks
         {
             _t.State = state;
             _t.Reason = reason;
-            // Un fallo aquí ya quedó marcado (Durable=false, _checkpointError); el siguiente punto de autoridad detiene la tarea.
+            // A failure here is already flagged (Durable=false, _checkpointError); the next authority point stops the task.
             try { Checkpoint(); } catch (CheckpointException) { }
         }
 
@@ -613,10 +613,10 @@ namespace Bimbridge.Engine.Tasks
             }
             catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException)
             {
-                // R07: nunca se declara durable lo que sólo está en memoria. Se marca, se avisa y el siguiente punto de autoridad detiene la tarea.
+                // R07: what is only in memory is never declared durable. It is flagged, reported, and the next authority point stops the task.
                 _checkpointError = ex.Message;
                 _t.Durable = false;
-                _t.Reason = (_t.Reason == null ? "" : _t.Reason + " | ") + "checkpoint NO guardado: " + ex.Message;
+                _t.Reason = (_t.Reason == null ? "" : _t.Reason + " | ") + "checkpoint NOT saved: " + ex.Message;
                 _changed(_t);
                 throw new CheckpointException(ex.Message);
             }

@@ -7,11 +7,11 @@ using System.Linq;
 namespace Bimbridge.Engine.Workflows
 {
     /// <summary>
-    /// AUD-20: congelación y recuperación de las expectativas de un intento de Copy/Monitor. Sin Revit: el add-in aporta lo leído.
-    ///  - <see cref="Freeze"/> (preflight): guarda una sola vez inventario del anfitrión + expectativas. Si el intento ya existe,
-    ///    devuelve lo congelado y las diferencias con lo que se ve ahora; nunca lo sustituye.
-    ///  - <see cref="Load"/> (verificar): devuelve lo congelado y las diferencias con el estado actual. Si alguna altera el objetivo
-    ///    (<see cref="Result.Conflict"/>), no se debe verificar contra expectativas nuevas: se informa el conflicto.
+    /// AUD-20: freezing and retrieval of the expectations of a Copy/Monitor attempt. No Revit: the add-in supplies what it read.
+    ///  - <see cref="Freeze"/> (preflight): saves the host inventory + expectations exactly once. If the attempt already exists,
+    ///    returns what was frozen and the differences from what is seen now; it never replaces it.
+    ///  - <see cref="Load"/> (verify): returns what was frozen and the differences from the current state. If any alters the target
+    ///    (<see cref="Result.Conflict"/>), do not verify against new expectations: the conflict is reported.
     /// </summary>
     public static class CopyMonitorFlow
     {
@@ -33,7 +33,7 @@ namespace Bimbridge.Engine.Workflows
             return r;
         }
 
-        /// <param name="mappingGiven">false si quien verifica no indicó mapeo ni exclusiones: se usan los congelados (no es un cambio).</param>
+        /// <param name="mappingGiven">false if the verifier gave no mapping or exclusions: the frozen ones are used (not a change).</param>
         public static Result Load(ReceiptStore store, string attemptKey, CopyMonitorExpectations now, bool mappingGiven)
         {
             var b = store.LoadBaseline(attemptKey);
@@ -47,7 +47,7 @@ namespace Bimbridge.Engine.Workflows
         private static CopyMonitorExpectations Parse(ReceiptStore.Baseline b, string key)
         {
             if (string.IsNullOrEmpty(b.Expectations))
-                throw new InvalidDataException("el intento " + key + " se inició sin expectativas congeladas (versión anterior): inicie un intento nuevo con otra clave=");
+                throw new InvalidDataException("attempt " + key + " was started without frozen expectations (older version): start a new attempt with another key=");
             return CopyMonitorExpectations.FromText(b.Expectations);
         }
     }

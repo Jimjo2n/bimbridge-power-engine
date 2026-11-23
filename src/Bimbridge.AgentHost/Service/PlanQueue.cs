@@ -9,25 +9,25 @@ using System.Threading.Tasks;
 namespace Bimbridge.AgentHost
 {
     /// <summary>
-    /// alpha3 (P1-B): cola de planes del servicio con UN estado por plan bajo un candado.
-    /// Garantías: (1) un plan nunca se ejecuta dos veces a la vez en este servicio; (2) un Enqueue que llega durante la ejecución
-    /// no se pierde: se repite al terminar; (3) encolar algo ya en cola es idempotente y no consume capacidad.
-    /// Causa raíz del defecto anterior: el id se quitaba de "_queued" antes de ocupar "_slots"; un Enqueue en ese hueco o durante
-    /// la ejecución lo volvía a meter en la cola, otro trabajador lo sacaba, no podía ocupar el slot y lo descartaba sin aviso.
+    /// alpha3 (P1-B): the service's plan queue with ONE state per plan under a lock.
+    /// Guarantees: (1) a plan never runs twice at once in this service; (2) an Enqueue that arrives during the run
+    /// is not lost: it is repeated when the run ends; (3) enqueuing something already queued is idempotent and uses no capacity.
+    /// Root cause of the earlier defect: the id was removed from "_queued" before taking "_slots"; an Enqueue in that gap or during
+    /// the run put it back in the queue, another worker took it, could not take the slot and dropped it without warning.
     /// </summary>
     public sealed class PlanQueue
     {
-        private enum St { EnCola, Ejecutando, EjecutandoYRepetir }
+        private enum St { Queued, Running, RunningThenRerun }
         private readonly Dictionary<string, St> _q = new Dictionary<string, St>(StringComparer.Ordinal);
         private readonly object _lock = new object();
         private readonly Channel<string> _ch;
-        public Action<string, string> OnLost;   // (plan, motivo): reprogramación que no cupo en la cola
+        public Action<string, string> OnLost;   // (plan, reason): a reschedule that did not fit in the queue
 
         public PlanQueue(int capacity) =>
             _ch = Channel.CreateBounded<string>(new BoundedChannelOptions(Math.Max(1, capacity)) { FullMode = BoundedChannelFullMode.Wait, SingleReader = false });
 
-        public int Queued { get { lock (_lock) return _q.Values.Count(v => v == St.EnCola); } }
-        public bool IsRunning(string id) { lock (_lock) return _q.TryGetValue(id, out var s) && s != St.EnCola; }
+        public int Queued { get { lock (_lock) return _q.Values.Count(v => v == St.Queued); } }
+        public bool IsRunning(string id) { lock (_lock) return _q.TryGetValue(id, out var s) && s != St.Queued; }
 
         public bool Enqueue(string id)
         {
@@ -35,16 +35,16 @@ namespace Bimbridge.AgentHost
             {
                 if (_q.TryGetValue(id, out var st))
                 {
-                    if (st == St.Ejecutando) _q[id] = St.EjecutandoYRepetir;
+                    if (st == St.Running) _q[id] = St.RunningThenRerun;
                     return true;
                 }
                 if (!_ch.Writer.TryWrite(id)) return false;
-                _q[id] = St.EnCola;
+                _q[id] = St.Queued;
                 return true;
             }
         }
 
-        /// <summary>Bucle de trabajador: toma un plan, lo ejecuta y lo libera (re-encolándolo si hubo un Enqueue mientras corría).</summary>
+        /// <summary>Worker loop: takes a plan, runs it and releases it (re-enqueuing it if an Enqueue arrived while it ran).</summary>
         public async Task WorkerLoop(Action<string> run, CancellationToken stop)
         {
             try
@@ -54,8 +54,8 @@ namespace Bimbridge.AgentHost
                     if (!_ch.Reader.TryRead(out var id)) continue;
                     lock (_lock)
                     {
-                        if (!_q.TryGetValue(id, out var st) || st != St.EnCola) { OnLost?.Invoke(id, "cola_inconsistente"); continue; }
-                        _q[id] = St.Ejecutando;
+                        if (!_q.TryGetValue(id, out var st) || st != St.Queued) { OnLost?.Invoke(id, "inconsistent_queue"); continue; }
+                        _q[id] = St.Running;
                     }
                     try { run(id); }
                     finally { Release(id, stop); }
@@ -69,11 +69,11 @@ namespace Bimbridge.AgentHost
             bool again;
             lock (_lock)
             {
-                again = _q.TryGetValue(id, out var st) && st == St.EjecutandoYRepetir && !stop.IsCancellationRequested;
+                again = _q.TryGetValue(id, out var st) && st == St.RunningThenRerun && !stop.IsCancellationRequested;
                 _q.Remove(id);
-                if (again && _ch.Writer.TryWrite(id)) { _q[id] = St.EnCola; return; }
+                if (again && _ch.Writer.TryWrite(id)) { _q[id] = St.Queued; return; }
             }
-            if (again) OnLost?.Invoke(id, "cola llena; se recupera al reiniciar o con reanudar");
+            if (again) OnLost?.Invoke(id, "queue full; recovered on restart or with resume");
         }
     }
 }

@@ -10,10 +10,10 @@ using Bimbridge.Protocol;
 namespace BimBridge.PowerEngine
 {
     /// <summary>
-    /// Benchmark del Power Engine (sin Revit): C# frente a Rust FFI y Rust IPC por trabajo y tamaño, Python frente a .NET en DOCX,
-    /// coste fijo de cada vía y eficiencia de texto (descubrimiento bajo demanda y lote frente a llamadas sueltas).
-    /// Mide; no supone. La calibración (a partir de qué n gana Rust FFI) sale de estos números.
-    /// Los "tokens" son ESTIMADOS (caracteres/4): sin contador del cliente no hay tokens reales y se dice así.
+    /// Power Engine benchmark (no Revit): C# vs Rust FFI and Rust IPC per job and size, Python vs .NET on DOCX,
+    /// fixed cost of each path and text efficiency (on-demand discovery and batch vs individual calls).
+    /// It measures; it does not assume. The calibration (from which n Rust FFI wins) comes from these numbers.
+    /// "Tokens" are ESTIMATED (characters/4): without the client's counter there are no real tokens, and it says so.
     /// </summary>
     public static class PowerEngineBench
     {
@@ -42,15 +42,15 @@ namespace BimBridge.PowerEngine
                     foreach (var n in job == "segment_contacts" ? s.SegmentSizes : s.Sizes)
                     {
                         var input = Input(job, n);
-                        var row = new Dictionary<string, object> { ["trabajo"] = job, ["n"] = (long)n };
+                        var row = new Dictionary<string, object> { ["job"] = job, ["n"] = (long)n };
                         string reference = null;
                         foreach (var e in engines)
                         {
-                            // IPC con 100 000 puntos en JSON mide sobre todo serialización: se limita para no alargar la campaña
+                            // IPC with 100,000 points in JSON mostly measures serialization: capped so the campaign does not drag on
                             if (e == "rust_ipc" && n > 20000) { row[e] = null; continue; }
                             var pe = pes[e];
                             string sig = null;
-                            Exec(pe, job, input, out sig);                         // calentamiento (JIT, arranque del proceso IPC)
+                            Exec(pe, job, input, out sig);                         // warm-up (JIT, IPC process startup)
                             var times = new List<double>();
                             for (var r = 0; r < s.Rounds; r++)
                             {
@@ -62,7 +62,7 @@ namespace BimBridge.PowerEngine
                             var m = times[times.Count / 2];
                             med[(job, e, n)] = m;
                             row[e] = Math.Round(m, 3);
-                            if (reference == null) reference = sig; else if (sig != reference) row["diferencia_" + e] = "resultado distinto de C#";
+                            if (reference == null) reference = sig; else if (sig != reference) row["difference_" + e] = "result differs from C#";
                         }
                         if (row.TryGetValue("rust_ffi", out var f) && f != null) row["rust_ffi_vs_csharp"] = Math.Round(med[(job, "csharp", n)] / med[(job, "rust_ffi", n)], 2);
                         geo.Add(row);
@@ -70,38 +70,38 @@ namespace BimBridge.PowerEngine
                 var cal = Calibrate(med, engines.Contains("rust_ffi"), s);
                 var d = new Dictionary<string, object>
                 {
-                    ["fecha_utc"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
-                    ["equipo"] = new Dictionary<string, object> { ["os"] = System.Runtime.InteropServices.RuntimeInformation.OSDescription, ["cpus"] = (long)Environment.ProcessorCount, ["dotnet"] = Environment.Version.ToString() },
-                    ["rondas"] = (long)s.Rounds, ["motores"] = engines.Cast<object>().ToList(),
-                    ["geometria_ms_mediana"] = geo,
-                    ["coste_fijo_ms"] = FixedCost(pes),
-                    ["calibracion"] = cal.ToJson(),
-                    ["documentos"] = Docs(s),
-                    ["texto"] = TextEfficiency(),
+                    ["date_utc"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
+                    ["machine"] = new Dictionary<string, object> { ["os"] = System.Runtime.InteropServices.RuntimeInformation.OSDescription, ["cpus"] = (long)Environment.ProcessorCount, ["dotnet"] = Environment.Version.ToString() },
+                    ["rounds"] = (long)s.Rounds, ["engines"] = engines.Cast<object>().ToList(),
+                    ["geometry_ms_median"] = geo,
+                    ["fixed_cost_ms"] = FixedCost(pes),
+                    ["calibration"] = cal.ToJson(),
+                    ["documents"] = Docs(s),
+                    ["text"] = TextEfficiency(),
                 };
                 return d;
             }
             finally { foreach (var p in pes.Values) p.Dispose(); }
         }
 
-        /// <summary>n mínimo medido a partir del cual Rust FFI gana a C# en ese y en todos los tamaños mayores; si no, C# siempre.</summary>
+        /// <summary>Smallest measured n from which Rust FFI beats C# at that size and at all larger sizes; otherwise, always C#.</summary>
         public static Calibration Calibrate(Dictionary<(string job, string eng, int n), double> med, bool haveFfi, Settings s)
         {
             var c = Calibration.Default();
-            if (!haveFfi) { c.Source = "sin Rust FFI: C# siempre"; foreach (var j in Jobs) c.RustFfiFrom[j] = int.MaxValue; return c; }
+            if (!haveFfi) { c.Source = "no Rust FFI: always C#"; foreach (var j in Jobs) c.RustFfiFrom[j] = int.MaxValue; return c; }
             foreach (var job in Jobs)
             {
                 var sizes = (job == "segment_contacts" ? s.SegmentSizes : s.Sizes).OrderBy(x => x).ToList();
                 var from = int.MaxValue;
                 for (var i = sizes.Count - 1; i >= 0; i--)
                 {
-                    // margen del 10 %: un empate técnico no justifica cruzar la frontera FFI
+                    // 10 % margin: a statistical tie does not justify crossing the FFI boundary
                     if (med.TryGetValue((job, "rust_ffi", sizes[i]), out var r) && med.TryGetValue((job, "csharp", sizes[i]), out var cs) && r * 1.1 < cs) from = sizes[i];
                     else break;
                 }
                 c.RustFfiFrom[job] = from;
             }
-            c.Source = "medida " + DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + ", " + Environment.ProcessorCount + " CPU";
+            c.Source = "measured " + DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + ", " + Environment.ProcessorCount + " CPU";
             return c;
         }
 
@@ -130,22 +130,22 @@ namespace BimBridge.PowerEngine
                 if (s.DocxPath != null && File.Exists(s.DocxPath))
                 {
                     var dir = new[] { Path.GetDirectoryName(Path.GetFullPath(s.DocxPath)) };
-                    var args = new Dictionary<string, object> { ["ruta"] = s.DocxPath };
+                    var args = new Dictionary<string, object> { ["path"] = s.DocxPath };
                     d["docx_dotnet_ms"] = Median(() => py.Document("docx_extract", args, dir, preferDotNet: true), s.Rounds);
                     if (py.PythonConfigured)
                     {
                         var sw = Stopwatch.StartNew();
                         var first = py.Document("docx_extract", args, dir);
-                        d["python_arranque_y_primer_trabajo_ms"] = Math.Round(sw.Elapsed.TotalMilliseconds, 1);
-                        d["docx_python_ms"] = first.Ok ? Median(() => py.Document("docx_extract", args, dir), s.Rounds) : (object)("no disponible: " + first.Error);
+                        d["python_startup_and_first_job_ms"] = Math.Round(sw.Elapsed.TotalMilliseconds, 1);
+                        d["docx_python_ms"] = first.Ok ? Median(() => py.Document("docx_extract", args, dir), s.Rounds) : (object)("not available: " + first.Error);
                     }
-                    else d["docx_python_ms"] = "Python no configurado";
+                    else d["docx_python_ms"] = "Python not configured";
                 }
                 if (s.PdfPath != null && File.Exists(s.PdfPath) && py.PythonConfigured)
                 {
                     var dir = new[] { Path.GetDirectoryName(Path.GetFullPath(s.PdfPath)) };
                     foreach (var job in new[] { "pdf_info", "pdf_extract", "pdf_tables", "pdf_symbols", "pdf_grids" })
-                        d[job + "_ms"] = Median(() => py.Document(job, new Dictionary<string, object> { ["ruta"] = s.PdfPath }, dir), s.Rounds);
+                        d[job + "_ms"] = Median(() => py.Document(job, new Dictionary<string, object> { ["path"] = s.PdfPath }, dir), s.Rounds);
                 }
             }
             finally { py.Dispose(); }
@@ -167,39 +167,39 @@ namespace BimBridge.PowerEngine
         }
 
         /// <summary>
-        /// Texto que lee y escribe la IA (estimación caracteres/4 = tokens ESTIMADOS):
-        ///  - descubrimiento: búsqueda breve + una ficha frente al catálogo completo;
-        ///  - colocación de N elementos: un lote "place" frente a N órdenes sueltas (mismo contenido, distinto número de llamadas).
+        /// Text the AI reads and writes (estimate characters/4 = ESTIMATED tokens):
+        ///  - discovery: brief search + one card vs the full catalog;
+        ///  - placement of N elements: one "place" batch vs N individual commands (same content, different number of calls).
         /// </summary>
         public static Dictionary<string, object> TextEfficiency(int n = 72)
         {
             var full = Json.Write(PowerEngineCapabilityRegistry.All.Select(e => (object)e.Full()).ToList());
-            var search = Json.Write(PowerEngineCapabilityRegistry.Search("pdf simbolo", 8).Select(e => (object)e.Brief()).ToList());
+            var search = Json.Write(PowerEngineCapabilityRegistry.Search("pdf symbol", 8).Select(e => (object)e.Brief()).ToList());
             var one = Json.Write(PowerEngineCapabilityRegistry.Describe("pdf.symbols").Full());
             var pts = Enumerable.Range(0, n).Select(i => (object)new List<object> { Math.Round(10 + i * 3.25, 4), Math.Round(20 + (i % 9) * 4.5, 4) }).ToList();
-            var batch = "plan " + Json.Write(new Dictionary<string, object> { ["op"] = "place", ["type"] = "LTG_DOWNLIGHT-SURFACE - ROUND: D", ["level"] = "LEVEL 09", ["puntos"] = pts, ["montaje"] = "losa", ["ws"] = "LIGHTING - DIST" });
-            var single = pts.Select(p => "plan " + Json.Write(new Dictionary<string, object> { ["op"] = "place", ["type"] = "LTG_DOWNLIGHT-SURFACE - ROUND: D", ["level"] = "LEVEL 09", ["puntos"] = new List<object> { p }, ["montaje"] = "losa", ["ws"] = "LIGHTING - DIST" })).ToList();
+            var batch = "plan " + Json.Write(new Dictionary<string, object> { ["op"] = "place", ["type"] = "LTG_DOWNLIGHT-SURFACE - ROUND: D", ["level"] = "LEVEL 09", ["points"] = pts, ["mounting"] = "slab", ["ws"] = "LIGHTING - DIST" });
+            var single = pts.Select(p => "plan " + Json.Write(new Dictionary<string, object> { ["op"] = "place", ["type"] = "LTG_DOWNLIGHT-SURFACE - ROUND: D", ["level"] = "LEVEL 09", ["points"] = new List<object> { p }, ["mounting"] = "slab", ["ws"] = "LIGHTING - DIST" })).ToList();
             long Tok(long chars) => (chars + 3) / 4;
             return new Dictionary<string, object>
             {
-                ["metodo"] = "tokens ESTIMADOS = caracteres/4; no son tokens reales del cliente",
-                ["descubrimiento"] = new Dictionary<string, object>
+                ["method"] = "ESTIMATED tokens = characters/4; not the client's real tokens",
+                ["discovery"] = new Dictionary<string, object>
                 {
-                    ["catalogo_completo_chars"] = (long)full.Length, ["busqueda_mas_ficha_chars"] = (long)(search.Length + one.Length),
-                    ["tokens_estimados_catalogo"] = Tok(full.Length), ["tokens_estimados_bajo_demanda"] = Tok(search.Length + one.Length),
-                    ["reduccion_pct"] = Math.Round(100.0 * (1 - (double)(search.Length + one.Length) / full.Length), 1),
+                    ["full_catalog_chars"] = (long)full.Length, ["search_plus_card_chars"] = (long)(search.Length + one.Length),
+                    ["catalog_estimated_tokens"] = Tok(full.Length), ["on_demand_estimated_tokens"] = Tok(search.Length + one.Length),
+                    ["reduction_pct"] = Math.Round(100.0 * (1 - (double)(search.Length + one.Length) / full.Length), 1),
                 },
-                ["colocacion_" + n] = new Dictionary<string, object>
+                ["placement_" + n] = new Dictionary<string, object>
                 {
-                    ["lote_chars"] = (long)batch.Length, ["lote_llamadas"] = 1L,
-                    ["sueltas_chars"] = (long)single.Sum(x => x.Length), ["sueltas_llamadas"] = (long)n,
-                    ["reduccion_chars_pct"] = Math.Round(100.0 * (1 - (double)batch.Length / single.Sum(x => x.Length)), 1),
-                    ["nota"] = "cada llamada suelta añade además la respuesta y el razonamiento de un turno de la IA; aquí sólo se cuenta la orden",
+                    ["batch_chars"] = (long)batch.Length, ["batch_calls"] = 1L,
+                    ["single_chars"] = (long)single.Sum(x => x.Length), ["single_calls"] = (long)n,
+                    ["chars_reduction_pct"] = Math.Round(100.0 * (1 - (double)batch.Length / single.Sum(x => x.Length)), 1),
+                    ["note"] = "each individual call also adds the response and reasoning of one AI turn; only the command is counted here",
                 },
             };
         }
 
-        // ---------------- entradas deterministas ----------------
+        // ---------------- deterministic inputs ----------------
 
         private sealed class In { public double[] A, B; public int[] E; public int Nodes; }
 
