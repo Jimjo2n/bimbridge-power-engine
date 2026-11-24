@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.6 experimental
+
+- Installer: fixed the endless "file in use" dialog at the end of an update. The installer no longer tries to recycle itself when it runs from Downloads or Desktop.
+
 ## 0.9.5 experimental
 
 - feat(ui): **Copy selection ID** ribbon button. Select elements in Revit, press it and paste into Claude or Codex: the text names the document, the categories and the ids, and gives a `$sel-xxxxxxxxxxxx` reference that every BIMBRIDGE command accepts (queries, plans, geo, audits, tools) from any conversation while Revit is open. An expired reference tells the AI to ask you to copy it again.
