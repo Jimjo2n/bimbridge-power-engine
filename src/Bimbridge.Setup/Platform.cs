@@ -221,7 +221,7 @@ namespace Bimbridge.Setup
             {
                 core.CacheSetup(self, ProductVersion, prev);
                 var found = Updates.Scan(Updates.Folders(p, extraFolders).Where(f => !string.Equals(f, p.UpdatesDir, StringComparison.OrdinalIgnoreCase)), p.UpdatesTemp);
-                foreach (var f in Updates.Superseded(found, Updates.Parse(ProductVersion), p.UpdatesDir))
+                foreach (var f in Updates.Superseded(found, Updates.Parse(ProductVersion), p.UpdatesDir, self))
                     if (Recycle(f)) recycled.Add(f);
             }
             catch (Exception) { }

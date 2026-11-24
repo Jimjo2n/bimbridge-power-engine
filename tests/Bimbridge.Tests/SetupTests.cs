@@ -433,6 +433,20 @@ namespace Bimbridge.Tests
         }
 
         [Fact]
+        public void Superseded_NeverIncludesTheRunningInstaller()
+        {
+            var p = Paths();
+            var self = Path.Combine(p.Downloads, "Bimbridge.Setup.exe");
+            FakeExe(self, "0.2.3");
+            FakeExe(Path.Combine(p.Downloads, "Bimbridge.Setup (1).exe"), "0.2.2");
+
+            var found = Updates.Scan(Updates.Folders(p), p.UpdatesTemp);
+            var old = Updates.Superseded(found, new Version(0, 2, 3), p.UpdatesDir, self);
+            Assert.Single(old);                                        // only the older copy, not the one that is running
+            Assert.EndsWith("(1).exe", old[0]);
+        }
+
+        [Fact]
         public void CacheSetup_KeepsCurrentAndPrevious()
         {
             var p = Paths();

@@ -164,11 +164,13 @@ namespace Bimbridge.Setup
         /// Installers already superseded by <paramref name="installed"/> in the user's folders (not in our own cache),
         /// to send them to the Recycle Bin after updating. This way copies do not pile up in Downloads.
         /// </summary>
-        public static List<string> Superseded(IEnumerable<UpdateCandidate> found, Version installed, string cacheDir)
+        public static List<string> Superseded(IEnumerable<UpdateCandidate> found, Version installed, string cacheDir, string running = null)
         {
             installed = Normalize(installed);
+            // The installer that is running right now is locked: recycling it only raises the "file in use" dialog.
             return found.Where(c => c.Version <= installed)
                         .Select(c => c.Source)
+                        .Where(s => running == null || !string.Equals(Path.GetFullPath(s), Path.GetFullPath(running), StringComparison.OrdinalIgnoreCase))
                         .Where(s => cacheDir == null || !Path.GetFullPath(s).StartsWith(Path.GetFullPath(cacheDir), StringComparison.OrdinalIgnoreCase))
                         .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
