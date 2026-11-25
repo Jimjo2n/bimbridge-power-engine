@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.7 experimental
+
+- Updater (patch for 0.9.6): the update now installs immediately and loads on the next Revit start, as the Update button promises. It no longer waits for every Revit process to exit, which never finished when a windowless Revit stayed alive.
+
 ## 0.9.6 experimental
 
 - Installer: fixed the endless "file in use" dialog at the end of an update. The installer no longer tries to recycle itself when it runs from Downloads or Desktop.

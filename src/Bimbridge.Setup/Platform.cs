@@ -346,9 +346,8 @@ namespace Bimbridge.Setup
         private static int Update(CommandLine c, SetupPaths paths, SetupCore core)
         {
             using var installation = Platform.LockInstallation(paths);
-            if (Platform.RevitRunning())
-                Report(paths, Platform.WaitingForRevit, "Update pending. Close all Revit windows to apply it. Open Revit after the install finishes.");
-            if (!Platform.WaitForRevitExit()) return Report(paths, 2, "The wait ended with Revit still open.");
+            // Files in use are replaced by renaming (AllowInUse): the update installs now and loads on the next Revit start.
+            // Waiting for every "Revit" process to exit never ended when a windowless Revit (another tool's) stayed alive.
             Platform.MigrateLegacyData(paths, Console.WriteLine);
             var before = core.ReadInstalled();
             if (before == null || before.Versions.Count == 0) return Report(paths, 3, "There is no previous install: use the normal installer.");
